@@ -1,0 +1,4 @@
+ALTER TABLE "invitaciones_usuarios" ADD COLUMN "rol_id" uuid;--> statement-breakpoint
+ALTER TABLE "invitaciones_usuarios" ADD COLUMN "sucursal_id" uuid;--> statement-breakpoint
+ALTER TABLE "invitaciones_usuarios" ADD CONSTRAINT "invitaciones_usuarios_rol_id_cat_roles_id_fk" FOREIGN KEY ("rol_id") REFERENCES "public"."cat_roles"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "invitaciones_usuarios" ADD CONSTRAINT "invitaciones_usuarios_sucursal_id_sucursales_id_fk" FOREIGN KEY ("sucursal_id") REFERENCES "public"."sucursales"("id") ON DELETE no action ON UPDATE no action;
