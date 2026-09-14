@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { productos } from "@/db/schema/catalogs";
-import { requireOrganizationAccess } from "@/lib/auth/access";
+import { checkPermission } from "@/lib/auth/authorization";
 
 const productSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -30,7 +30,9 @@ export async function saveProduct(_previousState: ProductActionState, formData: 
   const result = productSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa los datos del producto." };
   const input = result.data;
-  const { user } = await requireOrganizationAccess(input.organizacionId);
+  const access = await checkPermission(input.organizacionId, "catalogos.editar");
+  if (!access) return { error: "No tienes permiso para editar catálogos." };
+  const { user } = access;
   const db = getDatabase();
   const conditions = [eq(productos.organizacionId, input.organizacionId), eq(productos.sku, input.sku)];
   if (input.id) conditions.push(ne(productos.id, input.id));
@@ -64,7 +66,9 @@ export async function toggleProduct(formData: FormData) {
   const organizationId = String(formData.get("organizacionId") ?? "");
   const id = String(formData.get("id") ?? "");
   const active = formData.get("activo") === "true";
-  const { user } = await requireOrganizationAccess(organizationId);
+  const access = await checkPermission(organizationId, "catalogos.editar");
+  if (!access) return;
+  const { user } = access;
   const db = getDatabase();
   await db.update(productos).set({ activo: !active, updatedBy: user.id }).where(and(eq(productos.id, id), eq(productos.organizacionId, organizationId)));
   revalidatePath("/admin/productos");

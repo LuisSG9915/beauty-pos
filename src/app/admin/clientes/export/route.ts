@@ -2,7 +2,7 @@ import { asc, eq } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
 import { clientes } from "@/db/schema/core";
-import { requireOrganizationAccess } from "@/lib/auth/access";
+import { hasPermission, resolveAccess } from "@/lib/auth/authorization";
 
 function escapeCsv(value: unknown) {
   const text = value == null ? "" : String(value);
@@ -17,7 +17,10 @@ export async function GET(request: Request) {
     return Response.json({ error: "organizationId es requerido" }, { status: 400 });
   }
 
-  await requireOrganizationAccess(organizationId);
+  const access = await resolveAccess(organizationId);
+  if (!hasPermission(access, "clientes.ver")) {
+    return Response.json({ error: "Sin permiso para exportar clientes" }, { status: 403 });
+  }
   const db = getDatabase();
   const rows = await db
     .select({

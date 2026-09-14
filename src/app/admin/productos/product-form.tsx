@@ -2,9 +2,11 @@
 
 import { useActionState } from "react";
 
+import { saveProduct, type ProductActionState } from "@/app/admin/productos/actions";
 import { FormTabs } from "@/components/form-tabs";
 import { Button } from "@/components/ui/button";
-import { saveProduct, type ProductActionState } from "@/app/admin/productos/actions";
+import { Field, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
+import { ActionFeedback } from "@/components/ui/toast";
 
 type ProductData = {
   id?: string;
@@ -41,58 +43,58 @@ export function ProductForm({
 
   const general = (
     <div className="grid gap-4 sm:grid-cols-2">
-      <label className="space-y-2">
-        <span className="text-sm font-medium">SKU *</span>
-        <input className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={String(value("sku"))} name="sku" placeholder="SHAMPOO-001" required />
-      </label>
-      <label className="space-y-2">
-        <span className="text-sm font-medium">Código de barras</span>
-        <input className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={String(value("codigoBarras"))} name="codigoBarras" placeholder="7501234567890" />
-      </label>
-      <label className="space-y-2 sm:col-span-2">
-        <span className="text-sm font-medium">Nombre *</span>
-        <input className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={String(value("nombre"))} name="nombre" placeholder="Shampoo reparador 300ml" required />
-      </label>
-      <label className="space-y-2">
-        <span className="text-sm font-medium">Categoría</span>
-        <select className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={String(value("categoriaId"))} name="categoriaId">
+      <Field>
+        <FieldLabel required>SKU</FieldLabel>
+        <Input defaultValue={String(value("sku"))} name="sku" placeholder="SHAMPOO-001" required />
+      </Field>
+      <Field>
+        <FieldLabel>Código de barras</FieldLabel>
+        <Input defaultValue={String(value("codigoBarras"))} name="codigoBarras" placeholder="7501234567890" />
+      </Field>
+      <Field className="sm:col-span-2">
+        <FieldLabel required>Nombre</FieldLabel>
+        <Input defaultValue={String(value("nombre"))} name="nombre" placeholder="Shampoo reparador 300ml" required />
+      </Field>
+      <Field>
+        <FieldLabel>Categoría</FieldLabel>
+        <Select defaultValue={String(value("categoriaId"))} name="categoriaId">
           <option value="">Sin categoría</option>
           {categories.map((category) => <option key={category.id} value={category.id}>{category.nombre}</option>)}
-        </select>
-      </label>
-      <label className="space-y-2">
-        <span className="text-sm font-medium">Unidad de medida</span>
-        <select className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={String(value("unidadMedidaId"))} name="unidadMedidaId">
+        </Select>
+      </Field>
+      <Field>
+        <FieldLabel>Unidad de medida</FieldLabel>
+        <Select defaultValue={String(value("unidadMedidaId"))} name="unidadMedidaId">
           <option value="">Sin unidad</option>
           {units.map((unit) => <option key={unit.id} value={unit.id}>{unit.nombre}</option>)}
-        </select>
-      </label>
-      <label className="space-y-2">
-        <span className="text-sm font-medium">Tipo *</span>
-        <select className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={tipo} name="tipo">
+        </Select>
+      </Field>
+      <Field>
+        <FieldLabel required>Tipo</FieldLabel>
+        <Select defaultValue={tipo} name="tipo">
           <option value="producto">Producto (se vende)</option>
           <option value="insumo">Insumo (se consume)</option>
           <option value="ambos">Ambos (se vende y se consume)</option>
-        </select>
-      </label>
-      <label className="space-y-2 sm:col-span-2">
-        <span className="text-sm font-medium">Descripción</span>
-        <textarea className="min-h-24 w-full rounded-xl border border-[#ded8d2] bg-white px-3 py-2 text-sm" defaultValue={String(value("descripcion"))} name="descripcion" />
-      </label>
+        </Select>
+      </Field>
+      <Field className="sm:col-span-2">
+        <FieldLabel>Descripción</FieldLabel>
+        <Textarea defaultValue={String(value("descripcion"))} name="descripcion" />
+      </Field>
     </div>
   );
 
   const precios = (
     <div className="grid gap-4 sm:grid-cols-2">
-      <label className="space-y-2">
-        <span className="text-sm font-medium">Costo (MXN)</span>
-        <input className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={String(value("costo") || "0")} min="0" name="costo" placeholder="0.00" required step="0.01" type="number" />
-      </label>
-      <label className="space-y-2">
-        <span className="text-sm font-medium">Precio de venta (MXN)</span>
-        <input className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={String(value("precioVenta") || "0")} min="0" name="precioVenta" placeholder="0.00" required step="0.01" type="number" />
-      </label>
-      <label className="flex items-center gap-3 rounded-xl border border-[#eee8e3] p-3 text-sm sm:col-span-2">
+      <Field>
+        <FieldLabel required>Costo (MXN)</FieldLabel>
+        <Input defaultValue={String(value("costo") || "0")} min="0" name="costo" placeholder="0.00" required step="0.01" type="number" />
+      </Field>
+      <Field>
+        <FieldLabel required>Precio de venta (MXN)</FieldLabel>
+        <Input defaultValue={String(value("precioVenta") || "0")} min="0" name="precioVenta" placeholder="0.00" required step="0.01" type="number" />
+      </Field>
+      <label className="flex min-h-11 items-center gap-3 rounded-xl border border-[#eee8e3] p-3 text-sm sm:col-span-2">
         <input defaultChecked={initial ? initial.visiblePos : true} name="visiblePos" type="checkbox" value="true" /> Visible en POS
       </label>
       <p className="rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55] sm:col-span-2">
@@ -103,12 +105,12 @@ export function ProductForm({
 
   const inventario = (
     <div className="grid gap-4 sm:grid-cols-2">
-      <label className="space-y-2">
-        <span className="text-sm font-medium">Stock mínimo</span>
-        <input className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={String(value("stockMinimo") || "0")} min="0" name="stockMinimo" placeholder="0" required step="0.001" type="number" />
-      </label>
+      <Field>
+        <FieldLabel required>Stock mínimo</FieldLabel>
+        <Input defaultValue={String(value("stockMinimo") || "0")} min="0" name="stockMinimo" placeholder="0" required step="0.001" type="number" />
+      </Field>
       <p className="rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55] sm:col-span-2">
-        El stock por sucursal y los movimientos de inventario se gestionarán desde el módulo de inventario.
+        El stock por sucursal y los movimientos de inventario se gestionan desde el módulo de inventario.
       </p>
     </div>
   );
@@ -120,7 +122,7 @@ export function ProductForm({
   );
 
   return (
-    <form action={formAction} className="rounded-2xl border border-[#ded8d2] bg-white p-6 shadow-sm">
+    <form action={formAction} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
       <h2 className="text-xl font-semibold">{initial ? "Editar producto" : "Nuevo producto o insumo"}</h2>
@@ -135,9 +137,10 @@ export function ProductForm({
           ]}
         />
       </div>
-      {state.error ? <p className="mt-4 rounded-xl border border-[#edc8bd] bg-[#fff3ef] px-4 py-3 text-sm text-[#a8443a]" role="alert">{state.error}</p> : null}
-      {state.success ? <p className="mt-4 rounded-xl border border-[#cce5d2] bg-[#f1faf3] px-4 py-3 text-sm text-[#347052]" role="status">Producto guardado correctamente.</p> : null}
-      <Button className="mt-6 rounded-xl bg-[#8a5140] text-white hover:bg-[#704032]" disabled={pending} type="submit">{pending ? "Guardando..." : "Guardar producto"}</Button>
+      <div className="mt-4">
+        <ActionFeedback state={state} successMessage="Producto guardado correctamente." />
+      </div>
+      <Button className="mt-6 rounded-xl" disabled={pending} type="submit">{pending ? "Guardando…" : "Guardar producto"}</Button>
     </form>
   );
 }

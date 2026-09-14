@@ -13,12 +13,19 @@ export function ClientImport({ organizationId }: { organizationId: string }) {
     <form action={formAction} className="rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm">
       <input name="organizacionId" type="hidden" value={organizationId} />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><h2 className="font-semibold">Importar clientes</h2><p className="mt-1 text-sm text-[#625b55]">Carga un CSV guardado desde Excel.</p></div>
-        <div className="w-full md:max-w-md"><FileDropzone accept=".csv,text/csv" name="archivo" required /></div>
+        <div>
+          <h2 className="font-semibold">Importar clientes</h2>
+          <p className="mt-1 text-sm text-[#625b55]">Carga un CSV guardado desde Excel.</p>
+        </div>
+        <div className="w-full md:max-w-md">
+          <FileDropzone accept=".csv,text/csv" name="archivo" required />
+        </div>
       </div>
-      {state.error ? <p className="mt-3 text-sm text-[#a34e3b]" role="alert">{state.error}</p> : null}
-      {state.success ? <p className="mt-3 text-sm text-[#3d7b50]" role="status">{state.success}</p> : null}
-      <Button className="mt-4 rounded-xl" disabled={isPending} type="submit">{isPending ? "Importando..." : "Importar CSV"}</Button>
+      {state.error ? <p className="mt-3 text-sm text-destructive" role="alert">{state.error}</p> : null}
+      {state.success ? <p className="mt-3 text-sm text-success" role="status">{state.success}</p> : null}
+      <Button className="mt-4 rounded-xl" disabled={isPending} type="submit">
+        {isPending ? "Importando…" : "Importar CSV"}
+      </Button>
     </form>
   );
 }

@@ -1,37 +1,53 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { Tabs } from "@base-ui/react/tabs";
+import type { ReactNode } from "react";
 
-type FormTab = { id: string; label: string; content: ReactNode };
+import { cn } from "@/lib/utils";
 
-export function FormTabs({ tabs }: { tabs: FormTab[] }) {
-  const [active, setActive] = useState(tabs[0]?.id ?? "");
+export type FormTab = { id: string; label: string; content: ReactNode };
 
+/**
+ * Pestañas de formulario sobre Base UI Tabs: incluyen teclado
+ * (flechas, Home/End) y roles ARIA correctos.
+ */
+export function FormTabs({
+  tabs,
+  defaultValue,
+  className,
+}: {
+  tabs: FormTab[];
+  defaultValue?: string;
+  className?: string;
+}) {
   return (
-    <div>
-      <div className="flex gap-1 overflow-x-auto border-b border-[#eee8e3]" role="tablist">
+    <Tabs.Root
+      className={className}
+      defaultValue={defaultValue ?? tabs[0]?.id}
+    >
+      <Tabs.List
+        aria-label="Secciones del formulario"
+        className="flex gap-1 overflow-x-auto border-b border-[#eee8e3]"
+      >
         {tabs.map((tab) => (
-          <button
-            aria-controls={`panel-${tab.id}`}
-            aria-selected={tab.id === active}
-            className={tab.id === active ? "border-b-2 border-[#8a5140] px-3 py-3 text-sm font-semibold text-[#8a5140]" : "border-b-2 border-transparent px-3 py-3 text-sm font-medium text-[#625b55] hover:text-[#8a5140]"}
-            id={`tab-${tab.id}`}
+          <Tabs.Tab
+            className={cn(
+              "-mb-px min-h-10 shrink-0 border-b-2 border-transparent px-3 text-sm font-medium text-[#625b55] outline-none transition-colors select-none",
+              "hover:text-[#8a5140] focus-visible:text-[#8a5140]",
+              "data-[active]:border-[#8a5140] data-[active]:font-semibold data-[active]:text-[#8a5140]",
+            )}
             key={tab.id}
-            onClick={() => setActive(tab.id)}
-            role="tab"
-            type="button"
+            value={tab.id}
           >
             {tab.label}
-          </button>
+          </Tabs.Tab>
         ))}
-      </div>
-      <div className="pt-5">
-        {tabs.map((tab) => (
-          <div aria-hidden={tab.id !== active} aria-labelledby={`tab-${tab.id}`} hidden={tab.id !== active} id={`panel-${tab.id}`} key={tab.id} role="tabpanel">
-            {tab.content}
-          </div>
-        ))}
-      </div>
-    </div>
+      </Tabs.List>
+      {tabs.map((tab) => (
+        <Tabs.Panel className="pt-5" keepMounted key={tab.id} value={tab.id}>
+          {tab.content}
+        </Tabs.Panel>
+      ))}
+    </Tabs.Root>
   );
 }

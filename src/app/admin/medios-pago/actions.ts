@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { catMediosPago } from "@/db/schema/catalogs";
-import { requireOrganizationAccess } from "@/lib/auth/access";
+import { checkPermission } from "@/lib/auth/authorization";
 
 const paymentMethodSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -22,7 +22,9 @@ export async function savePaymentMethod(_previousState: PaymentMethodActionState
   const result = paymentMethodSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa el medio de pago." };
   const input = result.data;
-  const { user } = await requireOrganizationAccess(input.organizacionId);
+  const access = await checkPermission(input.organizacionId, "catalogos.editar");
+  if (!access) return { error: "No tienes permiso para editar catálogos." };
+  const { user } = access;
   const db = getDatabase();
   const conditions = [eq(catMediosPago.organizacionId, input.organizacionId), eq(catMediosPago.clave, input.clave)];
   if (input.id) conditions.push(ne(catMediosPago.id, input.id));
@@ -48,7 +50,9 @@ export async function togglePaymentMethod(formData: FormData) {
   const organizationId = String(formData.get("organizacionId") ?? "");
   const id = String(formData.get("id") ?? "");
   const active = formData.get("activo") === "true";
-  const { user } = await requireOrganizationAccess(organizationId);
+  const access = await checkPermission(organizationId, "catalogos.editar");
+  if (!access) return;
+  const { user } = access;
   const db = getDatabase();
   await db.update(catMediosPago).set({ activo: !active, updatedBy: user.id }).where(and(eq(catMediosPago.id, id), eq(catMediosPago.organizacionId, organizationId)));
   revalidatePath("/admin/medios-pago");

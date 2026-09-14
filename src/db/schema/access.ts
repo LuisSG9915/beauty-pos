@@ -2,6 +2,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
@@ -105,5 +106,34 @@ export const invitacionesUsuarios = pgTable(
   (table) => [
     index("invitaciones_usuarios_organizacion_idx").on(table.organizacionId),
     uniqueIndex("invitaciones_usuarios_token_hash_uq").on(table.tokenHash),
+  ],
+);
+
+/**
+ * Bitácora de eventos sensibles: quién hizo qué, dónde y cuándo.
+ * Inmutable por diseño — no expone `activo` ni `updatedAt`; las filas nunca
+ * se editan ni se borran desde la aplicación.
+ */
+export const auditoriaEventos = pgTable(
+  "auditoria_eventos",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizacionId: uuid("organizacion_id")
+      .notNull()
+      .references(() => organizaciones.id),
+    sucursalId: uuid("sucursal_id").references(() => sucursales.id),
+    usuarioId: uuid("usuario_id").references(() => usuarios.id),
+    /** Ej. "venta.cobrada", "miembro.roles", "caja.cerrada". */
+    accion: varchar("accion", { length: 80 }).notNull(),
+    /** Tipo de entidad afectada: "venta", "miembro", "invitacion", etc. */
+    entidad: varchar("entidad", { length: 60 }),
+    entidadId: uuid("entidad_id"),
+    detalle: jsonb("detalle").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("auditoria_eventos_org_fecha_idx").on(table.organizacionId, table.createdAt),
+    index("auditoria_eventos_entidad_idx").on(table.entidad, table.entidadId),
+    index("auditoria_eventos_usuario_idx").on(table.usuarioId),
   ],
 );

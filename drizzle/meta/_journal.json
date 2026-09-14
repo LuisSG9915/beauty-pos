@@ -92,6 +92,62 @@
       "when": 1788935925546,
       "tag": "0012_green_prowler",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789355579490,
+      "tag": "0013_slow_garia",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1789356184440,
+      "tag": "0014_busy_quasar",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1789357352221,
+      "tag": "0015_rare_pretty_boy",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1789409695526,
+      "tag": "0016_wooden_gressill",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789415874526,
+      "tag": "0017_perpetual_stingray",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1789416539486,
+      "tag": "0018_medical_hellcat",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1789425489360,
+      "tag": "0019_romantic_rockslide",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1789427269922,
+      "tag": "0020_careless_lady_mastermind",
+      "breakpoints": true
     }
   ]
 }

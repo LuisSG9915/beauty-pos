@@ -16,12 +16,18 @@ export const defaultPermissions = [
   { clave: "ventas.ver", nombre: "Ver ventas", modulo: "ventas" },
   { clave: "ventas.crear", nombre: "Crear ventas", modulo: "ventas" },
   { clave: "ventas.cobrar", nombre: "Cobrar ventas", modulo: "ventas" },
+  { clave: "ventas.cancelar", nombre: "Cancelar ventas cobradas", modulo: "ventas" },
+  { clave: "caja.ver", nombre: "Ver caja y cortes", modulo: "caja" },
   { clave: "caja.abrir", nombre: "Abrir caja", modulo: "caja" },
   { clave: "caja.cerrar", nombre: "Cerrar caja", modulo: "caja" },
+  { clave: "caja.movimientos", nombre: "Registrar movimientos de caja", modulo: "caja" },
+  { clave: "catalogos.ver", nombre: "Ver catálogos", modulo: "catalogos" },
+  { clave: "catalogos.editar", nombre: "Editar catálogos", modulo: "catalogos" },
   { clave: "inventario.ver", nombre: "Ver inventario", modulo: "inventario" },
   { clave: "inventario.editar", nombre: "Editar inventario", modulo: "inventario" },
   { clave: "reportes.operativos", nombre: "Ver reportes operativos", modulo: "reportes" },
   { clave: "reportes.financieros", nombre: "Ver reportes financieros", modulo: "reportes" },
+  { clave: "auditoria.ver", nombre: "Ver bitácora de auditoría", modulo: "auditoria" },
 ] as const;
 
 export const defaultRoles = [
@@ -52,6 +58,7 @@ export const defaultRoles = [
       "clientes.editar",
       "agenda.ver",
       "agenda.editar",
+      "catalogos.ver",
       "ventas.ver",
       "ventas.crear",
     ],
@@ -65,8 +72,10 @@ export const defaultRoles = [
       "ventas.ver",
       "ventas.crear",
       "ventas.cobrar",
+      "caja.ver",
       "caja.abrir",
       "caja.cerrar",
+      "caja.movimientos",
     ],
   },
   {
@@ -78,12 +87,13 @@ export const defaultRoles = [
       "expedientes.alergias_ver",
       "agenda.ver",
       "agenda.editar",
+      "catalogos.ver",
       "ventas.ver",
     ],
   },
   {
     clave: "almacen",
     nombre: "Almacén",
-    permissions: ["inventario.ver", "inventario.editar"],
+    permissions: ["catalogos.ver", "inventario.ver", "inventario.editar"],
   },
 ] as const;

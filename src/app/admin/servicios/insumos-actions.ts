@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { productos, relServiciosInsumos, servicios } from "@/db/schema/catalogs";
-import { requireOrganizationAccess } from "@/lib/auth/access";
+import { checkPermission } from "@/lib/auth/authorization";
 
 export async function addServicioInsumo(formData: FormData) {
   const organizationId = String(formData.get("organizacionId") ?? "");
@@ -18,7 +18,9 @@ export async function addServicioInsumo(formData: FormData) {
   const cantidadResult = cantidadSchema.safeParse(cantidadStr);
   if (!cantidadResult.success) return;
 
-  const { user } = await requireOrganizationAccess(organizationId);
+  const access = await checkPermission(organizationId, "catalogos.editar");
+  if (!access) return;
+  const { user } = access;
   const db = getDatabase();
 
   const [servicio] = await db.select({ organizacionId: servicios.organizacionId }).from(servicios).where(and(eq(servicios.id, servicioId), eq(servicios.organizacionId, organizationId))).limit(1);
@@ -41,7 +43,9 @@ export async function removeServicioInsumo(formData: FormData) {
   const organizationId = String(formData.get("organizacionId") ?? "");
   const insumoRelId = String(formData.get("insumoRelId") ?? "");
 
-  const { user } = await requireOrganizationAccess(organizationId);
+  const access = await checkPermission(organizationId, "catalogos.editar");
+  if (!access) return;
+  const { user } = access;
   const db = getDatabase();
   await db.update(relServiciosInsumos).set({ activo: false, updatedBy: user.id }).where(and(eq(relServiciosInsumos.id, insumoRelId), eq(relServiciosInsumos.organizacionId, organizationId)));
   revalidatePath("/admin/servicios");

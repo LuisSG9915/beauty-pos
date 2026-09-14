@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { catCategoriasProductos } from "@/db/schema/catalogs";
-import { requireOrganizationAccess } from "@/lib/auth/access";
+import { checkPermission } from "@/lib/auth/authorization";
 
 const categorySchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -21,7 +21,9 @@ export async function saveProductCategory(_previousState: ProductCategoryActionS
   const result = categorySchema.safeParse(Object.fromEntries(formData.entries()));
   if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa la categoría." };
   const input = result.data;
-  const { user } = await requireOrganizationAccess(input.organizacionId);
+  const access = await checkPermission(input.organizacionId, "catalogos.editar");
+  if (!access) return { error: "No tienes permiso para editar catálogos." };
+  const { user } = access;
   const db = getDatabase();
   const conditions = [eq(catCategoriasProductos.organizacionId, input.organizacionId), eq(catCategoriasProductos.clave, input.clave)];
   if (input.id) conditions.push(ne(catCategoriasProductos.id, input.id));
@@ -40,7 +42,9 @@ export async function toggleProductCategory(formData: FormData) {
   const organizationId = String(formData.get("organizacionId") ?? "");
   const id = String(formData.get("id") ?? "");
   const active = formData.get("activo") === "true";
-  const { user } = await requireOrganizationAccess(organizationId);
+  const access = await checkPermission(organizationId, "catalogos.editar");
+  if (!access) return;
+  const { user } = access;
   const db = getDatabase();
   await db.update(catCategoriasProductos).set({ activo: !active, updatedBy: user.id }).where(and(eq(catCategoriasProductos.id, id), eq(catCategoriasProductos.organizacionId, organizationId)));
   revalidatePath("/admin/categorias-productos");

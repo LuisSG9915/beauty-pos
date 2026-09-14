@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { catUnidadesMedida } from "@/db/schema/catalogs";
-import { requireOrganizationAccess } from "@/lib/auth/access";
+import { checkPermission } from "@/lib/auth/authorization";
 
 const unitSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -21,7 +21,9 @@ export async function saveUnit(_previousState: UnitActionState, formData: FormDa
   const result = unitSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa la unidad." };
   const input = result.data;
-  const { user } = await requireOrganizationAccess(input.organizacionId);
+  const access = await checkPermission(input.organizacionId, "catalogos.editar");
+  if (!access) return { error: "No tienes permiso para editar catálogos." };
+  const { user } = access;
   const db = getDatabase();
   const conditions = [eq(catUnidadesMedida.organizacionId, input.organizacionId), eq(catUnidadesMedida.clave, input.clave)];
   if (input.id) conditions.push(ne(catUnidadesMedida.id, input.id));
@@ -40,7 +42,9 @@ export async function toggleUnit(formData: FormData) {
   const organizationId = String(formData.get("organizacionId") ?? "");
   const id = String(formData.get("id") ?? "");
   const active = formData.get("activo") === "true";
-  const { user } = await requireOrganizationAccess(organizationId);
+  const access = await checkPermission(organizationId, "catalogos.editar");
+  if (!access) return;
+  const { user } = access;
   const db = getDatabase();
   await db.update(catUnidadesMedida).set({ activo: !active, updatedBy: user.id }).where(and(eq(catUnidadesMedida.id, id), eq(catUnidadesMedida.organizacionId, organizationId)));
   revalidatePath("/admin/unidades-medida");

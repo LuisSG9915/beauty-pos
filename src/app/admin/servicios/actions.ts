@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { servicios } from "@/db/schema/catalogs";
-import { requireOrganizationAccess } from "@/lib/auth/access";
+import { checkPermission } from "@/lib/auth/authorization";
 
 const serviceSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -27,7 +27,9 @@ export async function saveService(_previousState: ServiceActionState, formData: 
   const result = serviceSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa los datos del servicio." };
   const input = result.data;
-  const { user } = await requireOrganizationAccess(input.organizacionId);
+  const access = await checkPermission(input.organizacionId, "catalogos.editar");
+  if (!access) return { error: "No tienes permiso para editar catálogos." };
+  const { user } = access;
   const db = getDatabase();
   const duplicate = await db.select({ id: servicios.id }).from(servicios).where(and(eq(servicios.organizacionId, input.organizacionId), eq(servicios.clave, input.clave), input.id ? ne(servicios.id, input.id) : undefined)).limit(1);
   if (duplicate.length > 0) return { error: "Ya existe un servicio con esa clave en la organización." };
@@ -56,7 +58,9 @@ export async function toggleService(formData: FormData) {
   const organizationId = String(formData.get("organizacionId") ?? "");
   const id = String(formData.get("id") ?? "");
   const active = formData.get("activo") === "true";
-  const { user } = await requireOrganizationAccess(organizationId);
+  const access = await checkPermission(organizationId, "catalogos.editar");
+  if (!access) return;
+  const { user } = access;
   const db = getDatabase();
   await db.update(servicios).set({ activo: !active, updatedBy: user.id }).where(and(eq(servicios.id, id), eq(servicios.organizacionId, organizationId)));
   revalidatePath("/admin/servicios");

@@ -27,6 +27,13 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -64,6 +71,13 @@
   --accent: #f2e3dc;
   --accent-foreground: #60392e;
   --destructive: #a8443a;
+  --destructive-foreground: #fff6f2;
+  --success: #347052;
+  --success-foreground: #f2f9f4;
+  --warning: #986b16;
+  --warning-foreground: #fffaf0;
+  --info: #3e6390;
+  --info-foreground: #f2f6fb;
   --border: #ded8d2;
   --input: #ded8d2;
   --ring: #8a5140;
@@ -99,6 +113,13 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.72 0.12 155);
+  --success-foreground: oklch(0.15 0 0);
+  --warning: oklch(0.8 0.14 85);
+  --warning-foreground: oklch(0.15 0 0);
+  --info: oklch(0.75 0.11 230);
+  --info-foreground: oklch(0.15 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
@@ -126,5 +147,22 @@
   }
   html {
     @apply font-sans;
+  }
+  /* Anillo de enfoque consistente para elementos interactivos. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Respeta usuarios con movimiento reducido: apaga animaciones y transiciones. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

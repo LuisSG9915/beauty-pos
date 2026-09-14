@@ -7,6 +7,7 @@ import { getDatabase } from "@/db/client";
 import { user as authUsers } from "@/db/schema/auth";
 import { invitacionesUsuarios, relMiembrosRoles } from "@/db/schema/access";
 import { miembrosOrganizaciones, relUsuariosSucursales, usuarios } from "@/db/schema/core";
+import { auditEvent } from "@/lib/audit";
 import { createAuth } from "@/lib/auth/server";
 
 const acceptSchema = z.object({
@@ -83,6 +84,15 @@ export async function acceptInvitation(
         .update(invitacionesUsuarios)
         .set({ estado: "aceptada", aceptadaAt: new Date(), aceptadaPor: posUser.id })
         .where(eq(invitacionesUsuarios.id, invitation.id));
+      await auditEvent(tx, {
+        organizacionId: invitation.organizacionId,
+        sucursalId: invitation.sucursalId,
+        usuarioId: posUser.id,
+        accion: "invitacion.aceptada",
+        entidad: "invitacion",
+        entidadId: invitation.id,
+        detalle: { correo: invitation.correo, rolId: invitation.rolId },
+      });
     });
   } catch {
     return { error: "No se pudo completar la asociación del usuario." };

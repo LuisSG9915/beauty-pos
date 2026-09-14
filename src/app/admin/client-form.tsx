@@ -4,6 +4,8 @@ import { useActionState } from "react";
 
 import { saveClient } from "@/app/admin/client-actions";
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel, Input, Textarea } from "@/components/ui/field";
+import { ActionFeedback } from "@/components/ui/toast";
 
 type ClientData = {
   id?: string;
@@ -22,6 +24,23 @@ type ClientData = {
   usoCfdi?: string | null;
 };
 
+const PERSONAL_FIELDS: Array<{ name: keyof ClientData; label: string; placeholder: string; required?: boolean; type?: string }> = [
+  { name: "nombre", label: "Nombre", placeholder: "Mariana", required: true },
+  { name: "apellidoPaterno", label: "Apellido paterno", placeholder: "López" },
+  { name: "apellidoMaterno", label: "Apellido materno", placeholder: "García" },
+  { name: "telefono", label: "Teléfono", placeholder: "5512345678" },
+  { name: "correo", label: "Correo", placeholder: "cliente@correo.com", type: "email" },
+  { name: "fechaNacimiento", label: "Fecha de nacimiento", placeholder: "", type: "date" },
+];
+
+const FISCAL_FIELDS: Array<{ name: keyof ClientData; label: string; placeholder: string }> = [
+  { name: "rfc", label: "RFC", placeholder: "XAXX010101000" },
+  { name: "razonSocial", label: "Razón social", placeholder: "" },
+  { name: "codigoPostalFiscal", label: "Código postal fiscal", placeholder: "" },
+  { name: "regimenFiscal", label: "Régimen fiscal", placeholder: "" },
+  { name: "usoCfdi", label: "Uso CFDI", placeholder: "" },
+];
+
 export function ClientForm({ organizationId, initial }: { organizationId: string; initial?: ClientData }) {
   const [state, formAction, isPending] = useActionState(saveClient, {});
   const value = (key: keyof ClientData) => initial?.[key] ?? "";
@@ -34,34 +53,37 @@ export function ClientForm({ organizationId, initial }: { organizationId: string
       <p className="mt-1 text-sm text-[#81746c]">Los campos fiscales son opcionales mientras CFDI esté pendiente.</p>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        {[
-          ["nombre", "Nombre", "Mariana"],
-          ["apellidoPaterno", "Apellido paterno", "López"],
-          ["apellidoMaterno", "Apellido materno", "García"],
-          ["telefono", "Teléfono", "5512345678"],
-          ["correo", "Correo", "cliente@correo.com"],
-          ["fechaNacimiento", "Fecha de nacimiento", ""],
-        ].map(([name, label, placeholder]) => (
-          <label className="space-y-2" key={name}>
-            <span className="text-sm font-medium">{label}{name === "nombre" ? " *" : ""}</span>
-            <input className="h-10 w-full rounded-xl border border-[#e3d9d1] bg-[#fffdfb] px-3 text-sm outline-none focus:border-[#b8795d]" defaultValue={String(value(name as keyof ClientData))} name={name} placeholder={placeholder} required={name === "nombre"} type={name === "correo" ? "email" : name === "fechaNacimiento" ? "date" : "text"} />
-          </label>
+        {PERSONAL_FIELDS.map((field) => (
+          <Field key={field.name}>
+            <FieldLabel required={field.required}>{field.label}</FieldLabel>
+            <Input defaultValue={String(value(field.name))} name={field.name} placeholder={field.placeholder} required={field.required} type={field.type ?? "text"} />
+          </Field>
         ))}
-        <label className="space-y-2 sm:col-span-2"><span className="text-sm font-medium">Notas operativas</span><textarea className="min-h-24 w-full rounded-xl border border-[#e3d9d1] bg-[#fffdfb] px-3 py-2 text-sm outline-none focus:border-[#b8795d]" defaultValue={String(value("notasOperativas"))} name="notasOperativas" /></label>
+        <Field className="sm:col-span-2">
+          <FieldLabel>Notas operativas</FieldLabel>
+          <Textarea defaultValue={String(value("notasOperativas"))} name="notasOperativas" />
+        </Field>
         <p className="text-sm font-semibold text-[#a76348] sm:col-span-2">Datos fiscales opcionales</p>
-        {[
-          ["rfc", "RFC", "XAXX010101000"],
-          ["razonSocial", "Razón social", ""],
-          ["codigoPostalFiscal", "Código postal fiscal", ""],
-          ["regimenFiscal", "Régimen fiscal", ""],
-          ["usoCfdi", "Uso CFDI", ""],
-        ].map(([name, label, placeholder]) => <label className="space-y-2" key={name}><span className="text-sm font-medium">{label}</span><input className="h-10 w-full rounded-xl border border-[#e3d9d1] bg-[#fffdfb] px-3 text-sm outline-none focus:border-[#b8795d]" defaultValue={String(value(name as keyof ClientData))} name={name} placeholder={placeholder} /></label>)}
+        {FISCAL_FIELDS.map((field) => (
+          <Field key={field.name}>
+            <FieldLabel>{field.label}</FieldLabel>
+            <Input defaultValue={String(value(field.name))} name={field.name} placeholder={field.placeholder} />
+          </Field>
+        ))}
       </div>
 
-      {state.warning ? <label className="mt-5 flex items-start gap-3 rounded-xl border border-[#ecd9a9] bg-[#fff9e9] p-4 text-sm text-[#80621d]"><input className="mt-1" name="confirmarDuplicado" type="checkbox" value="true" /> <span>{state.warning} Deseo guardar el cliente de todas formas.</span></label> : null}
-      {state.error ? <p className="mt-4 rounded-xl border border-[#edc8bd] bg-[#fff3ef] px-4 py-3 text-sm text-[#a34e3b]" role="alert">{state.error}</p> : null}
-      {state.success ? <p className="mt-4 rounded-xl border border-[#cce5d2] bg-[#f1faf3] px-4 py-3 text-sm text-[#3d7b50]" role="status">Cliente guardado correctamente.</p> : null}
-      <Button className="mt-6 rounded-xl bg-[#2c2522] text-[#fffaf5] hover:bg-[#463a34]" disabled={isPending} type="submit">{isPending ? "Guardando..." : "Guardar cliente"}</Button>
+      {state.warning ? (
+        <label className="mt-5 flex items-start gap-3 rounded-xl border border-[#ecd9a9] bg-[#fff9e9] p-4 text-sm text-[#80621d]">
+          <input className="mt-1" name="confirmarDuplicado" type="checkbox" value="true" />
+          <span>{state.warning} Deseo guardar el cliente de todas formas.</span>
+        </label>
+      ) : null}
+      <div className="mt-4">
+        <ActionFeedback state={state} successMessage="Cliente guardado correctamente." />
+      </div>
+      <Button className="mt-6 rounded-xl" disabled={isPending} type="submit">
+        {isPending ? "Guardando…" : "Guardar cliente"}
+      </Button>
     </form>
   );
 }

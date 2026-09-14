@@ -5,6 +5,7 @@ import { FormEvent, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
+import { Field, FieldLabel, Input } from "@/components/ui/field";
 import { authClient } from "@/lib/auth/client";
 
 export function LoginForm() {
@@ -39,35 +40,37 @@ export function LoginForm() {
 
   return (
     <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
-      <label className="block space-y-2">
-        <span className="text-sm font-medium text-[#4b403a]">Correo de acceso</span>
-        <span className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#b8795d] focus-within:ring-3 focus-within:ring-[#b8795d]/10">
+      <Field className="space-y-2" name="email">
+        <FieldLabel className="text-[#4b403a]" required>
+          Correo de acceso
+        </FieldLabel>
+        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#b8795d] focus-within:ring-3 focus-within:ring-[#b8795d]/10">
           <Mail className="size-4 text-[#a18d81]" />
-          <input
+          <Input
             required
             autoComplete="email"
-            className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#b6a9a1]"
-            name="email"
+            className="h-11 min-w-0 flex-1 border-0 bg-transparent px-0 placeholder:text-[#b6a9a1] focus:border-transparent focus:ring-0"
             placeholder="tu@salon.com"
             type="email"
           />
-        </span>
-      </label>
+        </div>
+      </Field>
 
-      <label className="block space-y-2">
-        <span className="text-sm font-medium text-[#4b403a]">Contraseña</span>
-        <span className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#b8795d] focus-within:ring-3 focus-within:ring-[#b8795d]/10">
+      <Field className="space-y-2" name="password">
+        <FieldLabel className="text-[#4b403a]" required>
+          Contraseña
+        </FieldLabel>
+        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#b8795d] focus-within:ring-3 focus-within:ring-[#b8795d]/10">
           <LockKeyhole className="size-4 text-[#a18d81]" />
-          <input
+          <Input
             required
             autoComplete="current-password"
-            className="h-11 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#b6a9a1]"
-            name="password"
+            className="h-11 min-w-0 flex-1 border-0 bg-transparent px-0 placeholder:text-[#b6a9a1] focus:border-transparent focus:ring-0"
             placeholder="Tu contraseña"
             type="password"
           />
-        </span>
-      </label>
+        </div>
+      </Field>
 
       {errorMessage ? (
         <p className="rounded-xl border border-[#edc8bd] bg-[#fff3ef] px-4 py-3 text-sm text-[#a34e3b]" role="alert">

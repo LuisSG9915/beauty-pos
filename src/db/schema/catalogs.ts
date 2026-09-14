@@ -18,7 +18,7 @@ import { catRoles } from "@/db/schema/access";
 const catalogAuditColumns = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   createdBy: uuid("created_by"),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull().$onUpdate(() => new Date()),
   updatedBy: uuid("updated_by"),
 };
 

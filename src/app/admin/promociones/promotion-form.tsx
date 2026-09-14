@@ -2,9 +2,11 @@
 
 import { useActionState } from "react";
 
+import { savePromotion, type PromotionActionState } from "@/app/admin/promociones/actions";
 import { FormTabs } from "@/components/form-tabs";
 import { Button } from "@/components/ui/button";
-import { savePromotion, type PromotionActionState } from "@/app/admin/promociones/actions";
+import { Field, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
+import { ActionFeedback } from "@/components/ui/toast";
 
 type PromotionData = {
   id?: string;
@@ -27,52 +29,52 @@ export function PromotionForm({ organizationId, initial }: { organizationId: str
 
   const reglas = (
     <div className="grid gap-4 sm:grid-cols-2">
-      <label className="space-y-2">
-        <span className="text-sm font-medium">Clave *</span>
-        <input className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={String(value("clave"))} name="clave" placeholder="DESC10" required />
-      </label>
-      <label className="space-y-2">
-        <span className="text-sm font-medium">Nombre *</span>
-        <input className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={String(value("nombre"))} name="nombre" placeholder="Descuento del 10%" required />
-      </label>
-      <label className="space-y-2 sm:col-span-2">
-        <span className="text-sm font-medium">Descripción</span>
-        <textarea className="min-h-24 w-full rounded-xl border border-[#ded8d2] bg-white px-3 py-2 text-sm" defaultValue={String(value("descripcion"))} name="descripcion" />
-      </label>
-      <label className="space-y-2">
-        <span className="text-sm font-medium">Tipo de promoción *</span>
-        <select className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={tipo} name="tipo">
+      <Field>
+        <FieldLabel required>Clave</FieldLabel>
+        <Input defaultValue={String(value("clave"))} name="clave" placeholder="DESC10" required />
+      </Field>
+      <Field>
+        <FieldLabel required>Nombre</FieldLabel>
+        <Input defaultValue={String(value("nombre"))} name="nombre" placeholder="Descuento del 10%" required />
+      </Field>
+      <Field className="sm:col-span-2">
+        <FieldLabel>Descripción</FieldLabel>
+        <Textarea defaultValue={String(value("descripcion"))} name="descripcion" />
+      </Field>
+      <Field>
+        <FieldLabel required>Tipo de promoción</FieldLabel>
+        <Select defaultValue={tipo} name="tipo">
           <option value="porcentaje">Porcentaje de descuento</option>
           <option value="monto">Monto fijo de descuento</option>
           <option value="2x1">2x1</option>
           <option value="paquete">Paquete (precio especial)</option>
-        </select>
-      </label>
-      <label className="space-y-2">
-        <span className="text-sm font-medium">Valor *</span>
-        <input className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={String(value("valor") || "0")} min="0" name="valor" placeholder="10" required step="0.001" type="number" />
-      </label>
-      <label className="space-y-2 sm:col-span-2">
-        <span className="text-sm font-medium">Aplica a *</span>
-        <select className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={aplica} name="aplica">
+        </Select>
+      </Field>
+      <Field>
+        <FieldLabel required>Valor</FieldLabel>
+        <Input defaultValue={String(value("valor") || "0")} min="0" name="valor" placeholder="10" required step="0.001" type="number" />
+      </Field>
+      <Field className="sm:col-span-2">
+        <FieldLabel required>Aplica a</FieldLabel>
+        <Select defaultValue={aplica} name="aplica">
           <option value="ambos">Productos y servicios</option>
           <option value="producto">Solo productos</option>
           <option value="servicio">Solo servicios</option>
-        </select>
-      </label>
+        </Select>
+      </Field>
     </div>
   );
 
   const vigencia = (
     <div className="grid gap-4 sm:grid-cols-2">
-      <label className="space-y-2">
-        <span className="text-sm font-medium">Vigencia desde *</span>
-        <input className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={String(value("vigenciaDesde"))} name="vigenciaDesde" required type="date" />
-      </label>
-      <label className="space-y-2">
-        <span className="text-sm font-medium">Vigencia hasta</span>
-        <input className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm" defaultValue={String(value("vigenciaHasta"))} name="vigenciaHasta" type="date" />
-      </label>
+      <Field>
+        <FieldLabel required>Vigencia desde</FieldLabel>
+        <Input defaultValue={String(value("vigenciaDesde"))} name="vigenciaDesde" required type="date" />
+      </Field>
+      <Field>
+        <FieldLabel>Vigencia hasta</FieldLabel>
+        <Input defaultValue={String(value("vigenciaHasta"))} name="vigenciaHasta" type="date" />
+      </Field>
       <p className="rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55] sm:col-span-2">
         Si no indicas fecha de fin, la promoción queda vigente hasta que la ocultes manualmente.
       </p>
@@ -86,7 +88,7 @@ export function PromotionForm({ organizationId, initial }: { organizationId: str
   );
 
   return (
-    <form action={formAction} className="rounded-2xl border border-[#ded8d2] bg-white p-6 shadow-sm">
+    <form action={formAction} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
       <h2 className="text-xl font-semibold">{initial ? "Editar promoción" : "Nueva promoción"}</h2>
@@ -100,9 +102,10 @@ export function PromotionForm({ organizationId, initial }: { organizationId: str
           ]}
         />
       </div>
-      {state.error ? <p className="mt-4 rounded-xl border border-[#edc8bd] bg-[#fff3ef] px-4 py-3 text-sm text-[#a8443a]" role="alert">{state.error}</p> : null}
-      {state.success ? <p className="mt-4 rounded-xl border border-[#cce5d2] bg-[#f1faf3] px-4 py-3 text-sm text-[#347052]" role="status">Promoción guardada correctamente.</p> : null}
-      <Button className="mt-6 rounded-xl bg-[#8a5140] text-white hover:bg-[#704032]" disabled={pending} type="submit">{pending ? "Guardando..." : "Guardar promoción"}</Button>
+      <div className="mt-4">
+        <ActionFeedback state={state} successMessage="Promoción guardada correctamente." />
+      </div>
+      <Button className="mt-6 rounded-xl" disabled={pending} type="submit">{pending ? "Guardando…" : "Guardar promoción"}</Button>
     </form>
   );
 }

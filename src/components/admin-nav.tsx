@@ -1,136 +1,294 @@
-import Link from "next/link";
+"use client";
+
 import {
   Boxes,
   Calendar,
+  CalendarCheck,
   Clipboard,
   CreditCard,
   Landmark,
+  Package,
   Percent,
   Ruler,
   Scissors,
+  ScrollText,
+  ShieldCheck,
   ShoppingBag,
+  ShoppingCart,
   Tags,
   Users,
+  Wallet,
   type LucideIcon,
 } from "lucide-react";
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
 
-type NavItem = {
-  href: string;
+import { buildAdminHref, firstParam } from "@/lib/url-context";
+import { cn } from "@/lib/utils";
+
+export type AdminNavItem = {
+  path: string;
   label: string;
   description: string;
   icon: LucideIcon;
+  /** Permiso requerido para ver el acceso; undefined = siempre visible. */
+  permiso?: string;
 };
 
-type NavSection = {
+export type AdminNavSection = {
   title: string;
-  items: NavItem[];
+  items: AdminNavItem[];
 };
 
-export function AdminNav({
-  organizationId,
+const OPERACION: AdminNavItem[] = [
+  { path: "/admin/agenda", label: "Agenda", description: "Citas, estados y venta en proceso", icon: Calendar, permiso: "agenda.ver" },
+  { path: "/admin/mi-dia", label: "Mi día", description: "Tus citas, propinas y comisiones de hoy", icon: CalendarCheck, permiso: "agenda.ver" },
+  { path: "/admin/pos", label: "POS", description: "Ventas directas y cobro de citas", icon: ShoppingCart, permiso: "ventas.ver" },
+  { path: "/admin/caja", label: "Caja", description: "Apertura, cierre ciego y discrepancias", icon: Wallet, permiso: "caja.ver" },
+  { path: "/admin/clientes", label: "Clientes", description: "Expedientes, contacto y seguimiento", icon: Users, permiso: "clientes.ver" },
+  { path: "/admin/servicios", label: "Servicios", description: "Catálogo de servicios del salón", icon: Scissors, permiso: "catalogos.ver" },
+  { path: "/admin/productos", label: "Productos", description: "Venta, consumo e inventario", icon: ShoppingBag, permiso: "catalogos.ver" },
+  { path: "/admin/inventario", label: "Inventario", description: "Stock, entradas, salidas y consumos", icon: Package, permiso: "inventario.ver" },
+];
+
+const CATALOGOS: AdminNavItem[] = [
+  { path: "/admin/categorias-servicios", label: "Cat. servicios", description: "Agrupa los servicios", icon: Tags, permiso: "catalogos.ver" },
+  { path: "/admin/categorias-productos", label: "Cat. productos", description: "Agrupa productos e insumos", icon: Boxes, permiso: "catalogos.ver" },
+  { path: "/admin/unidades-medida", label: "Unidades", description: "Pieza, litro, gramo, etc.", icon: Ruler, permiso: "catalogos.ver" },
+  { path: "/admin/medios-pago", label: "Medios de pago", description: "Efectivo, tarjeta, transferencia", icon: CreditCard, permiso: "catalogos.ver" },
+  { path: "/admin/impuestos", label: "Impuestos", description: "IVA, IEPS y configuración", icon: Percent, permiso: "catalogos.ver" },
+  { path: "/admin/promociones", label: "Promociones", description: "Descuentos, 2x1 y paquetes", icon: Clipboard, permiso: "catalogos.ver" },
+];
+
+const EQUIPO: AdminNavItem[] = [
+  { path: "/admin/usuarios", label: "Equipo", description: "Miembros, roles y sucursales", icon: Users, permiso: "usuarios.ver" },
+  { path: "/admin/roles", label: "Roles", description: "Permisos por rol", icon: ShieldCheck, permiso: "roles.ver" },
+  { path: "/admin/auditoria", label: "Auditoría", description: "Bitácora de eventos", icon: ScrollText, permiso: "auditoria.ver" },
+];
+
+const PLATAFORMA: AdminNavItem[] = [
+  { path: "/admin", label: "Plataforma", description: "Organizaciones y sucursales", icon: Landmark },
+];
+
+/** `/admin/…` → `/…` para usarlo con `buildAdminHref`. */
+function toAdminPath(path: string): `/${string}` | "" {
+  return path.replace("/admin", "") as `/${string}` | "";
+}
+
+/**
+ * Secciones visibles según los permisos del usuario en la organización
+ * activa. `permissions === null` desactiva el filtro (admin de plataforma).
+ */
+export function getAdminNavSections(
   platformAdmin = false,
-  activePath,
-}: {
+  permissions: ReadonlySet<string> | null = null,
+): AdminNavSection[] {
+  const visible = (items: AdminNavItem[]) =>
+    permissions === null ? items : items.filter((item) => !item.permiso || permissions.has(item.permiso));
+  const sections: AdminNavSection[] = [
+    { title: "Operación", items: visible(OPERACION) },
+    { title: "Catálogos", items: visible(CATALOGOS) },
+    { title: "Equipo", items: visible(EQUIPO) },
+  ].filter((section) => section.items.length > 0);
+  if (platformAdmin) sections.push({ title: "Plataforma", items: PLATAFORMA });
+  return sections;
+}
+
+function isItemActive(pathname: string, itemPath: string): boolean {
+  if (itemPath === "/admin") return pathname === "/admin";
+  return pathname === itemPath || pathname.startsWith(`${itemPath}/`);
+}
+
+type NavContext = {
   organizationId?: string;
+  sucursalId?: string;
   platformAdmin?: boolean;
   activePath?: string;
-}) {
-  const param = organizationId ? `?organizationId=${organizationId}` : "";
-  const sections: NavSection[] = [
-    {
-      title: "Operación",
-      items: [
-        { href: `/admin/agenda${param}`, label: "Agenda de citas", description: "Citas, estados y venta en proceso", icon: Calendar },
-        { href: `/admin/clientes${param}`, label: "Clientes", description: "Expedientes, contacto y seguimiento", icon: Users },
-        { href: `/admin/servicios${param}`, label: "Servicios", description: "Catálogo de servicios del salón", icon: Scissors },
-        { href: `/admin/productos${param}`, label: "Productos e insumos", description: "Venta, consumo y inventario", icon: ShoppingBag },
-      ],
-    },
-    {
-      title: "Catálogos",
-      items: [
-        { href: `/admin/categorias-servicios${param}`, label: "Categorías de servicios", description: "Agrupa los servicios", icon: Tags },
-        { href: `/admin/categorias-productos${param}`, label: "Categorías de productos", description: "Agrupa productos e insumos", icon: Boxes },
-        { href: `/admin/unidades-medida${param}`, label: "Unidades de medida", description: "Pieza, litro, gramo, etc.", icon: Ruler },
-        { href: `/admin/medios-pago${param}`, label: "Medios de pago", description: "Efectivo, tarjeta, transferencia", icon: CreditCard },
-        { href: `/admin/impuestos${param}`, label: "Impuestos", description: "IVA, IEPS y configuración", icon: Percent },
-        { href: `/admin/promociones${param}`, label: "Promociones", description: "Descuentos, 2x1 y paquetes", icon: Clipboard },
-      ],
-    },
-  ];
+  /** Permisos de la org activa; null = sin filtro (plataforma). */
+  permissions?: readonly string[] | null;
+};
 
-  if (platformAdmin) {
-    sections.push({
-      title: "Plataforma",
-      items: [
-        { href: "/admin", label: "Organizaciones", description: "Gestión de organizaciones y sucursales", icon: Landmark },
-      ],
-    });
-  }
+function useNavContext({ organizationId, sucursalId, activePath }: NavContext) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  return {
+    pathname: activePath ?? pathname,
+    organizationId:
+      organizationId ?? firstParam(searchParams.get("organizationId")),
+    sucursalId: sucursalId ?? firstParam(searchParams.get("sucursalId")),
+  };
+}
+
+function toPermissionSet(permissions: readonly string[] | null | undefined) {
+  return permissions === null || permissions === undefined ? null : new Set(permissions);
+}
+
+/**
+ * Navegación principal del panel en tarjetas, agrupada por sección.
+ * Conserva `organizationId`/`sucursalId` de la URL (o de las props) en
+ * cada enlace.
+ */
+export function AdminNav({
+  organizationId,
+  sucursalId,
+  platformAdmin = false,
+  activePath,
+  permissions,
+}: NavContext) {
+  const context = useNavContext({ organizationId, sucursalId, activePath });
+  const sections = getAdminNavSections(platformAdmin, toPermissionSet(permissions));
 
   return (
-    <div className="space-y-8">
+    <nav aria-label="Secciones del panel" className="space-y-8">
       {sections.map((section) => (
-        <div key={section.title}>
-          <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b8795d]">{section.title}</h3>
+        <section aria-label={section.title} key={section.title}>
+          <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b8795d]">
+            {section.title}
+          </h3>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {section.items.map((item) => {
-              const isActive = activePath === item.href.split("?")[0];
+              const isActive = isItemActive(context.pathname, item.path);
               return (
                 <Link
-                  className={`group flex items-start gap-3 rounded-2xl border p-4 transition-colors ${
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "group flex min-h-10 items-start gap-3 rounded-2xl border p-4 transition-colors",
                     isActive
                       ? "border-[#8a5140] bg-[#f2e3dc]"
-                      : "border-[#eadfd8] bg-white hover:border-[#c9a899] hover:bg-[#faf6f3]"
-                  }`}
-                  href={item.href}
-                  key={item.href}
+                      : "border-[#eadfd8] bg-white hover:border-[#c9a899] hover:bg-[#faf6f3]",
+                  )}
+                  href={buildAdminHref(toAdminPath(item.path), {
+                    organizationId: context.organizationId,
+                    sucursalId: context.sucursalId,
+                  })}
+                  key={item.path}
                 >
-                  <div className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${isActive ? "bg-[#8a5140] text-white" : "bg-[#f1eeea] text-[#8a5140] group-hover:bg-[#f2e3dc]"}`}>
-                    <item.icon className="size-5" strokeWidth={1.8} />
+                  <div
+                    className={cn(
+                      "flex size-10 shrink-0 items-center justify-center rounded-xl",
+                      isActive
+                        ? "bg-[#8a5140] text-white"
+                        : "bg-[#f1eeea] text-[#8a5140] group-hover:bg-[#f2e3dc]",
+                    )}
+                  >
+                    <item.icon aria-hidden="true" className="size-5" strokeWidth={1.8} />
                   </div>
                   <div className="min-w-0">
                     <p className="font-medium text-[#2d2926]">{item.label}</p>
-                    <p className="mt-0.5 text-xs leading-5 text-[#81746c]">{item.description}</p>
+                    <p className="mt-0.5 text-xs leading-5 text-[#81746c]">
+                      {item.description}
+                    </p>
                   </div>
                 </Link>
               );
             })}
           </div>
-        </div>
+        </section>
       ))}
-    </div>
+    </nav>
   );
 }
 
-export function AdminNavCompact({ organizationId, platformAdmin = false }: { organizationId?: string; platformAdmin?: boolean }) {
-  const param = organizationId ? `?organizationId=${organizationId}` : "";
-  const links: Array<{ href: string; label: string; icon: LucideIcon }> = [
-    { href: `/admin/agenda${param}`, label: "Agenda", icon: Calendar },
-    { href: `/admin/clientes${param}`, label: "Clientes", icon: Users },
-    { href: `/admin/servicios${param}`, label: "Servicios", icon: Scissors },
-    { href: `/admin/productos${param}`, label: "Productos", icon: ShoppingBag },
-    { href: `/admin/categorias-servicios${param}`, label: "Cat. servicios", icon: Tags },
-    { href: `/admin/categorias-productos${param}`, label: "Cat. productos", icon: Boxes },
-    { href: `/admin/unidades-medida${param}`, label: "Unidades", icon: Ruler },
-    { href: `/admin/medios-pago${param}`, label: "Medios de pago", icon: CreditCard },
-    { href: `/admin/impuestos${param}`, label: "Impuestos", icon: Percent },
-    { href: `/admin/promociones${param}`, label: "Promociones", icon: Clipboard },
-  ];
-  if (platformAdmin) links.push({ href: "/admin", label: "Plataforma", icon: Landmark });
+/** Accesos operativos del tab bar móvil (solo los flujos del día a día). */
+const TAB_BAR: AdminNavItem[] = [OPERACION[0], OPERACION[1], OPERACION[2]];
+
+/**
+ * Tab bar inferior para teléfono/tablet (<md): Agenda · Mi día · POS.
+ * Targets de 56 px y fijo al borde inferior para uso con una mano.
+ */
+export function AdminTabBar({ organizationId, sucursalId, activePath, permissions }: NavContext) {
+  const context = useNavContext({ organizationId, sucursalId, activePath });
+  const permissionSet = toPermissionSet(permissions);
+  const items = permissionSet === null
+    ? TAB_BAR
+    : TAB_BAR.filter((item) => !item.permiso || permissionSet.has(item.permiso));
+  return (
+    <nav
+      aria-label="Accesos rápidos"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-[#eee6e0] bg-white/95 backdrop-blur md:hidden"
+    >
+      <div
+        className="grid"
+        style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}
+      >
+        {items.map((item) => {
+          const isActive = isItemActive(context.pathname, item.path);
+          return (
+            <Link
+              aria-current={isActive ? "page" : undefined}
+              className={cn(
+                "flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors",
+                isActive ? "text-[#8a5140]" : "text-[#81746c] hover:text-[#8a5140]",
+              )}
+              href={buildAdminHref(toAdminPath(item.path), {
+                organizationId: context.organizationId,
+                sucursalId: context.sucursalId,
+              })}
+              key={item.path}
+            >
+              <item.icon aria-hidden="true" className="size-5" strokeWidth={isActive ? 2.2 : 1.8} />
+              {item.label}
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
+/**
+ * Variante compacta (píldoras) usable dentro del shell o de las páginas.
+ * Scroll horizontal en tablet/móvil; targets de al menos 40px.
+ */
+export function AdminNavCompact({
+  organizationId,
+  sucursalId,
+  platformAdmin = false,
+  activePath,
+  permissions,
+}: NavContext) {
+  const context = useNavContext({ organizationId, sucursalId, activePath });
+  const sections = getAdminNavSections(platformAdmin, toPermissionSet(permissions));
 
   return (
-    <nav className="flex flex-wrap gap-2">
-      {links.map((link) => (
-        <Link
-          className="inline-flex items-center gap-1.5 rounded-full border border-[#ded8d2] bg-white px-3 py-1.5 text-xs font-medium text-[#625b55] transition-colors hover:border-[#c9a899] hover:bg-[#faf6f3] hover:text-[#8a5140]"
-          href={link.href}
-          key={link.href}
-        >
-          <link.icon className="size-3.5" strokeWidth={2} />
-          {link.label}
-        </Link>
-      ))}
+    <nav aria-label="Navegación del panel">
+      <div className="flex items-stretch gap-2 overflow-x-auto pb-1">
+        {sections.map((section, sectionIndex) => (
+          <div
+            aria-label={section.title}
+            className={cn(
+              "flex items-center gap-2",
+              sectionIndex > 0 && "border-l border-[#e6dcd5] pl-2",
+            )}
+            key={section.title}
+            role="group"
+          >
+            {section.items.map((item) => {
+              const isActive = isItemActive(context.pathname, item.path);
+              return (
+                <Link
+                  aria-current={isActive ? "page" : undefined}
+                  className={cn(
+                    "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium whitespace-nowrap transition-colors",
+                    isActive
+                      ? "border-[#8a5140] bg-[#f2e3dc] text-[#60392e]"
+                      : "border-[#ded8d2] bg-white text-[#625b55] hover:border-[#c9a899] hover:bg-[#faf6f3] hover:text-[#8a5140]",
+                  )}
+                  href={buildAdminHref(toAdminPath(item.path), {
+                    organizationId: context.organizationId,
+                    sucursalId: context.sucursalId,
+                  })}
+                  key={item.path}
+                  title={item.description}
+                >
+                  <item.icon aria-hidden="true" className="size-3.5" strokeWidth={2} />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
+      </div>
     </nav>
   );
 }
