@@ -10,8 +10,10 @@ import {
   validateBusinessHours,
   validateCitaAvailability,
   validateCitaOverlaps,
+  validateRecursos,
   type BloqueoLike,
   type CitaLike,
+  type RecursoLike,
   type TurnoDia,
 } from "./rules";
 
@@ -146,6 +148,110 @@ describe("validateCitaOverlaps", () => {
     const citas = [{ ...cita("x", "u1", 9, 10), activo: false }];
     expect(validateCitaOverlaps({ candidato: { ...rango(9.5, 10.5), usuarioId: "u1" }, citas })).toHaveLength(0);
   });
+
+  it("capacidad 2 permite una segunda cita sin asignar pero no la tercera", () => {
+    const citas = [cita("x", null, 9, 10)];
+    expect(
+      validateCitaOverlaps({
+        candidato: { ...rango(9.5, 10.5), usuarioId: null },
+        citas,
+        capacidadSinAsignar: 2,
+      }),
+    ).toHaveLength(0);
+
+    const dosOcupadas = [cita("x", null, 9, 10), cita("y", null, 9.5, 10.5)];
+    const violaciones = validateCitaOverlaps({
+      candidato: { ...rango(9.5, 10.5), usuarioId: null },
+      citas: dosOcupadas,
+      capacidadSinAsignar: 2,
+    });
+    expect(violaciones).toHaveLength(1);
+    expect(violaciones[0]?.mensaje).toContain("2 citas simultáneas");
+  });
+
+  it("capacidad no afecta al carril de un profesional (siempre 1)", () => {
+    const citas = [cita("x", "u1", 9, 10)];
+    expect(
+      validateCitaOverlaps({
+        candidato: { ...rango(9.5, 10.5), usuarioId: "u1" },
+        citas,
+        capacidadSinAsignar: 5,
+      }),
+    ).toHaveLength(1);
+  });
+});
+
+describe("validateRecursos", () => {
+  const cabina: RecursoLike = { id: "r1", nombre: "Cabina 1", capacidad: 1 };
+  const sillas: RecursoLike = { id: "r2", nombre: "Sillas manicura", capacidad: 2 };
+
+  const citaConRecurso = (id: string, recursoId: string, ini: number, fin: number, estado = "pendiente"): CitaLike => ({
+    ...cita(id, "u1", ini, fin, estado),
+    recursoIds: [recursoId],
+  });
+
+  it("rechaza cuando el recurso ya está ocupado en ese horario", () => {
+    const v = validateRecursos({
+      recursoIds: ["r1"],
+      recursos: [cabina],
+      citas: [citaConRecurso("x", "r1", 9, 10)],
+      candidato: rango(9.5, 10.5),
+    });
+    expect(v).toHaveLength(1);
+    expect(v[0]?.codigo).toBe("recurso");
+    expect(v[0]?.conflictoId).toBe("r1");
+  });
+
+  it("acepta si la otra cita no se traslapa o no usa el recurso", () => {
+    expect(
+      validateRecursos({
+        recursoIds: ["r1"],
+        recursos: [cabina],
+        citas: [citaConRecurso("x", "r1", 10, 11)],
+        candidato: rango(9, 10),
+      }),
+    ).toHaveLength(0);
+    expect(
+      validateRecursos({
+        recursoIds: ["r1"],
+        recursos: [cabina],
+        citas: [cita("x", "u1", 9, 10)],
+        candidato: rango(9, 10),
+      }),
+    ).toHaveLength(0);
+  });
+
+  it("capacidad 2 permite la segunda reserva pero no la tercera", () => {
+    const una = [citaConRecurso("x", "r2", 9, 10)];
+    expect(
+      validateRecursos({ recursoIds: ["r2"], recursos: [sillas], citas: una, candidato: rango(9, 10) }),
+    ).toHaveLength(0);
+    const dos = [...una, citaConRecurso("y", "r2", 9.5, 10.5)];
+    expect(
+      validateRecursos({ recursoIds: ["r2"], recursos: [sillas], citas: dos, candidato: rango(9.5, 10) }),
+    ).toHaveLength(1);
+  });
+
+  it("ignora citas inactivas, terminales y la propia (ignoreCitaId)", () => {
+    const base = { recursoIds: ["r1"], recursos: [cabina], candidato: rango(9, 10) };
+    expect(validateRecursos({ ...base, citas: [{ ...citaConRecurso("x", "r1", 9, 10), activo: false }] })).toHaveLength(0);
+    expect(validateRecursos({ ...base, citas: [citaConRecurso("x", "r1", 9, 10, "cancelada")] })).toHaveLength(0);
+    expect(validateRecursos({ ...base, citas: [citaConRecurso("x", "r1", 9, 10)], ignoreCitaId: "x" })).toHaveLength(0);
+  });
+
+  it("ignora recursos desconocidos y valida cada uno por separado", () => {
+    expect(
+      validateRecursos({ recursoIds: ["fantasma"], recursos: [cabina], citas: [], candidato: rango(9, 10) }),
+    ).toHaveLength(0);
+    const v = validateRecursos({
+      recursoIds: ["r1", "r2"],
+      recursos: [cabina, sillas],
+      citas: [citaConRecurso("x", "r1", 9, 10)],
+      candidato: rango(9, 10),
+    });
+    expect(v).toHaveLength(1);
+    expect(v[0]?.conflictoId).toBe("r1");
+  });
 });
 
 describe("validateCitaAvailability", () => {
@@ -175,6 +281,40 @@ describe("validateCitaAvailability", () => {
     });
     expect(r.ok).toBe(false);
     expect(r.violaciones.map((v) => v.codigo)).toEqual(["fuera_horario", "bloqueo", "traslape"]);
+  });
+
+  it("combina profesional + recurso: ambos deben estar libres", () => {
+    const recursos: RecursoLike[] = [{ id: "r1", nombre: "Cabina 1", capacidad: 1 }];
+    const ocupada: CitaLike = { ...cita("x", "u2", 10, 11), recursoIds: ["r1"] };
+    // Profesional libre pero cabina ocupada.
+    const r1 = validateCitaAvailability({
+      ...base,
+      candidato: { ...rango(10, 11), usuarioId: "u1" },
+      citas: [ocupada],
+      recursoIds: ["r1"],
+      recursos,
+    });
+    expect(r1.ok).toBe(false);
+    expect(r1.violaciones[0]?.codigo).toBe("recurso");
+    // Profesional ocupado aunque la cabina esté libre.
+    const r2 = validateCitaAvailability({
+      ...base,
+      candidato: { ...rango(10, 11), usuarioId: "u2" },
+      citas: [ocupada],
+      recursoIds: [],
+      recursos,
+    });
+    expect(r2.violaciones[0]?.codigo).toBe("traslape");
+    // Ambos libres en otro horario.
+    const r3 = validateCitaAvailability({
+      ...base,
+      iniciaMinutosLocal: 11 * 60,
+      candidato: { ...rango(11, 12), usuarioId: "u1" },
+      citas: [ocupada],
+      recursoIds: ["r1"],
+      recursos,
+    });
+    expect(r3.ok).toBe(true);
   });
 });
 

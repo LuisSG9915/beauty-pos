@@ -16,7 +16,7 @@ import {
   Textarea,
 } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatDate, formatTime } from "@/lib/format";
 import { getZonedParts } from "@/modules/agenda";
 
 type CitaData = {
@@ -28,8 +28,15 @@ type CitaData = {
   fechaHora: string;
   duracionMinutos: number;
   notas?: string | null;
+  /** Versión leída al abrir el formulario (concurrencia optimista). */
+  version?: number;
   servicioIds?: string[];
+  recursoIds?: string[];
 };
+
+function formatSugerencia(iso: string, timeZone: string) {
+  return `${formatDate(iso, { timeZone })} · ${formatTime(iso, { timeZone })}`;
+}
 
 function toBranchDateTimeInput(value: string, timeZone: string) {
   if (!value) return "";
@@ -47,6 +54,7 @@ export function CitaForm({
   clientes,
   staff,
   servicios,
+  recursos = [],
   currency = "MXN",
   timeZone,
   initial,
@@ -57,6 +65,7 @@ export function CitaForm({
   clientes: Array<{ id: string; nombre: string; telefono: string | null }>;
   staff: Array<{ id: string; nombre: string }>;
   servicios: Array<{ id: string; nombre: string; precioBase: string; duracionMinutos: number }>;
+  recursos?: Array<{ id: string; nombre: string; tipo: string; capacidad: number }>;
   currency?: string;
   timeZone: string;
   initial?: CitaData;
@@ -66,6 +75,7 @@ export function CitaForm({
   const toast = useToast();
   const [state, formAction, pending] = useActionState<CitaActionState, FormData>(saveCita, {});
   const [seleccionados, setSeleccionados] = useState<Set<string>>(() => new Set(initial?.servicioIds ?? []));
+  const [recursosSel, setRecursosSel] = useState<Set<string>>(() => new Set(initial?.recursoIds ?? []));
   const [inicio, setInicio] = useState(() => toBranchDateTimeInput(initial?.fechaHora ?? "", timeZone));
   const [duracionManual, setDuracionManual] = useState<number>(initial?.duracionMinutos ?? 60);
   const [usuarioId, setUsuarioId] = useState(initial?.usuarioId ?? "");
@@ -98,6 +108,15 @@ export function CitaForm({
 
   const toggleServicio = (id: string) => {
     setSeleccionados((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleRecurso = (id: string) => {
+    setRecursosSel((current) => {
       const next = new Set(current);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -211,6 +230,32 @@ export function CitaForm({
           ))}
         </div>
       )}
+      {recursos.length > 0 ? (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+            Recursos de la cita (cabina, silla, equipo)
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {recursos.map((recurso) => (
+              <label
+                className="flex min-h-11 items-center gap-3 rounded-xl border border-[#eee8e3] p-3 text-sm transition-colors hover:border-[#c9a899]"
+                key={recurso.id}
+              >
+                <input
+                  checked={recursosSel.has(recurso.id)}
+                  className="size-4 accent-[#8a5140]"
+                  name="recursoIds"
+                  onChange={() => toggleRecurso(recurso.id)}
+                  type="checkbox"
+                  value={recurso.id}
+                />
+                <span className="flex-1 font-medium">{recurso.nombre}</span>
+                <span className="text-[10px] uppercase tracking-wide text-[#81746c]">{recurso.tipo}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="rounded-xl border border-[#e3d9d1] bg-[#faf6f3] p-4">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">Resumen</h4>
         <div className="mt-2 grid grid-cols-3 gap-3 text-sm">
@@ -236,6 +281,9 @@ export function CitaForm({
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
       <input name="sucursalId" type="hidden" value={sucursal.id} />
+      {initial?.version !== undefined ? (
+        <input name="version" type="hidden" value={initial.version} />
+      ) : null}
       <FormTabs
         tabs={[
           { id: "general", label: "Datos de la cita", content: general },
@@ -243,6 +291,28 @@ export function CitaForm({
         ]}
       />
       <ActionFeedback state={state} successMessage="Cita guardada correctamente." />
+      {state.sugerencias && state.sugerencias.length > 0 ? (
+        <div className="rounded-xl border border-[#e3d9d1] bg-[#faf6f3] p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+            Horarios libres sugeridos
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {state.sugerencias.map((iso) => (
+              <button
+                className="rounded-lg border border-[#e3d9d1] bg-white px-3 py-1.5 text-xs font-medium text-[#403a35] transition-colors hover:border-[#8a5140] hover:bg-[#f2e3dc]"
+                key={iso}
+                onClick={() => setInicio(toBranchDateTimeInput(iso, timeZone))}
+                type="button"
+              >
+                {formatSugerencia(iso, timeZone)}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-[#81746c]">
+            Elige una sugerencia para rellenar fecha y hora, luego guarda de nuevo.
+          </p>
+        </div>
+      ) : null}
       <div className="flex justify-end">
         <Button className="rounded-xl" disabled={pending} type="submit">
           {pending ? "Guardando..." : initial?.id ? "Guardar cambios" : "Crear cita"}

@@ -1,9 +1,9 @@
 "use client";
 
-import { Package, Scissors, Search } from "lucide-react";
+import { Crown, Package, PackageCheck, Scissors, Search } from "lucide-react";
 import { useMemo, useState, useTransition } from "react";
 
-import { agregarProductoVenta, agregarServicioVenta } from "@/app/admin/pos/actions";
+import { agregarMembresiaVenta, agregarPaqueteVenta, agregarProductoVenta, agregarServicioVenta } from "@/app/admin/pos/actions";
 import { useToast } from "@/components/ui/toast";
 import { initialActionState, type ActionState } from "@/lib/action-state";
 import { categoryTone } from "@/lib/category-color";
@@ -11,15 +11,19 @@ import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { TicketData } from "@/modules/pos/ticket";
 
-type CatalogoTab = "servicios" | "productos";
+type CatalogoTab = "servicios" | "productos" | "paquetes" | "membresias";
 
 type ServicioItem = TicketData["catalogoServicios"][number];
 type ProductoItem = TicketData["catalogoProductos"][number];
-type CatalogoItem = ServicioItem | ProductoItem;
+type PaqueteItem = TicketData["catalogoPaquetes"][number];
+type MembresiaItem = TicketData["catalogoMembresias"][number];
+type CatalogoItem = ServicioItem | ProductoItem | PaqueteItem | MembresiaItem;
 
 const TABS: Array<{ value: CatalogoTab; label: string; icon: typeof Scissors }> = [
   { value: "servicios", label: "Servicios", icon: Scissors },
   { value: "productos", label: "Productos", icon: Package },
+  { value: "paquetes", label: "Paquetes", icon: PackageCheck },
+  { value: "membresias", label: "Membresías", icon: Crown },
 ];
 
 function chipClass(tone: string, selected: boolean) {
@@ -38,6 +42,9 @@ function chipClass(tone: string, selected: boolean) {
 export function CatalogoSelector({
   servicios,
   productos,
+  paquetes = [],
+  membresias = [],
+  hasCliente = false,
   currency,
   organizationId,
   ventaId,
@@ -46,6 +53,10 @@ export function CatalogoSelector({
 }: {
   servicios: TicketData["catalogoServicios"];
   productos: TicketData["catalogoProductos"];
+  paquetes?: TicketData["catalogoPaquetes"];
+  membresias?: TicketData["catalogoMembresias"];
+  /** La venta ya tiene cliente asignado (requisito para paquetes/membresías). */
+  hasCliente?: boolean;
   currency: string;
   organizationId: string;
   ventaId: string;
@@ -58,12 +69,13 @@ export function CatalogoSelector({
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
-  const items: CatalogoItem[] = tab === "servicios" ? servicios : productos;
+  const items: CatalogoItem[] =
+    tab === "servicios" ? servicios : tab === "productos" ? productos : tab === "membresias" ? membresias : paquetes;
 
   const categorias = useMemo(() => {
     const map = new Map<string, string>();
     for (const item of items) {
-      if (item.categoriaId) map.set(item.categoriaId, item.categoriaNombre ?? "Sin nombre");
+      if ("categoriaId" in item && item.categoriaId) map.set(item.categoriaId, item.categoriaNombre ?? "Sin nombre");
     }
     return [...map.entries()]
       .map(([id, nombre]) => ({ id, nombre }))
@@ -73,12 +85,14 @@ export function CatalogoSelector({
   const filtrados = useMemo(() => {
     const q = query.trim().toLowerCase();
     return items.filter((item) => {
-      if (categoriaId && item.categoriaId !== categoriaId) return false;
+      if (categoriaId && "categoriaId" in item && item.categoriaId !== categoriaId) return false;
+      if (categoriaId && !("categoriaId" in item)) return false;
       if (!q) return true;
       const candidatos = [
         item.nombre,
-        item.categoriaNombre ?? "",
+        "categoriaNombre" in item ? (item.categoriaNombre ?? "") : "",
         "sku" in item ? item.sku : "",
+        "servicioNombre" in item ? (item.servicioNombre ?? "") : "",
       ];
       return candidatos.some((candidato) => candidato.toLowerCase().includes(q));
     });
@@ -97,6 +111,24 @@ export function CatalogoSelector({
     const data = new FormData();
     data.set("organizacionId", organizationId);
     data.set("ventaId", ventaId);
+    if ("sesiones" in item) {
+      if (!hasCliente) {
+        toast.error("Asigna un cliente a la venta para vender un paquete.");
+        return;
+      }
+      data.set("paqueteId", item.id);
+      startTransition(async () => reportResult(await agregarPaqueteVenta(initialActionState, data)));
+      return;
+    }
+    if ("duracionDias" in item) {
+      if (!hasCliente) {
+        toast.error("Asigna un cliente a la venta para vender una membresía.");
+        return;
+      }
+      data.set("membresiaId", item.id);
+      startTransition(async () => reportResult(await agregarMembresiaVenta(initialActionState, data)));
+      return;
+    }
     let action = agregarServicioVenta;
     if ("duracionMinutos" in item) {
       data.set("servicioId", item.id);
@@ -153,7 +185,7 @@ export function CatalogoSelector({
             className="h-10 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
             id="pos-catalogo-buscar"
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={tab === "servicios" ? "Buscar servicio" : "Buscar por SKU o nombre"}
+            placeholder={tab === "servicios" ? "Buscar servicio" : tab === "paquetes" ? "Buscar paquete" : tab === "membresias" ? "Buscar membresía" : "Buscar por SKU o nombre"}
             type="search"
             value={query}
           />
@@ -184,11 +216,21 @@ export function CatalogoSelector({
         </div>
       ) : null}
 
+      {(tab === "paquetes" || tab === "membresias") && !hasCliente ? (
+        <p className="rounded-xl bg-[#fbf3ec] px-4 py-3 text-xs text-[#8a5140]">
+          Asigna un cliente a la venta para vender {tab === "paquetes" ? "paquetes: el saldo" : "membresías: la vigencia"} se crea a su nombre al cobrar.
+        </p>
+      ) : null}
+
       {filtrados.length === 0 ? (
         <p className="rounded-xl bg-[#f1eeea] px-4 py-3 text-sm text-[#625b55]">
           {tab === "servicios"
             ? "No hay servicios que coincidan."
-            : "No hay productos que coincidan."}
+            : tab === "paquetes"
+              ? "No hay paquetes que coincidan."
+              : tab === "membresias"
+                ? "No hay membresías que coincidan."
+                : "No hay productos que coincidan."}
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
@@ -197,7 +239,7 @@ export function CatalogoSelector({
               aria-label={`Agregar ${item.nombre} al ticket`}
               className={cn(
                 "flex min-h-14 flex-col justify-between gap-1.5 rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                categoryTone(item.categoriaId).card,
+                categoryTone("categoriaId" in item ? item.categoriaId : null).card,
               )}
               disabled={pending}
               key={item.id}
@@ -212,7 +254,13 @@ export function CatalogoSelector({
                   {formatCurrency(item.precio, { currency })}
                 </span>
                 <span className="truncate text-xs tabular-nums text-[#81746c]">
-                  {"duracionMinutos" in item ? `${item.duracionMinutos} min` : item.sku}
+                  {"duracionMinutos" in item
+                    ? `${item.duracionMinutos} min`
+                    : "sesiones" in item
+                      ? `${item.sesiones} sesiones · ${item.servicioNombre ?? ""}`
+                      : "duracionDias" in item
+                        ? `${Number(item.descuentoPorcentaje)}% · ${item.duracionDias} días`
+                        : item.sku}
                 </span>
               </span>
             </button>

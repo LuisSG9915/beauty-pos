@@ -112,6 +112,7 @@ async function cleanup(ctx: E2EContext) {
        where organizacion_id = $1 and (
          cita_id in (select id from citas where organizacion_id = $1 and notas ilike $2)
          or corte_id in (select id from cortes_caja where organizacion_id = $1 and notas ilike $2)
+         or notas ilike '%E2E-SMOKE%'
        )`,
       [ctx.orgId, E2E_NOTAS],
     );
@@ -119,6 +120,81 @@ async function cleanup(ctx: E2EContext) {
       `update citas set activo = false
        where organizacion_id = $1 and notas ilike $2`,
       [ctx.orgId, E2E_NOTAS],
+    );
+    // Anticipos ligados a citas E2E: quedan invisibles al desactivar la cita,
+    // pero se marcan igual para no acumular residuos vigentes.
+    await client.query(
+      `update anticipos set activo = false
+       where organizacion_id = $1 and cita_id in (
+         select id from citas where organizacion_id = $1 and notas ilike $2
+       )`,
+      [ctx.orgId, E2E_NOTAS],
+    );
+    // Paquetes: usos y saldos ligados a ventas E2E (cita marcada o corte E2E),
+    // más el catálogo E2E (clave E2EPAQ*) para no acumular residuos.
+    await client.query(
+      `update paquete_usos set activo = false
+       where organizacion_id = $1 and venta_id in (
+         select id from ventas where organizacion_id = $1 and (
+           cita_id in (select id from citas where organizacion_id = $1 and notas ilike $2)
+           or corte_id in (select id from cortes_caja where organizacion_id = $1 and notas ilike $2)
+         )
+       )`,
+      [ctx.orgId, E2E_NOTAS],
+    );
+    await client.query(
+      `update cliente_paquetes set activo = false
+       where organizacion_id = $1 and (
+         cliente_id in (select id from clientes where organizacion_id = $1 and nombre ilike 'E2ECLI%')
+         or venta_id in (
+           select id from ventas where organizacion_id = $1 and (
+             cita_id in (select id from citas where organizacion_id = $1 and notas ilike $2)
+             or corte_id in (select id from cortes_caja where organizacion_id = $1 and notas ilike $2)
+           )
+         )
+       )`,
+      [ctx.orgId, E2E_NOTAS],
+    );
+    await client.query(
+      `update paquetes set activo = false
+       where organizacion_id = $1 and clave ilike 'E2EPAQ%'`,
+      [ctx.orgId],
+    );
+    // Membresías E2E: saldos de clientes E2E y catálogo E2EMEM*.
+    await client.query(
+      `update cliente_membresias set activo = false
+       where organizacion_id = $1 and (
+         cliente_id in (select id from clientes where organizacion_id = $1 and nombre ilike 'E2ECLI%')
+         or venta_id in (
+           select id from ventas where organizacion_id = $1 and (
+             cita_id in (select id from citas where organizacion_id = $1 and notas ilike $2)
+             or corte_id in (select id from cortes_caja where organizacion_id = $1 and notas ilike $2)
+           )
+         )
+       )`,
+      [ctx.orgId, E2E_NOTAS],
+    );
+    await client.query(
+      `update membresias set activo = false
+       where organizacion_id = $1 and clave ilike 'E2EMEM%'`,
+      [ctx.orgId],
+    );
+    // Expediente E2E: fichas y consentimientos de clientes E2E.
+    await client.query(
+      `update clientes_fichas_tecnicas set activo = false
+       where organizacion_id = $1 and (
+         cliente_id in (select id from clientes where organizacion_id = $1 and nombre ilike 'E2ECLI%')
+         or notas ilike 'E2E%' or formula ilike 'E2E%'
+       )`,
+      [ctx.orgId],
+    );
+    await client.query(
+      `update clientes_consentimientos set activo = false
+       where organizacion_id = $1 and (
+         cliente_id in (select id from clientes where organizacion_id = $1 and nombre ilike 'E2ECLI%')
+         or titulo ilike 'E2E%'
+       )`,
+      [ctx.orgId],
     );
     // Cortes E2E interrumpidos y residuos del usuario de prueba sin ventas
     // ligadas: se cierran para que la apertura del run actual pueda ejecutarse.
@@ -332,6 +408,8 @@ async function main() {
 
   const browser = await puppeteer.launch({ headless: true });
   const page = await browser.newPage();
+  // Dev mode recompila rutas tras cambios; 60s absorbe compiles pesadas.
+  page.setDefaultNavigationTimeout(60_000);
   await page.setViewport({ width: 1440, height: 900 });
   page.on("console", (msg) => {
     if (msg.type() === "error") consoleErrors.push(`[${page.url()}] ${msg.text()}`);
@@ -469,7 +547,10 @@ async function main() {
       await waitForText(page, "Agregar al ticket");
     };
     /** Tarjeta del catálogo POS → línea del ticket (reintenta hasta que hidrate React). */
-    const agregarAlTicket = async (tab: "Servicios" | "Productos", nombre: string) => {
+    const agregarAlTicket = async (tab: "Servicios" | "Productos" | "Paquetes" | "Membresías", nombre: string) => {
+      // Las líneas de paquete/membresía no tienen control de cantidad: se
+      // confirman por su botón "Quitar <nombre>".
+      const selector = tab === "Paquetes" || tab === "Membresías" ? `[aria-label="Quitar ${nombre}"]` : `[aria-label="Cantidad de ${nombre}"]`;
       for (let intento = 0; intento < 3; intento++) {
         await clickText(page, '[role="group"][aria-label="Tipo de catálogo"] button', tab);
         await sleep(300);
@@ -481,7 +562,7 @@ async function main() {
         }, nombre);
         if (!ok) throw new Error(`Tarjeta de catálogo no encontrada: ${nombre}`);
         const aparecio = await page
-          .waitForSelector(`[aria-label="Cantidad de ${nombre}"]`, { visible: true, timeout: 10000 })
+          .waitForSelector(selector, { visible: true, timeout: 10000 })
           .then(() => true)
           .catch(() => false);
         if (aparecio) return;
@@ -592,10 +673,13 @@ async function main() {
     await setNativeInput(page, 'input[name="cantidad"]', "1");
     await setNativeInput(page, 'textarea[name="notas"]', "");
     await clickText(page, 'button[type="submit"]', "Registrar movimiento");
-    await sleep(1500);
-    const notasRequeridas = await page.evaluate(() =>
-      document.body.innerText.toLowerCase().includes("motivo"),
-    );
+    const notasRequeridas = await page
+      .waitForFunction(
+        () => document.body.innerText.toLowerCase().includes("motivo"),
+        { timeout: 15000 },
+      )
+      .then(() => true)
+      .catch(() => false);
     record("Salida sin notas rechazada", notasRequeridas);
 
     // ── Cobro inline con stock: cierra el sheet y completa la cita ────────
@@ -620,6 +704,7 @@ async function main() {
       clickText(page, 'button[type="submit"]', "Abrir venta"),
     ]);
     record("Abrir venta walk-in crea ticket", page.url().includes("ventaId"));
+    const ventaWalkinUrl = page.url();
     await waitForText(page, "Agregar al ticket");
     await agregarAlTicket("Servicios", "CORTE DE DAMA");
     // Propina por atajo: 10% de $300 = $30 → cobro total $330
@@ -651,6 +736,24 @@ async function main() {
     const ventasListadas = await page.evaluate(() => document.body.innerText.includes("Completada"));
     record("Venta walk-in cobrada aparece en Ventas de hoy", ventasListadas);
     await shot(page, "10-pos-walkin");
+
+    // ── POS: devolución parcial por línea (venta cobrada sigue "completada")
+    await page.goto(ventaWalkinUrl, { waitUntil: "networkidle0" });
+    await waitForText(page, "Venta cerrada");
+    await clickText(page, "button", "Devolver líneas…");
+    await page.waitForSelector('input[aria-label="Cantidad a devolver de CORTE DE DAMA"]', { visible: true });
+    await setNativeInput(page, 'input[aria-label="Cantidad a devolver de CORTE DE DAMA"]', "1");
+    await setNativeInput(page, 'input[name="motivo"]', "E2E-SMOKE devolución parcial");
+    await clickText(page, 'button[type="submit"]', "Registrar devolución");
+    await waitPendingClear();
+    await page.reload({ waitUntil: "networkidle0" });
+    const devolucionVisible = await page.evaluate(() => {
+      const texto = document.body.innerText;
+      return texto.includes("Devoluciones") && texto.includes("E2E-SMOKE devolución parcial");
+    });
+    record("Devolución parcial registrada y visible en el ticket", devolucionVisible);
+    await shot(page, "10b-devolucion-parcial");
+    await page.goto(`${BASE_URL}/admin/pos`, { waitUntil: "networkidle0" });
 
     // ── POS: descuento en ticket ──────────────────────────────────────────
     await Promise.all([
@@ -764,6 +867,15 @@ async function main() {
     record("Mi día: Cobrar abre ticket POS con returnTo", vuelveMiDia);
     await shot(page, "16-mi-dia-cobro");
 
+    // Retorno exacto: cobrar el ticket en modo página redirige a /admin/mi-dia.
+    await clickText(page, 'button[type="submit"]', "Cobrar");
+    const retornoExacto = await page
+      .waitForFunction(() => location.pathname === "/admin/mi-dia", { timeout: 25000 })
+      .then(() => true)
+      .catch(() => false);
+    record("Cobro desde ticket regresa a Mi día (returnTo)", retornoExacto);
+    await shot(page, "16b-mi-dia-retorno");
+
     // ── Catálogos: alta en cada módulo ────────────────────────────────────
     const runId = Date.now().toString(36).toUpperCase();
     const fill = (name: string, value: string) =>
@@ -799,6 +911,49 @@ async function main() {
       record(`Catálogo ${mod.ruta}: alta visible`, creado);
     }
     await shot(page, "16-catalogos");
+
+    // ── Paquetes: alta en catálogo (combobox de servicio aparte) ─────────
+    const paqueteNombre = `E2E Paquete ${runId}`;
+    await page.goto(`${BASE_URL}/admin/paquetes`, { waitUntil: "networkidle0" });
+    await fill("clave", `E2EPAQ${runId}`);
+    await fill("nombre", paqueteNombre);
+    await pickCombobox(page, "Servicio cubierto", "CORTE DE DAMA");
+    await fill("sesiones", "3");
+    await fill("precio", "800");
+    await clickText(page, 'button[type="submit"]', "Guardar paquete");
+    await waitPendingClear();
+    await sleep(800);
+    await page.goto(`${BASE_URL}/admin/paquetes`, { waitUntil: "networkidle0" });
+    const paqueteCreado = await page.evaluate(
+      (n) => document.body.innerText.includes(n),
+      paqueteNombre,
+    );
+    record("Catálogo paquetes: alta visible", paqueteCreado);
+
+    // ── Membresías: alta en catálogo (una vigente y otra para la prueba de
+    // vigencia: se le inserta un saldo vencido directo en base) ─────────
+    const membresiaNombre = `E2E Membresía ${runId}`;
+    const membresiaVencidaNombre = `E2E Membresía Vencida ${runId}`;
+    for (const [clave, nombre] of [
+      [`E2EMEM${runId}`, membresiaNombre],
+      [`E2EMEMV${runId}`, membresiaVencidaNombre],
+    ] as const) {
+      await page.goto(`${BASE_URL}/admin/membresias`, { waitUntil: "networkidle0" });
+      await fill("clave", clave);
+      await fill("nombre", nombre);
+      await fill("precio", "500");
+      await fill("duracionDias", "30");
+      await fill("descuentoPorcentaje", "10");
+      await clickText(page, 'button[type="submit"]', "Guardar membresía");
+      await waitPendingClear();
+      await sleep(800);
+    }
+    await page.goto(`${BASE_URL}/admin/membresias`, { waitUntil: "networkidle0" });
+    const membresiaCreada = await page.evaluate(
+      (n) => document.body.innerText.includes(n),
+      membresiaNombre,
+    );
+    record("Catálogo membresías: alta visible", membresiaCreada);
 
     // ── Servicios: editar y ocultar ───────────────────────────────────────
     const servicioNombre = `E2E Servicio ${runId}`;
@@ -917,6 +1072,67 @@ async function main() {
         .catch(() => false);
       record("Clientes: desactivar registro de ficha", fichaOff);
     }
+    // ── Nota privada del expediente (permiso expedientes.privado) ────
+    await clickText(page, '[role="tab"]', "Privado");
+    await sleep(300);
+    const notaPrivada = `E2E-PRIVADA-${runId} observación confidencial`;
+    // El formulario de la pestaña Privado es el último con checkbox privada
+    // (los paneles Base UI quedan montados en orden).
+    const privadaFilled = await page.evaluate((texto) => {
+      const checks = [...document.querySelectorAll('input[name="privada"]')];
+      const cb = checks[checks.length - 1];
+      if (!(cb instanceof HTMLInputElement)) return false;
+      const form = cb.closest("form");
+      const area = form?.querySelector('textarea[name="notas"]');
+      if (!(area instanceof HTMLTextAreaElement) || !form) return false;
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+      setter?.call(area, texto);
+      area.dispatchEvent(new Event("input", { bubbles: true }));
+      cb.checked = true;
+      cb.dispatchEvent(new Event("change", { bubbles: true }));
+      return true;
+    }, notaPrivada);
+    if (!privadaFilled) throw new Error("Formulario de nota privada no encontrado");
+    await page.evaluate(() => {
+      const checks = [...document.querySelectorAll('input[name="privada"]')];
+      (checks[checks.length - 1] as HTMLInputElement | undefined)?.closest("form")?.requestSubmit();
+    });
+    const privadaOk = await page
+      .waitForFunction(
+        (n) => document.body.innerText.includes(n) && document.body.innerText.includes("Privada"),
+        { timeout: 15000 },
+        notaPrivada,
+      )
+      .then(() => true)
+      .catch(() => false);
+    record("Clientes: nota privada del expediente", privadaOk);
+
+    // ── Consentimiento informado con firma ────────────────────────────
+    await clickText(page, '[role="tab"]', "Consentimientos");
+    await sleep(300);
+    const consentTitulo = `E2E Consentimiento ${runId}`;
+    const consentScope = 'form:has(input[name="firmadoPor"])';
+    await setNativeInput(page, 'input[name="titulo"]', consentTitulo, consentScope);
+    await setNativeInput(
+      page,
+      'textarea[name="contenido"]',
+      `E2E-${runId} declaro que se me informaron riesgos y cuidados del procedimiento.`,
+      consentScope,
+    );
+    await clickText(page, 'button[type="submit"]', "Registrar consentimiento");
+    const consentOk = await page
+      .waitForFunction(
+        (t) =>
+          document.body.innerText.includes(t) &&
+          document.body.innerText.includes("Aceptado") &&
+          document.body.innerText.includes("Firmado por:"),
+        { timeout: 15000 },
+        consentTitulo,
+      )
+      .then(() => true)
+      .catch(() => false);
+    record("Clientes: consentimiento informado firmado", consentOk);
+
     await shot(page, "17-clientes");
 
     // ── Caja: apertura, venta al corte y cierre ciego ─────────────────
@@ -930,6 +1146,45 @@ async function main() {
       .catch(() => false);
     record("Caja: apertura con fondo inicial", cajaAbierta);
 
+    // ── Anticipo: depósito de cita cobrado al turno y aplicado al cobro ──
+    // Cita nueva en el segundo slot libre: depósito $100 efectivo entra al
+    // corte como entrada; al cobrar, el ticket cobra solo el resto ($200).
+    await page.goto(`${BASE_URL}/admin/agenda`, { waitUntil: "networkidle0" });
+    await crearCita(slots[2], `${E2E_MARK} anticipo`);
+    await abrirDetalle("pendiente");
+    // El encabezado de sección usa text-transform:uppercase → innerText
+    // devuelve "ANTICIPOS"; se compara en minúsculas.
+    await page.waitForFunction(
+      () => document.body.innerText.toLowerCase().includes("anticipos"),
+      { timeout: 15000 },
+    );
+    await clickPanel("+ Cobrar anticipo");
+    await setNativeInput(page, 'input[aria-label="Monto del anticipo"]', "100");
+    await clickPanel("Cobrar anticipo");
+    const anticipoVigente = await page
+      .waitForFunction(() => document.body.innerText.includes("Vigente"), { timeout: 15000 })
+      .then(() => true)
+      .catch(() => false);
+    record("Anticipo de cita registrado y vigente", anticipoVigente);
+    await shot(page, "17a-anticipo");
+
+    // Check-in y cobro: $300 − $100 anticipo → se cobran $200 en efectivo.
+    await clickPanel("Cliente llegó");
+    await page.waitForFunction(() => document.body.innerText.includes("En proceso"), { timeout: 15000 });
+    await abrirCobro();
+    const anticipoVisible = await page.evaluate(() =>
+      document.body.innerText.includes("Anticipo por aplicar"),
+    );
+    record("Ticket muestra anticipo por aplicar", anticipoVisible);
+    await clickCobrar();
+    await esperarResultadoCobro(true);
+    await sleep(600);
+    const sheetCerroAnticipo = await page.evaluate(
+      () => !document.body.innerText.includes("Cobro de la cita"),
+    );
+    record("Cobro con anticipo aplicado cierra el sheet (resto $200)", sheetCerroAnticipo);
+    await shot(page, "17b-anticipo-cobro");
+
     // Venta walk-in en efectivo ($300) para que caiga en el corte abierto.
     await page.goto(`${BASE_URL}/admin/pos`, { waitUntil: "networkidle0" });
     await Promise.all([
@@ -938,6 +1193,18 @@ async function main() {
     ]);
     await waitForText(page, "Agregar al ticket");
     await agregarAlTicket("Servicios", "CORTE DE DAMA");
+
+    // Promoción vigente del catálogo (10% sobre todo): $300 → $270.
+    await pickCombobox(page, "Promoción vigente", `E2E Promo ${runId}`);
+    await clickText(page, 'button[type="submit"]', "Aplicar promoción");
+    await waitPendingClear();
+    const promoAplicada = await page
+      .waitForFunction(() => document.body.innerText.includes("$270.00"), { timeout: 15000 })
+      .then(() => true)
+      .catch(() => false);
+    record("Promoción vigente aplicada al ticket (10% = $270)", promoAplicada);
+    await shot(page, "17c-promocion");
+
     await page.evaluate(() => {
       const grupo = document.querySelector('[role="group"][aria-label="Medio del pago 1"]');
       const chip = Array.from(grupo?.querySelectorAll("button") ?? []).find((b) =>
@@ -949,13 +1216,173 @@ async function main() {
     await clickText(page, 'button[type="submit"]', "Cobrar");
     await esperarResultadoCobro(false);
 
-    // Cierre ciego: efectivo contado = fondo $100 + venta $300 = $400.
+    // ── Paquete prepagado: compra ($800) a nombre del cliente E2E ────────
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
+      clickText(page, 'button[type="submit"]', "Abrir venta"),
+    ]);
+    await waitForText(page, "Agregar al ticket");
+    await pickCombobox(page, "Cliente de la venta", clienteNombre);
+    const clienteAsignado = await page
+      .waitForFunction((n) => document.body.innerText.includes(`Cliente: ${n}`), { timeout: 15000 }, clienteNombre)
+      .then(() => true)
+      .catch(() => false);
+    record("POS: cliente asignado a venta walk-in", clienteAsignado);
+    await agregarAlTicket("Paquetes", paqueteNombre);
+    await page.evaluate(() => {
+      const grupo = document.querySelector('[role="group"][aria-label="Medio del pago 1"]');
+      const chip = Array.from(grupo?.querySelectorAll("button") ?? []).find((b) =>
+        b.textContent?.toUpperCase().includes("EFECTIVO"),
+      );
+      chip?.click();
+    });
+    await sleep(300);
+    await clickText(page, 'button[type="submit"]', "Cobrar");
+    await esperarResultadoCobro(false);
+    const ventaPaqueteOk = await page.evaluate(
+      () => location.pathname === "/admin/pos" && !location.search.includes("ventaId"),
+    );
+    record("POS: paquete vendido al cliente (cobro $800)", ventaPaqueteOk);
+
+    // Segunda venta del mismo cliente: la sesión de paquete cubre el servicio.
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
+      clickText(page, 'button[type="submit"]', "Abrir venta"),
+    ]);
+    await waitForText(page, "Agregar al ticket");
+    await pickCombobox(page, "Cliente de la venta", clienteNombre);
+    await page.waitForFunction((n) => document.body.innerText.includes(`Cliente: ${n}`), { timeout: 15000 }, clienteNombre);
+    await agregarAlTicket("Servicios", "CORTE DE DAMA");
+    const usoClick = await page.evaluate(() => {
+      const btn = Array.from(document.querySelectorAll<HTMLElement>("button")).find((b) =>
+        b.textContent?.includes("Usar paquete"),
+      );
+      if (!btn) return false;
+      btn.click();
+      return true;
+    });
+    const cubiertoPorPaquete = await page
+      .waitForFunction(
+        () => document.body.innerText.toLowerCase().includes("cubierto por paquete"),
+        { timeout: 15000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+    record("Paquete: sesión consumida cubre el servicio (total $0)", usoClick && cubiertoPorPaquete);
+    await shot(page, "17d-paquete");
+    await clickText(page, 'button[type="submit"]', "Completar venta");
+    await esperarResultadoCobro(false);
+
+    // ── Membresía: compra ($500) a nombre del cliente E2E ──────────────
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
+      clickText(page, 'button[type="submit"]', "Abrir venta"),
+    ]);
+    await waitForText(page, "Agregar al ticket");
+    await pickCombobox(page, "Cliente de la venta", clienteNombre);
+    await page.waitForFunction((n) => document.body.innerText.includes(`Cliente: ${n}`), { timeout: 15000 }, clienteNombre);
+    await agregarAlTicket("Membresías", membresiaNombre);
+    await page.evaluate(() => {
+      const grupo = document.querySelector('[role="group"][aria-label="Medio del pago 1"]');
+      const chip = Array.from(grupo?.querySelectorAll("button") ?? []).find((b) =>
+        b.textContent?.toUpperCase().includes("EFECTIVO"),
+      );
+      chip?.click();
+    });
+    await sleep(300);
+    await clickText(page, 'button[type="submit"]', "Cobrar");
+    await esperarResultadoCobro(false);
+    const ventaMembresiaOk = await page.evaluate(
+      () => location.pathname === "/admin/pos" && !location.search.includes("ventaId"),
+    );
+    record("POS: membresía vendida al cliente (cobro $500)", ventaMembresiaOk);
+
+    // Membresía vencida del cliente (vigencia pasada, ligada a la venta de
+    // compra): NO debe aparecer en el selector del ticket.
+    await withDb(async (client) => {
+      await client.query(
+        `insert into cliente_membresias (organizacion_id, sucursal_id, cliente_id, membresia_id, venta_id, vigencia_desde, vigencia_hasta, estado, created_by)
+         select v.organizacion_id, v.sucursal_id, v.cliente_id, m.id, v.id, '2020-01-01', '2020-01-31', 'vigente', $3
+         from ventas v
+         join detalle_ventas_membresias d on d.venta_id = v.id and d.activo
+         join membresias m on m.organizacion_id = v.organizacion_id and m.clave = $2
+         where v.organizacion_id = $1
+         order by v.created_at desc
+         limit 1`,
+        [ctx.orgId, `E2EMEMV${runId}`, ctx.adminId],
+      );
+    });
+
+    // ── Venta con descuento de membresía: servicio $300 − 10% = $270 ────
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
+      clickText(page, 'button[type="submit"]', "Abrir venta"),
+    ]);
+    await waitForText(page, "Agregar al ticket");
+    await pickCombobox(page, "Cliente de la venta", clienteNombre);
+    await page.waitForFunction((n) => document.body.innerText.includes(`Cliente: ${n}`), { timeout: 15000 }, clienteNombre);
+    await agregarAlTicket("Servicios", "CORTE DE DAMA");
+
+    // El selector "Membresía vigente" solo lista la membresía vigente: la
+    // vencida (vigencia 2020) queda fuera aunque su estado sea "vigente".
+    const membresiaInputId = await page.evaluate(() => {
+      const lab = Array.from(document.querySelectorAll("label")).find((l) =>
+        l.textContent?.toLowerCase().includes("membresía vigente"),
+      );
+      return lab?.htmlFor ?? null;
+    });
+    if (!membresiaInputId) throw new Error("Combobox 'Membresía vigente' no renderizó");
+    const membresiaSelector = `[id="${membresiaInputId.replace(/"/g, '\\"')}"]`;
+    await page.click(membresiaSelector);
+    // La lista de opciones abre al escribir: "E2E" matchea ambas membresías.
+    await page.type(membresiaSelector, "E2E");
+    await page.waitForSelector('[role="option"]', { visible: true, timeout: 8000 });
+    const opcionesMembresia = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('[role="option"]')).map((o) => o.textContent ?? ""),
+    );
+    const sinVencida = !opcionesMembresia.some((o) => o.includes("Vencida"));
+    const conVigente = opcionesMembresia.some((o) => o.includes(membresiaNombre));
+    record("Membresía: selector solo muestra vigentes (vencida fuera)", sinVencida && conVigente);
+    await page.evaluate((n) => {
+      const opt = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).find((o) =>
+        o.textContent?.includes(n),
+      );
+      opt?.click();
+    }, membresiaNombre);
+    await clickText(page, 'button[type="submit"]', "Aplicar membresía");
+    const descuentoMembresia = await page
+      .waitForFunction(
+        () => document.body.innerText.includes("Membresía ·"),
+        { timeout: 15000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+    record("Membresía: descuento 10% aplicado al ticket (−$30)", descuentoMembresia);
+    await shot(page, "17e-membresia");
+    await page.evaluate(() => {
+      const grupo = document.querySelector('[role="group"][aria-label="Medio del pago 1"]');
+      const chip = Array.from(grupo?.querySelectorAll("button") ?? []).find((b) =>
+        b.textContent?.toUpperCase().includes("EFECTIVO"),
+      );
+      chip?.click();
+    });
+    await sleep(300);
+    await clickText(page, 'button[type="submit"]', "Cobrar");
+    await esperarResultadoCobro(false);
+    const ventaConMembresiaOk = await page.evaluate(
+      () => location.pathname === "/admin/pos" && !location.search.includes("ventaId"),
+    );
+    record("POS: venta cobrada con descuento de membresía ($270)", ventaConMembresiaOk);
+
+    // Cierre ciego: efectivo contado = fondo $100 + anticipo $100 + venta con
+    // anticipo $200 + venta walk-in con promoción $270 + paquete $800 +
+    // membresía $500 + venta con membresía $270 = $2240.
     await page.goto(`${BASE_URL}/admin/caja`, { waitUntil: "networkidle0" });
     await page.evaluate(() => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
       for (const input of Array.from(document.querySelectorAll<HTMLInputElement>('input[name^="contado_"]'))) {
         const label = input.closest("div")?.querySelector("label")?.textContent ?? "";
-        setter.call(input, label.toUpperCase().includes("EFECTIVO") ? "400" : "0");
+        setter.call(input, label.toUpperCase().includes("EFECTIVO") ? "2240" : "0");
         input.dispatchEvent(new Event("input", { bubbles: true }));
       }
     });
@@ -969,6 +1396,143 @@ async function main() {
       .catch(() => false);
     record("Caja: cierre ciego cuadra (fondo + venta en efectivo)", cierreOk);
     await shot(page, "18-caja");
+
+    // ── Reportes: operativos y financieros del día ────────────────────
+    // El rango por defecto (últimos 30 días) incluye todas las ventas del run.
+    await page.goto(`${BASE_URL}/admin/reportes`, { waitUntil: "networkidle0" });
+    // Los KPI usan text-transform:uppercase → innerText llega en mayúsculas;
+    // se compara todo en minúsculas.
+    const reportesOk = await page
+      .waitForFunction(
+        () => {
+          const texto = document.body.innerText.toLowerCase();
+          return (
+            texto.includes("citas por estado") &&
+            texto.includes("ventas por día") &&
+            texto.includes("cobros por medio de pago") &&
+            texto.includes("asistencia")
+          );
+        },
+        { timeout: 15000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+    record("Reportes: secciones operativas y financieras", reportesOk);
+    const reportesData = await page.evaluate(
+      (hoy) => document.body.innerText.includes(hoy),
+      fecha,
+    );
+    record("Reportes: ventas del día en el rango por defecto", reportesData);
+    await shot(page, "19-reportes");
+
+    // ── PWA: manifest, iconos, service worker y fallback offline ──────
+    const manifest = await page.evaluate(async () => {
+      const res = await fetch("/manifest.webmanifest");
+      return res.ok ? res.json() : null;
+    });
+    const manifestOk = Boolean(
+      manifest?.display === "standalone" &&
+        manifest?.start_url === "/admin" &&
+        Array.isArray(manifest?.icons) &&
+        manifest.icons.some((icon: { sizes?: string }) => icon.sizes === "512x512"),
+    );
+    record("PWA: manifest instalable (standalone + icono 512)", manifestOk);
+
+    const assetsOk = await page.evaluate(async () => {
+      const [icon, apple, sw] = await Promise.all([
+        fetch("/icon"),
+        fetch("/apple-icon"),
+        fetch("/sw.js"),
+      ]);
+      return (
+        icon.ok && icon.headers.get("content-type")?.includes("image/png") &&
+        apple.ok && sw.ok && sw.headers.get("content-type")?.includes("javascript")
+      );
+    });
+    record("PWA: iconos generados + sw.js servido", Boolean(assetsOk));
+
+    await page.goto(`${BASE_URL}/offline`, { waitUntil: "networkidle0" });
+    const offlineOk = await page
+      .waitForFunction(() => document.body.innerText.includes("Sin conexión"), { timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    record("PWA: página offline renderiza", offlineOk);
+    await shot(page, "20-pwa");
+
+    // ── Offline transaccional: caché de catálogo, encolar y sincronizar ──
+    // Abrir un ticket en línea escribe el catálogo en IndexedDB.
+    await page.goto(ventaWalkinUrl, { waitUntil: "networkidle0" });
+    const catalogoOfflineOk = await page
+      .waitForFunction(
+        () =>
+          new Promise<boolean>((resolve) => {
+            const req = indexedDB.open("beauty-pos-offline");
+            req.onsuccess = () => {
+              const q = req.result.transaction("catalogo").objectStore("catalogo").getAll();
+              q.onsuccess = () => resolve((q.result as unknown[]).length > 0);
+              q.onerror = () => resolve(false);
+            };
+            req.onerror = () => resolve(false);
+          }),
+        { timeout: 15000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+    record("Offline: catálogo guardado en IndexedDB al visitar POS", catalogoOfflineOk);
+
+    await page.goto(`${BASE_URL}/offline/venta`, { waitUntil: "networkidle0" });
+    const ticketOfflineOk = await page
+      .waitForFunction(
+        (nombre) => document.body.innerText.includes(nombre),
+        { timeout: 15000 },
+        `E2E Producto ${runId}`,
+      )
+      .then(() => true)
+      .catch(() => false);
+    record("Offline: ticket sin conexión renderiza catálogo", ticketOfflineOk);
+
+    await page.setOfflineMode(true);
+    await clickText(page, "button", `E2E Producto ${runId}`);
+    await page.type('input[aria-label="Nota de la venta"]', `E2E-SMOKE offline ${runId}`);
+    const medioEfectivoId = await page.evaluate(() => {
+      const sel = document.querySelector<HTMLSelectElement>('select[aria-label="Medio de pago"]');
+      const opt = sel ? Array.from(sel.options).find((o) => o.text.toLowerCase().includes("efectivo")) : null;
+      return opt?.value ?? null;
+    });
+    if (medioEfectivoId) await page.select('select[aria-label="Medio de pago"]', medioEfectivoId);
+    await page.type('input[aria-label="Monto"]', "25");
+    await clickText(page, "button", "Registrar venta");
+    const encoladaOk = await page
+      .waitForFunction(() => document.body.innerText.includes("Por sincronizar (1)"), { timeout: 10000 })
+      .then(() => true)
+      .catch(() => false);
+    record("Offline: venta encolada sin conexión", encoladaOk);
+
+    await page.setOfflineMode(false);
+    const sincronizadaOk = await page
+      .waitForFunction(
+        () =>
+          document.body.innerText.includes("Por sincronizar (0)") ||
+          document.body.innerText.toLowerCase().includes("sincronizad"),
+        { timeout: 25000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+    record("Offline: venta sincronizada al recuperar conexión", sincronizadaOk);
+
+    const ventaOfflineRows = await withDb(async (client) => {
+      const { rows } = await client.query(
+        `select estado, total::float8 as total from ventas
+         where organizacion_id = $1 and notas ilike '%E2E-SMOKE offline%' and activo`,
+        [ctx.orgId],
+      );
+      return rows as { estado: string; total: number }[];
+    });
+    record(
+      "Offline: venta completada en BD (una sola, sin duplicar)",
+      ventaOfflineRows.length === 1 && ventaOfflineRows[0].estado === "completada" && Number(ventaOfflineRows[0].total) === 25,
+    );
+    await shot(page, "21-offline-venta");
   } catch (error) {
     record("Flujo interrumpido", false, error instanceof Error ? error.message : String(error));
     await shot(page, "99-error");

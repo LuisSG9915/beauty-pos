@@ -1,6 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 
 import { AdminShell } from "@/components/admin/admin-shell";
+import { OfflineSyncBadge } from "@/components/offline-sync";
 import { getDatabase } from "@/db/client";
 import { miembrosOrganizaciones, organizaciones } from "@/db/schema/core";
 import { requireAuthenticatedUser } from "@/lib/auth/access";
@@ -68,6 +69,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
       userEmail={session.user.email}
       userName={session.user.name}
     >
+      <OfflineSyncBadge />
       {children}
     </AdminShell>
   );

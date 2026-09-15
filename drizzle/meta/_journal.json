@@ -148,6 +148,69 @@
       "when": 1789427269922,
       "tag": "0020_careless_lady_mastermind",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1789428866033,
+      "tag": "0021_flowery_christian_walker",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1789430957816,
+      "tag": "0022_strange_apocalypse",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1789432925383,
+      "tag": "0023_wide_bloodstrike",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1789435039125,
+      "tag": "0024_anticipos",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1789439831505,
+      "tag": "0025_special_kitty_pryde",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1789445744617,
+      "tag": "0026_paquetes_prepagados",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1789445918973,
+      "tag": "0027_paquetes_usos_cantidad",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1789448738302,
+      "tag": "0028_membresias",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1789451688206,
+      "tag": "0029_expediente_privado",
+      "breakpoints": true
     }
   ]
 }

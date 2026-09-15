@@ -1,0 +1,1 @@
+ALTER TABLE "sucursales" ADD COLUMN "exigir_corte_para_cobrar" boolean DEFAULT false NOT NULL;

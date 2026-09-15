@@ -3,14 +3,14 @@
  * vive aquí; las reglas puras están en `rules.ts` y no conocen la base.
  */
 
-import { and, eq, gt, lt, notInArray } from "drizzle-orm";
+import { and, eq, gt, inArray, lt, notInArray } from "drizzle-orm";
 import type { ExtractTablesWithRelations } from "drizzle-orm";
 import type { NodePgDatabase, NodePgTransaction } from "drizzle-orm/node-postgres";
 
 import { clientes, organizaciones, relUsuariosSucursales, sucursales } from "@/db/schema/core";
-import { bloqueosAgenda, citas, horariosSucursales } from "@/db/schema/operations";
+import { bloqueosAgenda, citaRecursos, citas, citasHistorial, horariosSucursales, recursos } from "@/db/schema/operations";
 import { ESTADOS_CITA_INACTIVOS } from "./types";
-import type { BloqueoLike, CitaLike, TurnoDia } from "./rules";
+import type { BloqueoLike, CitaLike, RecursoLike, TurnoDia } from "./rules";
 import { resolveTimeZone } from "./timezone";
 
 type Schema = typeof import("@/db/schema");
@@ -26,6 +26,12 @@ export interface SucursalAgendaContext {
   activo: boolean;
   /** Zona IANA efectiva: sucursal.zonaHoraria ?? organizacion.zonaHoraria ?? default. */
   zonaHoraria: string;
+  /**
+   * Capacidad simultánea del carril "sin asignar" (política configurable por
+   * sucursal). 1 = una sola cita sin profesional por horario (comportamiento
+   * histórico).
+   */
+  capacidadSinAsignar: number;
 }
 
 /**
@@ -45,6 +51,7 @@ export async function lockSucursalAgenda(
       organizacionId: sucursales.organizacionId,
       activo: sucursales.activo,
       zonaHoraria: sucursales.zonaHoraria,
+      capacidadSinAsignar: sucursales.capacidadSinAsignar,
     })
     .from(sucursales)
     .where(and(eq(sucursales.id, sucursalId), eq(sucursales.organizacionId, organizacionId)))
@@ -64,6 +71,7 @@ export async function lockSucursalAgenda(
     organizacionId: row.organizacionId,
     activo: row.activo,
     zonaHoraria: resolveTimeZone(row.zonaHoraria, org?.zonaHoraria, undefined),
+    capacidadSinAsignar: Math.max(1, row.capacidadSinAsignar ?? 1),
   };
 }
 
@@ -110,6 +118,8 @@ export interface OcupacionAgenda {
   horarios: TurnoDia[];
   bloqueos: BloqueoLike[];
   citas: CitaLike[];
+  /** Recursos activos de la sucursal (para validar asignaciones). */
+  recursos: RecursoLike[];
 }
 
 /**
@@ -124,7 +134,7 @@ export async function getOcupacionAgenda(
   const { organizacionId, sucursalId, desde, hasta } = params;
   const desdeCitas = new Date(desde.getTime() - 24 * 60 * 60 * 1000);
 
-  const [horarioRows, bloqueoRows, citaRows] = await Promise.all([
+  const [horarioRows, bloqueoRows, citaRows, recursoRows] = await Promise.all([
     db
       .select({
         diaSemana: horariosSucursales.diaSemana,
@@ -178,7 +188,36 @@ export async function getOcupacionAgenda(
           gt(citas.fechaHora, desdeCitas),
         ),
       ),
+    db
+      .select({
+        id: recursos.id,
+        nombre: recursos.nombre,
+        capacidad: recursos.capacidad,
+      })
+      .from(recursos)
+      .where(
+        and(
+          eq(recursos.organizacionId, organizacionId),
+          eq(recursos.sucursalId, sucursalId),
+          eq(recursos.activo, true),
+        ),
+      ),
   ]);
+
+  // Recursos asignados por cita (solo las citas vivas de la ventana).
+  const citaIds = citaRows.map((c) => c.id);
+  const asignaciones = citaIds.length > 0
+    ? await db
+        .select({ citaId: citaRecursos.citaId, recursoId: citaRecursos.recursoId })
+        .from(citaRecursos)
+        .where(and(inArray(citaRecursos.citaId, citaIds), eq(citaRecursos.activo, true)))
+    : [];
+  const recursosPorCita = new Map<string, string[]>();
+  for (const asignacion of asignaciones) {
+    const list = recursosPorCita.get(asignacion.citaId) ?? [];
+    list.push(asignacion.recursoId);
+    recursosPorCita.set(asignacion.citaId, list);
+  }
 
   return {
     horarios: horarioRows,
@@ -190,8 +229,47 @@ export async function getOcupacionAgenda(
       terminaAtMs: b.terminaAt.getTime(),
       activo: true,
     })),
-    citas: citaRows.map(toCitaLike),
+    citas: citaRows.map((c) => ({ ...toCitaLike(c), recursoIds: recursosPorCita.get(c.id) ?? [] })),
+    recursos: recursoRows,
   };
+}
+
+/**
+ * Control optimista de concurrencia: cuando el cliente envía `versionEsperada`
+ * debe coincidir con `version` actual de la cita. `undefined` omite la
+ * validación (llamadas internas como el cobro POS).
+ */
+export function versionCoincide(cita: { version: number }, versionEsperada: number | undefined): boolean {
+  return versionEsperada === undefined || versionEsperada === cita.version;
+}
+
+/** Mensaje estándar para edición sobre una versión obsoleta. */
+export const CITA_STALE_MESSAGE =
+  "La cita fue modificada por otro usuario. Recarga la agenda y vuelve a intentar.";
+
+/**
+ * Inserta un movimiento en `citas_historial`. Debe llamarse dentro de la misma
+ * transacción que origina el cambio para que quede comprometido junto con él.
+ */
+export async function registrarHistorialCita(
+  db: AgendaDb,
+  params: {
+    citaId: string;
+    organizacionId: string;
+    /** Quien ejecuta la acción (null = proceso interno, p.ej. cobro POS). */
+    usuarioId: string | null;
+    /** Ej. "creada", "editada", "movida", "reagendada", "estado", "servicio_agregado". */
+    accion: string;
+    detalle?: Record<string, unknown>;
+  },
+): Promise<void> {
+  await db.insert(citasHistorial).values({
+    citaId: params.citaId,
+    organizacionId: params.organizacionId,
+    usuarioId: params.usuarioId,
+    accion: params.accion,
+    detalle: params.detalle ?? null,
+  });
 }
 
 export function toCitaLike(row: {

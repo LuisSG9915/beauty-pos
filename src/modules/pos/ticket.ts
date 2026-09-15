@@ -1,26 +1,42 @@
 import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
+import { todayDateInput } from "@/lib/format";
+import { anticiposAplicables } from "@/modules/pos/anticipos";
+import { membresiaVigente } from "@/modules/pos/membresias";
+import { promocionVigente } from "@/modules/pos/promociones";
 import { relMiembrosRoles } from "@/db/schema/access";
 import {
   catCategoriasProductos,
   catCategoriasServicios,
   catMediosPago,
+  membresias,
+  paquetes,
   productos,
+  promociones,
   servicios,
 } from "@/db/schema/catalogs";
 import {
   clientes,
   miembrosOrganizaciones,
   relUsuariosSucursales,
+  sucursales,
   usuarios,
 } from "@/db/schema/core";
 import {
+  anticipos,
+  clienteMembresias,
+  clientePaquetes,
+  detalleDevoluciones,
   detalleVentasComisiones,
   detalleVentasMediosPagos,
+  detalleVentasMembresias,
+  detalleVentasPaquetes,
   detalleVentasProductos,
   detalleVentasPropinas,
   detalleVentasServicios,
+  devoluciones,
+  paqueteUsos,
   ventas,
 } from "@/db/schema/operations";
 
@@ -30,20 +46,76 @@ export type TicketData = {
     estado: string;
     citaId: string | null;
     sucursalId: string;
+    clienteId: string | null;
     clienteNombre: string | null;
     subtotal: string;
     descuento: string;
     total: string;
     propina: string;
+    /** Promoción del catálogo ligada al ticket (si hay). */
+    promocionId: string | null;
+    promocionNombre: string | null;
+    descuentoPromocion: string;
+    /** Membresía del catálogo ligada al ticket (beneficio del cliente). */
+    membresiaId: string | null;
+    membresiaNombre: string | null;
+    descuentoMembresia: string;
   };
+  /** Promociones vigentes hoy (timezone de la sucursal) para el selector. */
+  promocionesDisponibles: Array<{ id: string; nombre: string; tipo: string; valor: string; aplica: string }>;
   lineasServicios: Array<{
     id: string;
+    servicioId: string;
     nombre: string;
     precio: string;
     cantidad: number;
     usuarioId: string | null;
+    /** true si la línea está cubierta por una sesión de paquete (no cobra). */
+    paqueteUsado: boolean;
+    paqueteNombre: string | null;
   }>;
   lineasProductos: Array<{ id: string; nombre: string; precio: string; cantidad: number }>;
+  /** Líneas de compra de paquetes prepagados en el ticket. */
+  lineasPaquetes: Array<{ id: string; paqueteId: string; nombre: string; precio: string; cantidad: number }>;
+  /** Líneas de compra de membresías en el ticket. */
+  lineasMembresias: Array<{ id: string; membresiaId: string; nombre: string; precio: string; cantidad: number }>;
+  /** Membresías activas del catálogo para la pestaña del selector POS. */
+  catalogoMembresias: Array<{
+    id: string;
+    nombre: string;
+    precio: string;
+    duracionDias: number;
+    descuentoPorcentaje: string;
+    aplica: string;
+  }>;
+  /** Membresías vigentes hoy del cliente de la venta (para aplicar beneficio). */
+  membresiasCliente: Array<{
+    id: string;
+    nombre: string;
+    descuentoPorcentaje: string;
+    aplica: string;
+    vigenciaHasta: string;
+  }>;
+  /** Paquetes activos del catálogo para la pestaña del selector POS. */
+  catalogoPaquetes: Array<{
+    id: string;
+    nombre: string;
+    precio: string;
+    sesiones: number;
+    servicioId: string;
+    servicioNombre: string | null;
+  }>;
+  /** Saldo de paquetes del cliente de la venta (vigentes con sesiones). */
+  paquetesCliente: Array<{
+    id: string;
+    nombre: string;
+    servicioId: string;
+    servicioNombre: string | null;
+    sesionesTotal: number;
+    sesionesRestantes: number;
+  }>;
+  /** Clientes activos para asignar a una venta walk-in. */
+  catalogoClientes: Array<{ id: string; nombre: string; telefono: string | null }>;
   catalogoServicios: Array<{
     id: string;
     nombre: string;
@@ -65,6 +137,29 @@ export type TicketData = {
   staff: Array<{ id: string; nombre: string }>;
   propinas: Array<{ usuarioNombre: string; monto: string }>;
   comisiones: Array<{ usuarioNombre: string; monto: string }>;
+  /** Devoluciones parciales/totales registradas contra la venta. */
+  devoluciones: Array<{
+    id: string;
+    monto: string;
+    motivo: string;
+    createdAt: Date;
+    usuarioNombre: string | null;
+    lineas: Array<{ tipo: string; detalleId: string | null; cantidad: string; monto: string; nombre: string }>;
+  }>;
+  /** Cantidad ya devuelta por línea de ticket (para el límite de devolución). */
+  devueltoPorDetalle: Record<string, number>;
+  /** Anticipos ligados a la venta/cita: aplicados al cobrar y vigentes aún. */
+  anticipos: Array<{
+    id: string;
+    monto: string;
+    estado: string;
+    medioNombre: string | null;
+    createdAt: Date;
+  }>;
+  /** Suma de anticipos con estado "aplicado" ligados a esta venta. */
+  anticipoAplicado: number;
+  /** Anticipos vigentes que caben completos contra el total (se aplican al cobrar). */
+  anticipoPorAplicar: number;
   /** Lo fija `cargarTicket` según el permiso del usuario que consulta. */
   puedeCancelar?: boolean;
 };
@@ -86,14 +181,25 @@ export async function getTicketData(
       estado: ventas.estado,
       citaId: ventas.citaId,
       sucursalId: ventas.sucursalId,
+      clienteId: ventas.clienteId,
       clienteNombre: clientes.nombre,
       subtotal: ventas.subtotal,
       descuento: ventas.descuento,
       total: ventas.total,
       propina: ventas.propina,
+      promocionId: ventas.promocionId,
+      promocionNombre: promociones.nombre,
+      descuentoPromocion: ventas.descuentoPromocion,
+      membresiaId: ventas.membresiaId,
+      membresiaNombre: membresias.nombre,
+      descuentoMembresia: ventas.descuentoMembresia,
+      sucursalZonaHoraria: sucursales.zonaHoraria,
     })
     .from(ventas)
     .leftJoin(clientes, eq(ventas.clienteId, clientes.id))
+    .leftJoin(promociones, eq(ventas.promocionId, promociones.id))
+    .leftJoin(membresias, eq(ventas.membresiaId, membresias.id))
+    .innerJoin(sucursales, eq(ventas.sucursalId, sucursales.id))
     .where(and(eq(ventas.id, ventaId), eq(ventas.organizacionId, organizacionId), eq(ventas.activo, true)))
     .limit(1);
   if (!venta) return null;
@@ -101,17 +207,30 @@ export async function getTicketData(
   const [
     lineasServicios,
     lineasProductos,
+    lineasPaquetes,
+    lineasMembresias,
+    catalogoMembresias,
+    membresiasClienteRows,
     catalogoServicios,
     catalogoProductos,
+    catalogoPaquetes,
+    paquetesClienteRows,
+    usosRows,
+    catalogoClientes,
     mediosPago,
     pagos,
     staff,
     propinas,
     comisiones,
+    devolucionesRows,
+    detalleDevolucionesRows,
+    anticipoRows,
+    promocionesRows,
   ] = await Promise.all([
     db
       .select({
         id: detalleVentasServicios.id,
+        servicioId: detalleVentasServicios.servicioId,
         // Snapshot con fallback al catálogo (líneas históricas sin snapshot).
         nombre: sql<string>`coalesce(${detalleVentasServicios.nombre}, ${servicios.nombre})`,
         precio: detalleVentasServicios.precio,
@@ -131,6 +250,62 @@ export async function getTicketData(
       .from(detalleVentasProductos)
       .innerJoin(productos, eq(detalleVentasProductos.productoId, productos.id))
       .where(and(eq(detalleVentasProductos.ventaId, venta.id), eq(detalleVentasProductos.activo, true))),
+    db
+      .select({
+        id: detalleVentasPaquetes.id,
+        paqueteId: detalleVentasPaquetes.paqueteId,
+        nombre: sql<string>`coalesce(${detalleVentasPaquetes.nombre}, ${paquetes.nombre})`,
+        precio: detalleVentasPaquetes.precio,
+        cantidad: detalleVentasPaquetes.cantidad,
+      })
+      .from(detalleVentasPaquetes)
+      .innerJoin(paquetes, eq(detalleVentasPaquetes.paqueteId, paquetes.id))
+      .where(and(eq(detalleVentasPaquetes.ventaId, venta.id), eq(detalleVentasPaquetes.activo, true))),
+    db
+      .select({
+        id: detalleVentasMembresias.id,
+        membresiaId: detalleVentasMembresias.membresiaId,
+        nombre: sql<string>`coalesce(${detalleVentasMembresias.nombre}, ${membresias.nombre})`,
+        precio: detalleVentasMembresias.precio,
+        cantidad: detalleVentasMembresias.cantidad,
+      })
+      .from(detalleVentasMembresias)
+      .innerJoin(membresias, eq(detalleVentasMembresias.membresiaId, membresias.id))
+      .where(and(eq(detalleVentasMembresias.ventaId, venta.id), eq(detalleVentasMembresias.activo, true))),
+    db
+      .select({
+        id: membresias.id,
+        nombre: membresias.nombre,
+        precio: membresias.precio,
+        duracionDias: membresias.duracionDias,
+        descuentoPorcentaje: membresias.descuentoPorcentaje,
+        aplica: membresias.aplica,
+      })
+      .from(membresias)
+      .where(and(eq(membresias.organizacionId, organizacionId), eq(membresias.activo, true)))
+      .orderBy(asc(membresias.nombre)),
+    venta.clienteId
+      ? db
+          .select({
+            id: clienteMembresias.id,
+            nombre: membresias.nombre,
+            descuentoPorcentaje: membresias.descuentoPorcentaje,
+            aplica: membresias.aplica,
+            estado: clienteMembresias.estado,
+            vigenciaDesde: clienteMembresias.vigenciaDesde,
+            vigenciaHasta: clienteMembresias.vigenciaHasta,
+          })
+          .from(clienteMembresias)
+          .innerJoin(membresias, eq(clienteMembresias.membresiaId, membresias.id))
+          .where(
+            and(
+              eq(clienteMembresias.organizacionId, organizacionId),
+              eq(clienteMembresias.clienteId, venta.clienteId),
+              eq(clienteMembresias.activo, true),
+            ),
+          )
+          .orderBy(asc(clienteMembresias.createdAt))
+      : Promise.resolve([]),
     db
       .select({
         id: servicios.id,
@@ -164,6 +339,57 @@ export async function getTicketData(
         ),
       )
       .orderBy(asc(productos.nombre)),
+    db
+      .select({
+        id: paquetes.id,
+        nombre: paquetes.nombre,
+        precio: paquetes.precio,
+        sesiones: paquetes.sesiones,
+        servicioId: paquetes.servicioId,
+        servicioNombre: servicios.nombre,
+      })
+      .from(paquetes)
+      .innerJoin(servicios, eq(paquetes.servicioId, servicios.id))
+      .where(and(eq(paquetes.organizacionId, organizacionId), eq(paquetes.activo, true)))
+      .orderBy(asc(paquetes.nombre)),
+    venta.clienteId
+      ? db
+          .select({
+            id: clientePaquetes.id,
+            nombre: paquetes.nombre,
+            servicioId: paquetes.servicioId,
+            servicioNombre: servicios.nombre,
+            sesionesTotal: clientePaquetes.sesionesTotal,
+            sesionesRestantes: clientePaquetes.sesionesRestantes,
+          })
+          .from(clientePaquetes)
+          .innerJoin(paquetes, eq(clientePaquetes.paqueteId, paquetes.id))
+          .innerJoin(servicios, eq(paquetes.servicioId, servicios.id))
+          .where(
+            and(
+              eq(clientePaquetes.organizacionId, organizacionId),
+              eq(clientePaquetes.clienteId, venta.clienteId),
+              eq(clientePaquetes.estado, "vigente"),
+              eq(clientePaquetes.activo, true),
+            ),
+          )
+          .orderBy(asc(clientePaquetes.createdAt))
+      : Promise.resolve([]),
+    db
+      .select({
+        detalleVentaServicioId: paqueteUsos.detalleVentaServicioId,
+        paqueteNombre: paquetes.nombre,
+      })
+      .from(paqueteUsos)
+      .innerJoin(clientePaquetes, eq(paqueteUsos.clientePaqueteId, clientePaquetes.id))
+      .innerJoin(paquetes, eq(clientePaquetes.paqueteId, paquetes.id))
+      .where(and(eq(paqueteUsos.ventaId, venta.id), eq(paqueteUsos.activo, true))),
+    db
+      .select({ id: clientes.id, nombre: clientes.nombre, telefono: clientes.telefono })
+      .from(clientes)
+      .where(and(eq(clientes.organizacionId, organizacionId), eq(clientes.activo, true)))
+      .orderBy(asc(clientes.nombre))
+      .limit(500),
     db
       .select({ id: catMediosPago.id, nombre: catMediosPago.nombre, categoria: catMediosPago.categoria })
       .from(catMediosPago)
@@ -209,12 +435,142 @@ export async function getTicketData(
       .from(detalleVentasComisiones)
       .innerJoin(usuarios, eq(detalleVentasComisiones.usuarioId, usuarios.id))
       .where(and(eq(detalleVentasComisiones.ventaId, venta.id), eq(detalleVentasComisiones.activo, true))),
+    db
+      .select({
+        id: devoluciones.id,
+        monto: devoluciones.monto,
+        motivo: devoluciones.motivo,
+        createdAt: devoluciones.createdAt,
+        usuarioNombre: usuarios.nombre,
+      })
+      .from(devoluciones)
+      .leftJoin(usuarios, eq(devoluciones.usuarioId, usuarios.id))
+      .where(eq(devoluciones.ventaId, venta.id))
+      .orderBy(asc(devoluciones.createdAt)),
+    db
+      .select({
+        devolucionId: detalleDevoluciones.devolucionId,
+        tipo: detalleDevoluciones.tipo,
+        detalleId: detalleDevoluciones.detalleId,
+        cantidad: detalleDevoluciones.cantidad,
+        monto: detalleDevoluciones.monto,
+        nombreServicio: sql<string | null>`${servicios.nombre}`,
+        nombreProducto: sql<string | null>`${productos.nombre}`,
+        nombrePaquete: sql<string | null>`${detalleVentasPaquetes.nombre}`,
+        nombreMembresia: sql<string | null>`${detalleVentasMembresias.nombre}`,
+      })
+      .from(detalleDevoluciones)
+      .innerJoin(devoluciones, eq(detalleDevoluciones.devolucionId, devoluciones.id))
+      .leftJoin(detalleVentasServicios, and(eq(detalleDevoluciones.detalleId, detalleVentasServicios.id), eq(detalleDevoluciones.tipo, "servicio")))
+      .leftJoin(servicios, eq(detalleVentasServicios.servicioId, servicios.id))
+      .leftJoin(detalleVentasProductos, and(eq(detalleDevoluciones.detalleId, detalleVentasProductos.id), eq(detalleDevoluciones.tipo, "producto")))
+      .leftJoin(productos, eq(detalleVentasProductos.productoId, productos.id))
+      .leftJoin(detalleVentasPaquetes, and(eq(detalleDevoluciones.detalleId, detalleVentasPaquetes.id), eq(detalleDevoluciones.tipo, "paquete")))
+      .leftJoin(detalleVentasMembresias, and(eq(detalleDevoluciones.detalleId, detalleVentasMembresias.id), eq(detalleDevoluciones.tipo, "membresia")))
+      .where(eq(devoluciones.ventaId, venta.id)),
+    // Anticipos aplicados a esta venta + vigentes de la cita (se aplican al cobrar).
+    venta.citaId
+      ? db
+          .select({
+            id: anticipos.id,
+            ventaId: anticipos.ventaId,
+            monto: anticipos.monto,
+            estado: anticipos.estado,
+            createdAt: anticipos.createdAt,
+            medioNombre: catMediosPago.nombre,
+          })
+          .from(anticipos)
+          .leftJoin(catMediosPago, eq(anticipos.medioPagoId, catMediosPago.id))
+          .where(
+            and(
+              eq(anticipos.citaId, venta.citaId),
+              eq(anticipos.organizacionId, organizacionId),
+              eq(anticipos.activo, true),
+              inArray(anticipos.estado, ["vigente", "aplicado"]),
+            ),
+          )
+          .orderBy(asc(anticipos.createdAt))
+      : db
+          .select({
+            id: anticipos.id,
+            ventaId: anticipos.ventaId,
+            monto: anticipos.monto,
+            estado: anticipos.estado,
+            createdAt: anticipos.createdAt,
+            medioNombre: catMediosPago.nombre,
+          })
+          .from(anticipos)
+          .leftJoin(catMediosPago, eq(anticipos.medioPagoId, catMediosPago.id))
+          .where(
+            and(
+              eq(anticipos.ventaId, venta.id),
+              eq(anticipos.organizacionId, organizacionId),
+              eq(anticipos.activo, true),
+              inArray(anticipos.estado, ["vigente", "aplicado"]),
+            ),
+          )
+          .orderBy(asc(anticipos.createdAt)),
+    // Catálogo de promociones activas; la vigencia se evalúa con la fecha de
+    // hoy en la zona horaria de la sucursal de la venta.
+    db
+      .select({
+        id: promociones.id,
+        nombre: promociones.nombre,
+        tipo: promociones.tipo,
+        valor: promociones.valor,
+        aplica: promociones.aplica,
+        activo: promociones.activo,
+        vigenciaDesde: promociones.vigenciaDesde,
+        vigenciaHasta: promociones.vigenciaHasta,
+      })
+      .from(promociones)
+      .where(eq(promociones.organizacionId, organizacionId))
+      .orderBy(asc(promociones.nombre)),
   ]);
 
+  const { sucursalZonaHoraria, ...ventaData } = venta;
+  const hoySucursal = todayDateInput(sucursalZonaHoraria ?? undefined);
+  const promocionesDisponibles = promocionesRows
+    .filter((p) => promocionVigente(p, hoySucursal))
+    .map(({ id, nombre, tipo, valor, aplica }) => ({ id, nombre, tipo, valor, aplica }));
+
+  const devueltoPorDetalle: Record<string, number> = {};
+  const lineasPorDevolucion = new Map<string, NonNullable<TicketData["devoluciones"]>[number]["lineas"]>();
+  for (const linea of detalleDevolucionesRows) {
+    if (linea.detalleId) {
+      devueltoPorDetalle[linea.detalleId] = (devueltoPorDetalle[linea.detalleId] ?? 0) + Number(linea.cantidad);
+    }
+    const list = lineasPorDevolucion.get(linea.devolucionId) ?? [];
+    list.push({
+      tipo: linea.tipo,
+      detalleId: linea.detalleId,
+      cantidad: linea.cantidad,
+      monto: linea.monto,
+      nombre: linea.nombreServicio ?? linea.nombreProducto ?? linea.nombrePaquete ?? linea.nombreMembresia ?? "Línea",
+    });
+    lineasPorDevolucion.set(linea.devolucionId, list);
+  }
+
+  const usoPorDetalle = new Map(usosRows.map((u) => [u.detalleVentaServicioId, u.paqueteNombre]));
+
   return {
-    venta: { ...venta, sucursalId: venta.sucursalId ?? "" },
-    lineasServicios,
+    venta: { ...ventaData, sucursalId: venta.sucursalId ?? "" },
+    promocionesDisponibles,
+    lineasServicios: lineasServicios.map((linea) => ({
+      ...linea,
+      paqueteUsado: usoPorDetalle.has(linea.id),
+      paqueteNombre: usoPorDetalle.get(linea.id) ?? null,
+    })),
     lineasProductos,
+    lineasPaquetes,
+    lineasMembresias,
+    catalogoMembresias,
+    membresiasCliente: membresiasClienteRows
+      .filter((m) => membresiaVigente(m, hoySucursal))
+      .map(({ id, nombre, descuentoPorcentaje, aplica, vigenciaHasta }) => ({ id, nombre, descuentoPorcentaje, aplica, vigenciaHasta })),
+    catalogoPaquetes,
+    paquetesCliente: paquetesClienteRows,
+    catalogoClientes,
     catalogoServicios,
     catalogoProductos,
     mediosPago,
@@ -222,6 +578,30 @@ export async function getTicketData(
     staff,
     propinas,
     comisiones,
+    devoluciones: devolucionesRows.map((row) => ({
+      ...row,
+      lineas: lineasPorDevolucion.get(row.id) ?? [],
+    })),
+    devueltoPorDetalle,
+    // Solo los vigentes (se aplicarán al cobrar) o los ya aplicados a esta venta.
+    anticipos: anticipoRows
+      .filter((a) => a.estado === "vigente" || a.ventaId === venta.id)
+      .map((a) => ({
+        id: a.id,
+        monto: a.monto,
+        estado: a.estado,
+        medioNombre: a.medioNombre,
+        createdAt: a.createdAt,
+      })),
+    anticipoAplicado: anticipoRows
+      .filter((a) => a.estado === "aplicado" && a.ventaId === venta.id)
+      .reduce((s, a) => s + Number(a.monto), 0),
+    // Misma regla greedy que cobrarVenta (módulo compartido): cada anticipo
+    // entra completo si cabe contra el total (sin propina).
+    anticipoPorAplicar: anticiposAplicables(
+      anticipoRows.filter((a) => a.estado === "vigente"),
+      Number(venta.total),
+    ).suma,
   };
 }
 

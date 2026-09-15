@@ -2,6 +2,7 @@ import {
   boolean,
   date,
   index,
+  integer,
   pgTable,
   text,
   timestamp,
@@ -44,6 +45,12 @@ export const sucursales = pgTable(
     correo: varchar("correo", { length: 254 }),
     direccion: text("direccion"),
     zonaHoraria: varchar("zona_horaria", { length: 80 }),
+    // Capacidad del carril "sin asignar": cuántas citas sin profesional pueden
+    // traslaparse en la misma sucursal y horario. 1 = una sola a la vez.
+    capacidadSinAsignar: integer("capacidad_sin_asignar").default(1).notNull(),
+    // Política de caja: true = el POS rechaza cobros sin un corte abierto en
+    // la sucursal; false = cobra libre y asocia la venta al corte si existe.
+    exigirCorteParaCobrar: boolean("exigir_corte_para_cobrar").default(false).notNull(),
     activo: boolean("activo").default(true).notNull(),
     ...auditColumns,
   },

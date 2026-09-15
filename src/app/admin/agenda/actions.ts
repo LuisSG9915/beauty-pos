@@ -1,39 +1,68 @@
 "use server";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
-import { citas, detalleCitasServicios } from "@/db/schema/operations";
-import { servicios } from "@/db/schema/catalogs";
+import { sucursales, usuarios } from "@/db/schema/core";
 import {
+  bloqueosAgenda,
+  citaRecursos,
+  citas,
+  citasHistorial,
+  detalleCitasServicios,
+  horariosSucursales,
+  recursos,
+  RECURSO_TIPOS,
+} from "@/db/schema/operations";
+import { servicios } from "@/db/schema/catalogs";
+import { auditEvent } from "@/lib/audit";
+import {
+  assertBranchScope,
   canAccessBranch,
   checkPermission,
   type ResolvedAccess,
 } from "@/lib/auth/authorization";
 import {
+  BLOQUEO_TIPOS,
   canRescheduleEstado,
   canTransitionEstado,
   isCitaEditable,
+  sugerirHorariosLibres,
   validateCitaAvailability,
   type AgendaDb,
   type CitaRow,
 } from "@/modules/agenda";
 import {
+  CITA_STALE_MESSAGE,
   clienteEnOrganizacion,
   getCita,
   getOcupacionAgenda,
   lockSucursalAgenda,
   profesionalAsignadoASucursal,
+  registrarHistorialCita,
+  versionCoincide,
 } from "@/modules/agenda/service";
 import { getZonedParts, parseFechaHoraInput } from "@/modules/agenda/timezone";
 import { intervalFromDates, type DisponibilidadResult } from "@/modules/agenda/types";
 
 const CITA_ESTADOS = ["pendiente", "confirmada", "en_proceso", "completada", "cancelada", "no_asistio"] as const;
 
-export type CitaActionState = { error?: string; success?: boolean; message?: string; citaId?: string };
-export type CitaMutationResult = { success: boolean; message?: string; error?: string };
+export type CitaActionState = {
+  error?: string;
+  success?: boolean;
+  message?: string;
+  citaId?: string;
+  /** ISO 8601: próximos horarios libres cuando hubo conflicto de disponibilidad. */
+  sugerencias?: string[];
+};
+export type CitaMutationResult = {
+  success: boolean;
+  message?: string;
+  error?: string;
+  sugerencias?: string[];
+};
 
 const citaSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -44,6 +73,8 @@ const citaSchema = z.object({
   fechaHora: z.string().min(1, "Indica fecha y hora."),
   duracionMinutos: z.coerce.number().int().min(5).max(1440),
   notas: z.string().trim().max(4000).optional().or(z.literal("")),
+  // Concurrencia optimista: versión leída al abrir el formulario.
+  version: z.coerce.number().int().min(1).optional(),
 });
 
 function violacionesAError(disponibilidad: DisponibilidadResult): string {
@@ -60,6 +91,9 @@ async function validarDisponibilidadCita(
     duracionMinutos: number;
     zonaHoraria: string;
     ignoreCitaId?: string | null;
+    capacidadSinAsignar?: number;
+    /** Recursos que ocupará la cita (default: los que ya tiene asignados). */
+    recursoIds?: readonly string[];
   },
 ): Promise<DisponibilidadResult> {
   const candidato = intervalFromDates(params.fechaHora, params.duracionMinutos);
@@ -78,8 +112,94 @@ async function validarDisponibilidadCita(
     horarios: ocupacion.horarios,
     bloqueos: ocupacion.bloqueos,
     citas: ocupacion.citas,
+    recursoIds: params.recursoIds,
+    recursos: ocupacion.recursos,
     ignoreCitaId: params.ignoreCitaId,
+    capacidadSinAsignar: params.capacidadSinAsignar,
   });
+}
+
+/** Días calendario que explora la búsqueda de sugerencias tras un conflicto. */
+const SUGERENCIA_DIAS = 4;
+
+/**
+ * Tras un conflicto de disponibilidad, busca los próximos horarios libres
+ * (misma duración y profesional) y los devuelve como ISO 8601 para la UI.
+ */
+async function sugerenciasEnConflicto(
+  tx: AgendaDb,
+  params: {
+    organizacionId: string;
+    sucursalId: string;
+    usuarioId: string | null;
+    fechaHora: Date;
+    duracionMinutos: number;
+    zonaHoraria: string;
+    capacidadSinAsignar: number;
+    ignoreCitaId?: string | null;
+    recursoIds?: readonly string[];
+  },
+): Promise<string[]> {
+  const ocupacion = await getOcupacionAgenda(tx, {
+    organizacionId: params.organizacionId,
+    sucursalId: params.sucursalId,
+    desde: params.fechaHora,
+    hasta: new Date(params.fechaHora.getTime() + SUGERENCIA_DIAS * 24 * 60 * 60 * 1000),
+  });
+  return sugerirHorariosLibres({
+    desde: params.fechaHora,
+    duracionMinutos: params.duracionMinutos,
+    usuarioId: params.usuarioId,
+    recursoIds: params.recursoIds,
+    ocupacion,
+    zonaHoraria: params.zonaHoraria,
+    capacidadSinAsignar: params.capacidadSinAsignar,
+    ignoreCitaId: params.ignoreCitaId,
+  }).map((inicio) => inicio.toISOString());
+}
+
+/** Recursos activos asignados actualmente a la cita. */
+async function recursosDeCita(tx: AgendaDb, citaId: string): Promise<string[]> {
+  const rows = await tx
+    .select({ recursoId: citaRecursos.recursoId })
+    .from(citaRecursos)
+    .where(and(eq(citaRecursos.citaId, citaId), eq(citaRecursos.activo, true)));
+  return rows.map((r) => r.recursoId);
+}
+
+/** Upsert de asignaciones cita↔recurso (mismo patrón que servicios). */
+async function syncRecursosCita(
+  tx: AgendaDb,
+  params: { citaId: string; organizacionId: string; recursoIds: string[]; userId: string },
+) {
+  const existentes = await tx
+    .select({ id: citaRecursos.id, recursoId: citaRecursos.recursoId })
+    .from(citaRecursos)
+    .where(eq(citaRecursos.citaId, params.citaId));
+  const porRecurso = new Map(existentes.map((e) => [e.recursoId, e.id]));
+  for (const recursoId of params.recursoIds) {
+    const existenteId = porRecurso.get(recursoId);
+    if (existenteId) {
+      await tx
+        .update(citaRecursos)
+        .set({ activo: true, updatedBy: params.userId })
+        .where(eq(citaRecursos.id, existenteId));
+      porRecurso.delete(recursoId);
+    } else {
+      await tx.insert(citaRecursos).values({
+        citaId: params.citaId,
+        recursoId,
+        organizacionId: params.organizacionId,
+        createdBy: params.userId,
+      });
+    }
+  }
+  for (const detalleId of porRecurso.values()) {
+    await tx
+      .update(citaRecursos)
+      .set({ activo: false, updatedBy: params.userId })
+      .where(eq(citaRecursos.id, detalleId));
+  }
 }
 
 /** Inserta/reactiva/desactiva renglones de detalle_citas_servicios sin duplicar. */
@@ -116,6 +236,10 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
   const servicioIds = [...new Set(formData.getAll("servicioIds").map(String).filter((v) => v !== ""))];
   if (!servicioIds.every((id) => z.string().uuid().safeParse(id).success)) {
     return { error: "Uno o más servicios son inválidos." };
+  }
+  const recursoIds = [...new Set(formData.getAll("recursoIds").map(String).filter((v) => v !== ""))];
+  if (!recursoIds.every((id) => z.string().uuid().safeParse(id).success)) {
+    return { error: "Uno o más recursos son inválidos." };
   }
   const result = citaSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa los datos de la cita." };
@@ -156,12 +280,32 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
       if (servicioRows.length !== servicioIds.length) return { error: "Uno o más servicios no son válidos." };
       const totalEstimado = servicioRows.reduce((sum, r) => sum + parseFloat(r.precio), 0).toFixed(2);
 
+      if (recursoIds.length > 0) {
+        const recursoRows = await tx
+          .select({ id: recursos.id })
+          .from(recursos)
+          .where(
+            and(
+              eq(recursos.organizacionId, input.organizacionId),
+              eq(recursos.sucursalId, input.sucursalId),
+              eq(recursos.activo, true),
+              inArray(recursos.id, recursoIds),
+            ),
+          );
+        if (recursoRows.length !== recursoIds.length) {
+          return { error: "Uno o más recursos no están disponibles en esta sucursal." };
+        }
+      }
+
       let previa: CitaRow | null = null;
       if (input.id) {
         previa = await getCita(tx, input.organizacionId, input.id);
         if (!previa || !previa.activo) return { error: "La cita no existe." };
         if (!isCitaEditable(previa.estado)) {
           return { error: "Una cita cancelada, completada o no asistida solo puede reagendarse." };
+        }
+        if (!versionCoincide(previa, input.version)) {
+          return { error: CITA_STALE_MESSAGE };
         }
       }
 
@@ -173,8 +317,23 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
         duracionMinutos: input.duracionMinutos,
         zonaHoraria: sucursal.zonaHoraria,
         ignoreCitaId: input.id || null,
+        capacidadSinAsignar: sucursal.capacidadSinAsignar,
+        recursoIds,
       });
-      if (!disponibilidad.ok) return { error: violacionesAError(disponibilidad) };
+      if (!disponibilidad.ok) {
+        const sugerencias = await sugerenciasEnConflicto(tx, {
+          organizacionId: input.organizacionId,
+          sucursalId: input.sucursalId,
+          usuarioId: input.usuarioId || null,
+          fechaHora,
+          duracionMinutos: input.duracionMinutos,
+          zonaHoraria: sucursal.zonaHoraria,
+          capacidadSinAsignar: sucursal.capacidadSinAsignar,
+          ignoreCitaId: input.id || null,
+          recursoIds,
+        });
+        return { error: violacionesAError(disponibilidad), sugerencias };
+      }
 
       const values = {
         organizacionId: input.organizacionId,
@@ -191,7 +350,10 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
       let citaId: string;
       if (previa) {
         // Edición: el estado se preserva (no forma parte de `values`).
-        await tx.update(citas).set(values).where(eq(citas.id, previa.id));
+        await tx
+          .update(citas)
+          .set({ ...values, version: previa.version + 1 })
+          .where(eq(citas.id, previa.id));
         citaId = previa.id;
       } else {
         const [inserted] = await tx
@@ -202,6 +364,29 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
       }
 
       await syncServiciosCita(tx, citaId, servicioRows, user.id);
+      await syncRecursosCita(tx, { citaId, organizacionId: input.organizacionId, recursoIds, userId: user.id });
+      await registrarHistorialCita(tx, {
+        citaId,
+        organizacionId: input.organizacionId,
+        usuarioId: user.id,
+        accion: previa ? "editada" : "creada",
+        detalle: {
+          fechaHora: fechaHora.toISOString(),
+          duracionMinutos: input.duracionMinutos,
+          profesionalId: input.usuarioId || null,
+          servicioIds,
+          recursoIds,
+          ...(previa
+            ? {
+                previo: {
+                  fechaHora: previa.fechaHora.toISOString(),
+                  duracionMinutos: previa.duracionMinutos,
+                  profesionalId: previa.usuarioId,
+                },
+              }
+            : {}),
+        },
+      });
       return { success: true, message: "Cita guardada correctamente.", citaId };
     });
 
@@ -221,6 +406,7 @@ const servicioCitaSchema = z.object({
   citaId: z.string().uuid(),
   servicioId: z.string().uuid(),
   agregar: z.coerce.boolean(),
+  version: z.coerce.number().int().min(1).optional(),
 });
 
 /**
@@ -245,6 +431,9 @@ export async function toggleServicioCita(formData: FormData): Promise<CitaMutati
       }
       if (!isCitaEditable(cita.estado)) {
         return { success: false, error: "Solo se pueden modificar servicios en citas pendientes, confirmadas o en proceso." };
+      }
+      if (!versionCoincide(cita, input.version)) {
+        return { success: false, error: CITA_STALE_MESSAGE };
       }
 
       const [servicio] = await tx
@@ -280,7 +469,17 @@ export async function toggleServicioCita(formData: FormData): Promise<CitaMutati
 
       const totalEstimado = activos.reduce((sum, a) => sum + Number(a.precio), 0).toFixed(2);
       const duracion = activos.length > 0 ? Math.max(activos.reduce((sum, a) => sum + a.duracion, 0), 5) : cita.duracionMinutos;
-      await tx.update(citas).set({ totalEstimado, duracionMinutos: duracion, updatedBy: user.id }).where(eq(citas.id, cita.id));
+      await tx
+        .update(citas)
+        .set({ totalEstimado, duracionMinutos: duracion, version: cita.version + 1, updatedBy: user.id })
+        .where(eq(citas.id, cita.id));
+      await registrarHistorialCita(tx, {
+        citaId: cita.id,
+        organizacionId: input.organizacionId,
+        usuarioId: user.id,
+        accion: input.agregar ? "servicio_agregado" : "servicio_quitado",
+        detalle: { servicioId: input.servicioId },
+      });
       return { success: true, message: input.agregar ? "Servicio agregado." : "Servicio quitado." };
     });
 
@@ -301,6 +500,7 @@ const estadoSchema = z.object({
   estado: z.enum(CITA_ESTADOS),
   // Opcional: al reagendar (estado=pendiente) permite indicar la nueva fecha/hora.
   fechaHora: z.string().optional().or(z.literal("")),
+  version: z.coerce.number().int().min(1).optional(),
 });
 
 export async function updateCitaEstado(formData: FormData): Promise<CitaMutationResult> {
@@ -325,6 +525,9 @@ export async function updateCitaEstado(formData: FormData): Promise<CitaMutation
       const cita = await getCita(tx, input.organizacionId, input.citaId);
       if (!cita || !cita.activo) return { success: false, error: "La cita no existe." };
 
+      if (!versionCoincide(cita, input.version)) {
+        return { success: false, error: CITA_STALE_MESSAGE };
+      }
       if (cita.estado === input.estado) return { success: true, message: "La cita ya está en ese estado." };
       if (!canTransitionEstado(cita.estado, input.estado)) {
         return { success: false, error: `No se puede pasar de "${cita.estado}" a "${input.estado}".` };
@@ -338,6 +541,8 @@ export async function updateCitaEstado(formData: FormData): Promise<CitaMutation
         fechaHora = parsed;
       }
       if (input.estado === "pendiente") {
+        // La cita conserva sus recursos asignados al reagendar.
+        const recursoIds = await recursosDeCita(tx, cita.id);
         const disponibilidad = await validarDisponibilidadCita(tx, {
           organizacionId: input.organizacionId,
           sucursalId: cita.sucursalId,
@@ -346,11 +551,42 @@ export async function updateCitaEstado(formData: FormData): Promise<CitaMutation
           duracionMinutos: cita.duracionMinutos,
           zonaHoraria: sucursal.zonaHoraria,
           ignoreCitaId: cita.id,
+          capacidadSinAsignar: sucursal.capacidadSinAsignar,
+          recursoIds,
         });
-        if (!disponibilidad.ok) return { success: false, error: violacionesAError(disponibilidad) };
+        if (!disponibilidad.ok) {
+          const sugerencias = await sugerenciasEnConflicto(tx, {
+            organizacionId: input.organizacionId,
+            sucursalId: cita.sucursalId,
+            usuarioId: cita.usuarioId,
+            fechaHora,
+            duracionMinutos: cita.duracionMinutos,
+            zonaHoraria: sucursal.zonaHoraria,
+            capacidadSinAsignar: sucursal.capacidadSinAsignar,
+            ignoreCitaId: cita.id,
+            recursoIds,
+          });
+          return { success: false, error: violacionesAError(disponibilidad), sugerencias };
+        }
       }
 
-      await tx.update(citas).set({ estado: input.estado, fechaHora, updatedBy: user.id }).where(eq(citas.id, cita.id));
+      await tx
+        .update(citas)
+        .set({ estado: input.estado, fechaHora, version: cita.version + 1, updatedBy: user.id })
+        .where(eq(citas.id, cita.id));
+      await registrarHistorialCita(tx, {
+        citaId: cita.id,
+        organizacionId: input.organizacionId,
+        usuarioId: user.id,
+        accion: "estado",
+        detalle: {
+          de: cita.estado,
+          a: input.estado,
+          ...(fechaHora.getTime() !== cita.fechaHora.getTime()
+            ? { fechaHora: fechaHora.toISOString(), fechaHoraPrevia: cita.fechaHora.toISOString() }
+            : {}),
+        },
+      });
       return { success: true, message: "Estado actualizado." };
     });
 
@@ -369,14 +605,20 @@ export async function toggleCitaActiva(formData: FormData): Promise<CitaMutation
   const organizationId = String(formData.get("organizacionId") ?? "");
   const id = String(formData.get("id") ?? "");
   const active = formData.get("activo") === "true";
-  const parsed = z.object({ organizationId: z.string().uuid(), id: z.string().uuid() }).safeParse({ organizationId, id });
+  const parsed = z
+    .object({
+      organizationId: z.string().uuid(),
+      id: z.string().uuid(),
+      version: z.coerce.number().int().min(1).optional(),
+    })
+    .safeParse({ organizationId, id, version: formData.get("version") ?? undefined });
   if (!parsed.success) return { success: false, error: "Datos inválidos." };
   const access = await checkPermission(organizationId, "agenda.editar");
   if (!access) return { success: false, error: "No tienes permiso para editar la agenda." };
   const { user } = access;
   const db = getDatabase();
   const [cita] = await db
-    .select({ sucursalId: citas.sucursalId })
+    .select({ sucursalId: citas.sucursalId, version: citas.version })
     .from(citas)
     .where(and(eq(citas.id, id), eq(citas.organizacionId, organizationId)))
     .limit(1);
@@ -384,10 +626,21 @@ export async function toggleCitaActiva(formData: FormData): Promise<CitaMutation
   if (!canAccessBranch(access, cita.sucursalId)) {
     return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
   }
-  await db
-    .update(citas)
-    .set({ activo: !active, updatedBy: user.id })
-    .where(and(eq(citas.id, id), eq(citas.organizacionId, organizationId)));
+  if (!versionCoincide(cita, parsed.data.version)) {
+    return { success: false, error: CITA_STALE_MESSAGE };
+  }
+  await db.transaction(async (tx) => {
+    await tx
+      .update(citas)
+      .set({ activo: !active, version: cita.version + 1, updatedBy: user.id })
+      .where(and(eq(citas.id, id), eq(citas.organizacionId, organizationId)));
+    await registrarHistorialCita(tx, {
+      citaId: id,
+      organizacionId: organizationId,
+      usuarioId: user.id,
+      accion: active ? "ocultada" : "reactivada",
+    });
+  });
   revalidatePath("/admin/agenda");
   revalidatePath("/admin/pos");
   return { success: true, message: active ? "Cita desactivada." : "Cita reactivada." };
@@ -398,6 +651,7 @@ const moveSchema = z.object({
   citaId: z.string().uuid(),
   fechaHora: z.string().min(1),
   usuarioId: z.string().uuid().optional().or(z.literal("")),
+  version: z.coerce.number().int().min(1).optional(),
 });
 
 async function moverCitaEnTx(
@@ -418,6 +672,10 @@ async function moverCitaEnTx(
   const cita = await getCita(tx, input.organizacionId, input.citaId);
   if (!cita || !cita.activo) return { success: false, error: "La cita no existe." };
 
+  if (!versionCoincide(cita, input.version)) {
+    return { success: false, error: CITA_STALE_MESSAGE };
+  }
+
   if (opts.reactivarAPendiente) {
     if (!canRescheduleEstado(cita.estado)) {
       return { success: false, error: `Una cita en estado "${cita.estado}" no puede reagendarse.` };
@@ -435,6 +693,8 @@ async function moverCitaEnTx(
     if (!asignado) return { success: false, error: "El profesional no está asignado a esta sucursal." };
   }
 
+  // Mover conserva los recursos asignados a la cita.
+  const recursoIds = await recursosDeCita(tx, cita.id);
   const disponibilidad = await validarDisponibilidadCita(tx, {
     organizacionId: input.organizacionId,
     sucursalId: cita.sucursalId,
@@ -443,8 +703,23 @@ async function moverCitaEnTx(
     duracionMinutos: cita.duracionMinutos,
     zonaHoraria: sucursal.zonaHoraria,
     ignoreCitaId: cita.id,
+    capacidadSinAsignar: sucursal.capacidadSinAsignar,
+    recursoIds,
   });
-  if (!disponibilidad.ok) return { success: false, error: violacionesAError(disponibilidad) };
+  if (!disponibilidad.ok) {
+    const sugerencias = await sugerenciasEnConflicto(tx, {
+      organizacionId: input.organizacionId,
+      sucursalId: cita.sucursalId,
+      usuarioId,
+      fechaHora,
+      duracionMinutos: cita.duracionMinutos,
+      zonaHoraria: sucursal.zonaHoraria,
+      capacidadSinAsignar: sucursal.capacidadSinAsignar,
+      ignoreCitaId: cita.id,
+      recursoIds,
+    });
+    return { success: false, error: violacionesAError(disponibilidad), sugerencias };
+  }
 
   await tx
     .update(citas)
@@ -452,9 +727,23 @@ async function moverCitaEnTx(
       fechaHora,
       usuarioId,
       ...(opts.reactivarAPendiente ? { estado: "pendiente" } : {}),
+      version: cita.version + 1,
       updatedBy: userId,
     })
     .where(eq(citas.id, cita.id));
+  await registrarHistorialCita(tx, {
+    citaId: cita.id,
+    organizacionId: input.organizacionId,
+    usuarioId: userId,
+    accion: opts.reactivarAPendiente ? "reagendada" : "movida",
+    detalle: {
+      fechaHoraDe: cita.fechaHora.toISOString(),
+      fechaHoraA: fechaHora.toISOString(),
+      profesionalDe: cita.usuarioId,
+      profesionalA: usuarioId,
+      ...(opts.reactivarAPendiente ? { estadoDe: cita.estado } : {}),
+    },
+  });
   return { success: true, message: opts.reactivarAPendiente ? "Cita reagendada a pendiente." : "Cita movida." };
 }
 
@@ -503,5 +792,509 @@ export async function rescheduleCita(formData: FormData): Promise<CitaMutationRe
   } catch (error) {
     console.error("rescheduleCita", error);
     return { success: false, error: "No se pudo reagendar la cita." };
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Disponibilidad: horarios, bloqueos y capacidad "sin asignar"          */
+/* ------------------------------------------------------------------ */
+
+const horarioSchema = z.object({
+  organizacionId: z.string().uuid(),
+  sucursalId: z.string().uuid(),
+  diaSemana: z.coerce.number().int().min(0).max(6),
+  iniciaMinutos: z.coerce.number().int().min(0).max(1439),
+  terminaMinutos: z.coerce.number().int().min(1).max(1440),
+});
+
+/** Crea un turno de atención para un día de la semana en la sucursal. */
+export async function saveHorarioSucursal(formData: FormData): Promise<CitaMutationResult> {
+  const result = horarioSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!result.success) return { success: false, error: "Datos inválidos para el horario." };
+  const input = result.data;
+  if (input.iniciaMinutos >= input.terminaMinutos) {
+    return { success: false, error: "La hora de inicio debe ser anterior a la de cierre." };
+  }
+  const access = await checkPermission(input.organizacionId, "agenda.editar");
+  if (!access) return { success: false, error: "No tienes permiso para configurar la agenda." };
+  if (!(await assertBranchScope(access, input.sucursalId))) {
+    return { success: false, error: "No tienes acceso a esta sucursal." };
+  }
+  const db = getDatabase();
+
+  try {
+    const outcome = await db.transaction(async (tx): Promise<CitaMutationResult> => {
+      // Rechaza turnos traslapados en el mismo día: los huecos entre turnos
+      // (comida, limpieza) se modelan como dos turnos no traslapados.
+      const existentes = await tx
+        .select({ iniciaMinutos: horariosSucursales.iniciaMinutos, terminaMinutos: horariosSucursales.terminaMinutos })
+        .from(horariosSucursales)
+        .where(
+          and(
+            eq(horariosSucursales.sucursalId, input.sucursalId),
+            eq(horariosSucursales.diaSemana, input.diaSemana),
+            eq(horariosSucursales.activo, true),
+          ),
+        );
+      const traslapa = existentes.some(
+        (turno) => input.iniciaMinutos < turno.terminaMinutos && turno.iniciaMinutos < input.terminaMinutos,
+      );
+      if (traslapa) {
+        return { success: false, error: "El turno se traslapa con otro horario activo de ese día." };
+      }
+      await tx.insert(horariosSucursales).values({
+        organizacionId: input.organizacionId,
+        sucursalId: input.sucursalId,
+        diaSemana: input.diaSemana,
+        iniciaMinutos: input.iniciaMinutos,
+        terminaMinutos: input.terminaMinutos,
+        createdBy: access.user.id,
+      });
+      await auditEvent(tx, {
+        organizacionId: input.organizacionId,
+        sucursalId: input.sucursalId,
+        usuarioId: access.user.id,
+        accion: "agenda.horario_creado",
+        entidad: "horarios_sucursales",
+        detalle: {
+          diaSemana: input.diaSemana,
+          iniciaMinutos: input.iniciaMinutos,
+          terminaMinutos: input.terminaMinutos,
+        },
+      });
+      return { success: true, message: "Horario agregado." };
+    });
+    if (outcome.success) revalidatePath("/admin/agenda");
+    return outcome;
+  } catch (error) {
+    console.error("saveHorarioSucursal", error);
+    return { success: false, error: "No se pudo guardar el horario." };
+  }
+}
+
+/** Activa/desactiva un turno de horario existente. */
+export async function toggleHorarioSucursal(formData: FormData): Promise<CitaMutationResult> {
+  const parsed = z
+    .object({ organizacionId: z.string().uuid(), id: z.string().uuid(), activo: z.coerce.boolean() })
+    .safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return { success: false, error: "Datos inválidos." };
+  const input = parsed.data;
+  const access = await checkPermission(input.organizacionId, "agenda.editar");
+  if (!access) return { success: false, error: "No tienes permiso para configurar la agenda." };
+  const db = getDatabase();
+  const [horario] = await db
+    .select({ sucursalId: horariosSucursales.sucursalId })
+    .from(horariosSucursales)
+    .where(and(eq(horariosSucursales.id, input.id), eq(horariosSucursales.organizacionId, input.organizacionId)))
+    .limit(1);
+  if (!horario) return { success: false, error: "El horario no existe." };
+  if (!(await assertBranchScope(access, horario.sucursalId))) {
+    return { success: false, error: "No tienes acceso a esta sucursal." };
+  }
+  await db
+    .update(horariosSucursales)
+    .set({ activo: !input.activo, updatedBy: access.user.id })
+    .where(eq(horariosSucursales.id, input.id));
+  revalidatePath("/admin/agenda");
+  return { success: true, message: input.activo ? "Horario desactivado." : "Horario reactivado." };
+}
+
+const bloqueoSchema = z.object({
+  organizacionId: z.string().uuid(),
+  sucursalId: z.string().uuid(),
+  usuarioId: z.string().uuid().optional().or(z.literal("")),
+  iniciaAt: z.string().min(1, "Indica el inicio del bloqueo."),
+  terminaAt: z.string().min(1, "Indica el fin del bloqueo."),
+  tipo: z.enum(BLOQUEO_TIPOS),
+  motivo: z.string().trim().max(400).optional().or(z.literal("")),
+});
+
+/**
+ * Crea un bloqueo de agenda (descanso, cierre, personal, mantenimiento).
+ * `usuarioId` vacío = bloqueo general de la sucursal. Las horas se interpretan
+ * en la zona horaria de la sucursal.
+ */
+export async function saveBloqueoAgenda(formData: FormData): Promise<CitaMutationResult> {
+  const result = bloqueoSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!result.success) return { success: false, error: result.error.issues[0]?.message ?? "Datos inválidos." };
+  const input = result.data;
+  const access = await checkPermission(input.organizacionId, "agenda.editar");
+  if (!access) return { success: false, error: "No tienes permiso para configurar la agenda." };
+  const db = getDatabase();
+
+  try {
+    const outcome = await db.transaction(async (tx): Promise<CitaMutationResult> => {
+      const sucursal = await lockSucursalAgenda(tx, input.organizacionId, input.sucursalId);
+      if (!sucursal) return { success: false, error: "La sucursal no existe o no pertenece a la organización." };
+      if (!sucursal.activo) return { success: false, error: "La sucursal está inactiva." };
+      if (!canAccessBranch(access, input.sucursalId)) {
+        return { success: false, error: "No tienes acceso a esta sucursal." };
+      }
+      const inicia = parseFechaHoraInput(input.iniciaAt, sucursal.zonaHoraria);
+      const termina = parseFechaHoraInput(input.terminaAt, sucursal.zonaHoraria);
+      if (!inicia || !termina) return { success: false, error: "Fechas de bloqueo inválidas." };
+      if (inicia.getTime() >= termina.getTime()) {
+        return { success: false, error: "El inicio del bloqueo debe ser anterior a su fin." };
+      }
+      if (input.usuarioId) {
+        const asignado = await profesionalAsignadoASucursal(tx, input.organizacionId, input.sucursalId, input.usuarioId);
+        if (!asignado) return { success: false, error: "El profesional no está asignado a esta sucursal." };
+      }
+      const [inserted] = await tx
+        .insert(bloqueosAgenda)
+        .values({
+          organizacionId: input.organizacionId,
+          sucursalId: input.sucursalId,
+          usuarioId: input.usuarioId || null,
+          iniciaAt: inicia,
+          terminaAt: termina,
+          tipo: input.tipo,
+          motivo: input.motivo || null,
+          createdBy: access.user.id,
+        })
+        .returning({ id: bloqueosAgenda.id });
+      await auditEvent(tx, {
+        organizacionId: input.organizacionId,
+        sucursalId: input.sucursalId,
+        usuarioId: access.user.id,
+        accion: "agenda.bloqueo_creado",
+        entidad: "bloqueos_agenda",
+        entidadId: inserted.id,
+        detalle: {
+          usuarioId: input.usuarioId || null,
+          iniciaAt: inicia.toISOString(),
+          terminaAt: termina.toISOString(),
+          tipo: input.tipo,
+        },
+      });
+      return { success: true, message: "Bloqueo creado." };
+    });
+    if (outcome.success) revalidatePath("/admin/agenda");
+    return outcome;
+  } catch (error) {
+    console.error("saveBloqueoAgenda", error);
+    return { success: false, error: "No se pudo crear el bloqueo." };
+  }
+}
+
+/** Activa/desactiva un bloqueo de agenda. */
+export async function toggleBloqueoAgenda(formData: FormData): Promise<CitaMutationResult> {
+  const parsed = z
+    .object({ organizacionId: z.string().uuid(), id: z.string().uuid(), activo: z.coerce.boolean() })
+    .safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return { success: false, error: "Datos inválidos." };
+  const input = parsed.data;
+  const access = await checkPermission(input.organizacionId, "agenda.editar");
+  if (!access) return { success: false, error: "No tienes permiso para configurar la agenda." };
+  const db = getDatabase();
+  const [bloqueo] = await db
+    .select({ sucursalId: bloqueosAgenda.sucursalId })
+    .from(bloqueosAgenda)
+    .where(and(eq(bloqueosAgenda.id, input.id), eq(bloqueosAgenda.organizacionId, input.organizacionId)))
+    .limit(1);
+  if (!bloqueo) return { success: false, error: "El bloqueo no existe." };
+  if (!(await assertBranchScope(access, bloqueo.sucursalId))) {
+    return { success: false, error: "No tienes acceso a esta sucursal." };
+  }
+  await db
+    .update(bloqueosAgenda)
+    .set({ activo: !input.activo, updatedBy: access.user.id })
+    .where(eq(bloqueosAgenda.id, input.id));
+  revalidatePath("/admin/agenda");
+  return { success: true, message: input.activo ? "Bloqueo desactivado." : "Bloqueo reactivado." };
+}
+
+/**
+ * Política de citas sin profesional: cuántas citas "sin asignar" pueden
+ * coexistir en el mismo horario de la sucursal (1 = una a la vez).
+ */
+export async function updateCapacidadSinAsignar(formData: FormData): Promise<CitaMutationResult> {
+  const parsed = z
+    .object({
+      organizacionId: z.string().uuid(),
+      sucursalId: z.string().uuid(),
+      capacidadSinAsignar: z.coerce.number().int().min(1).max(50),
+    })
+    .safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return { success: false, error: "Indica una capacidad entre 1 y 50." };
+  const input = parsed.data;
+  const access = await checkPermission(input.organizacionId, "agenda.editar");
+  if (!access) return { success: false, error: "No tienes permiso para configurar la agenda." };
+  if (!(await assertBranchScope(access, input.sucursalId))) {
+    return { success: false, error: "No tienes acceso a esta sucursal." };
+  }
+  const db = getDatabase();
+  await db.transaction(async (tx) => {
+    await tx
+      .update(sucursales)
+      .set({ capacidadSinAsignar: input.capacidadSinAsignar, updatedBy: access.user.id })
+      .where(and(eq(sucursales.id, input.sucursalId), eq(sucursales.organizacionId, input.organizacionId)));
+    await auditEvent(tx, {
+      organizacionId: input.organizacionId,
+      sucursalId: input.sucursalId,
+      usuarioId: access.user.id,
+      accion: "agenda.capacidad_sin_asignar",
+      entidad: "sucursales",
+      entidadId: input.sucursalId,
+      detalle: { capacidadSinAsignar: input.capacidadSinAsignar },
+    });
+  });
+  revalidatePath("/admin/agenda");
+  return { success: true, message: "Capacidad actualizada." };
+}
+
+/* ------------------------------------------------------------------ */
+/* Historial de la cita (panel lateral, carga perezosa)                  */
+/* ------------------------------------------------------------------ */
+
+export interface CitaHistorialEvento {
+  id: string;
+  accion: string;
+  detalle: Record<string, unknown> | null;
+  createdAt: string;
+  usuarioNombre: string | null;
+}
+
+/** Devuelve los últimos movimientos de la cita (más reciente primero). */
+export async function getCitaHistorial(formData: FormData): Promise<{
+  success: boolean;
+  error?: string;
+  eventos?: CitaHistorialEvento[];
+}> {
+  const parsed = z
+    .object({ organizacionId: z.string().uuid(), citaId: z.string().uuid() })
+    .safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return { success: false, error: "Datos inválidos." };
+  const input = parsed.data;
+  const access = await checkPermission(input.organizacionId, "agenda.ver");
+  if (!access) return { success: false, error: "No tienes permiso para ver la agenda." };
+  const db = getDatabase();
+  const cita = await getCita(db, input.organizacionId, input.citaId);
+  if (!cita) return { success: false, error: "La cita no existe." };
+  if (!canAccessBranch(access, cita.sucursalId)) {
+    return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
+  }
+  const rows = await db
+    .select({
+      id: citasHistorial.id,
+      accion: citasHistorial.accion,
+      detalle: citasHistorial.detalle,
+      createdAt: citasHistorial.createdAt,
+      usuarioNombre: usuarios.nombre,
+    })
+    .from(citasHistorial)
+    .leftJoin(usuarios, eq(citasHistorial.usuarioId, usuarios.id))
+    .where(
+      and(
+        eq(citasHistorial.citaId, input.citaId),
+        eq(citasHistorial.organizacionId, input.organizacionId),
+      ),
+    )
+    .orderBy(desc(citasHistorial.createdAt))
+    .limit(30);
+  return {
+    success: true,
+    eventos: rows.map((row) => ({
+      id: row.id,
+      accion: row.accion,
+      detalle: row.detalle ?? null,
+      createdAt: row.createdAt.toISOString(),
+      usuarioNombre: row.usuarioNombre ?? null,
+    })),
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Recursos físicos (cabina, silla, equipo) y asignación a citas         */
+/* ------------------------------------------------------------------ */
+
+const recursoSchema = z.object({
+  organizacionId: z.string().uuid(),
+  sucursalId: z.string().uuid(),
+  nombre: z.string().trim().min(2, "Indica el nombre del recurso.").max(160),
+  tipo: z.enum(RECURSO_TIPOS),
+  capacidad: z.coerce.number().int().min(1).max(100),
+  notas: z.string().trim().max(400).optional().or(z.literal("")),
+});
+
+/** Registra un recurso físico de la sucursal (cabina, silla, equipo…). */
+export async function saveRecurso(formData: FormData): Promise<CitaMutationResult> {
+  const result = recursoSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!result.success) return { success: false, error: result.error.issues[0]?.message ?? "Datos inválidos." };
+  const input = result.data;
+  const access = await checkPermission(input.organizacionId, "agenda.editar");
+  if (!access) return { success: false, error: "No tienes permiso para configurar la agenda." };
+  if (!(await assertBranchScope(access, input.sucursalId))) {
+    return { success: false, error: "No tienes acceso a esta sucursal." };
+  }
+  const db = getDatabase();
+  try {
+    const outcome = await db.transaction(async (tx): Promise<CitaMutationResult> => {
+      const [inserted] = await tx
+        .insert(recursos)
+        .values({
+          organizacionId: input.organizacionId,
+          sucursalId: input.sucursalId,
+          nombre: input.nombre,
+          tipo: input.tipo,
+          capacidad: input.capacidad,
+          notas: input.notas || null,
+          createdBy: access.user.id,
+        })
+        .returning({ id: recursos.id });
+      await auditEvent(tx, {
+        organizacionId: input.organizacionId,
+        sucursalId: input.sucursalId,
+        usuarioId: access.user.id,
+        accion: "agenda.recurso_creado",
+        entidad: "recursos",
+        entidadId: inserted.id,
+        detalle: { nombre: input.nombre, tipo: input.tipo, capacidad: input.capacidad },
+      });
+      return { success: true, message: "Recurso registrado." };
+    });
+    if (outcome.success) revalidatePath("/admin/agenda");
+    return outcome;
+  } catch (error) {
+    console.error("saveRecurso", error);
+    return { success: false, error: "No se pudo registrar el recurso." };
+  }
+}
+
+/** Activa/desactiva un recurso. Desactivar no libera citas ya agendadas. */
+export async function toggleRecurso(formData: FormData): Promise<CitaMutationResult> {
+  const parsed = z
+    .object({ organizacionId: z.string().uuid(), id: z.string().uuid(), activo: z.coerce.boolean() })
+    .safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return { success: false, error: "Datos inválidos." };
+  const input = parsed.data;
+  const access = await checkPermission(input.organizacionId, "agenda.editar");
+  if (!access) return { success: false, error: "No tienes permiso para configurar la agenda." };
+  const db = getDatabase();
+  const [recurso] = await db
+    .select({ sucursalId: recursos.sucursalId })
+    .from(recursos)
+    .where(and(eq(recursos.id, input.id), eq(recursos.organizacionId, input.organizacionId)))
+    .limit(1);
+  if (!recurso) return { success: false, error: "El recurso no existe." };
+  if (!(await assertBranchScope(access, recurso.sucursalId))) {
+    return { success: false, error: "No tienes acceso a esta sucursal." };
+  }
+  await db
+    .update(recursos)
+    .set({ activo: !input.activo, updatedBy: access.user.id })
+    .where(eq(recursos.id, input.id));
+  revalidatePath("/admin/agenda");
+  return { success: true, message: input.activo ? "Recurso desactivado." : "Reactivado." };
+}
+
+const recursoCitaSchema = z.object({
+  organizacionId: z.string().uuid(),
+  citaId: z.string().uuid(),
+  recursoId: z.string().uuid(),
+  agregar: z.coerce.boolean(),
+  version: z.coerce.number().int().min(1).optional(),
+});
+
+/**
+ * Asigna o libera un recurso en una cita existente (panel lateral). Al
+ * agregarlo se valida que el recurso esté libre en el horario de la cita.
+ */
+export async function toggleRecursoCita(formData: FormData): Promise<CitaMutationResult> {
+  const result = recursoCitaSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!result.success) return { success: false, error: "Datos inválidos para el recurso." };
+  const input = result.data;
+  const access = await checkPermission(input.organizacionId, "agenda.editar");
+  if (!access) return { success: false, error: "No tienes permiso para editar la agenda." };
+  const { user } = access;
+  const db = getDatabase();
+
+  try {
+    const outcome = await db.transaction(async (tx): Promise<CitaMutationResult> => {
+      const cita = await getCita(tx, input.organizacionId, input.citaId);
+      if (!cita || !cita.activo) return { success: false, error: "La cita no existe." };
+      if (!canAccessBranch(access, cita.sucursalId)) {
+        return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
+      }
+      if (!isCitaEditable(cita.estado)) {
+        return { success: false, error: "Solo se pueden modificar recursos en citas pendientes, confirmadas o en proceso." };
+      }
+      if (!versionCoincide(cita, input.version)) {
+        return { success: false, error: CITA_STALE_MESSAGE };
+      }
+
+      const [recurso] = await tx
+        .select({ id: recursos.id, nombre: recursos.nombre })
+        .from(recursos)
+        .where(
+          and(
+            eq(recursos.id, input.recursoId),
+            eq(recursos.organizacionId, input.organizacionId),
+            eq(recursos.sucursalId, cita.sucursalId),
+            eq(recursos.activo, true),
+          ),
+        )
+        .limit(1);
+      if (!recurso) return { success: false, error: "El recurso no está disponible en esta sucursal." };
+
+      const [existente] = await tx
+        .select({ id: citaRecursos.id, activo: citaRecursos.activo })
+        .from(citaRecursos)
+        .where(and(eq(citaRecursos.citaId, cita.id), eq(citaRecursos.recursoId, input.recursoId)))
+        .limit(1);
+
+      if (input.agregar) {
+        if (existente?.activo) return { success: true, message: "El recurso ya está en la cita." };
+        // El recurso debe estar libre en el horario actual de la cita.
+        const sucursal = await lockSucursalAgenda(tx, input.organizacionId, cita.sucursalId);
+        if (!sucursal) return { success: false, error: "La sucursal ya no existe." };
+        const actuales = await recursosDeCita(tx, cita.id);
+        const recursoIds = [...actuales.filter((id) => id !== input.recursoId), input.recursoId];
+        const disponibilidad = await validarDisponibilidadCita(tx, {
+          organizacionId: input.organizacionId,
+          sucursalId: cita.sucursalId,
+          usuarioId: cita.usuarioId,
+          fechaHora: cita.fechaHora,
+          duracionMinutos: cita.duracionMinutos,
+          zonaHoraria: sucursal.zonaHoraria,
+          ignoreCitaId: cita.id,
+          capacidadSinAsignar: sucursal.capacidadSinAsignar,
+          recursoIds,
+        });
+        if (!disponibilidad.ok) return { success: false, error: violacionesAError(disponibilidad) };
+        if (existente) {
+          await tx.update(citaRecursos).set({ activo: true, updatedBy: user.id }).where(eq(citaRecursos.id, existente.id));
+        } else {
+          await tx.insert(citaRecursos).values({
+            citaId: cita.id,
+            recursoId: input.recursoId,
+            organizacionId: input.organizacionId,
+            createdBy: user.id,
+          });
+        }
+      } else {
+        if (!existente?.activo) return { success: true, message: "El recurso no estaba en la cita." };
+        await tx.update(citaRecursos).set({ activo: false, updatedBy: user.id }).where(eq(citaRecursos.id, existente.id));
+      }
+
+      await tx.update(citas).set({ version: cita.version + 1, updatedBy: user.id }).where(eq(citas.id, cita.id));
+      await registrarHistorialCita(tx, {
+        citaId: cita.id,
+        organizacionId: input.organizacionId,
+        usuarioId: user.id,
+        accion: input.agregar ? "recurso_agregado" : "recurso_quitado",
+        detalle: { recursoId: input.recursoId, nombre: recurso.nombre },
+      });
+      return { success: true, message: input.agregar ? "Recurso asignado." : "Recurso liberado." };
+    });
+
+    if (outcome.success) {
+      revalidatePath("/admin/agenda");
+      revalidatePath("/admin/pos");
+    }
+    return outcome;
+  } catch (error) {
+    console.error("toggleRecursoCita", error);
+    return { success: false, error: "No se pudo actualizar los recursos." };
   }
 }

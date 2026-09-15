@@ -10,16 +10,28 @@ import {
   UserCheck,
   X,
 } from "lucide-react";
-import { useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 
-import { toggleServicioCita } from "@/app/admin/agenda/actions";
-import type { AgendaCita } from "@/app/admin/agenda/agenda-board";
+import {
+  getCitaHistorial,
+  toggleRecursoCita,
+  toggleServicioCita,
+  type CitaHistorialEvento,
+} from "@/app/admin/agenda/actions";
+import {
+  cobrarAnticipo,
+  devolverAnticipo,
+  getCitaAnticipos,
+  type CitaAnticipo,
+} from "@/app/admin/pos/actions";
+import type { AgendaCita, AgendaRecurso } from "@/app/admin/agenda/agenda-board";
 import { FichaForm } from "@/app/admin/clientes/ficha-form";
 import { StatusBadge, type StatusTone } from "@/components/status-badge";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { useToast } from "@/components/ui/toast";
+import { initialActionState } from "@/lib/action-state";
 import { formatCurrency, formatDate, formatTime } from "@/lib/format";
 import { buildAdminHref } from "@/lib/url-context";
 import { cn } from "@/lib/utils";
@@ -57,6 +69,375 @@ const TRANSITION_LABEL: Record<string, string> = {
 
 export { ESTADO_LABEL };
 
+const HISTORIAL_LABEL: Record<string, string> = {
+  creada: "Cita creada",
+  editada: "Datos editados",
+  movida: "Movida de horario",
+  reagendada: "Reagendada a pendiente",
+  estado: "Cambio de estado",
+  servicio_agregado: "Servicio agregado",
+  servicio_quitado: "Servicio quitado",
+  recurso_agregado: "Recurso asignado",
+  recurso_quitado: "Recurso liberado",
+  ocultada: "Ocultada de la agenda",
+  reactivada: "Reactivada",
+  anticipo: "Anticipo cobrado",
+  anticipo_devuelto: "Anticipo devuelto",
+};
+
+function historialResumen(evento: CitaHistorialEvento): string {
+  const detalle = evento.detalle ?? {};
+  if (evento.accion === "estado") {
+    return `${ESTADO_LABEL[String(detalle.de)] ?? String(detalle.de)} → ${ESTADO_LABEL[String(detalle.a)] ?? String(detalle.a)}`;
+  }
+  if ((evento.accion === "movida" || evento.accion === "reagendada") && detalle.fechaHoraA) {
+    return `nueva hora: ${formatTime(String(detalle.fechaHoraA))}`;
+  }
+  if ((evento.accion === "recurso_agregado" || evento.accion === "recurso_quitado") && detalle.nombre) {
+    return String(detalle.nombre);
+  }
+  return HISTORIAL_LABEL[evento.accion] ?? evento.accion;
+}
+
+/** Historial de movimientos de la cita, cargado al expandir (bitácora propia). */
+function CitaHistorial({
+  citaId,
+  organizationId,
+  timeZone,
+}: {
+  citaId: string;
+  organizationId: string;
+  timeZone: string;
+}) {
+  const [eventos, setEventos] = useState<CitaHistorialEvento[] | null>(null);
+  const [cargando, setCargando] = useState(false);
+
+  const cargar = () => {
+    if (eventos !== null || cargando) return;
+    setCargando(true);
+    const data = new FormData();
+    data.set("organizacionId", organizationId);
+    data.set("citaId", citaId);
+    void getCitaHistorial(data)
+      .then((result) => setEventos(result.success ? (result.eventos ?? []) : []))
+      .catch(() => setEventos([]))
+      .finally(() => setCargando(false));
+  };
+
+  return (
+    <details
+      className="rounded-xl border border-[#eee8e3] bg-[#faf9f7] px-4 py-3"
+      onToggle={(event) => {
+        if (event.currentTarget.open) cargar();
+      }}
+    >
+      <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-[#8a5140] select-none">
+        Historial de la cita
+      </summary>
+      <ul className="mt-3 space-y-2">
+        {eventos === null ? (
+          <li className="text-xs text-[#81746c]">{cargando ? "Cargando…" : ""}</li>
+        ) : eventos.length === 0 ? (
+          <li className="text-xs text-[#81746c]">Sin movimientos registrados.</li>
+        ) : (
+          eventos.map((evento) => (
+            <li className="flex items-baseline gap-2 text-xs" key={evento.id}>
+              <span className="shrink-0 tabular-nums text-[#a89f97]">
+                {formatDate(evento.createdAt, { timeZone })} {formatTime(evento.createdAt, { timeZone })}
+              </span>
+              <span className="min-w-0 flex-1 text-[#625b55]">
+                <span className="font-medium text-[#403a35]">
+                  {HISTORIAL_LABEL[evento.accion] ?? evento.accion}
+                </span>
+                {["estado", "movida", "reagendada", "recurso_agregado", "recurso_quitado"].includes(evento.accion)
+                  ? ` — ${historialResumen(evento)}`
+                  : ""}
+                {evento.usuarioNombre ? ` · ${evento.usuarioNombre}` : ""}
+              </span>
+            </li>
+          ))
+        )}
+      </ul>
+    </details>
+  );
+}
+
+const ANTICIPO_ESTADO_LABEL: Record<string, string> = {
+  vigente: "Vigente",
+  aplicado: "Aplicado",
+  devuelto: "Devuelto",
+};
+
+const ANTICIPO_ESTADO_TONE: Record<string, StatusTone> = {
+  vigente: "info",
+  aplicado: "success",
+  devuelto: "destructive",
+};
+
+/**
+ * Anticipos de la cita: lista cargada al abrir el panel, mini-formulario para
+ * cobrar un depósito (entra al corte abierto) y devolución de los vigentes.
+ * Los permisos se resuelven del lado servidor en `getCitaAnticipos`.
+ */
+function CitaAnticipos({
+  cita,
+  currency,
+  editable,
+  onChanged,
+  organizationId,
+}: {
+  cita: AgendaCita;
+  currency: string;
+  editable: boolean;
+  onChanged: () => void;
+  organizationId: string;
+}) {
+  const toast = useToast();
+  const [data, setData] = useState<{
+    anticipos: CitaAnticipo[];
+    mediosPago: Array<{ id: string; nombre: string; categoria: string }>;
+    puedeCobrar: boolean;
+    puedeDevolver: boolean;
+  } | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [formAbierto, setFormAbierto] = useState(false);
+  const [monto, setMonto] = useState("");
+  const [medioPagoId, setMedioPagoId] = useState("");
+  const [referencia, setReferencia] = useState("");
+  const [devolviendoId, setDevolviendoId] = useState<string | null>(null);
+  const [motivoDevolucion, setMotivoDevolucion] = useState("");
+  const [idempotencia, setIdempotencia] = useState(() => crypto.randomUUID());
+
+  const cargar = () => {
+    const params = new FormData();
+    params.set("organizacionId", organizationId);
+    params.set("citaId", cita.id);
+    void getCitaAnticipos(params)
+      .then((result) => {
+        if (result.success) setData(result);
+      })
+      .catch(() => setData(null));
+  };
+
+  // Carga perezosa al montar el panel; si cambia la cita se recarga.
+  useEffect(() => {
+    cargar();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cita.id]);
+
+  const medioSeleccionado = data?.mediosPago.find((m) => m.id === medioPagoId);
+  const requiereReferencia = medioSeleccionado ? medioSeleccionado.categoria !== "efectivo" : false;
+  const vigenteTotal = (data?.anticipos ?? [])
+    .filter((a) => a.estado === "vigente")
+    .reduce((s, a) => s + Number(a.monto), 0);
+
+  const cobrar = () => {
+    const params = new FormData();
+    params.set("organizacionId", organizationId);
+    params.set("citaId", cita.id);
+    params.set("monto", monto);
+    params.set("medioPagoId", medioPagoId);
+    params.set("referencia", referencia);
+    params.set("idempotencia", idempotencia);
+    startTransition(async () => {
+      const result = await cobrarAnticipo(initialActionState, params);
+      if (result.success) {
+        toast.success(result.message ?? "Anticipo registrado.");
+        setFormAbierto(false);
+        setMonto("");
+        setReferencia("");
+        setIdempotencia(crypto.randomUUID());
+        cargar();
+        onChanged();
+      } else {
+        toast.error(result.error ?? "No se pudo registrar el anticipo.");
+      }
+    });
+  };
+
+  const devolver = (anticipoId: string) => {
+    const params = new FormData();
+    params.set("organizacionId", organizationId);
+    params.set("anticipoId", anticipoId);
+    params.set("motivo", motivoDevolucion);
+    startTransition(async () => {
+      const result = await devolverAnticipo(initialActionState, params);
+      if (result.success) {
+        toast.success(result.message ?? "Anticipo devuelto.");
+        setDevolviendoId(null);
+        setMotivoDevolucion("");
+        cargar();
+        onChanged();
+      } else {
+        toast.error(result.error ?? "No se pudo devolver el anticipo.");
+      }
+    });
+  };
+
+  if (!data) return null;
+  const puedeCapturar = editable && data.puedeCobrar;
+  if (data.anticipos.length === 0 && !puedeCapturar) return null;
+
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+          Anticipos
+        </h3>
+        {vigenteTotal > 0 ? (
+          <span className="text-xs font-semibold tabular-nums text-[#347052]">
+            {formatCurrency(vigenteTotal, { currency })} vigente
+          </span>
+        ) : null}
+      </div>
+
+      {data.anticipos.length > 0 ? (
+        <ul className="space-y-2">
+          {data.anticipos.map((ant) => (
+            <li
+              className="rounded-xl border border-[#eee8e3] px-4 py-2.5 text-sm"
+              key={ant.id}
+            >
+              <div className="flex min-h-8 items-center gap-3">
+                <span className="min-w-0 flex-1">
+                  <span className="font-medium tabular-nums">
+                    {formatCurrency(ant.monto, { currency })}
+                  </span>
+                  <span className="ml-2 text-xs text-[#81746c]">{ant.medioNombre ?? "Medio"}</span>
+                </span>
+                <StatusBadge tone={ANTICIPO_ESTADO_TONE[ant.estado] ?? "neutral"}>
+                  {ANTICIPO_ESTADO_LABEL[ant.estado] ?? ant.estado}
+                </StatusBadge>
+                {ant.estado === "vigente" && data.puedeDevolver ? (
+                  <Button
+                    aria-label="Devolver anticipo"
+                    disabled={pending}
+                    onClick={() => setDevolviendoId(devolviendoId === ant.id ? null : ant.id)}
+                    size="icon-sm"
+                    type="button"
+                    variant="ghost"
+                  >
+                    <RefreshCcw aria-hidden="true" className="size-4 text-[#a8443a]" />
+                  </Button>
+                ) : null}
+              </div>
+              {devolviendoId === ant.id ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <input
+                    aria-label="Motivo de la devolución"
+                    className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                    onChange={(event) => setMotivoDevolucion(event.target.value)}
+                    placeholder="Motivo de la devolución"
+                    type="text"
+                    value={motivoDevolucion}
+                  />
+                  <Button
+                    className="rounded-lg"
+                    disabled={pending || motivoDevolucion.trim().length < 3}
+                    onClick={() => devolver(ant.id)}
+                    size="sm"
+                    type="button"
+                    variant="destructive"
+                  >
+                    Devolver
+                  </Button>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {puedeCapturar ? (
+        formAbierto ? (
+          <div className="space-y-2 rounded-xl border border-[#eee8e3] p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                aria-label="Monto del anticipo"
+                className="h-9 w-28 rounded-lg border border-input bg-background px-3 text-sm tabular-nums outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                inputMode="decimal"
+                min="0"
+                onChange={(event) => setMonto(event.target.value)}
+                placeholder="Monto"
+                step="0.01"
+                type="number"
+                value={monto}
+              />
+              <div aria-label="Medio del anticipo" className="flex flex-wrap gap-1.5" role="group">
+                {data.mediosPago.map((medio) => (
+                  <button
+                    aria-pressed={medioPagoId === medio.id}
+                    className={cn(
+                      "min-h-9 rounded-lg border px-3 text-xs font-medium transition-colors",
+                      medioPagoId === medio.id
+                        ? "border-[#8a5140] bg-[#f2e3dc] text-[#60392e]"
+                        : "border-[#e3d9d1] bg-white text-[#625b55] hover:border-[#c9a899]",
+                    )}
+                    key={medio.id}
+                    onClick={() => setMedioPagoId(medio.id)}
+                    type="button"
+                  >
+                    {medio.nombre}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {requiereReferencia ? (
+              <input
+                aria-label="Referencia del anticipo"
+                className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                onChange={(event) => setReferencia(event.target.value)}
+                placeholder={`Referencia de ${medioSeleccionado?.nombre ?? "pago"} (folio o autorización)`}
+                type="text"
+                value={referencia}
+              />
+            ) : null}
+            <div className="flex gap-2">
+              <Button
+                className="rounded-lg"
+                disabled={
+                  pending ||
+                  !(Number(monto) > 0) ||
+                  !medioPagoId ||
+                  (requiereReferencia && referencia.trim().length === 0)
+                }
+                onClick={cobrar}
+                size="sm"
+                type="button"
+              >
+                {pending ? "Registrando…" : "Cobrar anticipo"}
+              </Button>
+              <Button
+                className="rounded-lg"
+                disabled={pending}
+                onClick={() => setFormAbierto(false)}
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button
+            className="rounded-xl text-[#8a5140]"
+            onClick={() => {
+              setFormAbierto(true);
+              setMedioPagoId((prev) => prev || (data.mediosPago.find((m) => m.categoria === "efectivo") ?? data.mediosPago[0])?.id || "");
+            }}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            + Cobrar anticipo
+          </Button>
+        )
+      ) : null}
+    </section>
+  );
+}
+
 export function CitaStatusBadge({ estado }: { estado: string }) {
   return (
     <StatusBadge tone={ESTADO_TONE[estado] ?? "neutral"}>
@@ -82,6 +463,7 @@ export function CitaSidePanel({
   currency,
   organizationId,
   pending,
+  recursos = [],
   servicios,
   staff,
   timeZone,
@@ -98,6 +480,7 @@ export function CitaSidePanel({
   currency: string;
   organizationId: string;
   pending: boolean;
+  recursos?: AgendaRecurso[];
   servicios: AgendaServicio[];
   staff: Array<{ id: string; nombre: string }>;
   timeZone: string;
@@ -121,6 +504,8 @@ export function CitaSidePanel({
   const editable = isCitaEditable(cita.estado);
   const serviciosEnCita = new Set(cita.servicios.map((servicio) => servicio.id));
   const disponibles = servicios.filter((servicio) => !serviciosEnCita.has(servicio.id));
+  const recursosEnCita = new Set(cita.recursos.map((recurso) => recurso.id));
+  const recursosDisponibles = recursos.filter((recurso) => !recursosEnCita.has(recurso.id));
 
   const puedeCheckIn = canTransitionEstado(cita.estado, "en_proceso");
   const puedeConfirmar = canTransitionEstado(cita.estado, "confirmada");
@@ -137,6 +522,7 @@ export function CitaSidePanel({
     data.set("citaId", cita.id);
     data.set("servicioId", servicioId);
     data.set("agregar", agregar ? "true" : "false");
+    data.set("version", String(cita.version));
     startServicioTransition(async () => {
       try {
         const result = await toggleServicioCita(data);
@@ -150,6 +536,29 @@ export function CitaSidePanel({
       } catch (error) {
         console.error(error);
         toast.error("No se pudo actualizar los servicios.");
+      }
+    });
+  };
+
+  const toggleRecurso = (recursoId: string, agregar: boolean) => {
+    const data = new FormData();
+    data.set("organizacionId", organizationId);
+    data.set("citaId", cita.id);
+    data.set("recursoId", recursoId);
+    data.set("agregar", agregar ? "true" : "false");
+    data.set("version", String(cita.version));
+    startServicioTransition(async () => {
+      try {
+        const result = await toggleRecursoCita(data);
+        if (result.success) {
+          toast.success(result.message ?? "Recursos actualizados.");
+          onToggleServicio();
+        } else {
+          toast.error(result.error ?? "No se pudo actualizar los recursos.");
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error("No se pudo actualizar los recursos.");
       }
     });
   };
@@ -285,6 +694,67 @@ export function CitaSidePanel({
         ) : null}
       </section>
 
+      {cita.recursos.length > 0 || (editable && recursosDisponibles.length > 0) ? (
+        <section className="space-y-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+            Recursos
+          </h3>
+          {cita.recursos.length === 0 ? (
+            <p className="rounded-xl bg-[#f1eeea] px-4 py-3 text-sm text-[#625b55]">
+              Sin recursos asignados.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {cita.recursos.map((recurso) => (
+                <li
+                  className="flex min-h-11 items-center gap-3 rounded-xl border border-[#eee8e3] px-4 py-2 text-sm"
+                  key={recurso.id}
+                >
+                  <span className="min-w-0 flex-1 truncate font-medium">{recurso.nombre}</span>
+                  {editable ? (
+                    <Button
+                      aria-label={`Liberar ${recurso.nombre}`}
+                      disabled={ocupado}
+                      onClick={() => toggleRecurso(recurso.id, false)}
+                      size="icon-sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <X aria-hidden="true" className="text-destructive" />
+                    </Button>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+          {editable && recursosDisponibles.length > 0 ? (
+            <Combobox
+              clearable={false}
+              disabled={ocupado}
+              emptyMessage="No hay más recursos disponibles."
+              items={recursosDisponibles.map((recurso) => ({
+                value: recurso.id,
+                label: recurso.nombre,
+                description: recurso.tipo,
+              }))}
+              onValueChange={(value) => {
+                if (value) toggleRecurso(value, true);
+              }}
+              placeholder="+ Asignar recurso"
+              value={null}
+            />
+          ) : null}
+        </section>
+      ) : null}
+
+      <CitaAnticipos
+        cita={cita}
+        currency={currency}
+        editable={editable}
+        onChanged={onToggleServicio}
+        organizationId={organizationId}
+      />
+
       {cita.notas ? (
         <section>
           <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
@@ -372,6 +842,8 @@ export function CitaSidePanel({
           </Button>
         ) : null}
       </div>
+
+      <CitaHistorial citaId={cita.id} organizationId={organizationId} timeZone={timeZone} />
 
       <div className="flex flex-wrap gap-2 border-t border-[#eee8e3] pt-4">
         {puedeCancelar ? (

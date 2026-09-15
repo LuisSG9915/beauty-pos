@@ -1,13 +1,16 @@
 "use client";
 
 import {
+  BarChart3,
   Boxes,
   Calendar,
   CalendarCheck,
   Clipboard,
   CreditCard,
+  Crown,
   Landmark,
   Package,
+  PackageCheck,
   Percent,
   Ruler,
   Scissors,
@@ -31,8 +34,8 @@ export type AdminNavItem = {
   label: string;
   description: string;
   icon: LucideIcon;
-  /** Permiso requerido para ver el acceso; undefined = siempre visible. */
-  permiso?: string;
+  /** Permiso(s) requerido(s) para ver el acceso; array = cualquiera. */
+  permiso?: string | readonly string[];
 };
 
 export type AdminNavSection = {
@@ -49,6 +52,7 @@ const OPERACION: AdminNavItem[] = [
   { path: "/admin/servicios", label: "Servicios", description: "Catálogo de servicios del salón", icon: Scissors, permiso: "catalogos.ver" },
   { path: "/admin/productos", label: "Productos", description: "Venta, consumo e inventario", icon: ShoppingBag, permiso: "catalogos.ver" },
   { path: "/admin/inventario", label: "Inventario", description: "Stock, entradas, salidas y consumos", icon: Package, permiso: "inventario.ver" },
+  { path: "/admin/reportes", label: "Reportes", description: "Operativos y financieros por rango", icon: BarChart3, permiso: ["reportes.operativos", "reportes.financieros"] },
 ];
 
 const CATALOGOS: AdminNavItem[] = [
@@ -58,6 +62,8 @@ const CATALOGOS: AdminNavItem[] = [
   { path: "/admin/medios-pago", label: "Medios de pago", description: "Efectivo, tarjeta, transferencia", icon: CreditCard, permiso: "catalogos.ver" },
   { path: "/admin/impuestos", label: "Impuestos", description: "IVA, IEPS y configuración", icon: Percent, permiso: "catalogos.ver" },
   { path: "/admin/promociones", label: "Promociones", description: "Descuentos, 2x1 y paquetes", icon: Clipboard, permiso: "catalogos.ver" },
+  { path: "/admin/paquetes", label: "Paquetes", description: "Sesiones prepagadas por servicio", icon: PackageCheck, permiso: "catalogos.ver" },
+  { path: "/admin/membresias", label: "Membresías", description: "Descuento por vigencia para clientes", icon: Crown, permiso: "catalogos.ver" },
 ];
 
 const EQUIPO: AdminNavItem[] = [
@@ -79,12 +85,20 @@ function toAdminPath(path: string): `/${string}` | "" {
  * Secciones visibles según los permisos del usuario en la organización
  * activa. `permissions === null` desactiva el filtro (admin de plataforma).
  */
+/** `permiso` simple o lista (cualquiera) contra el set efectivo del usuario. */
+function tienePermiso(permiso: AdminNavItem["permiso"], permissions: ReadonlySet<string>): boolean {
+  if (!permiso) return true;
+  return Array.isArray(permiso)
+    ? (permiso as readonly string[]).some((clave) => permissions.has(clave))
+    : permissions.has(permiso as string);
+}
+
 export function getAdminNavSections(
   platformAdmin = false,
   permissions: ReadonlySet<string> | null = null,
 ): AdminNavSection[] {
   const visible = (items: AdminNavItem[]) =>
-    permissions === null ? items : items.filter((item) => !item.permiso || permissions.has(item.permiso));
+    permissions === null ? items : items.filter((item) => tienePermiso(item.permiso, permissions));
   const sections: AdminNavSection[] = [
     { title: "Operación", items: visible(OPERACION) },
     { title: "Catálogos", items: visible(CATALOGOS) },
@@ -201,7 +215,7 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
   const permissionSet = toPermissionSet(permissions);
   const items = permissionSet === null
     ? TAB_BAR
-    : TAB_BAR.filter((item) => !item.permiso || permissionSet.has(item.permiso));
+    : TAB_BAR.filter((item) => tienePermiso(item.permiso, permissionSet));
   return (
     <nav
       aria-label="Accesos rápidos"

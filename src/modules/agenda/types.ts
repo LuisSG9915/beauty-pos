@@ -84,6 +84,7 @@ export type ViolacionCodigo =
   | "sin_horario"
   | "bloqueo"
   | "traslape"
+  | "recurso"
   | "duracion_invalida";
 
 export interface ViolacionAgenda {

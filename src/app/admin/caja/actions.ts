@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getDatabase } from "@/db/client";
 import { withDbRetry } from "@/db/retry";
 import { catMediosPago } from "@/db/schema/catalogs";
+import { sucursales } from "@/db/schema/core";
 import {
   cortesCaja,
   detalleCortes,
@@ -295,4 +296,47 @@ export async function registrarMovimientoCaja(_previousState: ActionState, formD
 
   if (outcome.success) revalidatePath("/admin/caja");
   return outcome;
+}
+
+const politicaSchema = z.object({
+  organizacionId: z.string().uuid(),
+  sucursalId: z.string().uuid(),
+  exigirCorteParaCobrar: z.coerce.boolean(),
+});
+
+/**
+ * Política de la sucursal: cuando está activa, el POS rechaza cobros si no hay
+ * un corte de caja abierto. Solo usuarios con `caja.configurar`.
+ */
+export async function updatePoliticaCaja(formData: FormData): Promise<ActionState> {
+  const parsed = parseWithSchema(politicaSchema, Object.fromEntries(formData.entries()), "Datos inválidos.");
+  if (!parsed.success) return parsed.state;
+  const input = parsed.data;
+
+  const access = await checkPermission(input.organizacionId, "caja.configurar");
+  if (!access) return actionError("No tienes permiso para configurar caja.");
+  const sucursalValida = await assertBranchScope(access, input.sucursalId);
+  if (!sucursalValida) return actionError("La sucursal no existe, está inactiva o no tienes acceso a ella.");
+
+  const db = getDatabase();
+  await db
+    .update(sucursales)
+    .set({ exigirCorteParaCobrar: input.exigirCorteParaCobrar, updatedBy: access.user.id })
+    .where(and(eq(sucursales.id, input.sucursalId), eq(sucursales.organizacionId, input.organizacionId)));
+  await auditEvent(db, {
+    organizacionId: input.organizacionId,
+    sucursalId: input.sucursalId,
+    usuarioId: access.user.id,
+    accion: "caja.politica_corte",
+    entidad: "sucursal",
+    entidadId: input.sucursalId,
+    detalle: { exigirCorteParaCobrar: input.exigirCorteParaCobrar },
+  });
+  revalidatePath("/admin/caja");
+  revalidatePath("/admin/pos");
+  return actionSuccess(
+    input.exigirCorteParaCobrar
+      ? "Cobro exige corte abierto."
+      : "Cobro permitido sin corte abierto.",
+  );
 }

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { crearVentaDirecta } from "@/app/admin/pos/actions";
+import { OfflineCatalogoCache } from "@/app/admin/pos/offline-cache";
 import { VentaTicket } from "@/app/admin/pos/venta-ticket";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { StatusBadge } from "@/components/status-badge";
@@ -65,6 +66,19 @@ export default async function PosPage({ searchParams }: { searchParams: SearchPa
 
   return (
     <div className="space-y-6">
+      <OfflineCatalogoCache
+        catalogo={{
+          organizacionId: organizationId,
+          sucursalId: ticket.venta.sucursalId,
+          sucursalNombre: context.branches.find((b) => b.id === ticket.venta.sucursalId)?.nombre ?? "",
+          moneda: context.currency,
+          guardadoAt: "",
+          servicios: ticket.catalogoServicios.map((s) => ({ id: s.id, nombre: s.nombre, precio: s.precio })),
+          productos: ticket.catalogoProductos.map((p) => ({ id: p.id, nombre: p.nombre, precio: p.precio })),
+          mediosPago: ticket.mediosPago,
+          staff: ticket.staff,
+        }}
+      />
       <AdminPageHeader
         breadcrumbs={[
           { label: "Punto de venta", href: buildAdminHref("/pos", { organizationId, sucursalId: ticket.venta.sucursalId }) },
@@ -74,15 +88,28 @@ export default async function PosPage({ searchParams }: { searchParams: SearchPa
         title="Panel de venta"
       />
       <VentaTicket
+        anticipoAplicado={ticket.anticipoAplicado}
+        anticipoPorAplicar={ticket.anticipoPorAplicar}
+        anticipos={ticket.anticipos}
+        catalogoClientes={ticket.catalogoClientes}
+        catalogoMembresias={ticket.catalogoMembresias}
+        catalogoPaquetes={ticket.catalogoPaquetes}
         catalogoProductos={ticket.catalogoProductos}
         catalogoServicios={ticket.catalogoServicios}
         comisiones={ticket.comisiones}
         currency={context.currency}
+        devoluciones={ticket.devoluciones}
+        devueltoPorDetalle={ticket.devueltoPorDetalle}
+        lineasMembresias={ticket.lineasMembresias}
+        lineasPaquetes={ticket.lineasPaquetes}
         lineasProductos={ticket.lineasProductos}
         lineasServicios={ticket.lineasServicios}
         mediosPago={ticket.mediosPago}
+        membresiasCliente={ticket.membresiasCliente}
         organizationId={organizationId}
         pagos={ticket.pagos}
+        paquetesCliente={ticket.paquetesCliente}
+        promocionesDisponibles={ticket.promocionesDisponibles}
         propinas={ticket.propinas}
         puedeCancelar={hasPermission(context.access, "ventas.cancelar")}
         returnTo={returnTo}

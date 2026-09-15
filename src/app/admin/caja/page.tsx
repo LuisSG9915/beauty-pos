@@ -4,11 +4,12 @@ import { notFound } from "next/navigation";
 import { AperturaCajaForm } from "@/app/admin/caja/apertura-caja-form";
 import { CierreCajaForm } from "@/app/admin/caja/cierre-caja-form";
 import { MovimientoCajaForm } from "@/app/admin/caja/movimiento-caja-form";
+import { PoliticaCajaToggle } from "@/app/admin/caja/politica-caja-toggle";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { getDatabase } from "@/db/client";
 import { catMediosPago } from "@/db/schema/catalogs";
-import { usuarios } from "@/db/schema/core";
+import { sucursales, usuarios } from "@/db/schema/core";
 import {
   cortesCaja,
   detalleCortes,
@@ -17,7 +18,7 @@ import {
   ventas,
 } from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
-import { requireAccessPermission } from "@/lib/auth/authorization";
+import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate, formatTime } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -33,6 +34,12 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
   requireAccessPermission(context.access, "caja.ver");
 
   const db = getDatabase();
+
+  const [sucursalRow] = await db
+    .select({ exigirCorteParaCobrar: sucursales.exigirCorteParaCobrar })
+    .from(sucursales)
+    .where(eq(sucursales.id, branch.id))
+    .limit(1);
 
   const [corteAbierto] = await db
     .select({ id: cortesCaja.id, fondoInicial: cortesCaja.fondoInicial, createdAt: cortesCaja.createdAt, notas: cortesCaja.notas })
@@ -136,6 +143,14 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
   return (
     <div className="space-y-6">
       <AdminPageHeader description={`${branch.nombre} · cierre ciego por turno`} title="Caja" />
+
+      {hasPermission(context.access, "caja.configurar") ? (
+        <PoliticaCajaToggle
+          exigir={sucursalRow?.exigirCorteParaCobrar ?? false}
+          organizationId={organization.id}
+          sucursalId={branch.id}
+        />
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         {corteAbierto ? (

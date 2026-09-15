@@ -27,6 +27,7 @@ export function FichaForm({
   compact = false,
   onSaved,
   organizationId,
+  puedePrivada = false,
   servicioId,
   tipoDefault = "color",
 }: {
@@ -36,6 +37,8 @@ export function FichaForm({
   compact?: boolean;
   onSaved?: () => void;
   organizationId: string;
+  /** El usuario puede marcar la entrada como privada (`expedientes.privado`). */
+  puedePrivada?: boolean;
   servicioId?: string;
   tipoDefault?: string;
 }) {
@@ -89,6 +92,12 @@ export function FichaForm({
           <FieldLabel>Notas</FieldLabel>
           <Textarea name="notas" placeholder="Reacciones, preferencias, observaciones" rows={2} />
         </Field>
+      ) : null}
+      {puedePrivada ? (
+        <label className="flex items-center gap-2 text-xs text-[#625b55]">
+          <input className="size-4 accent-[#8a5140]" name="privada" type="checkbox" value="true" />
+          Nota privada — solo visible para quien tenga permiso de expediente privado
+        </label>
       ) : null}
 
       <ActionFeedback state={state} />

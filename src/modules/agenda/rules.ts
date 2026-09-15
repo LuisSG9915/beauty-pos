@@ -27,6 +27,16 @@ export interface CitaLike extends IntervalMs {
   usuarioId: string | null;
   estado: string;
   activo: boolean;
+  /** Recursos activos asignados a la cita (para validación de recursos). */
+  recursoIds?: readonly string[];
+}
+
+/** Recurso físico de sucursal (cabina, silla, equipo). */
+export interface RecursoLike {
+  id: string;
+  nombre: string;
+  /** Citas simultáneas que puede atender (default 1). */
+  capacidad: number;
 }
 
 /** Solape de intervalos semiabiertos [inicio, fin): tocarse en el borde NO es traslape. */
@@ -94,28 +104,46 @@ export function validateBlocks(params: {
 }
 
 /**
- * Traslapes entre citas del mismo "carril": mismo `usuarioId`; las citas sin
- * asignar (usuarioId null) compiten entre sí. Se ignoran citas inactivas, en
- * estados terminales y la propia cita que se edita (`ignoreCitaId`).
+ * Traslapes entre citas del mismo "carril". Para citas con profesional el
+ * carril tiene capacidad 1 (cualquier traslape es violación). Las citas sin
+ * asignar comparten un carril con `capacidadSinAsignar` lugares simultáneos
+ * (política configurable por sucursal); se viola al exceder la capacidad.
+ * Se ignoran citas inactivas, en estados terminales y la propia cita que se
+ * edita (`ignoreCitaId`).
  */
 export function validateCitaOverlaps(params: {
   candidato: IntervalMs & { usuarioId: string | null };
   citas: readonly CitaLike[];
   ignoreCitaId?: string | null;
+  /** Capacidad del carril "sin asignar" (default 1). */
+  capacidadSinAsignar?: number;
 }): ViolacionAgenda[] {
   const { candidato, citas, ignoreCitaId } = params;
+  const capacidad = Math.max(1, params.capacidadSinAsignar ?? 1);
   const violaciones: ViolacionAgenda[] = [];
+  let traslapesSinAsignar = 0;
   for (const cita of citas) {
     if (!cita.activo) continue;
     if (ignoreCitaId && cita.id === ignoreCitaId) continue;
     if ((ESTADOS_CITA_INACTIVOS as readonly string[]).includes(cita.estado)) continue;
     if (cita.usuarioId !== candidato.usuarioId) continue;
-    if (intervalsOverlap(candidato, cita)) {
+    if (!intervalsOverlap(candidato, cita)) continue;
+    if (cita.usuarioId !== null) {
       violaciones.push({
         codigo: "traslape",
-        mensaje: cita.usuarioId === null
-          ? "Ya hay otra cita sin asignar en ese horario."
-          : "El profesional ya tiene una cita en ese horario.",
+        mensaje: "El profesional ya tiene una cita en ese horario.",
+        conflictoId: cita.id,
+      });
+      continue;
+    }
+    traslapesSinAsignar += 1;
+    if (traslapesSinAsignar >= capacidad) {
+      violaciones.push({
+        codigo: "traslape",
+        mensaje:
+          capacidad === 1
+            ? "Ya hay otra cita sin asignar en ese horario."
+            : `El horario sin asignar ya tiene ${capacidad} citas simultáneas.`,
         conflictoId: cita.id,
       });
     }
@@ -124,8 +152,50 @@ export function validateCitaOverlaps(params: {
 }
 
 /**
- * Disponibilidad completa de una cita candidata: horario de sucursal, bloqueos
- * y traslapes con otras citas.
+ * Recursos asignados a la cita candidata: cada recurso es un carril con
+ * `capacidad` lugares simultáneos; se viola al excederlo contando citas vivas
+ * que lo tienen asignado y se traslapan. Recursos desconocidos (no presentes
+ * en `recursos`) se ignoran: el caller debe validarlos antes.
+ */
+export function validateRecursos(params: {
+  recursoIds: readonly string[];
+  recursos: readonly RecursoLike[];
+  citas: readonly CitaLike[];
+  candidato: IntervalMs;
+  ignoreCitaId?: string | null;
+}): ViolacionAgenda[] {
+  const { recursoIds, recursos, citas, candidato, ignoreCitaId } = params;
+  if (recursoIds.length === 0) return [];
+  const capacidadPorId = new Map(recursos.map((r) => [r.id, r]));
+  const violaciones: ViolacionAgenda[] = [];
+  for (const recursoId of new Set(recursoIds)) {
+    const recurso = capacidadPorId.get(recursoId);
+    if (!recurso) continue;
+    const capacidad = Math.max(1, recurso.capacidad);
+    let enUso = 0;
+    for (const cita of citas) {
+      if (!cita.activo) continue;
+      if (ignoreCitaId && cita.id === ignoreCitaId) continue;
+      if ((ESTADOS_CITA_INACTIVOS as readonly string[]).includes(cita.estado)) continue;
+      if (!cita.recursoIds?.includes(recursoId)) continue;
+      if (!intervalsOverlap(candidato, cita)) continue;
+      enUso += 1;
+      if (enUso >= capacidad) {
+        violaciones.push({
+          codigo: "recurso",
+          mensaje: `El recurso "${recurso.nombre}" ya está ocupado en ese horario.`,
+          conflictoId: recursoId,
+        });
+        break;
+      }
+    }
+  }
+  return violaciones;
+}
+
+/**
+ * Disponibilidad completa de una cita candidata: horario de sucursal, bloqueos,
+ * traslapes con otras citas y recursos asignados.
  */
 export function validateCitaAvailability(params: {
   candidato: IntervalMs & { usuarioId: string | null };
@@ -137,7 +207,12 @@ export function validateCitaAvailability(params: {
   horarios: readonly TurnoDia[];
   bloqueos: readonly BloqueoLike[];
   citas: readonly CitaLike[];
+  /** Recursos elegidos para la cita candidata. */
+  recursoIds?: readonly string[];
+  /** Catálogo de recursos de la sucursal (id, nombre, capacidad). */
+  recursos?: readonly RecursoLike[];
   ignoreCitaId?: string | null;
+  capacidadSinAsignar?: number;
 }): DisponibilidadResult {
   const violaciones: ViolacionAgenda[] = [
     ...validateBusinessHours({
@@ -147,7 +222,19 @@ export function validateCitaAvailability(params: {
       horarios: params.horarios,
     }),
     ...validateBlocks({ candidato: params.candidato, bloqueos: params.bloqueos }),
-    ...validateCitaOverlaps({ candidato: params.candidato, citas: params.citas, ignoreCitaId: params.ignoreCitaId }),
+    ...validateCitaOverlaps({
+      candidato: params.candidato,
+      citas: params.citas,
+      ignoreCitaId: params.ignoreCitaId,
+      capacidadSinAsignar: params.capacidadSinAsignar,
+    }),
+    ...validateRecursos({
+      recursoIds: params.recursoIds ?? [],
+      recursos: params.recursos ?? [],
+      citas: params.citas,
+      candidato: params.candidato,
+      ignoreCitaId: params.ignoreCitaId,
+    }),
   ];
   return { ok: violaciones.length === 0, violaciones };
 }

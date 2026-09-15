@@ -40,6 +40,7 @@ export function CobroForm({
   ventaId,
   mediosPago,
   total,
+  anticipo = 0,
   returnTo,
   modo,
   onCobrada,
@@ -48,6 +49,8 @@ export function CobroForm({
   ventaId: string;
   mediosPago: MedioPago[];
   total: number;
+  /** Anticipos vigentes que se aplicarán al cobrar (contra el total). */
+  anticipo?: number;
   returnTo: string;
   modo?: "inline";
   onCobrada?: () => void;
@@ -58,7 +61,7 @@ export function CobroForm({
   );
   const medioInicial = mediosPago.find((m) => m.categoria === "efectivo") ?? mediosPago[0];
   const [pagos, setPagos] = useState<PagoRow[]>([
-    pagoVacio(medioInicial?.id ?? "", total.toFixed(2)),
+    pagoVacio(medioInicial?.id ?? "", Math.max(redondear(total - anticipo), 0).toFixed(2)),
   ]);
   const [propinaOpcion, setPropinaOpcion] = useState("0");
   const [propinaOtro, setPropinaOtro] = useState("");
@@ -76,28 +79,32 @@ export function CobroForm({
     return pct > 0 ? redondear((total * pct) / 100) : 0;
   }, [propinaOpcion, propinaOtro, total]);
 
-  const aCubrir = redondear(total + propina);
+  // El anticipo descuenta el total de la venta; la propina siempre se cobra.
+  const aCubrir = Math.max(redondear(total - anticipo + propina), 0);
   const recibido = redondear(
     pagos.reduce((sum, pago) => sum + (Number(pago.monto) || 0), 0),
   );
-  const cubre = recibido >= aCubrir - 0.005;
+  const cubiertoPorAnticipo = aCubrir <= 0.005;
+  const cubre = cubiertoPorAnticipo || recibido >= aCubrir - 0.005;
   const faltante = Math.max(redondear(aCubrir - recibido), 0);
-  const cambio = cubre ? redondear(recibido - aCubrir) : 0;
+  const cambio = cubre && !cubiertoPorAnticipo ? redondear(recibido - aCubrir) : 0;
 
   const pagosCompletos = pagos.every((pago) => {
     const medio = medioPorId.get(pago.medioPagoId);
     if (!medio || !(Number(pago.monto) > 0)) return false;
     return medio.categoria === "efectivo" || pago.referencia.trim().length > 0;
   });
-  const puedeCobrar = !pending && cubre && pagosCompletos && aCubrir > 0;
+  const puedeCobrar = !pending && cubre && (cubiertoPorAnticipo || pagosCompletos) && (cubiertoPorAnticipo || aCubrir > 0);
 
-  const pagosPayload = JSON.stringify(
-    pagos.map((pago) => ({
-      medioPagoId: pago.medioPagoId,
-      monto: Number(pago.monto) || 0,
-      referencia: pago.referencia.trim(),
-    })),
-  );
+  const pagosPayload = cubiertoPorAnticipo
+    ? "[]"
+    : JSON.stringify(
+        pagos.map((pago) => ({
+          medioPagoId: pago.medioPagoId,
+          monto: Number(pago.monto) || 0,
+          referencia: pago.referencia.trim(),
+        })),
+      );
 
   // Cobro inline (sheet de agenda): la action devuelve el resultado en vez de
   // redirigir; aquí se avisa al padre para cerrar el sheet.
@@ -180,9 +187,11 @@ export function CobroForm({
           {formatCurrency(aCubrir)}
         </p>
       </div>
-      {propina > 0 ? (
+      {propina > 0 || anticipo > 0 ? (
         <p className="mt-0.5 text-xs tabular-nums text-[#81746c]">
-          {formatCurrency(total)} + {formatCurrency(propina)} propina
+          {formatCurrency(total)}
+          {anticipo > 0 ? ` − ${formatCurrency(anticipo)} anticipo` : ""}
+          {propina > 0 ? ` + ${formatCurrency(propina)} propina` : ""}
         </p>
       ) : null}
 
@@ -227,7 +236,15 @@ export function CobroForm({
         ) : null}
       </div>
 
-      <div className="mt-5 space-y-3">
+      {cubiertoPorAnticipo ? (
+        <p className="mt-5 rounded-xl border border-[#b5d4bd] bg-[#f1faf3] px-4 py-3 text-sm font-medium text-[#347052]">
+          {anticipo > 0
+            ? `El anticipo cubre el total${propina > 0 ? " y la propina" : ""}; confirma para cerrar la venta.`
+            : "El total ya está cubierto; confirma para cerrar la venta."}
+        </p>
+      ) : null}
+
+      <div className={cubiertoPorAnticipo ? "hidden" : "mt-5 space-y-3"}>
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs font-medium text-[#81746c]">
             Pagos{pagos.length > 1 ? ` (${pagos.length})` : ""}
@@ -325,7 +342,7 @@ export function CobroForm({
       </div>
 
       <div className="mt-4">
-        {cubre ? (
+        {cubiertoPorAnticipo ? null : cubre ? (
           <p className="rounded-xl border border-[#b5d4bd] bg-[#f1faf3] px-4 py-2.5 text-sm font-medium text-[#347052]">
             {cambio > 0.005 ? `Cambio ${formatCurrency(cambio)}` : "Monto exacto"}
           </p>
@@ -349,7 +366,7 @@ export function CobroForm({
         size="lg"
         type="submit"
       >
-        {pending ? "Cobrando…" : `Cobrar ${formatCurrency(aCubrir)}`}
+        {pending ? "Cobrando…" : cubiertoPorAnticipo ? (anticipo > 0 ? "Completar venta (anticipo)" : "Completar venta") : `Cobrar ${formatCurrency(aCubrir)}`}
       </Button>
     </form>
   );

@@ -6,10 +6,10 @@ import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { clientes } from "@/db/schema/core";
-import { clientesFichasTecnicas, citas, FICHA_TIPOS } from "@/db/schema/operations";
+import { clientesConsentimientos, clientesFichasTecnicas, citas, FICHA_TIPOS } from "@/db/schema/operations";
 import { servicios } from "@/db/schema/catalogs";
 import { auditEvent } from "@/lib/audit";
-import { checkPermission } from "@/lib/auth/authorization";
+import { checkPermission, hasPermission } from "@/lib/auth/authorization";
 
 const clientSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -92,6 +92,7 @@ const fichaSchema = z.object({
   formula: z.string().trim().max(4000).optional().or(z.literal("")),
   tiempoPoseMinutos: z.coerce.number().int().min(0).max(1440).optional().or(z.literal("")),
   notas: z.string().trim().max(4000).optional().or(z.literal("")),
+  privada: z.literal("true").optional(),
 });
 
 export type FichaActionState = { error?: string; success?: boolean; message?: string };
@@ -107,6 +108,13 @@ export async function saveFichaTecnica(
   const access = await checkPermission(input.organizacionId, "clientes.editar");
   if (!access) return { error: "No tienes permiso para editar expedientes." };
   const { user } = access;
+  const esPrivada = input.privada === "true";
+  if (esPrivada && !hasPermission(access, "expedientes.privado")) {
+    return { error: "No tienes permiso para crear notas privadas." };
+  }
+  if (input.tipo === "alergia" && !hasPermission(access, "expedientes.alergias_ver")) {
+    return { error: "No tienes permiso para registrar alergias." };
+  }
   const db = getDatabase();
 
   const [cliente] = await db
@@ -143,16 +151,17 @@ export async function saveFichaTecnica(
     formula: input.formula || null,
     tiempoPoseMinutos: input.tiempoPoseMinutos === "" || input.tiempoPoseMinutos == null ? null : input.tiempoPoseMinutos,
     notas: input.notas || null,
+    privada: esPrivada,
     createdBy: user.id,
   });
-  // Las alergias son dato sensible: se audita el tipo sin el contenido.
+  // Las alergias/notas privadas son dato sensible: se audita el tipo sin el contenido.
   await auditEvent(db, {
     organizacionId: input.organizacionId,
     usuarioId: user.id,
     accion: "expediente.ficha_creada",
     entidad: "cliente",
     entidadId: input.clienteId,
-    detalle: { tipo: input.tipo },
+    detalle: { tipo: input.tipo, privada: esPrivada },
   });
   revalidatePath("/admin/clientes");
   return { success: true, message: "Registro guardado en la ficha." };
@@ -167,10 +176,96 @@ export async function toggleFichaTecnicaActiva(formData: FormData) {
   if (!access) return;
   const { user } = access;
   const db = getDatabase();
+  // Las entradas privadas solo las desactiva quien puede verlas; las alergias
+  // requieren el permiso de alergias.
+  const [ficha] = await db
+    .select({ privada: clientesFichasTecnicas.privada, tipo: clientesFichasTecnicas.tipo })
+    .from(clientesFichasTecnicas)
+    .where(and(eq(clientesFichasTecnicas.id, parsed.data.id), eq(clientesFichasTecnicas.organizacionId, parsed.data.organizacionId)))
+    .limit(1);
+  if (ficha?.privada && !hasPermission(access, "expedientes.privado")) return;
+  if (ficha?.tipo === "alergia" && !hasPermission(access, "expedientes.alergias_ver")) return;
   await db
     .update(clientesFichasTecnicas)
     .set({ activo: parsed.data.activo !== "true", updatedBy: user.id })
     .where(and(eq(clientesFichasTecnicas.id, parsed.data.id), eq(clientesFichasTecnicas.organizacionId, parsed.data.organizacionId)));
+  revalidatePath("/admin/clientes");
+}
+
+const consentimientoSchema = z.object({
+  organizacionId: z.string().uuid(),
+  clienteId: z.string().uuid(),
+  citaId: z.string().uuid().optional().or(z.literal("")),
+  servicioId: z.string().uuid().optional().or(z.literal("")),
+  titulo: z.string().trim().min(3).max(160),
+  contenido: z.string().trim().min(10, "El texto del consentimiento es obligatorio.").max(8000),
+  firmadoPor: z.string().trim().min(2, "Indica quién firma.").max(160),
+  respuesta: z.enum(["aceptado", "rechazado"]),
+});
+
+export type ConsentimientoActionState = { error?: string; success?: boolean; message?: string };
+
+/**
+ * Registra el consentimiento informado del cliente (aceptado o rechazado) como
+ * evidencia legal: texto íntegro, firmante y usuario que lo levantó. No se
+ * audita el contenido completo — solo título y respuesta.
+ */
+export async function saveConsentimiento(
+  _previousState: ConsentimientoActionState,
+  formData: FormData,
+): Promise<ConsentimientoActionState> {
+  const result = consentimientoSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa el consentimiento." };
+  const input = result.data;
+  const access = await checkPermission(input.organizacionId, "clientes.editar");
+  if (!access) return { error: "No tienes permiso para editar expedientes." };
+  const { user } = access;
+  const db = getDatabase();
+
+  const [cliente] = await db
+    .select({ id: clientes.id })
+    .from(clientes)
+    .where(and(eq(clientes.id, input.clienteId), eq(clientes.organizacionId, input.organizacionId), eq(clientes.activo, true)))
+    .limit(1);
+  if (!cliente) return { error: "El cliente no existe o está inactivo." };
+
+  await db.insert(clientesConsentimientos).values({
+    organizacionId: input.organizacionId,
+    clienteId: input.clienteId,
+    citaId: input.citaId || null,
+    servicioId: input.servicioId || null,
+    usuarioId: user.id,
+    titulo: input.titulo,
+    contenido: input.contenido,
+    firmadoPor: input.firmadoPor,
+    respuesta: input.respuesta,
+    createdBy: user.id,
+  });
+  await auditEvent(db, {
+    organizacionId: input.organizacionId,
+    usuarioId: user.id,
+    accion: "expediente.consentimiento",
+    entidad: "cliente",
+    entidadId: input.clienteId,
+    detalle: { titulo: input.titulo, respuesta: input.respuesta },
+  });
+  revalidatePath("/admin/clientes");
+  return { success: true, message: "Consentimiento registrado." };
+}
+
+export async function toggleConsentimientoActivo(formData: FormData) {
+  const parsed = z
+    .object({ organizacionId: z.string().uuid(), id: z.string().uuid(), activo: z.literal("true").optional() })
+    .safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return;
+  const access = await checkPermission(parsed.data.organizacionId, "clientes.editar");
+  if (!access) return;
+  const { user } = access;
+  const db = getDatabase();
+  await db
+    .update(clientesConsentimientos)
+    .set({ activo: parsed.data.activo !== "true", updatedBy: user.id })
+    .where(and(eq(clientesConsentimientos.id, parsed.data.id), eq(clientesConsentimientos.organizacionId, parsed.data.organizacionId)));
   revalidatePath("/admin/clientes");
 }
 

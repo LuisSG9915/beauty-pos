@@ -18,6 +18,7 @@ import {
   rescheduleCita,
   toggleCitaActiva,
   updateCitaEstado,
+  type CitaMutationResult,
 } from "@/app/admin/agenda/actions";
 import { CheckoutSheet } from "@/app/admin/agenda/checkout-sheet";
 import { CitaForm } from "@/app/admin/agenda/cita-form";
@@ -62,8 +63,18 @@ export type AgendaCita = {
   sucursalId: string;
   usuarioId: string | null;
   usuarioNombre: string | null;
+  /** Concurrencia optimista: se envía en cada mutación. */
+  version: number;
   ventaId: string | null;
   servicios: Array<{ id: string; nombre: string; precio: string }>;
+  recursos: Array<{ id: string; nombre: string }>;
+};
+
+export type AgendaRecurso = {
+  id: string;
+  nombre: string;
+  tipo: string;
+  capacidad: number;
 };
 
 export type AgendaHorario = {
@@ -212,14 +223,22 @@ function MoveCitaDialog({
   staff: Array<{ id: string; nombre: string }>;
   timeZone: string;
   onClose: () => void;
-  onSubmit: (fechaHora: string, usuarioId: string | null) => Promise<boolean>;
+  onSubmit: (fechaHora: string, usuarioId: string | null) => Promise<CitaMutationResult>;
 }) {
   const initial = cita ? dateTimeInputValue(cita.fechaHora, timeZone) : "";
   const [fecha, setFecha] = useState(initial.slice(0, 10));
   const [hora, setHora] = useState(initial.slice(11, 16));
   const [usuarioId, setUsuarioId] = useState(cita?.usuarioId ?? "");
+  const [sugerencias, setSugerencias] = useState<string[]>([]);
 
   if (!cita || !mode) return null;
+
+  const aplicarSugerencia = (iso: string) => {
+    const local = dateTimeInputValue(iso, timeZone);
+    setFecha(local.slice(0, 10));
+    setHora(local.slice(11, 16));
+    setSugerencias([]);
+  };
 
   return (
     <Dialog onOpenChange={(open) => !open && onClose()} open>
@@ -236,8 +255,12 @@ function MoveCitaDialog({
           className="space-y-4"
           onSubmit={async (event) => {
             event.preventDefault();
-            const ok = await onSubmit(`${fecha}T${hora}`, usuarioId || null);
-            if (ok) onClose();
+            const result = await onSubmit(`${fecha}T${hora}`, usuarioId || null);
+            if (result.success) {
+              onClose();
+            } else {
+              setSugerencias(result.sugerencias ?? []);
+            }
           }}
         >
           <div className="grid gap-4 sm:grid-cols-2">
@@ -261,6 +284,28 @@ function MoveCitaDialog({
               ))}
             </Select>
           </Field>
+          {sugerencias.length > 0 ? (
+            <div className="rounded-xl border border-[#e3d9d1] bg-[#faf6f3] p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+                Horarios libres sugeridos
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {sugerencias.map((iso) => (
+                  <button
+                    className="rounded-lg border border-[#e3d9d1] bg-white px-3 py-1.5 text-xs font-medium text-[#403a35] transition-colors hover:border-[#8a5140] hover:bg-[#f2e3dc]"
+                    key={iso}
+                    onClick={() => aplicarSugerencia(iso)}
+                    type="button"
+                  >
+                    {formatDate(iso, { timeZone })} · {formatTime(iso, { timeZone })}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] text-[#81746c]">
+                Elige una sugerencia para rellenar fecha y hora, luego confirma.
+              </p>
+            </div>
+          ) : null}
           <div className="flex justify-end gap-2">
             <Button disabled={pending} onClick={onClose} type="button" variant="outline">
               Cancelar
@@ -284,6 +329,7 @@ export function AgendaBoard({
   staff,
   clientes,
   servicios,
+  recursos,
   citas,
   horarios,
   bloqueos,
@@ -298,6 +344,7 @@ export function AgendaBoard({
   staff: Array<{ id: string; nombre: string }>;
   clientes: Array<{ id: string; nombre: string; telefono: string | null }>;
   servicios: Array<{ id: string; nombre: string; precioBase: string; duracionMinutos: number }>;
+  recursos: AgendaRecurso[];
   citas: AgendaCita[];
   horarios: AgendaHorario[];
   bloqueos: AgendaBloqueo[];
@@ -350,10 +397,10 @@ export function AgendaBoard({
   }, [citas, columns]);
 
   const runMutation = (
-    action: Promise<{ success: boolean; message?: string; error?: string }>,
+    action: Promise<CitaMutationResult>,
     opts: { keepSelected?: boolean } = {},
   ) =>
-    new Promise<boolean>((resolve) => {
+    new Promise<CitaMutationResult>((resolve) => {
       startTransition(async () => {
         try {
           const result = await action;
@@ -363,11 +410,11 @@ export function AgendaBoard({
           } else {
             toast.error(result.error ?? "No se pudo aplicar el cambio.");
           }
-          resolve(result.success);
+          resolve(result);
         } catch (error) {
           console.error(error);
           toast.error("No se pudo aplicar el cambio.");
-          resolve(false);
+          resolve({ success: false, error: "No se pudo aplicar el cambio." });
         }
       });
     });
@@ -377,15 +424,17 @@ export function AgendaBoard({
     data.set("organizacionId", organizationId);
     data.set("citaId", cita.id);
     data.set("estado", estado);
+    data.set("version", String(cita.version));
     return data;
   };
 
-  const submitMove = (cita: AgendaCita, mode: MoveMode) => async (fechaHora: string, usuarioId: string | null) => {
+  const submitMove = (cita: AgendaCita, mode: MoveMode) => (fechaHora: string, usuarioId: string | null) => {
     const data = new FormData();
     data.set("organizacionId", organizationId);
     data.set("citaId", cita.id);
     data.set("fechaHora", fechaHora);
     data.set("usuarioId", usuarioId ?? "");
+    data.set("version", String(cita.version));
     return runMutation(mode === "mover" ? moveCita(data) : rescheduleCita(data));
   };
 
@@ -403,6 +452,7 @@ export function AgendaBoard({
     data.set("citaId", cita.id);
     data.set("fechaHora", fechaHora);
     data.set("usuarioId", usuarioId);
+    data.set("version", String(cita.version));
     void runMutation(moveCita(data));
     setDragId(null);
     setDropTarget(null);
@@ -623,6 +673,9 @@ export function AgendaBoard({
                 <td className="px-4 py-3 text-xs text-[#625b55]">{cita.usuarioNombre ?? "Sin asignar"}</td>
                 <td className="max-w-56 truncate px-4 py-3 text-xs text-[#625b55]">
                   {cita.servicios.map((servicio) => servicio.nombre).join(", ") || "Sin servicios"}
+                  {cita.recursos.length > 0 ? (
+                    <span className="block text-[10px] text-[#81746c]">{cita.recursos.map((r) => r.nombre).join(", ")}</span>
+                  ) : null}
                 </td>
                 <td className="px-4 py-3"><CitaStatusBadge estado={cita.estado} /></td>
                 <td className="px-4 py-3 text-right tabular-nums">{formatCurrency(cita.totalEstimado, { currency })}</td>
@@ -664,6 +717,7 @@ export function AgendaBoard({
         data.set("organizacionId", organizationId);
         data.set("id", selected.id);
         data.set("activo", "true");
+        data.set("version", String(selected.version));
         void runMutation(toggleCitaActiva(data));
       }}
       onToggleServicio={() => router.refresh()}
@@ -672,6 +726,7 @@ export function AgendaBoard({
       }
       organizationId={organizationId}
       pending={pending}
+      recursos={recursos}
       servicios={servicios}
       staff={staff}
       timeZone={timeZone}
@@ -751,7 +806,7 @@ export function AgendaBoard({
           setMoveTarget(null);
           setMoveMode(null);
         }}
-        onSubmit={moveTarget && moveMode ? submitMove(moveTarget, moveMode) : async () => false}
+        onSubmit={moveTarget && moveMode ? submitMove(moveTarget, moveMode) : async () => ({ success: false })}
         pending={pending}
         staff={staff}
         timeZone={timeZone}
@@ -784,6 +839,7 @@ export function AgendaBoard({
             key={`nueva-${createInitial?.fechaHora ?? "default"}-${createInitial?.usuarioId ?? ""}`}
             onSuccess={() => setCreateOpen(false)}
             organizationId={organizationId}
+            recursos={recursos}
             servicios={servicios}
             staff={staff}
             sucursal={sucursal}
@@ -813,11 +869,14 @@ export function AgendaBoard({
                 fechaHora: editing.fechaHora,
                 duracionMinutos: editing.duracionMinutos,
                 notas: editing.notas,
+                version: editing.version,
                 servicioIds: editing.servicios.map((servicio) => servicio.id),
+                recursoIds: editing.recursos.map((recurso) => recurso.id),
               }}
               key={editing.id}
               onSuccess={() => setEditing(null)}
               organizationId={organizationId}
+              recursos={recursos}
               servicios={servicios}
               staff={staff}
               sucursal={sucursal}

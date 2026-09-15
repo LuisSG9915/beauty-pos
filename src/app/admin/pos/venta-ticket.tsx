@@ -1,22 +1,33 @@
 "use client";
 
-import { Minus, Plus, ReceiptText, Trash2 } from "lucide-react";
+import { Minus, PackageCheck, Plus, ReceiptText, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 
 import {
   aplicarDescuento,
+  aplicarMembresiaVenta,
+  aplicarPromocionVenta,
+  asignarClienteVenta,
   asignarEstilistaLinea,
   cambiarCantidadLinea,
   cancelarVentaCobrada,
+  devolverLineasVenta,
+  quitarMembresiaAplicada,
+  quitarMembresiaVenta,
+  quitarPaqueteDeLinea,
+  quitarPaqueteVenta,
   quitarProductoVenta,
+  quitarPromocionVenta,
   quitarServicioVenta,
+  usarPaqueteEnLinea,
 } from "@/app/admin/pos/actions";
 import { CatalogoSelector } from "@/app/admin/pos/catalogo-selector";
 import { CobroForm } from "@/app/admin/pos/cobro-form";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
+import { Combobox } from "@/components/ui/combobox";
 import { Field, FieldLabel, Input } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
 import { initialActionState, type ActionState } from "@/lib/action-state";
@@ -25,12 +36,17 @@ import type { TicketData } from "@/modules/pos/ticket";
 
 type LineaServicio = {
   id: string;
+  servicioId: string;
   nombre: string;
   precio: string;
   cantidad: number;
   usuarioId: string | null;
+  paqueteUsado: boolean;
+  paqueteNombre: string | null;
 };
 type LineaProducto = { id: string; nombre: string; precio: string; cantidad: number };
+type LineaPaquete = { id: string; paqueteId: string; nombre: string; precio: string; cantidad: number };
+type LineaMembresia = { id: string; membresiaId: string; nombre: string; precio: string; cantidad: number };
 
 type VentaTicketProps = {
   organizationId: string;
@@ -38,21 +54,41 @@ type VentaTicketProps = {
     id: string;
     estado: string;
     citaId: string | null;
+    clienteId: string | null;
     clienteNombre: string | null;
     subtotal: string;
     descuento: string;
     total: string;
     propina: string;
+    promocionId?: string | null;
+    promocionNombre?: string | null;
+    descuentoPromocion?: string;
+    membresiaId?: string | null;
+    membresiaNombre?: string | null;
+    descuentoMembresia?: string;
   };
+  promocionesDisponibles?: TicketData["promocionesDisponibles"];
   lineasServicios: LineaServicio[];
   lineasProductos: LineaProducto[];
+  lineasPaquetes?: LineaPaquete[];
+  lineasMembresias?: LineaMembresia[];
   catalogoServicios: TicketData["catalogoServicios"];
   catalogoProductos: TicketData["catalogoProductos"];
+  catalogoPaquetes?: TicketData["catalogoPaquetes"];
+  catalogoMembresias?: TicketData["catalogoMembresias"];
+  membresiasCliente?: TicketData["membresiasCliente"];
+  paquetesCliente?: TicketData["paquetesCliente"];
+  catalogoClientes?: TicketData["catalogoClientes"];
   mediosPago: Array<{ id: string; nombre: string; categoria: string }>;
   pagos: Array<{ nombre: string; monto: string; recibido: string; cambio: string }>;
   staff: Array<{ id: string; nombre: string }>;
   propinas: Array<{ usuarioNombre: string; monto: string }>;
   comisiones: Array<{ usuarioNombre: string; monto: string }>;
+  devoluciones?: TicketData["devoluciones"];
+  devueltoPorDetalle?: Record<string, number>;
+  anticipos?: TicketData["anticipos"];
+  anticipoAplicado?: number;
+  anticipoPorAplicar?: number;
   currency: string;
   returnTo: string;
   /** Permiso ventas.cancelar (lo resuelve la página/llamante). */
@@ -92,6 +128,7 @@ function TicketLine({
   staff,
   tipo,
   usuarioId,
+  paquete,
   ventaId,
 }: {
   currency: string;
@@ -104,6 +141,8 @@ function TicketLine({
   tipo: "servicio" | "producto";
   /** Solo líneas de servicio. */
   usuarioId?: string | null;
+  /** Solo líneas de servicio: estado de cobertura por paquete del cliente. */
+  paquete?: { usado: boolean; nombre: string | null; disponible: number };
   ventaId: string;
 }) {
   const toast = useToast();
@@ -134,6 +173,7 @@ function TicketLine({
           <p className="truncate font-medium">{line.nombre}</p>
           <p className="mt-0.5 text-xs tabular-nums text-[#81746c]">
             {formatCurrency(line.precio, { currency })} c/u
+            {paquete?.usado ? " · cubierto por paquete" : ""}
             {!editable && profesionalNombre ? ` · ${profesionalNombre}` : ""}
           </p>
         </div>
@@ -170,7 +210,7 @@ function TicketLine({
               </button>
             </div>
             <span className="w-24 text-right font-semibold tabular-nums">
-              {formatCurrency(importe, { currency })}
+              {paquete?.usado ? "Paquete" : formatCurrency(importe, { currency })}
             </span>
             <Button
               aria-label={`Quitar ${line.nombre}`}
@@ -189,7 +229,7 @@ function TicketLine({
               {line.cantidad} × {formatCurrency(line.precio, { currency })}
             </span>
             <span className="w-24 text-right font-semibold tabular-nums">
-              {formatCurrency(importe, { currency })}
+              {paquete?.usado ? "Paquete" : formatCurrency(importe, { currency })}
             </span>
           </>
         )}
@@ -227,7 +267,128 @@ function TicketLine({
           </select>
         </div>
       ) : null}
+      {esServicio && editable && paquete ? (
+        <div className="mt-1.5 flex items-center gap-2">
+          {paquete.usado ? (
+            <>
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#e3efe7] px-2.5 py-1 text-xs font-medium text-[#347052]">
+                <PackageCheck aria-hidden="true" className="size-3.5" />
+                Paquete{paquete.nombre ? ` · ${paquete.nombre}` : ""}
+              </span>
+              <button
+                className="text-xs text-[#8a5140] underline underline-offset-2 hover:text-[#60392e] disabled:opacity-50"
+                disabled={pending}
+                onClick={() => run(quitarPaqueteDeLinea, {})}
+                type="button"
+              >
+                Liberar sesión
+              </button>
+            </>
+          ) : paquete.disponible > 0 ? (
+            <button
+              className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[#bfd8c8] px-2.5 text-xs font-medium text-[#347052] transition-colors hover:bg-[#e3efe7] disabled:opacity-50"
+              disabled={pending}
+              onClick={() => run(usarPaqueteEnLinea, {})}
+              type="button"
+            >
+              <PackageCheck aria-hidden="true" className="size-3.5" />
+              Usar paquete ({paquete.disponible} disp.)
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+/** Selector de cliente para ventas walk-in: habilita paquetes y expediente. */
+function ClientePicker({
+  clientes,
+  onChanged,
+  organizationId,
+  ventaId,
+}: {
+  clientes: TicketData["catalogoClientes"];
+  onChanged?: () => void;
+  organizationId: string;
+  ventaId: string;
+}) {
+  const toast = useToast();
+  const [pending, startTransition] = useTransition();
+  return (
+    <Combobox
+      className="w-56"
+      disabled={pending}
+      inputClassName="h-8 text-xs"
+      items={clientes.map((c) => ({
+        value: c.id,
+        label: c.nombre,
+        description: c.telefono ?? undefined,
+        keywords: [c.telefono ?? ""],
+      }))}
+      label="Cliente de la venta"
+      onValueChange={(value) => {
+        if (!value) return;
+        const data = new FormData();
+        data.set("organizacionId", organizationId);
+        data.set("ventaId", ventaId);
+        data.set("clienteId", value);
+        startTransition(async () => {
+          const result = await asignarClienteVenta(initialActionState, data);
+          if (result.success) {
+            toast.success(result.message ?? "Cliente asignado.");
+            onChanged?.();
+          } else {
+            toast.error(result.error ?? "No se pudo asignar el cliente.");
+          }
+        });
+      }}
+      placeholder="Asignar cliente…"
+    />
+  );
+}
+
+/** Botón quitar para líneas de paquete/membresía (acción dedicada por tipo). */
+function PaqueteQuitarButton({
+  action,
+  detalleId,
+  nombre,
+  onChanged,
+  organizationId,
+  ventaId,
+}: {
+  action?: LineAction;
+  detalleId: string;
+  nombre: string;
+  onChanged?: () => void;
+  organizationId: string;
+  ventaId: string;
+}) {
+  const toast = useToast();
+  const [pending, startTransition] = useTransition();
+  const removeAction = action ?? quitarPaqueteVenta;
+  return (
+    <Button
+      aria-label={`Quitar ${nombre}`}
+      disabled={pending}
+      onClick={() => {
+        const data = lineFormData(organizationId, ventaId, detalleId, {});
+        startTransition(async () => {
+          const result = await removeAction(initialActionState, data);
+          if (result.success) {
+            toast.success(result.message ?? "Línea quitada.");
+            onChanged?.();
+          } else {
+            toast.error(result.error ?? "No se pudo quitar la línea.");
+          }
+        });
+      }}
+      size="icon-sm"
+      type="button"
+      variant="ghost"
+    >
+      <Trash2 aria-hidden="true" className="text-destructive" />
+    </Button>
   );
 }
 
@@ -236,13 +397,26 @@ export function VentaTicket({
   venta,
   lineasServicios,
   lineasProductos,
+  lineasPaquetes = [],
+  lineasMembresias = [],
   catalogoServicios,
   catalogoProductos,
+  catalogoPaquetes = [],
+  catalogoMembresias = [],
+  membresiasCliente = [],
+  paquetesCliente = [],
+  catalogoClientes = [],
   mediosPago,
   pagos,
   staff,
   propinas,
   comisiones,
+  devoluciones = [],
+  devueltoPorDetalle = {},
+  anticipos = [],
+  anticipoAplicado = 0,
+  anticipoPorAplicar = 0,
+  promocionesDisponibles = [],
   currency,
   returnTo,
   puedeCancelar = false,
@@ -256,8 +430,29 @@ export function VentaTicket({
     aplicarDescuento,
     initialActionState,
   );
+  const [promoState, promoAction, promoPending] = useActionState(
+    aplicarPromocionVenta,
+    initialActionState,
+  );
+  const [quitarPromoState, quitarPromoAction, quitarPromoPending] = useActionState(
+    quitarPromocionVenta,
+    initialActionState,
+  );
+  const [membresiaState, membresiaAction, membresiaPending] = useActionState(
+    aplicarMembresiaVenta,
+    initialActionState,
+  );
+  const [quitarMembresiaState, quitarMembresiaAction, quitarMembresiaPending] = useActionState(
+    quitarMembresiaAplicada,
+    initialActionState,
+  );
   const [, startQuickTransition] = useTransition();
   const propinaNum = Number(venta.propina) || 0;
+  const totalDevuelto = devoluciones.reduce((s, d) => s + Number(d.monto), 0);
+  // Importe de servicios cubiertos por paquete (informativo; no cobrado).
+  const cubiertoPorPaquete = lineasServicios
+    .filter((l) => l.paqueteUsado)
+    .reduce((s, l) => s + Number(l.precio) * l.cantidad, 0);
 
   // En modo inline el descuento también debe provocar el refetch del ticket.
   const handledDescuento = useRef<ActionState | null>(null);
@@ -266,6 +461,22 @@ export function VentaTicket({
     handledDescuento.current = descuentoState;
     onChanged?.();
   }, [descuentoState, onChanged]);
+  // En modo inline la promoción también provoca el refetch del ticket.
+  const handledPromo = useRef<ActionState | null>(null);
+  useEffect(() => {
+    const estado = promoState.success ? promoState : quitarPromoState.success ? quitarPromoState : null;
+    if (!estado || handledPromo.current === estado) return;
+    handledPromo.current = estado;
+    onChanged?.();
+  }, [promoState, quitarPromoState, onChanged]);
+  // Ídem la membresía aplicada al ticket.
+  const handledMembresia = useRef<ActionState | null>(null);
+  useEffect(() => {
+    const estado = membresiaState.success ? membresiaState : quitarMembresiaState.success ? quitarMembresiaState : null;
+    if (!estado || handledMembresia.current === estado) return;
+    handledMembresia.current = estado;
+    onChanged?.();
+  }, [membresiaState, quitarMembresiaState, onChanged]);
 
   const aplicarPorcentaje = (pct: number) => {
     const data = new FormData();
@@ -285,10 +496,20 @@ export function VentaTicket({
             <h2 className="flex items-center gap-2 text-lg font-semibold text-[#2d2926]">
               <ReceiptText aria-hidden="true" className="size-5 text-[#8a5140]" /> Ticket
             </h2>
-            <p className="mt-1 text-sm text-[#81746c]">
-              Cliente: {venta.clienteNombre ?? "Walk-in"}
-              {venta.citaId ? " · desde cita" : ""}
-            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[#81746c]">
+              <span>
+                Cliente: {venta.clienteNombre ?? "Walk-in"}
+                {venta.citaId ? " · desde cita" : ""}
+              </span>
+              {editable && catalogoClientes.length > 0 ? (
+                <ClientePicker
+                  clientes={catalogoClientes}
+                  onChanged={onChanged}
+                  organizationId={organizationId}
+                  ventaId={venta.id}
+                />
+              ) : null}
+            </div>
           </div>
           <StatusBadge tone={editable ? "warning" : cancelada ? "destructive" : "success"}>
             {editable ? "En proceso" : cancelada ? "Cancelada" : "Completada"}
@@ -303,8 +524,11 @@ export function VentaTicket({
             <CatalogoSelector
               className="mt-3"
               currency={currency}
+              hasCliente={Boolean(venta.clienteId)}
+              membresias={catalogoMembresias}
               onAdded={onChanged}
               organizationId={organizationId}
+              paquetes={catalogoPaquetes}
               productos={catalogoProductos}
               servicios={catalogoServicios}
               ventaId={venta.id}
@@ -331,6 +555,13 @@ export function VentaTicket({
                     line={linea}
                     onChanged={onChanged}
                     organizationId={organizationId}
+                    paquete={{
+                      usado: linea.paqueteUsado,
+                      nombre: linea.paqueteNombre,
+                      disponible: paquetesCliente
+                        .filter((p) => p.servicioId === linea.servicioId)
+                        .reduce((s, p) => s + p.sesionesRestantes, 0),
+                    }}
                     removeAction={quitarServicioVenta}
                     staff={staff}
                     tipo="servicio"
@@ -369,6 +600,79 @@ export function VentaTicket({
               )}
             </div>
           </section>
+
+          {lineasPaquetes.length > 0 ? (
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+                Paquetes
+              </h3>
+              <div className="mt-3 space-y-2">
+                {lineasPaquetes.map((linea) => (
+                  <div
+                    className="flex items-center gap-3 rounded-xl border border-[#eee8e3] px-3 py-2.5 text-sm sm:px-4"
+                    key={linea.id}
+                  >
+                    <PackageCheck aria-hidden="true" className="size-4 shrink-0 text-[#347052]" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{linea.nombre}</p>
+                      <p className="mt-0.5 text-xs tabular-nums text-[#81746c]">
+                        {linea.cantidad} × {formatCurrency(linea.precio, { currency })}
+                      </p>
+                    </div>
+                    <span className="w-24 text-right font-semibold tabular-nums">
+                      {formatCurrency(Number(linea.precio) * linea.cantidad, { currency })}
+                    </span>
+                    {editable ? (
+                      <PaqueteQuitarButton
+                        detalleId={linea.id}
+                        nombre={linea.nombre}
+                        onChanged={onChanged}
+                        organizationId={organizationId}
+                        ventaId={venta.id}
+                      />
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {lineasMembresias.length > 0 ? (
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+                Membresías
+              </h3>
+              <div className="mt-3 space-y-2">
+                {lineasMembresias.map((linea) => (
+                  <div
+                    className="flex items-center gap-3 rounded-xl border border-[#eee8e3] px-3 py-2.5 text-sm sm:px-4"
+                    key={linea.id}
+                  >
+                    <PackageCheck aria-hidden="true" className="size-4 shrink-0 text-[#6b4d8f]" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{linea.nombre}</p>
+                      <p className="mt-0.5 text-xs tabular-nums text-[#81746c]">
+                        {linea.cantidad} × {formatCurrency(linea.precio, { currency })}
+                      </p>
+                    </div>
+                    <span className="w-24 text-right font-semibold tabular-nums">
+                      {formatCurrency(Number(linea.precio) * linea.cantidad, { currency })}
+                    </span>
+                    {editable ? (
+                      <PaqueteQuitarButton
+                        action={quitarMembresiaVenta}
+                        detalleId={linea.id}
+                        nombre={linea.nombre}
+                        onChanged={onChanged}
+                        organizationId={organizationId}
+                        ventaId={venta.id}
+                      />
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
         </div>
       </section>
 
@@ -382,12 +686,36 @@ export function VentaTicket({
                 {formatCurrency(venta.subtotal, { currency })}
               </span>
             </div>
+            {cubiertoPorPaquete > 0 ? (
+              <div className="flex justify-between text-xs text-[#347052]">
+                <span>Cubierto por paquete (no cobrado)</span>
+                <span className="tabular-nums">
+                  {formatCurrency(cubiertoPorPaquete, { currency })}
+                </span>
+              </div>
+            ) : null}
             <div className="flex justify-between text-sm text-[#625b55]">
               <span>Descuento</span>
               <span className="tabular-nums">
                 -{formatCurrency(venta.descuento, { currency })}
               </span>
             </div>
+            {Number(venta.descuentoPromocion ?? 0) > 0 ? (
+              <div className="flex justify-between text-sm font-medium text-[#347052]">
+                <span>Promoción{venta.promocionNombre ? ` · ${venta.promocionNombre}` : ""}</span>
+                <span className="tabular-nums">
+                  -{formatCurrency(venta.descuentoPromocion ?? "0", { currency })}
+                </span>
+              </div>
+            ) : null}
+            {Number(venta.descuentoMembresia ?? 0) > 0 ? (
+              <div className="flex justify-between text-sm font-medium text-[#6b4d8f]">
+                <span>Membresía{venta.membresiaNombre ? ` · ${venta.membresiaNombre}` : ""}</span>
+                <span className="tabular-nums">
+                  -{formatCurrency(venta.descuentoMembresia ?? "0", { currency })}
+                </span>
+              </div>
+            ) : null}
             {propinaNum > 0 ? (
               <div className="flex justify-between text-sm text-[#625b55]">
                 <span>Propina</span>
@@ -402,6 +730,32 @@ export function VentaTicket({
                 {formatCurrency(venta.total, { currency })}
               </span>
             </div>
+            {anticipoAplicado > 0 ? (
+              <div className="flex justify-between text-sm font-medium text-[#347052]">
+                <span>Anticipo aplicado</span>
+                <span className="tabular-nums">-{formatCurrency(anticipoAplicado, { currency })}</span>
+              </div>
+            ) : null}
+            {editable && anticipoPorAplicar > 0 ? (
+              <div className="flex justify-between text-sm font-medium text-[#347052]">
+                <span>Anticipo por aplicar</span>
+                <span className="tabular-nums">-{formatCurrency(anticipoPorAplicar, { currency })}</span>
+              </div>
+            ) : null}
+            {totalDevuelto > 0 ? (
+              <>
+                <div className="flex justify-between text-sm text-[#a8443a]">
+                  <span>Devuelto</span>
+                  <span className="tabular-nums">-{formatCurrency(totalDevuelto, { currency })}</span>
+                </div>
+                <div className="flex justify-between text-sm font-semibold text-[#2d2926]">
+                  <span>Neto cobrado</span>
+                  <span className="tabular-nums">
+                    {formatCurrency(Math.max(Number(venta.total) - totalDevuelto, 0), { currency })}
+                  </span>
+                </div>
+              </>
+            ) : null}
             {propinaNum > 0 ? (
               <div className="flex justify-between text-sm font-semibold text-[#60392e]">
                 <span>Total + propina</span>
@@ -461,8 +815,154 @@ export function VentaTicket({
           </form>
         ) : null}
 
+        {editable && (promocionesDisponibles.length > 0 || venta.promocionId) ? (
+          <section className="space-y-3 rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
+            <h2 className="text-sm font-semibold text-[#2d2926]">Promoción</h2>
+            {venta.promocionId ? (
+              <form action={quitarPromoAction} className="flex items-center justify-between gap-3">
+                <input name="organizacionId" type="hidden" value={organizationId} />
+                <input name="ventaId" type="hidden" value={venta.id} />
+                <p className="min-w-0 flex-1 text-sm text-[#347052]">
+                  <span className="font-medium">{venta.promocionNombre ?? "Aplicada"}</span>
+                  <span className="ml-2 tabular-nums">-{formatCurrency(venta.descuentoPromocion ?? "0", { currency })}</span>
+                </p>
+                <Button
+                  className="rounded-xl"
+                  disabled={quitarPromoPending}
+                  size="sm"
+                  type="submit"
+                  variant="ghost"
+                >
+                  {quitarPromoPending ? "Quitando…" : "Quitar"}
+                </Button>
+              </form>
+            ) : (
+              <form action={promoAction} className="flex flex-wrap items-end gap-2">
+                <input name="organizacionId" type="hidden" value={organizationId} />
+                <input name="ventaId" type="hidden" value={venta.id} />
+                <div className="min-w-0 flex-1">
+                  <Combobox
+                    clearable={false}
+                    emptyMessage="Sin promociones vigentes"
+                    items={promocionesDisponibles.map((p) => ({
+                      value: p.id,
+                      label: p.nombre,
+                      description:
+                        p.tipo === "porcentaje"
+                          ? `${Number(p.valor)}% ${p.aplica === "ambos" ? "en todo" : `en ${p.aplica}`}`
+                          : `-${formatCurrency(p.valor, { currency })} ${p.aplica === "ambos" ? "en todo" : `en ${p.aplica}`}`,
+                    }))}
+                    label="Promoción vigente"
+                    name="promocionId"
+                    placeholder="Buscar promoción…"
+                    required
+                  />
+                </div>
+                <Button
+                  className="rounded-xl"
+                  disabled={promoPending}
+                  type="submit"
+                  variant="outline"
+                >
+                  {promoPending ? "Aplicando…" : "Aplicar promoción"}
+                </Button>
+              </form>
+            )}
+            <ActionFeedback state={promoState.success || promoState.error ? promoState : quitarPromoState} />
+          </section>
+        ) : null}
+
+        {editable && (membresiasCliente.length > 0 || venta.membresiaId) ? (
+          <section className="space-y-3 rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
+            <h2 className="text-sm font-semibold text-[#2d2926]">Membresía del cliente</h2>
+            {venta.membresiaId ? (
+              <form action={quitarMembresiaAction} className="flex items-center justify-between gap-3">
+                <input name="organizacionId" type="hidden" value={organizationId} />
+                <input name="ventaId" type="hidden" value={venta.id} />
+                <p className="min-w-0 flex-1 text-sm text-[#6b4d8f]">
+                  <span className="font-medium">{venta.membresiaNombre ?? "Aplicada"}</span>
+                  <span className="ml-2 tabular-nums">-{formatCurrency(venta.descuentoMembresia ?? "0", { currency })}</span>
+                </p>
+                <Button
+                  className="rounded-xl"
+                  disabled={quitarMembresiaPending}
+                  size="sm"
+                  type="submit"
+                  variant="ghost"
+                >
+                  {quitarMembresiaPending ? "Quitando…" : "Quitar"}
+                </Button>
+              </form>
+            ) : (
+              <form action={membresiaAction} className="flex flex-wrap items-end gap-2">
+                <input name="organizacionId" type="hidden" value={organizationId} />
+                <input name="ventaId" type="hidden" value={venta.id} />
+                <div className="min-w-0 flex-1">
+                  <Combobox
+                    clearable={false}
+                    emptyMessage="Sin membresías vigentes"
+                    items={membresiasCliente.map((m) => ({
+                      value: m.id,
+                      label: m.nombre,
+                      description: `${Number(m.descuentoPorcentaje)}% ${m.aplica === "ambos" ? "en todo" : `en ${m.aplica}`} · hasta ${m.vigenciaHasta}`,
+                    }))}
+                    label="Membresía vigente"
+                    name="clienteMembresiaId"
+                    placeholder="Buscar membresía…"
+                    required
+                  />
+                </div>
+                <Button
+                  className="rounded-xl"
+                  disabled={membresiaPending}
+                  type="submit"
+                  variant="outline"
+                >
+                  {membresiaPending ? "Aplicando…" : "Aplicar membresía"}
+                </Button>
+              </form>
+            )}
+            <ActionFeedback state={membresiaState.success || membresiaState.error ? membresiaState : quitarMembresiaState} />
+          </section>
+        ) : null}
+
+        {anticipos.length > 0 ? (
+          <section className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
+            <h2 className="text-sm font-semibold text-[#2d2926]">Anticipos de la cita</h2>
+            <ul className="mt-3 space-y-2">
+              {anticipos.map((ant) => (
+                <li
+                  className="flex items-center justify-between gap-3 rounded-xl border border-[#eee8e3] px-4 py-2.5 text-sm"
+                  key={ant.id}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="font-medium tabular-nums">
+                      {formatCurrency(ant.monto, { currency })}
+                    </span>
+                    <span className="ml-2 text-xs text-[#81746c]">
+                      {ant.medioNombre ?? "Medio"}
+                    </span>
+                  </span>
+                  <StatusBadge
+                    tone={ant.estado === "aplicado" ? "success" : ant.estado === "devuelto" ? "destructive" : "info"}
+                  >
+                    {ant.estado === "aplicado" ? "Aplicado" : ant.estado === "devuelto" ? "Devuelto" : "Vigente"}
+                  </StatusBadge>
+                </li>
+              ))}
+            </ul>
+            {editable && anticipos.some((a) => a.estado === "vigente") && anticipoPorAplicar === 0 ? (
+              <p className="mt-3 rounded-xl bg-[#fbf4e2] px-4 py-2.5 text-xs text-[#986b16]">
+                El anticipo vigente excede el total del ticket; no se aplicará automáticamente.
+                Devuélvelo desde la cita.
+              </p>
+            ) : null}
+          </section>
+        ) : null}
+
         {editable ? (
           <CobroForm
+            anticipo={anticipoPorAplicar}
             mediosPago={mediosPago}
             modo={modo === "inline" ? "inline" : undefined}
             onCobrada={onCobrada}
@@ -512,6 +1012,48 @@ export function VentaTicket({
             </div>
           </section>
         )}
+
+        {devoluciones.length > 0 ? (
+          <section className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-semibold text-[#2d2926]">Devoluciones</h3>
+            <ul className="mt-3 space-y-3">
+              {devoluciones.map((dev) => (
+                <li className="rounded-xl border border-[#eee8e3] px-4 py-3 text-sm" key={dev.id}>
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-[#a8443a]">
+                      -{formatCurrency(dev.monto, { currency })}
+                    </span>
+                    <span className="text-xs text-[#81746c]">{dev.usuarioNombre ?? "—"}</span>
+                  </div>
+                  <ul className="mt-1.5 space-y-0.5 text-xs text-[#625b55]">
+                    {dev.lineas.map((linea, i) => (
+                      <li key={i}>
+                        {linea.nombre} × {linea.cantidad} · {formatCurrency(linea.monto, { currency })}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1 text-xs text-[#81746c]">{dev.motivo}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {!editable && !cancelada && puedeCancelar ? (
+          <DevolucionParcialPanel
+            currency={currency}
+            devueltoPorDetalle={devueltoPorDetalle}
+            lineas={[
+              ...lineasServicios.map((l) => ({ tipo: "servicio" as const, detalleId: l.id, nombre: l.nombre, precio: l.precio, cantidad: l.cantidad })),
+              ...lineasProductos.map((l) => ({ tipo: "producto" as const, detalleId: l.id, nombre: l.nombre, precio: l.precio, cantidad: l.cantidad })),
+              ...lineasPaquetes.map((l) => ({ tipo: "paquete" as const, detalleId: l.id, nombre: l.nombre, precio: l.precio, cantidad: l.cantidad })),
+              ...lineasMembresias.map((l) => ({ tipo: "membresia" as const, detalleId: l.id, nombre: l.nombre, precio: l.precio, cantidad: l.cantidad })),
+            ]}
+            onChanged={onChanged}
+            organizationId={organizationId}
+            ventaId={venta.id}
+          />
+        ) : null}
 
         {pagos.length > 0 ? (
           <section className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
@@ -656,5 +1198,151 @@ function CancelarVentaButton({
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * Devolución parcial por línea: selecciona cantidades a devolver por línea del
+ * ticket (tope = vendidas − ya devueltas) y genera el documento compensatorio.
+ */
+function DevolucionParcialPanel({
+  currency,
+  devueltoPorDetalle,
+  lineas,
+  onChanged,
+  organizationId,
+  ventaId,
+}: {
+  currency: string;
+  devueltoPorDetalle: Record<string, number>;
+  lineas: Array<{ tipo: "servicio" | "producto" | "paquete" | "membresia"; detalleId: string; nombre: string; precio: string; cantidad: number }>;
+  onChanged?: () => void;
+  organizationId: string;
+  ventaId: string;
+}) {
+  const router = useRouter();
+  const toast = useToast();
+  const [abierto, setAbierto] = useState(false);
+  const [cantidades, setCantidades] = useState<Record<string, number>>({});
+  const [pending, startTransition] = useTransition();
+
+  const conSaldo = lineas.filter((l) => l.cantidad - (devueltoPorDetalle[l.detalleId] ?? 0) > 0);
+  const totalSeleccionado = conSaldo.reduce((s, l) => s + (cantidades[l.detalleId] ?? 0), 0);
+
+  const submit = (form: HTMLFormElement) => {
+    const motivo = String(new FormData(form).get("motivo") ?? "").trim();
+    const seleccion = conSaldo
+      .filter((l) => (cantidades[l.detalleId] ?? 0) > 0)
+      .map((l) => ({ tipo: l.tipo, detalleId: l.detalleId, cantidad: cantidades[l.detalleId] }));
+    if (seleccion.length === 0) {
+      toast.error("Indica al menos una cantidad a devolver.");
+      return;
+    }
+    const data = new FormData();
+    data.set("organizacionId", organizationId);
+    data.set("ventaId", ventaId);
+    data.set("motivo", motivo);
+    data.set("lineas", JSON.stringify(seleccion));
+    startTransition(async () => {
+      const result = await devolverLineasVenta(initialActionState, data);
+      if (result.success) {
+        toast.success(result.message ?? "Devolución registrada.");
+        setAbierto(false);
+        setCantidades({});
+        onChanged?.();
+        router.refresh();
+      } else {
+        toast.error(result.error ?? "No se pudo registrar la devolución.");
+      }
+    });
+  };
+
+  if (!abierto) {
+    return conSaldo.length > 0 ? (
+      <button
+        className="inline-flex min-h-10 items-center rounded-xl border border-[#e3d9d1] bg-white px-4 text-sm font-medium text-[#625b55] transition-colors hover:border-[#c9a899]"
+        onClick={() => setAbierto(true)}
+        type="button"
+      >
+        Devolver líneas…
+      </button>
+    ) : null;
+  }
+
+  return (
+    <section className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
+      <h3 className="text-sm font-semibold text-[#2d2926]">Devolución parcial</h3>
+      <form
+        className="mt-3 space-y-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          submit(event.currentTarget);
+        }}
+      >
+        <ul className="space-y-2">
+          {lineas.map((linea) => {
+            const devueltas = devueltoPorDetalle[linea.detalleId] ?? 0;
+            const pendiente = linea.cantidad - devueltas;
+            return (
+              <li
+                className="flex items-center gap-3 rounded-xl border border-[#eee8e3] px-3 py-2 text-sm"
+                key={linea.detalleId}
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{linea.nombre}</p>
+                  <p className="text-xs tabular-nums text-[#81746c]">
+                    {linea.tipo} · {linea.cantidad} vendida(s)
+                    {devueltas > 0 ? ` · ${devueltas} devuelta(s)` : ""}
+                    {(cantidades[linea.detalleId] ?? 0) > 0
+                      ? ` · devuelve ≈${formatCurrency(Number(linea.precio) * (cantidades[linea.detalleId] ?? 0), { currency })}`
+                      : ""}
+                  </p>
+                </div>
+                {pendiente > 0 ? (
+                  <Input
+                    aria-label={`Cantidad a devolver de ${linea.nombre}`}
+                    className="w-20 text-center"
+                    max={pendiente}
+                    min={0}
+                    onChange={(event) =>
+                      setCantidades((current) => ({
+                        ...current,
+                        [linea.detalleId]: Math.min(Math.max(Number(event.target.value) || 0, 0), pendiente),
+                      }))
+                    }
+                    step={1}
+                    type="number"
+                    value={cantidades[linea.detalleId] ?? 0}
+                  />
+                ) : (
+                  <span className="text-xs text-[#a89f97]">devuelta</span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        <Field>
+          <FieldLabel className="text-xs">Motivo</FieldLabel>
+          <Input maxLength={500} name="motivo" placeholder="Ej. producto defectuoso" required />
+        </Field>
+        <div className="flex flex-wrap gap-2">
+          <Button className="rounded-xl" disabled={pending || totalSeleccionado === 0} type="submit" variant="outline">
+            {pending ? "Registrando…" : "Registrar devolución"}
+          </Button>
+          <Button
+            className="rounded-xl"
+            disabled={pending}
+            onClick={() => setAbierto(false)}
+            type="button"
+            variant="ghost"
+          >
+            Volver
+          </Button>
+        </div>
+        <p className="text-[11px] leading-4 text-[#a89f97]">
+          El descuento del ticket se prorratea en el monto devuelto; el stock de productos vuelve a inventario.
+        </p>
+      </form>
+    </section>
   );
 }

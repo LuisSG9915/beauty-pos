@@ -17,6 +17,7 @@ import { getAdminContext } from "@/lib/admin-context";
 import { requireAccessPermission } from "@/lib/auth/authorization";
 import { todayDateInput } from "@/lib/format";
 import { dayBoundsUtc } from "@/modules/agenda";
+import { alergiasPorCliente, conAlergias } from "@/modules/expedientes/alergias";
 
 export const dynamic = "force-dynamic";
 
@@ -172,6 +173,14 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
   const suma = (rows: Array<{ monto: string }>) =>
     rows.reduce((total, row) => total + Number(row.monto), 0);
 
+  // Alergias del expediente — visibles solo con `expedientes.alergias_ver`.
+  const alergias = await alergiasPorCliente(
+    db,
+    organization.id,
+    [...new Set(citaRows.map((row) => row.clienteId).filter((id): id is string => Boolean(id)))],
+    context.access,
+  );
+
   const citasSerializadas: MiDiaCita[] = citaRows.map((row) => ({
     id: row.id,
     fechaHora: row.fechaHora.toISOString(),
@@ -181,7 +190,7 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
     totalEstimado: row.totalEstimado,
     clienteId: row.clienteId,
     clienteNombre: row.clienteNombre ?? "Walk-in",
-    clienteNotas: row.clienteNotas,
+    clienteNotas: conAlergias(row.clienteNotas, row.clienteId ? alergias.get(row.clienteId) : undefined),
     ventaId: row.ventaId,
     ventaEstado: row.ventaEstado,
     servicios: serviciosPorCita.get(row.id) ?? [],
