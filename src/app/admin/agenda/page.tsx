@@ -21,6 +21,7 @@ import { firstParam, normalizeDateInput, normalizeView } from "@/lib/url-context
 import { dayBoundsUtc, shiftDateKey, weekStartDateKey } from "@/modules/agenda";
 import { contextoSuscripcion } from "@/modules/billing/queries";
 import { alergiasPorCliente, conAlergias } from "@/modules/expedientes/alergias";
+import { avisosRecientes, type AvisoReciente } from "@/modules/notificaciones/service";
 
 export const dynamic = "force-dynamic";
 
@@ -297,6 +298,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
     .limit(1);
   const suscripcion = await contextoSuscripcion(organization.id);
   const puedeEditar = hasPermission(context.access, "agenda.editar");
+  const avisos: AvisoReciente[] = puedeEditar ? await avisosRecientes(organization.id) : [];
   const recursosConfig: RecursoConfig[] = recursoRows;
   const recursosActivos = recursoRows.filter((r) => r.activo);
   const weekDays = vista === "semana"
@@ -327,6 +329,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
           permiteAutoConfirmar={suscripcion.capacidades.has("reservas_auto_confirmar")}
           permiteRecordatorios={suscripcion.capacidades.has("recordatorios_email")}
           permiteReservasOnline={suscripcion.capacidades.has("reservas_online")}
+          avisos={avisos}
           recordatoriosActivos={orgRow?.recordatoriosActivos ?? false}
           recordatoriosHorasAntes={orgRow?.recordatoriosHorasAntes ?? 24}
           reservasAutoConfirmar={sucursalRow?.reservasAutoConfirmar ?? false}

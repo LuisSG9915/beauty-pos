@@ -23,6 +23,7 @@ import { useToast } from "@/components/ui/toast";
 import { formatDate, formatTime } from "@/lib/format";
 import { RECURSO_TIPOS } from "@/db/schema/operations";
 import { BLOQUEO_TIPOS } from "@/modules/agenda";
+import type { AvisoReciente } from "@/modules/notificaciones/service";
 import { cn } from "@/lib/utils";
 
 export type HorarioConfig = {
@@ -42,6 +43,30 @@ export type BloqueoConfig = {
   tipo: string;
   motivo: string | null;
   activo: boolean;
+};
+
+const ETIQUETA_AVISO: Record<string, string> = {
+  confirmacion: "Confirmación",
+  solicitud: "Solicitud recibida",
+  recordatorio: "Recordatorio",
+  cambio: "Cambio de horario",
+  cancelacion: "Cancelación",
+};
+
+const ETIQUETA_ESTADO_AVISO: Record<string, string> = {
+  pendiente: "Programado",
+  enviando: "Enviando",
+  enviado: "Aceptado",
+  fallido: "Fallido",
+  omitido: "Omitido",
+};
+
+const TONO_ESTADO_AVISO: Record<string, "success" | "warning" | "info" | "destructive" | "neutral"> = {
+  pendiente: "info",
+  enviando: "info",
+  enviado: "success",
+  fallido: "destructive",
+  omitido: "neutral",
 };
 
 export type RecursoConfig = {
@@ -118,6 +143,7 @@ export function DisponibilidadPanel({
   permiteReservasOnline,
   permiteAutoConfirmar,
   permiteRecordatorios,
+  avisos,
   timeZone,
 }: {
   organizationId: string;
@@ -137,6 +163,8 @@ export function DisponibilidadPanel({
   permiteReservasOnline: boolean;
   permiteAutoConfirmar: boolean;
   permiteRecordatorios: boolean;
+  /** Últimos avisos de cita encolados/enviados (bitácora operativa). */
+  avisos: AvisoReciente[];
   timeZone: string;
 }) {
   const toast = useToast();
@@ -482,6 +510,42 @@ export function DisponibilidadPanel({
             >
               Guardar recordatorios
             </Button>
+          </section>
+
+          {/* --------------------- Últimos avisos de cita --------------------- */}
+          <section className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+              Últimos avisos de cita
+            </h3>
+            {avisos.length === 0 ? (
+              <p className="text-xs text-[#81746c]">
+                Aún no hay avisos. Las confirmaciones, cambios, cancelaciones y recordatorios por correo aparecen aquí.
+              </p>
+            ) : (
+              <ul className="divide-y divide-[#eee8e3] rounded-xl border border-[#eee8e3]">
+                {avisos.map((aviso) => (
+                  <li className="flex items-center justify-between gap-3 px-3 py-2" key={aviso.id}>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-[#403a35]">
+                        {ETIQUETA_AVISO[aviso.tipo] ?? aviso.tipo} · {aviso.correoDestino}
+                      </p>
+                      <p className="text-xs text-[#81746c]">
+                        {aviso.citaFechaHora
+                          ? `Cita: ${formatDate(aviso.citaFechaHora, { timeZone })} ${formatTime(aviso.citaFechaHora, { timeZone })}`
+                          : `Programado: ${formatDate(aviso.programadoPara, { timeZone })} ${formatTime(aviso.programadoPara, { timeZone })}`}
+                        {aviso.error ? ` · ${aviso.error}` : ""}
+                      </p>
+                    </div>
+                    <StatusBadge tone={TONO_ESTADO_AVISO[aviso.estado] ?? "neutral"}>
+                      {ETIQUETA_ESTADO_AVISO[aviso.estado] ?? aviso.estado}
+                    </StatusBadge>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="text-xs text-[#81746c]">
+              «Aceptado» significa que el proveedor de correo recibió el envío; no garantiza que el cliente lo haya leído.
+            </p>
           </section>
 
           {/* ---------------------------- Bloqueos ---------------------------- */}

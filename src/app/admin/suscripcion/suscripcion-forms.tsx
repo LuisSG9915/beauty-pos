@@ -12,10 +12,12 @@ export function CambioPlanForm({
   organizacionId,
   planClave,
   periodicidadActual,
+  sucursalesActuales,
 }: {
   organizacionId: string;
   planClave: string;
   periodicidadActual: string;
+  sucursalesActuales: number;
 }) {
   const [state, formAction, isPending] = useActionState(solicitarCambioPlan, {});
 
@@ -23,12 +25,16 @@ export function CambioPlanForm({
     <form action={formAction} className="flex flex-wrap items-end gap-2">
       <input name="organizacionId" type="hidden" value={organizacionId} />
       <input name="planClave" type="hidden" value={planClave} />
-      <Field className="w-36">
+      <Field className="w-32">
         <FieldLabel>Periodicidad</FieldLabel>
         <Select defaultValue={periodicidadActual === "anual" ? "anual" : "mensual"} name="periodicidad">
           <option value="mensual">Mensual</option>
           <option value="anual">Anual</option>
         </Select>
+      </Field>
+      <Field className="w-28">
+        <FieldLabel>Sucursales</FieldLabel>
+        <Input defaultValue={sucursalesActuales} min={1} max={50} name="sucursalesFacturadas" required type="number" />
       </Field>
       <Button className="rounded-xl" disabled={isPending} size="sm" type="submit" variant="outline">
         {isPending ? "Enviando…" : "Solicitar este plan"}

@@ -28,6 +28,8 @@ export type AdminShellProps = {
   permissionsByOrg?: Record<string, string[]> | null;
   /** Estado de suscripción por organización para el banner (trial / vencida). */
   billingByOrg?: Record<string, BillingBadge>;
+  /** Capacidades ausentes del plan vigente por organización (ocultan accesos). */
+  capacidadesFaltantesByOrg?: Record<string, string[]> | null;
   children: ReactNode;
 };
 
@@ -109,10 +111,12 @@ function ShellNav({
   organizations,
   platformAdmin,
   permissionsByOrg,
+  capacidadesFaltantesByOrg,
 }: {
   organizations: AdminShellOrganization[];
   platformAdmin: boolean;
   permissionsByOrg?: Record<string, string[]> | null;
+  capacidadesFaltantesByOrg?: Record<string, string[]> | null;
 }) {
   const searchParams = useSearchParams();
   const organizationId =
@@ -121,8 +125,13 @@ function ShellNav({
     platformAdmin || permissionsByOrg == null
       ? null
       : (organizationId ? (permissionsByOrg[organizationId] ?? []) : []);
+  const capacidadesFaltantes =
+    platformAdmin || capacidadesFaltantesByOrg == null
+      ? null
+      : (organizationId ? (capacidadesFaltantesByOrg[organizationId] ?? []) : []);
   return (
     <AdminNavCompact
+      capacidadesFaltantes={capacidadesFaltantes}
       organizationId={organizationId}
       permissions={permissions}
       platformAdmin={platformAdmin}
@@ -165,6 +174,7 @@ export function AdminShell({
   organizations,
   permissionsByOrg,
   billingByOrg,
+  capacidadesFaltantesByOrg,
   children,
 }: AdminShellProps) {
   return (
@@ -213,6 +223,7 @@ export function AdminShell({
             <div className="mx-auto w-full max-w-[1400px] px-4 py-2 sm:px-6 lg:px-10">
               <Suspense fallback={null}>
                 <ShellNav
+                  capacidadesFaltantesByOrg={capacidadesFaltantesByOrg}
                   organizations={organizations}
                   permissionsByOrg={permissionsByOrg}
                   platformAdmin={isPlatformAdmin}

@@ -13,6 +13,20 @@ export type EstadoSuscripcionAdmin =
   | { tipo: "activa"; termina: string | null }
   | { tipo: "vencida" };
 
+export type PlanOpcion = {
+  clave: string;
+  nombre: string;
+  precioMensual: string;
+  precioAnual: string | null;
+};
+
+/** Última solicitud de cambio pendiente: pre-llena el formulario del admin. */
+export type SolicitudSugerida = {
+  planClave: string;
+  periodicidad: "mensual" | "anual";
+  sucursales: number;
+};
+
 function estadoLabel(estado: EstadoSuscripcionAdmin): { texto: string; tono: string } {
   switch (estado.tipo) {
     case "trialing":
@@ -32,17 +46,25 @@ function estadoLabel(estado: EstadoSuscripcionAdmin): { texto: string; tono: str
   }
 }
 
+const selectClass =
+  "w-full rounded-xl border border-[#e5ddd6] bg-white px-3 py-2 text-sm text-[#2d2926] focus:border-[#c98a6b] focus:outline-none";
+
 /**
  * Fila de organización para el admin de plataforma: estado de suscripción y
- * formulario plegable para registrar un pago manual (transferencia) que activa
- * el plan por N meses. Solo lectura para suscripciones vigentes largas.
+ * formulario plegable para registrar un pago manual (transferencia). El pago
+ * aplica el plan/periodicidad/sucursales elegidos — pre-llenados con la
+ * última solicitud del propietario cuando existe.
  */
 export function SuscripcionAdminRow({
   estado,
   organizationId,
+  planes,
+  sugerida,
 }: {
   organizationId: string;
   estado: EstadoSuscripcionAdmin;
+  planes: PlanOpcion[];
+  sugerida?: SolicitudSugerida;
 }) {
   const [state, formAction, isPending] = useActionState(registrarPagoSuscripcion, {});
   const badge = estadoLabel(estado);
@@ -58,11 +80,32 @@ export function SuscripcionAdminRow({
         <summary className="cursor-pointer text-xs font-medium text-[#a76348]">
           Registrar pago / activar plan
         </summary>
-        <form action={formAction} className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_2fr_auto] sm:items-end">
+        <form action={formAction} className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:items-end">
           <input name="organizacionId" type="hidden" value={organizationId} />
           <Field>
-            <FieldLabel required>Meses</FieldLabel>
-            <Input defaultValue="1" min={1} max={24} name="meses" required type="number" />
+            <FieldLabel required>Plan</FieldLabel>
+            <select className={selectClass} defaultValue={sugerida?.planClave ?? planes[0]?.clave} name="planClave" required>
+              {planes.map((plan) => (
+                <option key={plan.clave} value={plan.clave}>
+                  {plan.nombre}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field>
+            <FieldLabel required>Periodicidad</FieldLabel>
+            <select className={selectClass} defaultValue={sugerida?.periodicidad ?? "mensual"} name="periodicidad" required>
+              <option value="mensual">Mensual</option>
+              <option value="anual">Anual</option>
+            </select>
+          </Field>
+          <Field>
+            <FieldLabel required>Sucursales</FieldLabel>
+            <Input defaultValue={sugerida?.sucursales ?? 1} min={1} max={50} name="sucursalesFacturadas" required type="number" />
+          </Field>
+          <Field>
+            <FieldLabel required>Meses cubiertos</FieldLabel>
+            <Input defaultValue={sugerida?.periodicidad === "anual" ? 12 : 1} min={1} max={24} name="meses" required type="number" />
           </Field>
           <Field>
             <FieldLabel required>Monto (MXN)</FieldLabel>
@@ -72,10 +115,10 @@ export function SuscripcionAdminRow({
             <FieldLabel>Referencia</FieldLabel>
             <Input maxLength={160} name="referencia" placeholder="Transferencia, folio…" />
           </Field>
-          <Button className="rounded-xl" disabled={isPending} size="sm" type="submit">
-            {isPending ? "Guardando…" : "Activar"}
-          </Button>
-          <div className="sm:col-span-4">
+          <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-3">
+            <Button className="rounded-xl" disabled={isPending} size="sm" type="submit">
+              {isPending ? "Guardando…" : "Confirmar pago y activar"}
+            </Button>
             <ActionFeedback state={state} successMessage="Suscripción activada." />
           </div>
         </form>

@@ -12,12 +12,14 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
 import { catRoles } from "@/db/schema/access";
-import { billingEventos, suscripciones } from "@/db/schema/billing";
+import { billingEventos, planes, suscripciones } from "@/db/schema/billing";
 import { organizaciones, sucursales } from "@/db/schema/core";
 import { getAccessibleOrganizations } from "@/lib/admin-context";
 import { requireAuthenticatedUser, requirePlatformAdmin } from "@/lib/auth/access";
 import { resolveAccessSafe } from "@/lib/auth/authorization";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
+import { CAPACIDADES } from "@/modules/billing/capacidades";
+import { getSuscripcionActual } from "@/modules/billing/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
 import { cargarEstadoNegocio, cargarProgresoGuia } from "@/modules/onboarding/queries";
 import { evaluarPasos, pasosParaPermisos, resumenGuia } from "@/modules/onboarding/rules";
@@ -45,6 +47,7 @@ function MemberDashboard({
   access,
   error,
   permissionsByOrg,
+  capacidadesFaltantesByOrg,
   checklist,
 }: {
   name: string;
@@ -52,6 +55,7 @@ function MemberDashboard({
   access: Array<{ organization: string; branch: string; branchKey: string; organizationId: string; branchId: string }>;
   error?: string;
   permissionsByOrg: Record<string, string[]>;
+  capacidadesFaltantesByOrg: Record<string, string[]>;
   checklist: ResumenGuia | null;
 }) {
   const first = access[0];
@@ -95,6 +99,7 @@ function MemberDashboard({
       )}
       {first ? (
         <AdminNav
+          capacidadesFaltantes={capacidadesFaltantesByOrg[first.organizationId] ?? []}
           organizationId={first.organizationId}
           permissions={permissionsByOrg[first.organizationId] ?? []}
           sucursalId={first.branchId}
@@ -114,10 +119,20 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     const organizations = await getAccessibleOrganizations(db, user);
     const access: Array<{ organization: string; branch: string; branchKey: string; organizationId: string; branchId: string }> = [];
     const permissionsByOrg: Record<string, string[]> = {};
+    const capacidadesFaltantesByOrg: Record<string, string[]> = {};
 
     for (const org of organizations) {
-      const resolved = await resolveAccessSafe(org.id, user);
+      const [resolved, suscripcion] = await Promise.all([
+        resolveAccessSafe(org.id, user),
+        getSuscripcionActual(org.id),
+      ]);
       permissionsByOrg[org.id] = resolved ? [...resolved.permissions] : [];
+      if (suscripcion && estadoEfectivoSuscripcion(suscripcion) === "vigente") {
+        const incluidas = new Set(suscripcion.capacidades ?? []);
+        capacidadesFaltantesByOrg[org.id] = Object.keys(CAPACIDADES).filter(
+          (capacidad) => !incluidas.has(capacidad),
+        );
+      }
       const branchConditions = [eq(sucursales.organizacionId, org.id), eq(sucursales.activo, true)];
       // null = alcance de toda la organización; Set = solo asignadas.
       if (resolved?.branchIds) {
@@ -158,11 +173,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       }
     }
 
-    return <MemberDashboard access={access} checklist={checklist} email={session.user.email} error={error} name={session.user.name} permissionsByOrg={permissionsByOrg} />;
+    return <MemberDashboard access={access} capacidadesFaltantesByOrg={capacidadesFaltantesByOrg} checklist={checklist} email={session.user.email} error={error} name={session.user.name} permissionsByOrg={permissionsByOrg} />;
   }
 
   const { session: platformSession } = await requirePlatformAdmin();
-  const [organizations, roles, branches, suscripcionRows, solicitudes] = await Promise.all([
+  const [organizations, roles, branches, suscripcionRows, solicitudes, planesCatalogo] = await Promise.all([
     db
       .select({ id: organizaciones.id, nombre: organizaciones.nombre, slug: organizaciones.slug, activo: organizaciones.activo })
       .from(organizaciones)
@@ -185,13 +200,34 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         payload: billingEventos.payload,
         createdAt: billingEventos.createdAt,
         organizacion: organizaciones.nombre,
+        organizacionId: billingEventos.organizacionId,
       })
       .from(billingEventos)
       .innerJoin(organizaciones, eq(billingEventos.organizacionId, organizaciones.id))
       .where(inArray(billingEventos.tipo, ["plan.cambio_solicitado", "cancelacion.solicitada"]))
       .orderBy(desc(billingEventos.createdAt))
       .limit(20),
+    db
+      .select({ clave: planes.clave, nombre: planes.nombre, precioMensual: planes.precioMensual, precioAnual: planes.precioAnual })
+      .from(planes)
+      .where(eq(planes.activo, true))
+      .orderBy(planes.orden),
   ]);
+
+  // Última solicitud de cambio por organización: pre-llena el formulario del
+  // admin con lo que el propietario pidió.
+  const solicitudPorOrg = new Map<string, { planClave: string; periodicidad: "mensual" | "anual"; sucursales: number }>();
+  for (const solicitud of solicitudes) {
+    if (solicitud.tipo !== "plan.cambio_solicitado" || !solicitud.organizacionId) continue;
+    if (solicitudPorOrg.has(solicitud.organizacionId)) continue;
+    const payload = (solicitud.payload ?? {}) as Record<string, unknown>;
+    if (typeof payload.planClave !== "string") continue;
+    solicitudPorOrg.set(solicitud.organizacionId, {
+      planClave: payload.planClave,
+      periodicidad: payload.periodicidad === "anual" ? "anual" : "mensual",
+      sucursales: typeof payload.sucursales === "number" ? payload.sucursales : 1,
+    });
+  }
 
   // Última suscripción por organización para el estado mostrado al admin.
   const suscripcionPorOrg = new Map<string, (typeof suscripcionRows)[number]>();
@@ -241,7 +277,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                       </StatusBadge>
                     </div>
                     <div className="mt-3">
-                      <SuscripcionAdminRow estado={estado} organizationId={organization.id} />
+                      <SuscripcionAdminRow
+                        estado={estado}
+                        organizationId={organization.id}
+                        planes={planesCatalogo}
+                        sugerida={solicitudPorOrg.get(organization.id)}
+                      />
                     </div>
                   </div>
                 );
@@ -261,7 +302,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     <p className="font-medium text-[#2d2926]">{solicitud.organizacion}</p>
                     <p className="text-xs text-[#81746c]">
                       {solicitud.tipo === "plan.cambio_solicitado"
-                        ? `Cambio a ${String(payload.planNombre ?? payload.planClave ?? "?")} (${String(payload.periodicidad ?? "mensual")})`
+                        ? `Cambio a ${String(payload.planNombre ?? payload.planClave ?? "?")} (${String(payload.periodicidad ?? "mensual")}${typeof payload.sucursales === "number" ? ` · ${payload.sucursales} sucursal(es)` : ""})`
                         : `Cancelación${payload.motivo ? ` — ${String(payload.motivo)}` : ""}`}
                     </p>
                   </div>

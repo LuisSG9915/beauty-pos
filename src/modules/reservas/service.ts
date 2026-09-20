@@ -10,6 +10,8 @@ import { getOcupacionAgenda, lockSucursalAgenda, registrarHistorialCita } from "
 import { validateCitaAvailability } from "@/modules/agenda/rules";
 import { getZonedParts } from "@/modules/agenda/timezone";
 import { intervalFromDates } from "@/modules/agenda/types";
+import { encolarAvisoCita } from "@/modules/notificaciones/service";
+import { TIPO_CONFIRMACION, TIPO_SOLICITUD } from "@/modules/notificaciones/rules";
 import { normalizarContacto, validarDatosReserva, type ReservaClienteInput } from "./rules";
 
 export type ReservaResult =
@@ -198,6 +200,12 @@ export async function crearReservaPublica(input: {
         entidad: "cita",
         entidadId: cita.id,
         detalle: { servicioId: servicio.id, autoConfirmada: autoConfirmar },
+      });
+
+      await encolarAvisoCita(tx, {
+        organizacionId: input.organizacionId,
+        citaId: cita.id,
+        tipo: autoConfirmar ? TIPO_CONFIRMACION : TIPO_SOLICITUD,
       });
 
       return { ok: true, citaId: cita.id, confirmada: autoConfirmar };

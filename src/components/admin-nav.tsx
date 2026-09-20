@@ -42,6 +42,8 @@ export type AdminNavItem = {
   icon: LucideIcon;
   /** Permiso(s) requerido(s) para ver el acceso; array = cualquiera. */
   permiso?: string | readonly string[];
+  /** Capacidad de plan requerida; se oculta cuando el plan vigente no la incluye. */
+  capacidad?: string;
 };
 
 export type AdminNavSection = {
@@ -68,21 +70,21 @@ const CATALOGOS: AdminNavItem[] = [
   { path: "/admin/unidades-medida", label: "Unidades", description: "Pieza, litro, gramo, etc.", icon: Ruler, permiso: "catalogos.ver" },
   { path: "/admin/medios-pago", label: "Medios de pago", description: "Efectivo, tarjeta, transferencia", icon: CreditCard, permiso: "catalogos.ver" },
   { path: "/admin/impuestos", label: "Impuestos", description: "IVA, IEPS y configuración", icon: Percent, permiso: "catalogos.ver" },
-  { path: "/admin/promociones", label: "Promociones", description: "Descuentos, 2x1 y paquetes", icon: Clipboard, permiso: "catalogos.ver" },
-  { path: "/admin/paquetes", label: "Paquetes", description: "Sesiones prepagadas por servicio", icon: PackageCheck, permiso: "catalogos.ver" },
-  { path: "/admin/membresias", label: "Membresías", description: "Descuento por vigencia para clientes", icon: Crown, permiso: "catalogos.ver" },
+  { path: "/admin/promociones", label: "Promociones", description: "Descuentos, 2x1 y paquetes", icon: Clipboard, permiso: "catalogos.ver", capacidad: "promociones" },
+  { path: "/admin/paquetes", label: "Paquetes", description: "Sesiones prepagadas por servicio", icon: PackageCheck, permiso: "catalogos.ver", capacidad: "paquetes" },
+  { path: "/admin/membresias", label: "Membresías", description: "Descuento por vigencia para clientes", icon: Crown, permiso: "catalogos.ver", capacidad: "membresias" },
 ];
 
 const DINERO: AdminNavItem[] = [
-  { path: "/admin/gastos", label: "Gastos", description: "Salidas del negocio por categoría y medio", icon: Banknote, permiso: "gastos.ver" },
-  { path: "/admin/comisiones", label: "Comisiones", description: "Pago de comisiones al equipo", icon: HandCoins, permiso: "comisiones.ver" },
-  { path: "/admin/reportes", label: "Reportes", description: "Operativos y financieros por rango", icon: BarChart3, permiso: ["reportes.operativos", "reportes.financieros"] },
+  { path: "/admin/gastos", label: "Gastos", description: "Salidas del negocio por categoría y medio", icon: Banknote, permiso: "gastos.ver", capacidad: "gastos" },
+  { path: "/admin/comisiones", label: "Comisiones", description: "Pago de comisiones al equipo", icon: HandCoins, permiso: "comisiones.ver", capacidad: "comisiones" },
+  { path: "/admin/reportes", label: "Reportes", description: "Operativos y financieros por rango", icon: BarChart3, permiso: ["reportes.operativos", "reportes.financieros"], capacidad: "reportes_avanzados" },
 ];
 
 const EQUIPO: AdminNavItem[] = [
   { path: "/admin/usuarios", label: "Equipo", description: "Miembros, roles y sucursales", icon: Users, permiso: "usuarios.ver" },
   { path: "/admin/roles", label: "Roles", description: "Permisos por rol", icon: ShieldCheck, permiso: "roles.ver" },
-  { path: "/admin/auditoria", label: "Auditoría", description: "Bitácora de eventos", icon: ScrollText, permiso: "auditoria.ver" },
+  { path: "/admin/auditoria", label: "Auditoría", description: "Bitácora de eventos", icon: ScrollText, permiso: "auditoria.ver", capacidad: "auditoria" },
   { path: "/admin/suscripcion", label: "Suscripción", description: "Plan, uso y pagos del negocio", icon: Gem, permiso: "organizaciones.ver" },
 ];
 
@@ -116,9 +118,14 @@ function tienePermiso(permiso: AdminNavItem["permiso"], permissions: ReadonlySet
 export function getAdminNavSections(
   platformAdmin = false,
   permissions: ReadonlySet<string> | null = null,
+  capacidadesFaltantes: ReadonlySet<string> | null = null,
 ): AdminNavSection[] {
   const visible = (items: AdminNavItem[]) =>
-    permissions === null ? items : items.filter((item) => tienePermiso(item.permiso, permissions));
+    items.filter(
+      (item) =>
+        (permissions === null || tienePermiso(item.permiso, permissions)) &&
+        !(item.capacidad && capacidadesFaltantes?.has(item.capacidad)),
+    );
   const sections: AdminNavSection[] = [
     { title: "Operación", items: visible(OPERACION) },
     { title: "Catálogos", items: visible(CATALOGOS) },
@@ -142,6 +149,8 @@ type NavContext = {
   activePath?: string;
   /** Permisos de la org activa; null = sin filtro (plataforma). */
   permissions?: readonly string[] | null;
+  /** Capacidades que el plan vigente NO incluye; esos accesos se ocultan. */
+  capacidadesFaltantes?: readonly string[] | null;
 };
 
 function useNavContext({ organizationId, sucursalId, activePath }: NavContext) {
@@ -170,9 +179,14 @@ export function AdminNav({
   platformAdmin = false,
   activePath,
   permissions,
+  capacidadesFaltantes,
 }: NavContext) {
   const context = useNavContext({ organizationId, sucursalId, activePath });
-  const sections = getAdminNavSections(platformAdmin, toPermissionSet(permissions));
+  const sections = getAdminNavSections(
+    platformAdmin,
+    toPermissionSet(permissions),
+    capacidadesFaltantes ? new Set(capacidadesFaltantes) : null,
+  );
 
   return (
     <nav aria-label="Secciones del panel" className="space-y-8">
@@ -282,9 +296,14 @@ export function AdminNavCompact({
   platformAdmin = false,
   activePath,
   permissions,
+  capacidadesFaltantes,
 }: NavContext) {
   const context = useNavContext({ organizationId, sucursalId, activePath });
-  const sections = getAdminNavSections(platformAdmin, toPermissionSet(permissions));
+  const sections = getAdminNavSections(
+    platformAdmin,
+    toPermissionSet(permissions),
+    capacidadesFaltantes ? new Set(capacidadesFaltantes) : null,
+  );
 
   return (
     <nav aria-label="Navegación del panel">

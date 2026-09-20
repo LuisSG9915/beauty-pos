@@ -1,0 +1,1 @@
+ALTER TABLE "notificaciones_envios" ADD COLUMN "detalle" jsonb;

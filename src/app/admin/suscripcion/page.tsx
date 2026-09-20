@@ -207,6 +207,7 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
                       organizacionId={organizationId}
                       periodicidadActual={actual?.periodicidad ?? "mensual"}
                       planClave={plan.clave}
+                      sucursalesActuales={actual?.sucursalesFacturadas ?? sucursalesActivas}
                     />
                   </div>
                 ) : null}

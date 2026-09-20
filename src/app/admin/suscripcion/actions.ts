@@ -15,6 +15,7 @@ const cambioPlanSchema = z.object({
   organizacionId: z.string().uuid(),
   planClave: z.string().trim().min(1).max(40),
   periodicidad: z.enum(["mensual", "anual"]),
+  sucursalesFacturadas: z.coerce.number().int().min(1).max(50),
 });
 
 /**
@@ -35,7 +36,7 @@ export async function solicitarCambioPlan(_previousState: ActionState, formData:
 
   const [plan, actual] = await Promise.all([
     db
-      .select({ id: planes.id, clave: planes.clave, nombre: planes.nombre, precioMensual: planes.precioMensual, precioAnual: planes.precioAnual })
+      .select({ id: planes.id, clave: planes.clave, nombre: planes.nombre, precioMensual: planes.precioMensual, precioAnual: planes.precioAnual, maxSucursales: planes.maxSucursales })
       .from(planes)
       .where(eq(planes.clave, input.planClave))
       .limit(1)
@@ -49,6 +50,9 @@ export async function solicitarCambioPlan(_previousState: ActionState, formData:
   if (input.periodicidad === "anual" && !plan.precioAnual) {
     return actionError("Ese plan solo está disponible en modalidad mensual.");
   }
+  if (plan.maxSucursales != null && input.sucursalesFacturadas > plan.maxSucursales) {
+    return actionError(`${plan.nombre} permite hasta ${plan.maxSucursales} sucursal(es). Elige un plan con más cobertura.`);
+  }
 
   await db.transaction(async (tx) => {
     await tx.insert(billingEventos).values({
@@ -59,6 +63,7 @@ export async function solicitarCambioPlan(_previousState: ActionState, formData:
         planClave: plan.clave,
         planNombre: plan.nombre,
         periodicidad: input.periodicidad,
+        sucursales: input.sucursalesFacturadas,
         planAnterior: actual?.planClave ?? null,
         solicitadoPor: user.id,
       },
@@ -69,7 +74,7 @@ export async function solicitarCambioPlan(_previousState: ActionState, formData:
       accion: "suscripcion.cambio_solicitado",
       entidad: "suscripcion",
       entidadId: actual?.id ?? null,
-      detalle: { plan: plan.clave, periodicidad: input.periodicidad },
+      detalle: { plan: plan.clave, periodicidad: input.periodicidad, sucursales: input.sucursalesFacturadas },
     });
   });
 

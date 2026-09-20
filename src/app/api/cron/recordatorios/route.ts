@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 
 import { getRuntimeEnv } from "@/lib/runtime-env";
-import { procesarRecordatorios } from "@/modules/recordatorios/service";
+import { procesarNotificaciones } from "@/modules/notificaciones/service";
 
 export const dynamic = "force-dynamic";
 
 /**
- * Cron de recordatorios de citas por correo. Protegido con `CRON_SECRET`
- * (Authorization: Bearer …). Pensado para un scheduler externo cada 15–30 min
- * (Cloudflare Cron Trigger, GitHub Actions, etc.): el índice único de envíos
- * por cita+tipo vuelve la operación segura ante corridas duplicadas.
+ * Worker de avisos de cita por correo (confirmación, solicitud, cambio,
+ * cancelación y recordatorio). Protegido con `CRON_SECRET`
+ * (Authorization: Bearer …). Pensado para un scheduler externo cada 15–30 min:
+ * el lease por aviso y la unicidad (cita, tipo, versión) lo hacen seguro ante
+ * corridas duplicadas o workers concurrentes.
  */
 async function handler(request: Request) {
   const secret = getRuntimeEnv().CRON_SECRET;
@@ -21,7 +22,7 @@ async function handler(request: Request) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
 
-  const resultado = await procesarRecordatorios();
+  const resultado = await procesarNotificaciones();
   return NextResponse.json({ ok: true, ...resultado });
 }
 

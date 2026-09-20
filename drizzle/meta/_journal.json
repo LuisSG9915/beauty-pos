@@ -281,6 +281,27 @@
       "when": 1789931851611,
       "tag": "0039_slimy_galactus",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1789934949591,
+      "tag": "0040_notificaciones-envios",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1789935152642,
+      "tag": "0041_notificaciones-detalle",
+      "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1789935215803,
+      "tag": "0042_notificaciones-tipo-solicitud",
+      "breakpoints": true
     }
   ]
 }

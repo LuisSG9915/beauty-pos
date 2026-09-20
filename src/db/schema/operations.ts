@@ -902,3 +902,65 @@ export const recordatoriosEnvios = pgTable(
     ),
   ],
 );
+
+export const NOTIFICACION_ESTADOS = ["pendiente", "enviando", "enviado", "fallido", "omitido"] as const;
+export const NOTIFICACION_TIPOS = ["confirmacion", "recordatorio", "cambio", "cancelacion", "solicitud"] as const;
+
+/**
+ * Cola transaccional de avisos de cita por correo. Cada aviso queda ligado a
+ * la `version_cita` vigente al encolarlo: si la cita se reagenda o cancela, el
+ * aviso queda obsoleto y el worker lo omite (o reprograma el recordatorio a la
+ * nueva hora). La clave única (cita, tipo, versión) evita duplicados ante
+ * doble submit y ante workers concurrentes.
+ *
+ * - `pendiente`: esperando su `programado_para` (y `proximo_intento` si reintenta).
+ * - `enviando`: lease tomado por un worker hasta `lease_hasta`; si el worker
+ *   muere, el lease expira y otro lo retoma como pendiente.
+ * - `enviado`/`fallido`/`omitido`: terminales. `fallido` agotó reintentos;
+ *   `omitido` quedó obsoleto por el estado actual de la cita.
+ */
+export const notificacionesEnvios = pgTable(
+  "notificaciones_envios",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizacionId: uuid("organizacion_id").notNull().references(() => organizaciones.id),
+    citaId: uuid("cita_id").notNull().references(() => citas.id),
+    /** confirmacion | recordatorio | cambio | cancelacion */
+    tipo: varchar("tipo", { length: 30 }).notNull(),
+    correoDestino: varchar("correo_destino", { length: 254 }).notNull(),
+    /** Fecha/hora de la cita al encolar; sirve para detectar cambios posteriores. */
+    fechaHoraSnapshot: timestamp("fecha_hora_snapshot", { withTimezone: true }).notNull(),
+    /** Versión de la cita al encolar; si difiere, el aviso puede estar obsoleto. */
+    versionCita: integer("version_cita").notNull(),
+    /** Instante a partir del cual el worker puede enviar. */
+    programadoPara: timestamp("programado_para", { withTimezone: true }).notNull(),
+    estado: varchar("estado", { length: 20 }).default("pendiente").notNull(),
+    intentos: integer("intentos").default(0).notNull(),
+    /** Próximo intento permitido tras un fallo transitorio (backoff). */
+    proximoIntento: timestamp("proximo_intento", { withTimezone: true }),
+    /** Expiración del lease del worker que lo está procesando. */
+    leaseHasta: timestamp("lease_hasta", { withTimezone: true }),
+    enviadoAt: timestamp("enviado_at", { withTimezone: true }),
+    /** messageId devuelto por el proveedor (Brevo). */
+    proveedorId: varchar("proveedor_id", { length: 160 }),
+    /** Datos extra del aviso (p.ej. fechaHoraPrevia en cambios de horario). */
+    detalle: jsonb("detalle"),
+    /** Error sanitizado del último intento (sin cuerpos completos del proveedor). */
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("notificaciones_envios_cita_tipo_version_uq").on(table.citaId, table.tipo, table.versionCita),
+    index("notificaciones_envios_pendientes_idx").on(table.estado, table.programadoPara),
+    index("notificaciones_envios_organizacion_idx").on(table.organizacionId),
+    index("notificaciones_envios_cita_idx").on(table.citaId),
+    check(
+      "notificaciones_envios_estado_chk",
+      sql`${table.estado} in ('pendiente','enviando','enviado','fallido','omitido')`,
+    ),
+    check(
+      "notificaciones_envios_tipo_chk",
+      sql`${table.tipo} in ('confirmacion','recordatorio','cambio','cancelacion','solicitud')`,
+    ),
+  ],
+);

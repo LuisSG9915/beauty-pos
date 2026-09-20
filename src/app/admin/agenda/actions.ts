@@ -47,6 +47,8 @@ import {
 import { getZonedParts, parseFechaHoraInput } from "@/modules/agenda/timezone";
 import { intervalFromDates, type DisponibilidadResult } from "@/modules/agenda/types";
 import { requiereCapacidad } from "@/modules/billing/queries";
+import { encolarAvisoCita } from "@/modules/notificaciones/service";
+import { TIPO_CAMBIO, TIPO_CANCELACION, TIPO_CONFIRMACION } from "@/modules/notificaciones/rules";
 
 const CITA_ESTADOS = ["pendiente", "confirmada", "en_proceso", "completada", "cancelada", "no_asistio"] as const;
 
@@ -388,6 +390,16 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
             : {}),
         },
       });
+      if (!previa) {
+        await encolarAvisoCita(tx, { organizacionId: input.organizacionId, citaId, tipo: TIPO_CONFIRMACION });
+      } else if (fechaHora.getTime() !== previa.fechaHora.getTime()) {
+        await encolarAvisoCita(tx, {
+          organizacionId: input.organizacionId,
+          citaId,
+          tipo: TIPO_CAMBIO,
+          fechaHoraPrevia: previa.fechaHora,
+        });
+      }
       return { success: true, message: "Cita guardada correctamente.", citaId };
     });
 
@@ -588,6 +600,18 @@ export async function updateCitaEstado(formData: FormData): Promise<CitaMutation
             : {}),
         },
       });
+      if (input.estado === "cancelada") {
+        await encolarAvisoCita(tx, { organizacionId: input.organizacionId, citaId: cita.id, tipo: TIPO_CANCELACION });
+      } else if (input.estado === "confirmada") {
+        await encolarAvisoCita(tx, { organizacionId: input.organizacionId, citaId: cita.id, tipo: TIPO_CONFIRMACION });
+      } else if (input.estado === "pendiente" && fechaHora.getTime() !== cita.fechaHora.getTime()) {
+        await encolarAvisoCita(tx, {
+          organizacionId: input.organizacionId,
+          citaId: cita.id,
+          tipo: TIPO_CAMBIO,
+          fechaHoraPrevia: cita.fechaHora,
+        });
+      }
       return { success: true, message: "Estado actualizado." };
     });
 
@@ -641,6 +665,9 @@ export async function toggleCitaActiva(formData: FormData): Promise<CitaMutation
       usuarioId: user.id,
       accion: active ? "ocultada" : "reactivada",
     });
+    if (active) {
+      await encolarAvisoCita(tx, { organizacionId: organizationId, citaId: id, tipo: TIPO_CANCELACION });
+    }
   });
   revalidatePath("/admin/agenda");
   revalidatePath("/admin/pos");
@@ -745,6 +772,14 @@ async function moverCitaEnTx(
       ...(opts.reactivarAPendiente ? { estadoDe: cita.estado } : {}),
     },
   });
+  if (fechaHora.getTime() !== cita.fechaHora.getTime()) {
+    await encolarAvisoCita(tx, {
+      organizacionId: input.organizacionId,
+      citaId: cita.id,
+      tipo: TIPO_CAMBIO,
+      fechaHoraPrevia: cita.fechaHora,
+    });
+  }
   return { success: true, message: opts.reactivarAPendiente ? "Cita reagendada a pendiente." : "Cita movida." };
 }
 
