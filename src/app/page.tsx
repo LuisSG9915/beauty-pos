@@ -100,7 +100,12 @@ export default function Home() {
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#a7978e]">Resumen del día</p>
                 <p className="mt-1 text-xl font-semibold">Casa Magnolia</p>
               </div>
-              <div className="rounded-full bg-[#f8eee8] px-3 py-1.5 text-xs font-medium text-[#a76348]">Hoy, 8 sep</div>
+              <div className="flex items-center gap-2">
+                <span className="rounded-full border border-[#e5ddd6] px-2.5 py-1 text-[10px] font-medium text-[#a7978e]">
+                  Ejemplo ilustrativo
+                </span>
+                <div className="rounded-full bg-[#f8eee8] px-3 py-1.5 text-xs font-medium text-[#a76348]">Hoy, 8 sep</div>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3 py-5">
               <div className="rounded-2xl bg-[#f8f5f2] p-4">

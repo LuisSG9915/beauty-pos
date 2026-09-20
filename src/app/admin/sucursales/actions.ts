@@ -1,11 +1,12 @@
 "use server";
 
-import { and, count, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { miembrosOrganizaciones, relUsuariosSucursales, sucursales, usuarios } from "@/db/schema/core";
+import { horariosSucursales } from "@/db/schema/operations";
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
 import { auditEvent } from "@/lib/audit";
 import { checkPermission } from "@/lib/auth/authorization";
@@ -105,6 +106,44 @@ export async function crearSucursalAction(
           .values({ organizacionId: input.organizacionId, usuarioId: user.id, sucursalId: creada.id, createdBy: user.id })
           .onConflictDoNothing();
       }
+
+      // Una sucursal sin horarios no admite citas y el error solo aparecía al
+      // agendar. Se copian los turnos activos de la sucursal más antigua; si
+      // no hay referencia, un horario base L–S 9:00–19:00.
+      const [referencia] = await tx
+        .select({ id: sucursales.id })
+        .from(sucursales)
+        .where(
+          and(
+            eq(sucursales.organizacionId, input.organizacionId),
+            eq(sucursales.activo, true),
+            ne(sucursales.id, creada.id),
+          ),
+        )
+        .orderBy(asc(sucursales.createdAt))
+        .limit(1);
+      const turnos = referencia
+        ? await tx
+            .select({
+              diaSemana: horariosSucursales.diaSemana,
+              iniciaMinutos: horariosSucursales.iniciaMinutos,
+              terminaMinutos: horariosSucursales.terminaMinutos,
+            })
+            .from(horariosSucursales)
+            .where(and(eq(horariosSucursales.sucursalId, referencia.id), eq(horariosSucursales.activo, true)))
+        : [];
+      const semilla =
+        turnos.length > 0
+          ? turnos
+          : [1, 2, 3, 4, 5, 6].map((diaSemana) => ({ diaSemana, iniciaMinutos: 540, terminaMinutos: 1140 }));
+      await tx.insert(horariosSucursales).values(
+        semilla.map((turno) => ({
+          organizacionId: input.organizacionId,
+          sucursalId: creada.id,
+          ...turno,
+          createdBy: user.id,
+        })),
+      );
 
       await auditEvent(tx, {
         organizacionId: input.organizacionId,
