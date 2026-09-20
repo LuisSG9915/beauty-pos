@@ -19,6 +19,7 @@ import { getAccessibleOrganizations } from "@/lib/admin-context";
 import { requireAuthenticatedUser, requirePlatformAdmin } from "@/lib/auth/access";
 import { resolveAccessSafe } from "@/lib/auth/authorization";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
+import { cargarAlertas, type AlertaOperativa } from "@/modules/alertas/queries";
 import { CAPACIDADES } from "@/modules/billing/capacidades";
 import { getSuscripcionActualCache } from "@/modules/billing/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
@@ -46,6 +47,7 @@ function AccessError({ error }: { error?: string }) {
 function MemberDashboard({
   name,
   access,
+  alertasByOrg,
   error,
   permissionsByOrg,
   capacidadesFaltantesByOrg,
@@ -54,6 +56,7 @@ function MemberDashboard({
   name: string;
   email: string;
   access: Array<{ organization: string; branch: string; branchKey: string; organizationId: string; branchId: string }>;
+  alertasByOrg: Record<string, AlertaOperativa[]>;
   error?: string;
   permissionsByOrg: Record<string, string[]>;
   capacidadesFaltantesByOrg: Record<string, string[]>;
@@ -81,6 +84,46 @@ function MemberDashboard({
           sucursalId={first.branchId}
         />
       ) : null}
+      {/* Tablero central de alertas: conteos accionables por organización,
+          solo de módulos que el usuario puede ver. */}
+      {access
+        .filter((item, index, lista) => lista.findIndex((otro) => otro.organizationId === item.organizationId) === index)
+        .map((item) => {
+          const alertas = alertasByOrg[item.organizationId] ?? [];
+          if (alertas.length === 0) return null;
+          return (
+            <AdminCard
+              description="Puntos operativos que necesitan atención en tu alcance."
+              key={item.organizationId}
+              title={`Alertas · ${item.organization}`}
+            >
+              <ul className="space-y-2">
+                {alertas.map((alerta) => (
+                  <li key={alerta.clave}>
+                    <Link
+                      className="flex items-center justify-between gap-3 rounded-xl border border-[#eadfd8] bg-white px-4 py-3 transition-colors hover:border-[#c9a899]"
+                      href={buildAdminHref(alerta.href, {
+                        organizationId: item.organizationId,
+                        sucursalId: item.branchId,
+                      })}
+                    >
+                      <span className="text-sm font-medium text-[#403a35]">{alerta.titulo}</span>
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                          alerta.tono === "critico"
+                            ? "bg-[#fdf1ee] text-[#a8443a]"
+                            : "bg-[#fdf6f1] text-[#a76348]"
+                        }`}
+                      >
+                        {alerta.cantidad}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </AdminCard>
+          );
+        })}
       {access.length === 0 ? (
         <EmptyState description="Tu cuenta todavía no tiene una sucursal asignada. Contacta al administrador." title="Sin sucursal asignada" />
       ) : (
@@ -121,6 +164,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     const access: Array<{ organization: string; branch: string; branchKey: string; organizationId: string; branchId: string }> = [];
     const permissionsByOrg: Record<string, string[]> = {};
     const capacidadesFaltantesByOrg: Record<string, string[]> = {};
+    const alertasByOrg: Record<string, AlertaOperativa[]> = {};
 
     for (const org of organizations) {
       const [resolved, suscripcion] = await Promise.all([
@@ -128,6 +172,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         getSuscripcionActualCache(org.id),
       ]);
       permissionsByOrg[org.id] = resolved ? [...resolved.permissions] : [];
+      alertasByOrg[org.id] = resolved
+        ? await cargarAlertas(db, {
+            organizacionId: org.id,
+            sucursalIds: resolved.branchIds ? [...resolved.branchIds] : null,
+            permisos: resolved.permissions,
+          })
+        : [];
       if (suscripcion && estadoEfectivoSuscripcion(suscripcion) === "vigente") {
         const incluidas = new Set(suscripcion.capacidades ?? []);
         capacidadesFaltantesByOrg[org.id] = Object.keys(CAPACIDADES).filter(
@@ -174,7 +225,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       }
     }
 
-    return <MemberDashboard access={access} capacidadesFaltantesByOrg={capacidadesFaltantesByOrg} checklist={checklist} email={session.user.email} error={error} name={session.user.name} permissionsByOrg={permissionsByOrg} />;
+    return <MemberDashboard access={access} alertasByOrg={alertasByOrg} capacidadesFaltantesByOrg={capacidadesFaltantesByOrg} checklist={checklist} email={session.user.email} error={error} name={session.user.name} permissionsByOrg={permissionsByOrg} />;
   }
 
   const { session: platformSession } = await requirePlatformAdmin();
