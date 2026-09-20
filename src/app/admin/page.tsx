@@ -270,9 +270,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const pct = (parte: number, total: number) => (total > 0 ? Math.round((parte / total) * 100) : 0);
   const embudo = [
     { etiqueta: "Registradas", valor: registradas },
-    { etiqueta: "En prueba", valor: trialsVigentes },
+    { etiqueta: "En prueba ahora", valor: trialsVigentes, pct: pct(trialsVigentes, registradas) },
     { etiqueta: "Activadas (1er cobro)", valor: activadas, pct: pct(activadas, registradas) },
-    { etiqueta: "Convertidas (pagando)", valor: convertidas, pct: pct(convertidas, registradas) },
+    // Conversión sobre las activadas: de las que ya cobraron algo, cuántas
+    // quedaron pagando. Es la tasa que importa comercialmente.
+    { etiqueta: "Convertidas (pagando)", valor: convertidas, pct: pct(convertidas, Math.max(activadas, 1)) },
     { etiqueta: "Vencidas / canceladas", valor: vencidasOCanceladas },
   ];
 

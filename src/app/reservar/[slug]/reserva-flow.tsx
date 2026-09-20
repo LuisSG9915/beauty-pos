@@ -25,6 +25,8 @@ type Servicio = {
 
 type Dia = { diaKey: string; etiqueta: string };
 
+type Profesional = { sucursalId: string; usuarioId: string; nombre: string };
+
 type Resultado =
   | { tipo: "confirmada"; gestionUrl: string | null }
   | { tipo: "pendiente"; gestionUrl: string | null }
@@ -49,16 +51,30 @@ function formatoPrecio(precio: string) {
 export function ReservaFlow({
   dias,
   organizacion,
+  profesionales,
+  profesionalInicial,
   servicios,
   sucursales,
 }: {
   dias: Dia[];
   organizacion: { id: string; nombre: string; slug: string };
+  profesionales: Profesional[];
+  /** Profesional preseleccionado por enlace directo (?p=usuarioId). */
+  profesionalInicial?: string | null;
   servicios: Servicio[];
   sucursales: Sucursal[];
 }) {
-  const [sucursalId, setSucursalId] = useState(sucursales[0]?.id ?? "");
+  const [sucursalId, setSucursalId] = useState(() => {
+    // Con enlace directo del profesional se arranca en su sucursal; si no,
+    // la primera reservable.
+    if (profesionalInicial) {
+      const asignacion = profesionales.find((p) => p.usuarioId === profesionalInicial);
+      if (asignacion) return asignacion.sucursalId;
+    }
+    return sucursales[0]?.id ?? "";
+  });
   const [servicioId, setServicioId] = useState("");
+  const [usuarioId, setUsuarioId] = useState(profesionalInicial ?? "");
   const [diaKey, setDiaKey] = useState("");
   const [slotIso, setSlotIso] = useState("");
   const [slots, setSlots] = useState<string[] | null>(null);
@@ -71,6 +87,11 @@ export function ReservaFlow({
     [sucursalId, sucursales],
   );
   const servicio = servicios.find((s) => s.id === servicioId);
+  const profesionalesSucursal = useMemo(
+    () => profesionales.filter((p) => p.sucursalId === sucursal?.id),
+    [profesionales, sucursal],
+  );
+  const profesional = profesionalesSucursal.find((p) => p.usuarioId === usuarioId);
 
   // Al cambiar sucursal/servicio/día se reinicia la selección de horario.
   const elegir = (fn: (v: string) => void) => (v: string) => {
@@ -90,6 +111,7 @@ export function ReservaFlow({
         sucursalId: sucursal.id,
         servicioId,
         diaKey,
+        usuarioId: usuarioId || null,
       });
       if (cancelado) return;
       if (res.ok) {
@@ -103,7 +125,7 @@ export function ReservaFlow({
     return () => {
       cancelado = true;
     };
-  }, [diaKey, servicioId, sucursal, organizacion.id]);
+  }, [diaKey, servicioId, sucursal, usuarioId, organizacion.id]);
 
   function enviar(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -114,6 +136,7 @@ export function ReservaFlow({
         sucursalId: sucursal.id,
         servicioId,
         fechaHora: slotIso,
+        usuarioId: usuarioId || null,
         nombre: String(data.get("nombre") ?? ""),
         telefono: String(data.get("telefono") ?? ""),
         correo: String(data.get("correo") ?? ""),
@@ -154,6 +177,12 @@ export function ReservaFlow({
                 {formatoHora(slotIso, sucursal.zonaHoraria)}
               </dd>
             </div>
+            {profesional ? (
+              <div className="flex justify-between gap-4">
+                <dt className="text-[#8a7b72]">Profesional</dt>
+                <dd className="font-medium">{profesional.nombre}</dd>
+              </div>
+            ) : null}
             <div className="flex justify-between gap-4">
               <dt className="text-[#8a7b72]">Sucursal</dt>
               <dd className="font-medium">{sucursal.nombre}</dd>
@@ -193,7 +222,14 @@ export function ReservaFlow({
                     : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
                 }`}
                 key={s.id}
-                onClick={() => elegir(setSucursalId)(s.id)}
+                onClick={() => {
+                  elegir(setSucursalId)(s.id);
+                  // Un profesional que no atiende la nueva sucursal se limpia
+                  // (vuelve al carril "cualquiera disponible").
+                  if (usuarioId && !profesionales.some((p) => p.sucursalId === s.id && p.usuarioId === usuarioId)) {
+                    setUsuarioId("");
+                  }
+                }}
                 type="button"
               >
                 <p className="font-medium">{s.nombre}</p>
@@ -233,7 +269,42 @@ export function ReservaFlow({
         </div>
       </div>
 
-      {/* Paso 3: día */}
+      {/* Paso 3: profesional (opcional — por defecto cualquiera disponible) */}
+      {servicioId && profesionalesSucursal.length > 0 ? (
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#a76348]">Profesional</h2>
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            <button
+              className={`rounded-2xl border p-4 text-left transition-colors ${
+                usuarioId === ""
+                  ? "border-[#b8795d] bg-[#fdf6f1]"
+                  : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
+              }`}
+              onClick={() => elegir(setUsuarioId)("")}
+              type="button"
+            >
+              <p className="font-medium">Cualquiera disponible</p>
+              <p className="mt-1 text-xs text-[#8a7b72]">Te asignamos quien esté libre</p>
+            </button>
+            {profesionalesSucursal.map((p) => (
+              <button
+                className={`rounded-2xl border p-4 text-left transition-colors ${
+                  p.usuarioId === usuarioId
+                    ? "border-[#b8795d] bg-[#fdf6f1]"
+                    : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
+                }`}
+                key={p.usuarioId}
+                onClick={() => elegir(setUsuarioId)(p.usuarioId)}
+                type="button"
+              >
+                <p className="font-medium">{p.nombre}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Paso 4: día */}
       {servicioId ? (
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#a76348]">Día</h2>

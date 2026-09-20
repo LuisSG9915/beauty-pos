@@ -4,7 +4,7 @@ import { getDatabase } from "@/db/client";
 import { clientIp } from "@/lib/client-ip";
 import { getOcupacionAgenda } from "@/modules/agenda/service";
 import { dayBoundsUtc } from "@/modules/agenda/timezone";
-import { getServiciosReservables, getSucursalReservable } from "@/modules/reservas/queries";
+import { esProfesionalReservable, getServiciosReservables, getSucursalReservable } from "@/modules/reservas/queries";
 import { slotsDisponiblesDia } from "@/modules/reservas/rules";
 import { crearReservaPublica } from "@/modules/reservas/service";
 
@@ -18,6 +18,7 @@ export async function obtenerSlotsReserva(input: {
   sucursalId: string;
   servicioId: string;
   diaKey: string;
+  usuarioId?: string | null;
 }): Promise<{ ok: true; slots: string[] } | { ok: false; error: string }> {
   const sucursal = await getSucursalReservable(input.organizacionId, input.sucursalId);
   if (!sucursal) return { ok: false, error: "La sucursal no acepta reservas en línea." };
@@ -25,6 +26,12 @@ export async function obtenerSlotsReserva(input: {
   const servicios = await getServiciosReservables(input.organizacionId);
   const servicio = servicios.find((s) => s.id === input.servicioId);
   if (!servicio) return { ok: false, error: "El servicio no está disponible." };
+
+  const db = getDatabase();
+  const usuarioId = input.usuarioId || null;
+  if (usuarioId && !(await esProfesionalReservable(db, input.organizacionId, input.sucursalId, usuarioId))) {
+    return { ok: false, error: "El profesional elegido no está disponible." };
+  }
 
   const bounds = dayBoundsUtc(input.diaKey, sucursal.zonaHoraria);
   if (!bounds) return { ok: false, error: "Fecha inválida." };
@@ -35,7 +42,6 @@ export async function obtenerSlotsReserva(input: {
     return { ok: true, slots: [] };
   }
 
-  const db = getDatabase();
   const ocupacion = await getOcupacionAgenda(db, {
     organizacionId: input.organizacionId,
     sucursalId: input.sucursalId,
@@ -52,6 +58,7 @@ export async function obtenerSlotsReserva(input: {
     // La anticipación mínima corre el "ahora" efectivo hacia adelante.
     ahora: new Date(ahora.getTime() + sucursal.anticipacionMinutos * 60_000),
     pasoMinutos: 30,
+    usuarioId,
   });
 
   return { ok: true, slots: slots.map((s) => s.toISOString()) };
@@ -62,6 +69,7 @@ export async function confirmarReserva(input: {
   sucursalId: string;
   servicioId: string;
   fechaHora: string;
+  usuarioId?: string | null;
   nombre: string;
   telefono: string;
   correo?: string;
@@ -82,6 +90,7 @@ export async function confirmarReserva(input: {
     sucursalId: input.sucursalId,
     servicioId: input.servicioId,
     fechaHora,
+    usuarioId: input.usuarioId || null,
     cliente: {
       nombre: input.nombre,
       telefono: input.telefono,

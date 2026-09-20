@@ -13,6 +13,7 @@ import { intervalFromDates } from "@/modules/agenda/types";
 import { encolarAvisoCita } from "@/modules/notificaciones/service";
 import { TIPO_CONFIRMACION, TIPO_SOLICITUD } from "@/modules/notificaciones/rules";
 import { emitirTokenGestion, verificarAbusoReserva } from "./gestion";
+import { esProfesionalReservable } from "./queries";
 import {
   dentroDeVentanaReserva,
   normalizarContacto,
@@ -77,6 +78,8 @@ export async function crearReservaPublica(input: {
   servicioId: string;
   /** Instante UTC elegido por el cliente. */
   fechaHora: Date;
+  /** Profesional elegido en el portal; null = carril "sin asignar". */
+  usuarioId?: string | null;
   cliente: ReservaClienteInput;
   /** IP del solicitante (cabeceras del request) para el antiabuso. */
   ip?: string | null;
@@ -155,6 +158,13 @@ export async function crearReservaPublica(input: {
         return { ok: false, error: "El servicio elegido ya no está disponible." };
       }
 
+      // Si el cliente eligió profesional, debe seguir siendo reservable en
+      // esa sucursal (miembro activo + asignado + usuario activo).
+      const usuarioId = input.usuarioId || null;
+      if (usuarioId && !(await esProfesionalReservable(tx, input.organizacionId, input.sucursalId, usuarioId))) {
+        return { ok: false, error: "El profesional elegido ya no está disponible." };
+      }
+
       const candidato = intervalFromDates(input.fechaHora, servicio.duracionMinutos);
       const partes = getZonedParts(input.fechaHora, sucursal.zonaHoraria);
       const ocupacion = await getOcupacionAgenda(tx, {
@@ -164,7 +174,7 @@ export async function crearReservaPublica(input: {
         hasta: new Date(candidato.terminaAtMs),
       });
       const disponibilidad = validateCitaAvailability({
-        candidato: { ...candidato, usuarioId: null },
+        candidato: { ...candidato, usuarioId },
         diaSemana: partes.diaSemana,
         iniciaMinutosLocal: partes.minutosDelDia,
         duracionMinutos: servicio.duracionMinutos,
@@ -186,7 +196,7 @@ export async function crearReservaPublica(input: {
           organizacionId: input.organizacionId,
           sucursalId: input.sucursalId,
           clienteId,
-          usuarioId: null,
+          usuarioId,
           fechaHora: input.fechaHora,
           duracionMinutos: servicio.duracionMinutos,
           estado: autoConfirmar ? "confirmada" : "pendiente",
@@ -223,7 +233,7 @@ export async function crearReservaPublica(input: {
         accion: "cita.reservada_web",
         entidad: "cita",
         entidadId: cita.id,
-        detalle: { servicioId: servicio.id, autoConfirmada: autoConfirmar },
+        detalle: { servicioId: servicio.id, usuarioId, autoConfirmada: autoConfirmar },
       });
 
       // Token de autogestión: el cliente cancela o reagenda sin cuenta.

@@ -491,10 +491,24 @@ export function DisponibilidadPanel({
                     </span>
                   </label>
                 </div>
-                <p className="break-all rounded-lg bg-[#f4f1ee] px-3 py-2 text-xs text-[#625b55]">
-                  Enlace para tus clientes:{" "}
-                  <span className="font-medium text-[#8a5140]">/reservar/{organizacionSlug}</span>
-                </p>
+                <div className="rounded-lg bg-[#f4f1ee] px-3 py-2 text-xs text-[#625b55]">
+                  <p className="break-all">
+                    Enlace para tus clientes:{" "}
+                    <span className="font-medium text-[#8a5140]">/reservar/{organizacionSlug}</span>
+                  </p>
+                  {staff.length > 0 ? (
+                    <ul className="mt-2 space-y-1 border-t border-[#e5d9d0] pt-2">
+                      {staff.map((item) => (
+                        <li className="break-all" key={item.id}>
+                          <span className="font-medium">{item.nombre}:</span>{" "}
+                          <span className="text-[#8a5140]">
+                            /reservar/{organizacionSlug}?p={item.id}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
               </>
             ) : null}
             <Button

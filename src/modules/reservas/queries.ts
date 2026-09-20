@@ -1,7 +1,7 @@
 import { and, asc, eq } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
-import { organizaciones, sucursales } from "@/db/schema/core";
+import { miembrosOrganizaciones, organizaciones, relUsuariosSucursales, sucursales, usuarios } from "@/db/schema/core";
 import { servicios } from "@/db/schema/catalogs";
 import { contextoSuscripcion, tieneCapacidad } from "@/modules/billing/queries";
 import { resolveTimeZone } from "@/modules/agenda/timezone";
@@ -100,6 +100,78 @@ export async function getServiciosReservables(organizacionId: string): Promise<S
     )
     .orderBy(asc(servicios.nombre));
   return rows;
+}
+
+export type ProfesionalReservable = {
+  sucursalId: string;
+  usuarioId: string;
+  nombre: string;
+};
+
+/**
+ * Profesionales que un cliente puede elegir en el portal: miembros activos
+ * con asignación explícita a una sucursal reservable — la misma población que
+ * el selector de profesional de la agenda interna.
+ */
+export async function getProfesionalesReservables(organizacionId: string): Promise<ProfesionalReservable[]> {
+  const db = getDatabase();
+  return db
+    .select({
+      sucursalId: relUsuariosSucursales.sucursalId,
+      usuarioId: usuarios.id,
+      nombre: usuarios.nombre,
+    })
+    .from(relUsuariosSucursales)
+    .innerJoin(usuarios, eq(relUsuariosSucursales.usuarioId, usuarios.id))
+    .innerJoin(
+      miembrosOrganizaciones,
+      and(
+        eq(miembrosOrganizaciones.usuarioId, usuarios.id),
+        eq(miembrosOrganizaciones.organizacionId, organizacionId),
+        eq(miembrosOrganizaciones.estado, "activo"),
+      ),
+    )
+    .innerJoin(
+      sucursales,
+      and(
+        eq(sucursales.id, relUsuariosSucursales.sucursalId),
+        eq(sucursales.activo, true),
+        eq(sucursales.reservasOnline, true),
+      ),
+    )
+    .where(and(eq(relUsuariosSucursales.organizacionId, organizacionId), eq(usuarios.activo, true)))
+    .orderBy(asc(usuarios.nombre));
+}
+
+/** Valida que un usuario sea elegible para recibir reservas en esa sucursal. */
+export async function esProfesionalReservable(
+  db: Pick<ReturnType<typeof getDatabase>, "select">,
+  organizacionId: string,
+  sucursalId: string,
+  usuarioId: string,
+): Promise<boolean> {
+  const [row] = await db
+    .select({ id: relUsuariosSucursales.id })
+    .from(relUsuariosSucursales)
+    .innerJoin(usuarios, eq(relUsuariosSucursales.usuarioId, usuarios.id))
+    .innerJoin(
+      miembrosOrganizaciones,
+      and(
+        eq(miembrosOrganizaciones.usuarioId, usuarios.id),
+        eq(miembrosOrganizaciones.organizacionId, organizacionId),
+        eq(miembrosOrganizaciones.estado, "activo"),
+      ),
+    )
+    .where(
+      and(
+        eq(relUsuariosSucursales.organizacionId, organizacionId),
+        eq(relUsuariosSucursales.sucursalId, sucursalId),
+        eq(relUsuariosSucursales.usuarioId, usuarioId),
+        eq(usuarios.activo, true),
+      ),
+    )
+    .limit(1);
+  return Boolean(row);
 }
 
 /** Sucursal reservable con su configuración (valida org + flag + entitlement). */

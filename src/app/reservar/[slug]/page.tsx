@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { ReservaFlow } from "@/app/reservar/[slug]/reserva-flow";
-import { getPortalReservas, getServiciosReservables } from "@/modules/reservas/queries";
+import { getPortalReservas, getProfesionalesReservables, getServiciosReservables } from "@/modules/reservas/queries";
 import { dayKey } from "@/modules/agenda/timezone";
 
 export const dynamic = "force-dynamic";
@@ -18,13 +18,29 @@ function etiquetaDia(dk: string) {
   }).format(fecha);
 }
 
-export default async function ReservarPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ReservarPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ p?: string | string[] }>;
+}) {
   const { slug } = await params;
+  const { p } = await searchParams;
   const portal = await getPortalReservas(slug);
   if (!portal || portal.sucursales.length === 0) notFound();
 
-  const servicios = await getServiciosReservables(portal.organizacion.id);
+  const [servicios, profesionales] = await Promise.all([
+    getServiciosReservables(portal.organizacion.id),
+    getProfesionalesReservables(portal.organizacion.id),
+  ]);
   if (servicios.length === 0) notFound();
+
+  // Enlace directo del profesional (/reservar/slug?p=usuarioId): solo se
+  // respeta si sigue siendo reservable en alguna sucursal.
+  const preseleccion = typeof p === "string" ? p : null;
+  const profesionalInicial =
+    preseleccion && profesionales.some((prof) => prof.usuarioId === preseleccion) ? preseleccion : null;
 
   // Próximos días en la zona horaria de la primera sucursal (todas suelen
   // compartirla; el flujo recalcula por sucursal al cambiar).
@@ -52,6 +68,8 @@ export default async function ReservarPage({ params }: { params: Promise<{ slug:
       <ReservaFlow
         dias={dias}
         organizacion={portal.organizacion}
+        profesionales={profesionales}
+        profesionalInicial={profesionalInicial}
         servicios={servicios}
         sucursales={portal.sucursales}
       />
