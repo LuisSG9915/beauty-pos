@@ -23,7 +23,7 @@ export type AlertaOperativa = {
   titulo: string;
   cantidad: number;
   /** Ruta del módulo que resuelve la alerta (sin parámetros de contexto). */
-  href: string;
+  href: `/${string}`;
   tono: "advertencia" | "critico";
 };
 

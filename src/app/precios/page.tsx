@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { PreciosPlanes, type PlanPrecioCard } from "@/app/precios/precios-planes";
+import { TelemetriaPing } from "@/components/telemetria-ping";
 import { CAPACIDADES, PLANES_CATALOGO, type CapacidadClave } from "@/modules/billing/capacidades";
 import { getPlanesActivos } from "@/modules/billing/queries";
 import { TRIAL_DIAS } from "@/modules/billing/service";
@@ -93,6 +94,7 @@ export default async function PreciosPage() {
 
   return (
     <main className="min-h-screen bg-[#faf9f7] text-[#292522]">
+      <TelemetriaPing origen="precios" />
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6 lg:px-10">
         <Link className="flex items-center gap-3" href="/">
           <div className="flex size-10 items-center justify-center rounded-2xl bg-[#2c2522] text-sm font-semibold text-[#f6eadf]">

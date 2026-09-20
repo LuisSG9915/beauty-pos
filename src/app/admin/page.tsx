@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import Link from "next/link";
 
 import { GuiaChecklistCard } from "@/app/admin/guia/checklist-card";
@@ -15,6 +15,7 @@ import { catRoles } from "@/db/schema/access";
 import { billingEventos, planes, suscripciones } from "@/db/schema/billing";
 import { organizaciones, sucursales } from "@/db/schema/core";
 import { ventas } from "@/db/schema/operations";
+import { telemetriaEventos } from "@/db/schema/telemetry";
 import { getAccessibleOrganizations } from "@/lib/admin-context";
 import { requireAuthenticatedUser, requirePlatformAdmin } from "@/lib/auth/access";
 import { resolveAccessSafe } from "@/lib/auth/authorization";
@@ -229,7 +230,9 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   }
 
   const { session: platformSession } = await requirePlatformAdmin();
-  const [organizations, roles, branches, suscripcionRows, solicitudes, planesCatalogo, orgsConVenta] = await Promise.all([
+  const ahora = new Date();
+  const hace30d = new Date(ahora.getTime() - 30 * 24 * 60 * 60_000);
+  const [organizations, roles, branches, suscripcionRows, solicitudes, planesCatalogo, orgsConVenta, adquisicionRows, adquisicionPorOrigen] = await Promise.all([
     db
       .select({ id: organizaciones.id, nombre: organizaciones.nombre, slug: organizaciones.slug, activo: organizaciones.activo })
       .from(organizaciones)
@@ -277,6 +280,23 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       .from(ventas)
       .where(and(eq(ventas.estado, "completada"), eq(ventas.activo, true)))
       .groupBy(ventas.organizacionId),
+    // Adquisición 30d: visitas únicas (vid), registros y atribución vid→registro.
+    db
+      .select({
+        visitas: sql<number>`count(distinct ${telemetriaEventos.vid}) filter (where ${telemetriaEventos.tipo} = 'visita')`,
+        registros: sql<number>`count(*) filter (where ${telemetriaEventos.tipo} = 'registro_completado')`,
+        atribuidos: sql<number>`count(*) filter (where ${telemetriaEventos.tipo} = 'registro_completado' and ${telemetriaEventos.vid} in (select vid from telemetria_eventos where tipo = 'visita' and vid is not null))`,
+      })
+      .from(telemetriaEventos)
+      .where(gte(telemetriaEventos.createdAt, hace30d)),
+    db
+      .select({
+        origen: telemetriaEventos.origen,
+        unicas: sql<number>`count(distinct ${telemetriaEventos.vid})`,
+      })
+      .from(telemetriaEventos)
+      .where(and(eq(telemetriaEventos.tipo, "visita"), gte(telemetriaEventos.createdAt, hace30d)))
+      .groupBy(telemetriaEventos.origen),
   ]);
 
   // Última solicitud de cambio por organización: pre-llena el formulario del
@@ -299,8 +319,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   for (const row of suscripcionRows) {
     if (!suscripcionPorOrg.has(row.organizacionId)) suscripcionPorOrg.set(row.organizacionId, row);
   }
-  const ahora = new Date();
-
   // Embudo del piloto: registro → trial → activación (primer cobro) →
   // conversión (suscripción activa). Métricas derivadas de datos reales —
   // sin eventos sintéticos.
@@ -351,6 +369,38 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             </div>
           ))}
         </dl>
+      </AdminCard>
+      <AdminCard
+        description="Visitas al landing/precios → registro completado. Atribución por visitante anónimo (sin IPs ni datos personales)."
+        title="Adquisición (últimos 30 días)"
+      >
+        {(() => {
+          const tot = adquisicionRows[0] ?? { visitas: 0, registros: 0, atribuidos: 0 };
+          const conversion = tot.visitas > 0 ? Math.round((tot.atribuidos / tot.visitas) * 100) : 0;
+          return (
+            <>
+              <dl className="grid gap-3 sm:grid-cols-4">
+                {[
+                  { etiqueta: "Visitas únicas", valor: tot.visitas },
+                  { etiqueta: "Registros", valor: tot.registros },
+                  { etiqueta: "Atribuidos a visita", valor: tot.atribuidos },
+                  { etiqueta: "Conversión visita→registro", valor: `${conversion}%` },
+                ].map((etapa) => (
+                  <div className="rounded-xl bg-[#faf6f3] px-3 py-2" key={etapa.etiqueta}>
+                    <dt className="text-[11px] uppercase tracking-wide text-[#81746c]">{etapa.etiqueta}</dt>
+                    <dd className="mt-0.5 text-lg font-semibold text-[#2d2926]">{etapa.valor}</dd>
+                  </div>
+                ))}
+              </dl>
+              {adquisicionPorOrigen.length > 0 ? (
+                <p className="mt-3 text-xs text-[#81746c]">
+                  Por origen:{" "}
+                  {adquisicionPorOrigen.map((o) => `${o.origen} ${o.unicas}`).join(" · ")}
+                </p>
+              ) : null}
+            </>
+          );
+        })()}
       </AdminCard>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <OrganizationForm />

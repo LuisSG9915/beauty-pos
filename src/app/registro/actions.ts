@@ -1,11 +1,13 @@
 "use server";
 
 import { eq } from "drizzle-orm";
+import { cookies } from "next/headers";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { user as authUsers } from "@/db/schema/auth";
 import { organizaciones } from "@/db/schema/core";
+import { telemetriaEventos } from "@/db/schema/telemetry";
 import { createAuth } from "@/lib/auth/server";
 import { getRuntimeEnv } from "@/lib/runtime-env";
 import { provisionarOrganizacionTrial } from "@/modules/billing/service";
@@ -122,6 +124,20 @@ export async function registrarNegocio(
       // sigue siendo válido y se puede limpiar manualmente.
     }
     return { error: provision.error };
+  }
+
+  // Telemetría de adquisición: atribuye el registro a la visita que trajo a
+  // la persona (cookie anónima bp_vid). Nunca rompe el registro si falla.
+  try {
+    const cookieStore = await cookies();
+    const vid = cookieStore.get("bp_vid")?.value ?? null;
+    await db.insert(telemetriaEventos).values({
+      vid,
+      tipo: "registro_completado",
+      origen: "registro",
+    });
+  } catch (error) {
+    console.error("registrarNegocio telemetria", error);
   }
 
   return { ok: true, verificacionPendiente: correoConfigurado };

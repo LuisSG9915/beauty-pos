@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarDays, ChartNoAxesCombined, ShieldCheck, Store } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { TelemetriaPing } from "@/components/telemetria-ping";
 
 const modules = [
   {
@@ -29,6 +30,7 @@ const modules = [
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col bg-[#faf9f7] text-[#292522]">
+      <TelemetriaPing origen="landing" />
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6 lg:px-10">
         <div className="flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-2xl bg-[#2c2522] text-sm font-semibold text-[#f6eadf]">
