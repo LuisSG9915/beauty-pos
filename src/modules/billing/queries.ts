@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, count, desc, eq } from "drizzle-orm";
 import type { ExtractTablesWithRelations } from "drizzle-orm";
 import type { NodePgDatabase, NodePgTransaction } from "drizzle-orm/node-postgres";
@@ -28,6 +29,10 @@ export type SuscripcionActual = {
   sucursalesFacturadas: number;
   canceladaAt: Date | null;
   motivoCancelacion: string | null;
+  /** Snapshot comercial del contrato (null en trials o contratos previos). */
+  sucursalesIncluidas: number | null;
+  precioUnitario: string | null;
+  precioSucursalExtra: string | null;
   /** null cuando el plan referenciado ya no existe (leftJoin). */
   capacidades: string[] | null;
   maxSucursales: number | null;
@@ -52,6 +57,9 @@ export async function getSuscripcionActual(
       sucursalesFacturadas: suscripciones.sucursalesFacturadas,
       canceladaAt: suscripciones.canceladaAt,
       motivoCancelacion: suscripciones.motivoCancelacion,
+      sucursalesIncluidas: suscripciones.sucursalesIncluidas,
+      precioUnitario: suscripciones.precioUnitario,
+      precioSucursalExtra: suscripciones.precioSucursalExtra,
       capacidades: planes.capacidades,
       maxSucursales: planes.maxSucursales,
       maxUsuarios: planes.maxUsuarios,
@@ -63,6 +71,16 @@ export async function getSuscripcionActual(
     .limit(1);
   return row ?? null;
 }
+
+/**
+ * Versión deduplicada por request (`React.cache`) para lecturas de páginas y
+ * layouts. Las server actions deben seguir usando `getSuscripcionActual` con su
+ * `db`/transacción explícita: la cache solo aplica a la conexión por defecto.
+ */
+export const getSuscripcionActualCache = cache(
+  async (organizacionId: string): Promise<SuscripcionActual | null> =>
+    getSuscripcionActual(organizacionId),
+);
 
 /**
  * `true` cuando la organización puede operar: sin suscripción se considera
@@ -111,12 +129,10 @@ export type ContextoSuscripcion = {
   capacidades: ReadonlySet<string>;
 };
 
-export async function contextoSuscripcion(
-  organizacionId: string,
-  db: BillingDb = getDatabase(),
-  ahora: Date = new Date(),
-): Promise<ContextoSuscripcion> {
-  const suscripcion = await getSuscripcionActual(organizacionId, db);
+function contextoDesdeSuscripcion(
+  suscripcion: SuscripcionActual | null,
+  ahora: Date,
+): ContextoSuscripcion {
   if (!suscripcion) {
     return {
       efectivo: "vigente",
@@ -135,6 +151,26 @@ export async function contextoSuscripcion(
     capacidades: new Set(suscripcion.capacidades ?? []),
   };
 }
+
+export async function contextoSuscripcion(
+  organizacionId: string,
+  db: BillingDb = getDatabase(),
+  ahora: Date = new Date(),
+): Promise<ContextoSuscripcion> {
+  const suscripcion = await getSuscripcionActual(organizacionId, db);
+  return contextoDesdeSuscripcion(suscripcion, ahora);
+}
+
+/**
+ * Versión deduplicada por request para lecturas de páginas y layouts (usa la
+ * conexión por defecto; no aplicable dentro de transacciones).
+ */
+export const contextoSuscripcionCache = cache(
+  async (organizacionId: string): Promise<ContextoSuscripcion> => {
+    const suscripcion = await getSuscripcionActualCache(organizacionId);
+    return contextoDesdeSuscripcion(suscripcion, new Date());
+  },
+);
 
 /**
  * `true` cuando el plan vigente incluye la capacidad. Una suscripción vencida
@@ -226,11 +262,11 @@ export async function validarLimiteUsuarios(
 }
 
 /**
- * Valida el límite de sucursales del plan: requiere la capacidad
- * `multisucursal` y que las sucursales activas + `adicionales` no excedan
- * `max_sucursales`. Debe llamarse con la fila de la organización bloqueada
- * (`FOR UPDATE`) dentro de la transacción para serializar altas
- * concurrentes. Sin suscripción el plan es null → sin límite.
+ * Valida el límite de sucursales del plan: las sucursales activas +
+ * `adicionales` no pueden exceder `max_sucursales` del plan vigente. Debe
+ * llamarse con la fila de la organización bloqueada (`FOR UPDATE`) dentro
+ * de la transacción para serializar altas concurrentes. Sin suscripción el
+ * plan es null → sin límite.
  */
 export async function validarLimiteSucursales(
   organizacionId: string,
@@ -247,11 +283,6 @@ export async function validarLimiteSucursales(
     .from(sucursales)
     .where(and(eq(sucursales.organizacionId, organizacionId), eq(sucursales.activo, true)));
 
-  // La primera sucursal nunca exige multisucursal: sin sucursal activa no hay
-  // operación. La capacidad aplica de la 2ª en adelante.
-  if (activas >= 1 && !ctx.capacidades.has("multisucursal")) {
-    return { ok: false, error: "Tu plan actual permite una sola sucursal. Cambia a un plan con multisucursal para agregar otra." };
-  }
   const limite = ctx.plan?.maxSucursales;
   if (limite == null) return { ok: true };
 

@@ -12,7 +12,7 @@ import { sucursales, usuarios } from "@/db/schema/core";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { requireAccessPermission } from "@/lib/auth/authorization";
 import { PlanUpgradeNotice } from "@/components/plan-gate";
-import { contextoSuscripcion } from "@/modules/billing/queries";
+import { contextoSuscripcionCache as contextoSuscripcion } from "@/modules/billing/queries";
 import { formatDate, formatTime } from "@/lib/format";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 

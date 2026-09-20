@@ -18,7 +18,7 @@ import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization
 import { formatCurrency, todayDateInput } from "@/lib/format";
 import { buildAdminHref, firstParam, normalizeDateInput } from "@/lib/url-context";
 import { listarGastos, resumenGastos } from "@/modules/gastos/queries";
-import { contextoSuscripcion } from "@/modules/billing/queries";
+import { contextoSuscripcionCache as contextoSuscripcion } from "@/modules/billing/queries";
 import { shiftDateKey } from "@/modules/agenda";
 
 export const dynamic = "force-dynamic";

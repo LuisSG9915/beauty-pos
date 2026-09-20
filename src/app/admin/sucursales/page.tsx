@@ -12,7 +12,7 @@ import { miembrosOrganizaciones, relUsuariosSucursales, sucursales, usuarios } f
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/format";
-import { contextoSuscripcion, getSuscripcionActual, tieneCapacidad } from "@/modules/billing/queries";
+import { contextoSuscripcionCache, getSuscripcionActualCache } from "@/modules/billing/queries";
 import { motivoBloqueoSucursal, puedeCrearOtraSucursal } from "@/modules/sucursales/rules";
 
 export const dynamic = "force-dynamic";
@@ -58,12 +58,17 @@ export default async function SucursalesPage({ searchParams }: Props) {
       })
       .from(relUsuariosSucursales)
       .where(eq(relUsuariosSucursales.organizacionId, organization.id)),
-    contextoSuscripcion(organization.id, db),
+    contextoSuscripcionCache(organization.id),
   ]);
 
   const [planRow] = ctx.plan?.clave
     ? await db
-        .select({ precioMensual: planes.precioMensual, precioAnual: planes.precioAnual })
+        .select({
+          precioMensual: planes.precioMensual,
+          precioAnual: planes.precioAnual,
+          sucursalesIncluidas: planes.sucursalesIncluidas,
+          precioSucursalExtra: planes.precioSucursalExtra,
+        })
         .from(planes)
         .where(eq(planes.clave, ctx.plan.clave))
         .limit(1)
@@ -71,10 +76,9 @@ export default async function SucursalesPage({ searchParams }: Props) {
 
   const activas = lista.filter((row) => row.activo).length;
   const maxSucursales = ctx.plan?.maxSucursales ?? null;
-  const multisucursal = tieneCapacidad(ctx, "multisucursal");
-  const suscripcion = ctx.plan ? await getSuscripcionActual(organization.id, db) : null;
+  const suscripcion = ctx.plan ? await getSuscripcionActualCache(organization.id) : null;
   const cubiertas = suscripcion?.sucursalesFacturadas ?? null;
-  const capacidad = { activas, multisucursal, maxSucursales, cubiertas };
+  const capacidad = { activas, maxSucursales, cubiertas };
   const puedeCrearOtra = puedeEditar && puedeCrearOtraSucursal(capacidad);
   const asignacionesPorSucursal = new Map<string, Set<string>>();
   const usuariosConAsignacion = new Set<string>();
@@ -93,7 +97,7 @@ export default async function SucursalesPage({ searchParams }: Props) {
       />
 
       <AdminCard
-        description="Cada sucursal activa se cobra por separado según tu plan. Desactivar conserva todo el historial."
+        description="Tu plan incluye sucursales en el precio base y cada adicional tiene su costo. Desactivar conserva todo el historial."
         title="Cobertura del plan"
       >
         <dl className="grid gap-3 sm:grid-cols-3">
@@ -117,17 +121,21 @@ export default async function SucursalesPage({ searchParams }: Props) {
         </dl>
         {planRow ? (
           <p className="mt-3 text-sm text-[#625b55]">
-            Precio por sucursal: {formatCurrency(Number(planRow.precioMensual), { currency })} MXN/mes
-            {planRow.precioAnual ? ` · ${formatCurrency(Number(planRow.precioAnual), { currency })} MXN/año` : ""}.
+            Tu plan: {formatCurrency(Number(planRow.precioMensual), { currency })} MXN/mes incluye{" "}
+            {planRow.sucursalesIncluidas} sucursal(es)
+            {planRow.precioSucursalExtra
+              ? ` · ${formatCurrency(Number(planRow.precioSucursalExtra), { currency })} MXN/mes por adicional`
+              : ""}
+            {planRow.precioAnual ? ` · anual ${formatCurrency(Number(planRow.precioAnual), { currency })} MXN` : ""}.
           </p>
         ) : null}
-        {!multisucursal && ctx.efectivo === "vigente" ? (
+        {maxSucursales != null && activas >= maxSucursales && ctx.efectivo === "vigente" ? (
           <p className="mt-4 rounded-xl bg-[#f6efe9] px-4 py-3 text-sm text-[#5f5347]">
-            Tu plan actual permite una sola sucursal.{" "}
+            Tu plan permite hasta {maxSucursales} sucursal(es).{" "}
             <Link className="font-medium text-[#8f3f2c] underline" href={`/admin/suscripcion?organizationId=${organization.id}`}>
               Cambia a Profesional
             </Link>{" "}
-            para multisucursal con reportes consolidados.
+            para más sucursales y reportes consolidados.
           </p>
         ) : null}
         {cubiertas != null && activas >= cubiertas ? (

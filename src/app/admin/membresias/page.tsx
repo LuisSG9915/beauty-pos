@@ -16,7 +16,7 @@ import { requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/format";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { PlanUpgradeNotice } from "@/components/plan-gate";
-import { contextoSuscripcion } from "@/modules/billing/queries";
+import { contextoSuscripcionCache as contextoSuscripcion } from "@/modules/billing/queries";
 
 export const dynamic = "force-dynamic";
 

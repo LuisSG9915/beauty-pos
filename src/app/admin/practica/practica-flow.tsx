@@ -191,7 +191,7 @@ export function PracticaFlow({
               </p>
             </div>
             <p className="mt-3 text-sm leading-6 text-[#625b55]">
-              Cuando la clienta llegue, cobras desde la misma cita o desde el POS. Vamos a cobrarla.
+              Cuando la clienta llegue, cobras desde la misma cita o desde Cobrar. Vamos a cobrarla.
             </p>
             <Button className="mt-5" onClick={() => setPaso(4)} type="button">
               Cobrar {money.format(elegido.precio)}

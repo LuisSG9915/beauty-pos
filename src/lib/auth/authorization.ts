@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation";
-import { and, desc, eq } from "drizzle-orm";
+import { cache } from "react";
+import { and, eq } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
 import { catPermisos, catRoles, relMiembrosRoles, relRolesPermisos } from "@/db/schema/access";
-import { suscripciones } from "@/db/schema/billing";
-import { miembrosOrganizaciones, relUsuariosSucursales, sucursales } from "@/db/schema/core";
-import { requireAuthenticatedUser } from "@/lib/auth/access";
+import { relUsuariosSucursales, sucursales } from "@/db/schema/core";
+import { getMembershipId, requireAuthenticatedUser } from "@/lib/auth/access";
+import { getSuscripcionActualCache } from "@/modules/billing/queries";
 import { esPermisoSoloLectura, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
 
 type AuthUser = Awaited<ReturnType<typeof requireAuthenticatedUser>>["user"];
@@ -56,7 +57,10 @@ export function canAccessBranch(access: ResolvedAccess, sucursalId: string): boo
  * miembro activo de la organización. La usa el shell para precalcular permisos
  * por organización.
  */
-export async function resolveAccessSafe(
+// Cache por request: el layout precalcula el acceso por organización y la
+// página lo reutiliza; `user` llega del `requireAuthenticatedUser` cacheado,
+// así que la identidad del objeto es estable dentro del mismo render.
+export const resolveAccessSafe = cache(async function resolveAccessSafe(
   organizationId: string,
   user: AuthUser,
 ): Promise<ResolvedAccess | null> {
@@ -74,21 +78,10 @@ export async function resolveAccessSafe(
     };
   }
 
-  const [membership] = await db
-    .select({ id: miembrosOrganizaciones.id })
-    .from(miembrosOrganizaciones)
-    .where(
-      and(
-        eq(miembrosOrganizaciones.organizacionId, organizationId),
-        eq(miembrosOrganizaciones.usuarioId, user.id),
-        eq(miembrosOrganizaciones.estado, "activo"),
-      ),
-    )
-    .limit(1);
+  const membershipId = await getMembershipId(organizationId, user.id);
+  if (!membershipId) return null;
 
-  if (!membership) return null;
-
-  const [permissionRows, branchRows, suscripcionRows] = await Promise.all([
+  const [permissionRows, branchRows, suscripcion] = await Promise.all([
     db
       .select({ clave: catPermisos.clave })
       .from(relMiembrosRoles)
@@ -97,7 +90,7 @@ export async function resolveAccessSafe(
       .innerJoin(catPermisos, eq(relRolesPermisos.permisoId, catPermisos.id))
       .where(
         and(
-          eq(relMiembrosRoles.miembroOrganizacionId, membership.id),
+          eq(relMiembrosRoles.miembroOrganizacionId, membershipId),
           eq(catRoles.activo, true),
           eq(catPermisos.activo, true),
         ),
@@ -113,28 +106,19 @@ export async function resolveAccessSafe(
           eq(sucursales.activo, true),
         ),
       ),
-    db
-      .select({
-        estado: suscripciones.estado,
-        trialTerminaAt: suscripciones.trialTerminaAt,
-        periodoTerminaAt: suscripciones.periodoTerminaAt,
-      })
-      .from(suscripciones)
-      .where(eq(suscripciones.organizacionId, organizationId))
-      .orderBy(desc(suscripciones.createdAt))
-      .limit(1),
+    getSuscripcionActualCache(organizationId),
   ]);
 
   return {
     user,
     organizationId,
-    membershipId: membership.id,
+    membershipId,
     permissions: new Set(permissionRows.map((row) => row.clave)),
     branchIds: branchRows.length ? new Set(branchRows.map((row) => row.sucursalId)) : null,
     esPlataforma: false,
-    soloLectura: estadoEfectivoSuscripcion(suscripcionRows[0] ?? null) === "vencida",
+    soloLectura: estadoEfectivoSuscripcion(suscripcion) === "vencida",
   };
-}
+});
 
 export async function resolveAccess(organizationId: string): Promise<ResolvedAccess> {
   const { user } = await requireAuthenticatedUser();

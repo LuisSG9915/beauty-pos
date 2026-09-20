@@ -8,6 +8,7 @@ import { billingEventos, pagosSuscripcion, planes, suscripciones } from "@/db/sc
 import { sucursales } from "@/db/schema/core";
 import { auditEvent } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth/access";
+import { cotizarSuscripcion, planPreciosDesdeFila } from "@/modules/billing/precios";
 import { revalidatePath } from "next/cache";
 
 const pagoManualSchema = z.object({
@@ -16,7 +17,6 @@ const pagoManualSchema = z.object({
   periodicidad: z.enum(["mensual", "anual"]),
   sucursalesFacturadas: z.coerce.number().int().min(1).max(50),
   meses: z.coerce.number().int().min(1).max(24),
-  monto: z.coerce.number().min(0),
   referencia: z.string().trim().max(160).optional(),
 });
 
@@ -40,7 +40,6 @@ export async function registrarPagoSuscripcion(
     periodicidad: formData.get("periodicidad"),
     sucursalesFacturadas: formData.get("sucursalesFacturadas"),
     meses: formData.get("meses"),
-    monto: formData.get("monto"),
     referencia: formData.get("referencia") || undefined,
   });
   if (!input.success) {
@@ -56,9 +55,16 @@ export async function registrarPagoSuscripcion(
         .where(eq(planes.clave, input.data.planClave))
         .limit(1);
       if (!plan) throw new Error("plan-invalido");
-      if (input.data.periodicidad === "anual" && !plan.precioAnual) {
-        throw new Error("plan-sin-anual");
-      }
+
+      // El monto se cotiza en servidor desde el catálogo — nunca se confía
+      // en un importe enviado por el cliente. El resultado queda como
+      // snapshot del contrato en la suscripción y en el pago.
+      const cotizacion = cotizarSuscripcion(planPreciosDesdeFila(plan), {
+        periodicidad: input.data.periodicidad,
+        sucursalesFacturadas: input.data.sucursalesFacturadas,
+        meses: input.data.meses,
+      });
+      if (!cotizacion.ok) throw new Error(`cotizacion-${cotizacion.error}`);
 
       // La cobertura aplicada no puede quedar por debajo del uso real:
       // primero se desactivan las sucursales excedentes.
@@ -90,6 +96,9 @@ export async function registrarPagoSuscripcion(
         estado: "activa" as const,
         periodicidad: input.data.periodicidad,
         sucursalesFacturadas: input.data.sucursalesFacturadas,
+        sucursalesIncluidas: cotizacion.sucursalesIncluidas,
+        precioUnitario: cotizacion.precioUnitario.toFixed(2),
+        precioSucursalExtra: cotizacion.extras > 0 ? cotizacion.precioExtraUnitario.toFixed(2) : null,
         periodoIniciaAt: ahora,
         periodoTerminaAt: termina,
         canceladaAt: null,
@@ -111,15 +120,10 @@ export async function registrarPagoSuscripcion(
 
       // Snapshot del precio contratado: el plan puede cambiar después sin
       // reescribir el historial.
-      const precioUnitario =
-        input.data.periodicidad === "anual"
-          ? (plan.precioAnual ?? plan.precioMensual)
-          : plan.precioMensual;
-
       await tx.insert(pagosSuscripcion).values({
         suscripcionId,
         organizacionId: input.data.organizacionId,
-        monto: input.data.monto.toFixed(2),
+        monto: cotizacion.monto.toFixed(2),
         moneda: "MXN",
         proveedor: "manual",
         referencia: input.data.referencia ?? null,
@@ -128,7 +132,7 @@ export async function registrarPagoSuscripcion(
         planClave: plan.clave,
         periodicidad: input.data.periodicidad,
         sucursalesFacturadas: input.data.sucursalesFacturadas,
-        precioUnitario,
+        precioUnitario: cotizacion.precioUnitario.toFixed(2),
         estado: "confirmado",
         createdBy: user.id,
         updatedBy: user.id,
@@ -145,6 +149,11 @@ export async function registrarPagoSuscripcion(
           planClave: plan.clave,
           periodicidad: input.data.periodicidad,
           sucursalesFacturadas: input.data.sucursalesFacturadas,
+          sucursalesIncluidas: cotizacion.sucursalesIncluidas,
+          extras: cotizacion.extras,
+          precioUnitario: cotizacion.precioUnitario,
+          precioExtraUnitario: cotizacion.precioExtraUnitario,
+          monto: cotizacion.monto,
         },
       });
 
@@ -156,7 +165,8 @@ export async function registrarPagoSuscripcion(
         entidadId: suscripcionId,
         detalle: {
           meses: input.data.meses,
-          monto: input.data.monto,
+          monto: cotizacion.monto,
+          extras: cotizacion.extras,
           referencia: input.data.referencia,
           plan: plan.clave,
           periodicidad: input.data.periodicidad,
@@ -169,8 +179,17 @@ export async function registrarPagoSuscripcion(
     if (message === "plan-invalido") {
       return { error: "El plan elegido no existe." };
     }
-    if (message === "plan-sin-anual") {
+    if (message === "cotizacion-sin-precio-anual") {
       return { error: "Ese plan no tiene precio anual configurado." };
+    }
+    if (message === "cotizacion-extras-no-permitidos") {
+      return { error: "Ese plan no permite más sucursales que las incluidas. Elige un plan con mayor cobertura." };
+    }
+    if (message === "cotizacion-anual-requiere-12") {
+      return { error: "Los pagos anuales se registran en periodos de 12 meses." };
+    }
+    if (message.startsWith("cotizacion-")) {
+      return { error: "No se pudo calcular el monto con esos datos." };
     }
     if (message === "cobertura-insuficiente") {
       return { error: "La organización tiene más sucursales activas que la cobertura elegida. Desactiva las excedentes primero." };

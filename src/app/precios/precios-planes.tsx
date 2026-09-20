@@ -12,6 +12,8 @@ export type PlanPrecioCard = {
   descripcion: string;
   precioMensual: string;
   precioAnual: string | null;
+  sucursalesIncluidas: number;
+  precioSucursalExtra: string | null;
   moneda: string;
   destacado: boolean;
   maxSucursales: number | null;
@@ -85,9 +87,13 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
         {planes.map((plan) => {
           const mensual = Number(plan.precioMensual);
           const anualMonto = plan.precioAnual ? Number(plan.precioAnual) : null;
+          const extraMensual = plan.precioSucursalExtra ? Number(plan.precioSucursalExtra) : 0;
+          const extras = Math.max(0, sucursales - plan.sucursalesIncluidas);
           const excedeMax = plan.maxSucursales != null && sucursales > plan.maxSucursales;
-          const total = anual && anualMonto ? anualMonto * sucursales : mensual * sucursales;
-          const equivMensual = anual && anualMonto ? (anualMonto / 12) * sucursales : null;
+          const total = anual && anualMonto
+            ? anualMonto + extras * extraMensual * 10
+            : mensual + extras * extraMensual;
+          const equivMensual = anual && anualMonto ? total / 12 : null;
 
           return (
             <article
@@ -120,19 +126,22 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
                     <span className="text-sm text-[#8a7b72]">
                       {" "}
                       / {anual ? "año" : "mes"}
-                      {sucursales > 1 ? ` · ${sucursales} sucursales` : " por sucursal"}
+                      {sucursales > 1 ? ` · ${sucursales} sucursales` : ""}
                     </span>
                   </p>
                   {equivMensual !== null ? (
                     <p className="mt-1 text-xs text-[#8a7b72]">
                       Equivale a {formatoPrecio(equivMensual, plan.moneda)}/mes — ahorras{" "}
-                      {formatoPrecio(mensual * 12 * sucursales - total, plan.moneda)} al año.
+                      {formatoPrecio((mensual + extras * extraMensual) * 12 - total, plan.moneda)} al año.
                     </p>
                   ) : (
                     <p className="mt-1 text-xs text-[#8a7b72]">
-                      {sucursales > 1
-                        ? `${formatoPrecio(mensual, plan.moneda)} por sucursal al mes`
-                        : "Precio por sucursal al mes"}
+                      Incluye {plan.sucursalesIncluidas} sucursal(es)
+                      {extras > 0
+                        ? ` + ${extras} × ${formatoPrecio(extraMensual, plan.moneda)}`
+                        : plan.precioSucursalExtra
+                          ? ` · adicional ${formatoPrecio(extraMensual, plan.moneda)}/mes`
+                          : ""}
                     </p>
                   )}
                 </>

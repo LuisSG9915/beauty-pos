@@ -13,7 +13,7 @@ import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
 import { clientes } from "@/db/schema/core";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
-import { requireAccessPermission } from "@/lib/auth/authorization";
+import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 
 export const dynamic = "force-dynamic";
@@ -54,13 +54,15 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
     <div className="space-y-6">
       <AdminPageHeader
         actions={
-          <Button
-            nativeButton={false}
-            render={<Link href={`/admin/clientes/export?organizationId=${organizationId}`} />}
-            variant="outline"
-          >
-            Exportar CSV para Excel
-          </Button>
+          hasPermission(context.access, "clientes.exportar") ? (
+            <Button
+              nativeButton={false}
+              render={<Link href={`/admin/clientes/export?organizationId=${organizationId}`} />}
+              variant="outline"
+            >
+              Exportar CSV para Excel
+            </Button>
+          ) : null
         }
         description="Directorio de clientes de la organización."
         title="Clientes"

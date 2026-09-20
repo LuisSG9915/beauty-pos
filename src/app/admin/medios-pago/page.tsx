@@ -90,7 +90,7 @@ export default async function PaymentMethodsPage({ searchParams }: { searchParam
           title="Medios registrados"
         >
           {methods.length === 0 ? (
-            <EmptyState description="Crea medios de pago como efectivo, tarjeta o transferencia para el POS." title="No hay medios de pago" />
+            <EmptyState description="Crea medios de pago como efectivo, tarjeta o transferencia para Cobrar." title="No hay medios de pago" />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[520px] text-left text-sm">

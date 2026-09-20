@@ -81,11 +81,11 @@ export default async function PosPage({ searchParams }: { searchParams: SearchPa
       />
       <AdminPageHeader
         breadcrumbs={[
-          { label: "Punto de venta", href: buildAdminHref("/pos", { organizationId, sucursalId: ticket.venta.sucursalId }) },
+          { label: "Cobrar", href: buildAdminHref("/pos", { organizationId, sucursalId: ticket.venta.sucursalId }) },
           { label: "Ticket" },
         ]}
         description="Revisa el ticket, agrega líneas y confirma el cobro."
-        title="Panel de venta"
+        title="Cobrar"
       />
       <VentaTicket
         anticipoAplicado={ticket.anticipoAplicado}
@@ -167,7 +167,7 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
           </Button>
         }
         description="Abre una venta directa o continúa una venta del día en la sucursal seleccionada."
-        title="Punto de venta"
+        title="Cobrar"
       />
       <div className="grid gap-6 lg:grid-cols-2">
         <AdminCard description="Venta directa sin cita: productos y servicios al momento." title="Nueva venta (walk-in)">

@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 
 import { registrarPagoSuscripcion } from "@/app/admin/billing-actions";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
+import { cotizarSuscripcion, planPreciosDesdeFila, type Periodicidad } from "@/modules/billing/precios";
 
 export type EstadoSuscripcionAdmin =
   | { tipo: "sin-suscripcion" }
@@ -18,6 +19,8 @@ export type PlanOpcion = {
   nombre: string;
   precioMensual: string;
   precioAnual: string | null;
+  sucursalesIncluidas: number;
+  precioSucursalExtra: string | null;
 };
 
 /** Última solicitud de cambio pendiente: pre-llena el formulario del admin. */
@@ -69,6 +72,22 @@ export function SuscripcionAdminRow({
   const [state, formAction, isPending] = useActionState(registrarPagoSuscripcion, {});
   const badge = estadoLabel(estado);
 
+  const [planClave, setPlanClave] = useState(sugerida?.planClave ?? planes[0]?.clave ?? "");
+  const [periodicidad, setPeriodicidad] = useState<Periodicidad>(sugerida?.periodicidad ?? "mensual");
+  const [facturadas, setFacturadas] = useState(sugerida?.sucursales ?? 1);
+  const [meses, setMeses] = useState(sugerida?.periodicidad === "anual" ? 12 : 1);
+
+  const planSel = planes.find((p) => p.clave === planClave);
+  const cotizacion = planSel
+    ? cotizarSuscripcion(planPreciosDesdeFila(planSel), {
+        periodicidad,
+        sucursalesFacturadas: facturadas,
+        meses,
+      })
+    : null;
+  const fmtMonto = (v: number) =>
+    new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 }).format(v);
+
   return (
     <div className="rounded-xl border border-[#eee6e0] px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -84,7 +103,13 @@ export function SuscripcionAdminRow({
           <input name="organizacionId" type="hidden" value={organizationId} />
           <Field>
             <FieldLabel required>Plan</FieldLabel>
-            <select className={selectClass} defaultValue={sugerida?.planClave ?? planes[0]?.clave} name="planClave" required>
+            <select
+              className={selectClass}
+              name="planClave"
+              onChange={(e) => setPlanClave(e.target.value)}
+              required
+              value={planClave}
+            >
               {planes.map((plan) => (
                 <option key={plan.clave} value={plan.clave}>
                   {plan.nombre}
@@ -94,22 +119,53 @@ export function SuscripcionAdminRow({
           </Field>
           <Field>
             <FieldLabel required>Periodicidad</FieldLabel>
-            <select className={selectClass} defaultValue={sugerida?.periodicidad ?? "mensual"} name="periodicidad" required>
+            <select
+              className={selectClass}
+              name="periodicidad"
+              onChange={(e) => {
+                const modo = e.target.value as Periodicidad;
+                setPeriodicidad(modo);
+                if (modo === "anual") setMeses(12);
+              }}
+              required
+              value={periodicidad}
+            >
               <option value="mensual">Mensual</option>
               <option value="anual">Anual</option>
             </select>
           </Field>
           <Field>
             <FieldLabel required>Sucursales</FieldLabel>
-            <Input defaultValue={sugerida?.sucursales ?? 1} min={1} max={50} name="sucursalesFacturadas" required type="number" />
+            <Input
+              max={50}
+              min={1}
+              name="sucursalesFacturadas"
+              onChange={(e) => setFacturadas(Number(e.target.value) || 1)}
+              required
+              type="number"
+              value={facturadas}
+            />
           </Field>
           <Field>
             <FieldLabel required>Meses cubiertos</FieldLabel>
-            <Input defaultValue={sugerida?.periodicidad === "anual" ? 12 : 1} min={1} max={24} name="meses" required type="number" />
+            <Input
+              max={24}
+              min={1}
+              name="meses"
+              onChange={(e) => setMeses(Number(e.target.value) || 1)}
+              required
+              type="number"
+              value={meses}
+            />
           </Field>
           <Field>
-            <FieldLabel required>Monto (MXN)</FieldLabel>
-            <Input min={0} name="monto" placeholder="0.00" required step="0.01" type="number" />
+            <FieldLabel>Total a cobrar</FieldLabel>
+            <p className="rounded-xl border border-[#e5ddd6] bg-[#faf6f3] px-3 py-2 text-sm font-semibold text-[#2d2926]">
+              {cotizacion?.ok
+                ? `${fmtMonto(cotizacion.monto)} MXN${cotizacion.extras > 0 ? ` (${cotizacion.extras} extra × ${fmtMonto(cotizacion.precioExtraUnitario)})` : ""}`
+                : "—"}
+            </p>
+            <p className="mt-1 text-[11px] text-[#95877e]">Se calcula del catálogo al confirmar.</p>
           </Field>
           <Field>
             <FieldLabel>Referencia</FieldLabel>

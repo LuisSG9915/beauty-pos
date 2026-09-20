@@ -58,7 +58,7 @@ export function PoliticaCajaToggle({
         <span className="font-medium text-[#2d2926]">Exigir corte abierto para cobrar</span>
         <span className="block text-xs text-[#81746c]">
           {exigir
-            ? "El POS rechaza cobros mientras no haya corte abierto."
+            ? "El cobro se rechaza mientras no haya corte abierto."
             : "Se puede cobrar sin corte; la venta se asocia al corte si existe."}
         </span>
       </span>

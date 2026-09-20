@@ -11,7 +11,7 @@ import { hasPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate, formatTime, todayDateInput } from "@/lib/format";
 import { firstParam, normalizeDateInput } from "@/lib/url-context";
 import { resolveTimeZone, shiftDateKey } from "@/modules/agenda";
-import { tieneCapacidadOrganizacion } from "@/modules/billing/queries";
+import { contextoSuscripcionCache, tieneCapacidad } from "@/modules/billing/queries";
 import {
   cargarAgregadosAnteriores,
   cargarReporte,
@@ -113,7 +113,8 @@ export default async function ReportesPage({ searchParams }: Props) {
   // Vista consolidada (Profesional): `sucursalId=todas` suma todas las
   // sucursales del alcance del usuario. La zona del reporte es explícita —
   // la de la organización — para no mezclar días de zonas distintas.
-  const multisucursal = await tieneCapacidadOrganizacion(organization.id, "multisucursal", db);
+  const suscripcionCtx = await contextoSuscripcionCache(organization.id);
+  const multisucursal = tieneCapacidad(suscripcionCtx, "multisucursal");
   const consolidado =
     firstParam(params.sucursalId) === "todas" && multisucursal && context.branches.length > 1;
   const reportTimeZone = consolidado ? resolveTimeZone(null, organization.zonaHoraria) : timeZone;
@@ -128,16 +129,42 @@ export default async function ReportesPage({ searchParams }: Props) {
   const anterior = periodoAnterior(desde, hasta);
 
   const fmt = (v: string | number | null | undefined) => formatCurrency(num(v), { currency });
-  const reporte = await cargarReporte(db, {
-    organizacionId: organization.id,
-    sucursalId: sucursalReporte,
-    timeZone: reportTimeZone,
-    desde,
-    hasta,
-    operativos: puedeOperativos,
-    financieros: puedeFinancieros,
-    sucursalesPermitidas: permitidas,
-  });
+  const [reporte, agregadosAnteriores, comparativo] = await Promise.all([
+    cargarReporte(db, {
+      organizacionId: organization.id,
+      sucursalId: sucursalReporte,
+      timeZone: reportTimeZone,
+      desde,
+      hasta,
+      operativos: puedeOperativos,
+      financieros: puedeFinancieros,
+      sucursalesPermitidas: permitidas,
+    }),
+    anterior
+      ? cargarAgregadosAnteriores(db, {
+          organizacionId: organization.id,
+          sucursalId: sucursalReporte,
+          timeZone: reportTimeZone,
+          desde: anterior.desde,
+          hasta: anterior.hasta,
+          operativos: puedeOperativos,
+          financieros: puedeFinancieros,
+          sucursalesPermitidas: permitidas,
+        })
+      : Promise.resolve({ ventasAnt: [{ total: "0", operaciones: 0 }], citasAnt: [] }),
+    // Comparativo por sucursal: solo en vista consolidada.
+    consolidado
+      ? comparativoSucursales(db, {
+          organizacionId: organization.id,
+          sucursalesPermitidas: permitidas,
+          timeZone: reportTimeZone,
+          desde,
+          hasta,
+          operativos: puedeOperativos,
+          financieros: puedeFinancieros,
+        })
+      : Promise.resolve([]),
+  ]);
   if (!reporte) notFound();
   const {
     citasPorEstado,
@@ -158,31 +185,7 @@ export default async function ReportesPage({ searchParams }: Props) {
     anticiposResumen,
     productosSinCosto,
   } = reporte;
-  const { ventasAnt, citasAnt } = anterior
-    ? await cargarAgregadosAnteriores(db, {
-        organizacionId: organization.id,
-        sucursalId: sucursalReporte,
-        timeZone: reportTimeZone,
-        desde: anterior.desde,
-        hasta: anterior.hasta,
-        operativos: puedeOperativos,
-        financieros: puedeFinancieros,
-        sucursalesPermitidas: permitidas,
-      })
-    : { ventasAnt: [{ total: "0", operaciones: 0 }], citasAnt: [] };
-
-  // Comparativo por sucursal: solo en vista consolidada.
-  const comparativo = consolidado
-    ? await comparativoSucursales(db, {
-        organizacionId: organization.id,
-        sucursalesPermitidas: permitidas,
-        timeZone: reportTimeZone,
-        desde,
-        hasta,
-        operativos: puedeOperativos,
-        financieros: puedeFinancieros,
-      })
-    : [];
+  const { ventasAnt, citasAnt } = agregadosAnteriores;
 
   // KPIs operativos
   const { totalCitas, asistencia } = derivarCitas(citasPorEstado);

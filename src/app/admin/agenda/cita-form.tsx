@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState, useActionState } from "react";
 import { saveCita, type CitaActionState } from "@/app/admin/agenda/actions";
 import { FormTabs } from "@/components/form-tabs";
 import { Button } from "@/components/ui/button";
-import { Combobox } from "@/components/ui/combobox";
+import { RemoteCombobox } from "@/components/ui/remote-combobox";
 import {
   Field,
   FieldDescription,
@@ -24,6 +24,9 @@ type CitaData = {
   organizacionId: string;
   sucursalId: string;
   clienteId?: string | null;
+  /** Nombre/teléfono del cliente actual para mostrarlo sin una búsqueda previa. */
+  clienteNombre?: string | null;
+  clienteTelefono?: string | null;
   usuarioId?: string | null;
   fechaHora: string;
   duracionMinutos: number;
@@ -51,7 +54,6 @@ function toBranchDateTimeInput(value: string, timeZone: string) {
 export function CitaForm({
   organizationId,
   sucursal,
-  clientes,
   staff,
   servicios,
   recursos = [],
@@ -62,7 +64,6 @@ export function CitaForm({
 }: {
   organizationId: string;
   sucursal: { id: string; nombre: string; clave: string };
-  clientes: Array<{ id: string; nombre: string; telefono: string | null }>;
   staff: Array<{ id: string; nombre: string }>;
   servicios: Array<{ id: string; nombre: string; precioBase: string; duracionMinutos: number }>;
   recursos?: Array<{ id: string; nombre: string; tipo: string; capacidad: number }>;
@@ -131,17 +132,20 @@ export function CitaForm({
         <Input readOnly value={`${sucursal.nombre} · ${sucursal.clave}`} />
         <FieldDescription>Las citas se crean dentro de la sucursal seleccionada.</FieldDescription>
       </Field>
-      <Combobox
-        defaultValue={initial?.clienteId ?? null}
-        items={clientes.map((cliente) => ({
-          value: cliente.id,
-          label: cliente.nombre,
-          description: cliente.telefono ?? undefined,
-          keywords: [cliente.telefono ?? ""],
-        }))}
+      <RemoteCombobox
+        initialItem={
+          initial?.clienteId
+            ? {
+                value: initial.clienteId,
+                label: initial.clienteNombre ?? "Cliente",
+                description: initial.clienteTelefono ?? undefined,
+              }
+            : null
+        }
         label="Cliente"
         name="clienteId"
         placeholder="Buscar cliente o dejar walk-in"
+        searchUrl={`/api/clientes?organizationId=${organizationId}`}
       />
       <Field>
         <FieldLabel required>Fecha y hora</FieldLabel>

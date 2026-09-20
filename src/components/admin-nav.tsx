@@ -55,7 +55,7 @@ export type AdminNavSection = {
 const OPERACION: AdminNavItem[] = [
   { path: "/admin/agenda", label: "Agenda", description: "Citas, estados y venta en proceso", icon: Calendar, permiso: "agenda.ver" },
   { path: "/admin/mi-dia", label: "Mi día", description: "Tus citas, propinas y comisiones de hoy", icon: CalendarCheck, permiso: "agenda.ver" },
-  { path: "/admin/pos", label: "POS", description: "Ventas directas y cobro de citas", icon: ShoppingCart, permiso: "ventas.ver" },
+  { path: "/admin/pos", label: "Cobrar", description: "Ventas directas y cobro de citas", icon: ShoppingCart, permiso: "ventas.ver" },
   { path: "/admin/ventas", label: "Historial", description: "Busca tickets, devoluciones y cancelaciones", icon: ReceiptText, permiso: "ventas.ver" },
   { path: "/admin/caja", label: "Caja", description: "Apertura, cierre ciego y discrepancias", icon: Wallet, permiso: "caja.ver" },
   { path: "/admin/clientes", label: "Clientes", description: "Expedientes, contacto y seguimiento", icon: Users, permiso: "clientes.ver" },
@@ -245,7 +245,7 @@ export function AdminNav({
 const TAB_BAR: AdminNavItem[] = [OPERACION[0], OPERACION[1], OPERACION[2]];
 
 /**
- * Tab bar inferior para teléfono/tablet (<md): Agenda · Mi día · POS.
+ * Tab bar inferior para teléfono/tablet (<md): Agenda · Mi día · Cobrar.
  * Targets de 56 px y fijo al borde inferior para uso con una mano.
  */
 export function AdminTabBar({ organizationId, sucursalId, activePath, permissions }: NavContext) {

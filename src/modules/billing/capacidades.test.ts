@@ -34,11 +34,12 @@ describe("catálogo de planes", () => {
     expect(esencial.capacidades).not.toContain("reservas_auto_confirmar");
   });
 
-  it("el plan del trial (crecimiento) tiene 14 días y límites definidos", () => {
+  it("el plan del trial (crecimiento) tiene 14 días y cubre 2 sucursales", () => {
     const crecimiento = planCatalogoPorClave("crecimiento")!;
     expect(crecimiento.trialDias).toBe(14);
     expect(crecimiento.maxUsuarios).toBe(8);
-    expect(crecimiento.maxSucursales).toBe(1);
+    expect(crecimiento.maxSucursales).toBe(2);
+    expect(crecimiento.sucursalesIncluidas).toBe(2);
     expect(crecimiento.recomendado).toBe(true);
   });
 
@@ -50,6 +51,23 @@ describe("catálogo de planes", () => {
         expect(Number(plan.precioAnual)).toBe(mensual * 10);
       }
     }
+  });
+
+  it("la cobertura incluida es coherente con los topes del plan", () => {
+    for (const plan of PLANES_CATALOGO) {
+      expect(plan.sucursalesIncluidas).toBeGreaterThanOrEqual(1);
+      if (plan.maxSucursales != null) {
+        expect(plan.sucursalesIncluidas).toBeLessThanOrEqual(plan.maxSucursales);
+      }
+      // Sin precio de extra el máximo no puede superar lo incluido.
+      if (plan.precioSucursalExtra == null && plan.maxSucursales != null) {
+        expect(plan.maxSucursales).toBeLessThanOrEqual(plan.sucursalesIncluidas);
+      }
+    }
+    const profesional = planCatalogoPorClave("profesional")!;
+    expect(profesional.sucursalesIncluidas).toBe(3);
+    expect(profesional.maxSucursales).toBeNull();
+    expect(Number(profesional.precioSucursalExtra)).toBeGreaterThan(0);
   });
 });
 

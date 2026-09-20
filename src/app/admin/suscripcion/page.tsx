@@ -14,7 +14,7 @@ import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDateTime } from "@/lib/format";
 import { CAPACIDADES, type CapacidadClave } from "@/modules/billing/capacidades";
-import { getPlanesActivos, getSuscripcionActual } from "@/modules/billing/queries";
+import { getPlanesActivos, getSuscripcionActualCache } from "@/modules/billing/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion, type EstadoEfectivo } from "@/modules/billing/rules";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +54,7 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
   const ahora = new Date();
 
   const [actual, planesCatalogo, uso, sucursalesActivas, pagos, eventos] = await Promise.all([
-    getSuscripcionActual(organizationId),
+    getSuscripcionActualCache(organizationId),
     getPlanesActivos(),
     db
       .select({
@@ -124,8 +124,15 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
                   <p className="text-lg font-semibold text-[#2d2926]">{actual.planNombre ?? "Plan desconocido"}</p>
                   <p className="text-sm text-[#81746c]">
                     {actual.periodicidad === "anual" ? "Facturación anual" : "Facturación mensual"} ·{" "}
-                    {actual.sucursalesFacturadas} sucursal(es)
+                    {actual.sucursalesFacturadas} sucursal(es) cubierta(s)
                   </p>
+                  {actual.precioUnitario ? (
+                    <p className="text-xs text-[#95877e]">
+                      Contratado: {fmt(actual.precioUnitario)} por periodo
+                      {actual.sucursalesIncluidas != null ? ` (incluye ${actual.sucursalesIncluidas})` : ""}
+                      {actual.precioSucursalExtra ? ` + ${fmt(actual.precioSucursalExtra)} por adicional` : ""}
+                    </p>
+                  ) : null}
                 </div>
                 <StatusBadge tone={ESTADO_TONO[efectivo]}>
                   {estadoTexto(efectivo, actual.estado, diasTrial, actual.periodoTerminaAt)}
@@ -177,7 +184,7 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
       </div>
 
       <AdminCard
-        description="Precio por sucursal, IVA incluido. El cambio se confirma por transferencia antes de aplicarse."
+        description="El precio base incluye sucursales según el plan; cada adicional tiene su precio. IVA incluido. El cambio se confirma por transferencia antes de aplicarse."
         title="Cambiar de plan"
       >
         <div className="grid gap-4 md:grid-cols-3">
@@ -194,11 +201,19 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
                 </div>
                 <p className="mt-1 text-xs leading-5 text-[#81746c]">{plan.descripcion}</p>
                 <p className="mt-3 text-lg font-semibold text-[#2d2926]">
-                  {fmt(plan.precioMensual)} <span className="text-xs font-normal text-[#81746c]">/mes por sucursal</span>
+                  {fmt(plan.precioMensual)} <span className="text-xs font-normal text-[#81746c]">/mes</span>
+                </p>
+                <p className="text-xs text-[#81746c]">
+                  Incluye {plan.sucursalesIncluidas} sucursal(es)
+                  {plan.precioSucursalExtra
+                    ? ` · ${fmt(plan.precioSucursalExtra)}/mes por sucursal adicional`
+                    : plan.maxSucursales != null && plan.maxSucursales > plan.sucursalesIncluidas
+                      ? ` (máx. ${plan.maxSucursales})`
+                      : ""}
                 </p>
                 {plan.precioAnual ? (
                   <p className="text-xs text-[#81746c]">
-                    o {fmt(plan.precioAnual)} /año por sucursal (equivale a {fmt(Number(plan.precioAnual) / 12)}/mes)
+                    o {fmt(plan.precioAnual)} /año (equivale a {fmt(Number(plan.precioAnual) / 12)}/mes)
                   </p>
                 ) : null}
                 {puedeEditar && !esActual ? (

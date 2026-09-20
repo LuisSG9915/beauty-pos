@@ -32,8 +32,8 @@ function beneficiosPlan(input: {
     input.maxSucursales == null
       ? "Sucursales sin límite"
       : input.maxSucursales === 1
-        ? "1 sucursal"
-        : `Hasta ${input.maxSucursales} sucursales`,
+        ? "1 sucursal incluida"
+        : `Hasta ${input.maxSucursales} sucursales incluidas`,
     input.maxUsuarios == null ? "Usuarios sin límite" : `Hasta ${input.maxUsuarios} usuarios`,
   ];
   const caps = input.capacidades.flatMap((c) => {
@@ -58,6 +58,8 @@ const planesFallback: PlanCard[] = PLANES_CATALOGO.map((p) => ({
   descripcion: p.descripcion,
   precioMensual: p.precioMensual,
   precioAnual: p.precioAnual,
+  sucursalesIncluidas: p.sucursalesIncluidas,
+  precioSucursalExtra: p.precioSucursalExtra,
   moneda: "MXN",
   destacado: p.recomendado,
   maxSucursales: p.maxSucursales,
@@ -74,6 +76,8 @@ async function cargarPlanes(): Promise<PlanCard[]> {
       descripcion: row.descripcion ?? "",
       precioMensual: row.precioMensual,
       precioAnual: row.precioAnual,
+      sucursalesIncluidas: row.sucursalesIncluidas,
+      precioSucursalExtra: row.precioSucursalExtra,
       moneda: row.moneda,
       destacado: row.recomendado,
       maxSucursales: row.maxSucursales,
@@ -131,9 +135,10 @@ export default async function PreciosPage() {
             <div>
               <p className="font-semibold text-[#292522]">¿Cómo funciona el precio por sucursal?</p>
               <p className="mt-1">
-                Cada sucursal activa de tu negocio paga el plan elegido. Si tienes
-                una sola ubicación, el precio es el que ves; al crecer, sumas el
-                mismo precio por cada sucursal nueva.
+                Cada plan incluye sucursales en su precio base: Esencial 1,
+                Crecimiento hasta 2 y Profesional 3. En Profesional, cada
+                sucursal adicional a la tercera suma un precio fijo mensual —
+                el pago anual equivale a 10 mensualidades.
               </p>
             </div>
             <div>

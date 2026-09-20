@@ -32,12 +32,17 @@ export const planes = pgTable(
     clave: varchar("clave", { length: 40 }).notNull(),
     nombre: varchar("nombre", { length: 120 }).notNull(),
     descripcion: text("descripcion"),
+    /** Precio del mes con la cobertura incluida (IVA incluido). */
     precioMensual: numeric("precio_mensual", { precision: 12, scale: 2 }).default("0").notNull(),
     moneda: varchar("moneda", { length: 3 }).default("MXN").notNull(),
     /** Días de prueba gratuita al registrarse con este plan. */
     trialDias: integer("trial_dias").default(14).notNull(),
-    /** Precio anual por sucursal (IVA incluido); null = solo mensual. */
+    /** Precio del año con la cobertura incluida (= 10 mensualidades); null = solo mensual. */
     precioAnual: numeric("precio_anual", { precision: 12, scale: 2 }),
+    /** Sucursales cubiertas por el precio base del plan. */
+    sucursalesIncluidas: integer("sucursales_incluidas").default(1).notNull(),
+    /** Precio mensual por cada sucursal adicional a las incluidas; null = no permite extras. */
+    precioSucursalExtra: numeric("precio_sucursal_extra", { precision: 12, scale: 2 }),
     /** Capacidades incluidas (claves de src/modules/billing/capacidades). */
     capacidades: jsonb("capacidades").$type<string[]>().default([]).notNull(),
     /** null = sin límite. */
@@ -66,10 +71,20 @@ export const suscripciones = pgTable(
     organizacionId: uuid("organizacion_id").notNull().references(() => organizaciones.id),
     planId: uuid("plan_id").notNull().references(() => planes.id),
     estado: varchar("estado", { length: 20 }).default("trialing").notNull(),
-    /** Periodicidad contratada: mensual o anual (por sucursal). */
+    /** Periodicidad contratada: mensual o anual. */
     periodicidad: varchar("periodicidad", { length: 20 }).default("mensual").notNull(),
-    /** Sucursales cubiertas por esta suscripción (el precio es por sucursal). */
+    /** Sucursales cubiertas por esta suscripción. */
     sucursalesFacturadas: integer("sucursales_facturadas").default(1).notNull(),
+    /**
+     * Snapshot comercial del contrato vigente — se llena al registrar el
+     * pago/activación para que ediciones posteriores del catálogo no alteren
+     * lo ya contratado. null en trials o contratos anteriores al snapshot.
+     */
+    sucursalesIncluidas: integer("sucursales_incluidas"),
+    /** Precio del periodo contratado (cobertura incluida, sin extras). */
+    precioUnitario: numeric("precio_unitario", { precision: 12, scale: 2 }),
+    /** Precio del periodo por sucursal adicional contratada. */
+    precioSucursalExtra: numeric("precio_sucursal_extra", { precision: 12, scale: 2 }),
     trialTerminaAt: timestamp("trial_termina_at", { withTimezone: true }),
     periodoIniciaAt: timestamp("periodo_inicia_at", { withTimezone: true }),
     periodoTerminaAt: timestamp("periodo_termina_at", { withTimezone: true }),

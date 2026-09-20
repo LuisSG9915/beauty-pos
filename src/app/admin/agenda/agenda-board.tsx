@@ -327,7 +327,6 @@ export function AgendaBoard({
   vista,
   weekDays,
   staff,
-  clientes,
   servicios,
   recursos,
   citas,
@@ -342,7 +341,6 @@ export function AgendaBoard({
   vista: AgendaVista;
   weekDays: string[];
   staff: Array<{ id: string; nombre: string }>;
-  clientes: Array<{ id: string; nombre: string; telefono: string | null }>;
   servicios: Array<{ id: string; nombre: string; precioBase: string; duracionMinutos: number }>;
   recursos: AgendaRecurso[];
   citas: AgendaCita[];
@@ -827,7 +825,6 @@ export function AgendaBoard({
             </DialogDescription>
           </DialogHeader>
           <CitaForm
-            clientes={clientes}
             currency={currency}
             initial={{
               organizacionId: organizationId,
@@ -858,13 +855,14 @@ export function AgendaBoard({
           </DialogHeader>
           {editing ? (
             <CitaForm
-              clientes={clientes}
               currency={currency}
               initial={{
                 id: editing.id,
                 organizacionId: organizationId,
                 sucursalId: editing.sucursalId,
                 clienteId: editing.clienteId,
+                clienteNombre: editing.clienteNombre,
+                clienteTelefono: editing.clienteTelefono,
                 usuarioId: editing.usuarioId,
                 fechaHora: editing.fechaHora,
                 duracionMinutos: editing.duracionMinutos,

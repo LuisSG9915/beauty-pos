@@ -1,5 +1,5 @@
 import { drizzleAdapter } from "@better-auth/drizzle-adapter";
-import { betterAuth } from "better-auth";
+import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { twoFactor as twoFactorPlugin } from "better-auth/plugins";
 
@@ -19,6 +19,12 @@ type AuthOptions = {
   sendEmails?: boolean;
 };
 
+type AuthInstance = ReturnType<typeof betterAuth>;
+
+// La configuración es estática por proceso; reutilizar la instancia evita
+// reconstruir el adaptador y los plugins en cada request.
+const authInstances = new Map<string, AuthInstance>();
+
 export function createAuth({ allowSignUp = false, sendEmails = true }: AuthOptions = {}) {
   const env = getRuntimeEnv();
   const secret = env.BETTER_AUTH_SECRET;
@@ -27,7 +33,11 @@ export function createAuth({ allowSignUp = false, sendEmails = true }: AuthOptio
     throw new Error("BETTER_AUTH_SECRET is not configured.");
   }
 
-  return betterAuth({
+  const key = `${allowSignUp}:${sendEmails}`;
+  const cached = authInstances.get(key);
+  if (cached) return cached;
+
+  const instance = betterAuth({
     secret,
     database: drizzleAdapter(getDatabase(), {
       provider: "pg",
@@ -81,5 +91,8 @@ export function createAuth({ allowSignUp = false, sendEmails = true }: AuthOptio
     rateLimit: {
       storage: "memory",
     },
-  });
+  } as BetterAuthOptions);
+
+  authInstances.set(key, instance);
+  return instance;
 }

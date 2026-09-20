@@ -1,12 +1,15 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { and, eq } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
 import { miembrosOrganizaciones, usuarios } from "@/db/schema/core";
 import { createAuth } from "@/lib/auth/server";
 
-export async function requireAuthenticatedUser() {
+// React.cache deduplica por render (request): el layout y la página comparten
+// la misma resolución de sesión+usuario en lugar de repetir las consultas.
+export const requireAuthenticatedUser = cache(async () => {
   const session = await createAuth().api.getSession({
     headers: await headers(),
   });
@@ -32,7 +35,27 @@ export async function requireAuthenticatedUser() {
   }
 
   return { session, user };
-}
+});
+
+// Membresía activa (org, usuario) → id; compartida por request entre el guard
+// y la resolución de acceso para no repetir la consulta.
+export const getMembershipId = cache(
+  async (organizationId: string, userId: string): Promise<string | null> => {
+    const db = getDatabase();
+    const [membership] = await db
+      .select({ id: miembrosOrganizaciones.id })
+      .from(miembrosOrganizaciones)
+      .where(
+        and(
+          eq(miembrosOrganizaciones.organizacionId, organizationId),
+          eq(miembrosOrganizaciones.usuarioId, userId),
+          eq(miembrosOrganizaciones.estado, "activo"),
+        ),
+      )
+      .limit(1);
+    return membership?.id ?? null;
+  },
+);
 
 export async function requireOrganizationAccess(organizationId: string) {
   const result = await requireAuthenticatedUser();
@@ -41,20 +64,9 @@ export async function requireOrganizationAccess(organizationId: string) {
     return result;
   }
 
-  const db = getDatabase();
-  const [membership] = await db
-    .select({ id: miembrosOrganizaciones.id })
-    .from(miembrosOrganizaciones)
-    .where(
-      and(
-        eq(miembrosOrganizaciones.organizacionId, organizationId),
-        eq(miembrosOrganizaciones.usuarioId, result.user.id),
-        eq(miembrosOrganizaciones.estado, "activo"),
-      ),
-    )
-    .limit(1);
+  const membershipId = await getMembershipId(organizationId, result.user.id);
 
-  if (!membership) {
+  if (!membershipId) {
     redirect("/admin?error=organization-access-denied");
   }
 

@@ -11,7 +11,7 @@ import {
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { getDatabase } from "@/db/client";
-import { clientes, miembrosOrganizaciones, organizaciones, relUsuariosSucursales, sucursales, usuarios } from "@/db/schema/core";
+import { clientes, miembrosOrganizaciones, relUsuariosSucursales, usuarios } from "@/db/schema/core";
 import { bloqueosAgenda, citaRecursos, citas, detalleCitasServicios, horariosSucursales, recursos, ventas } from "@/db/schema/operations";
 import { servicios } from "@/db/schema/catalogs";
 import { getAdminContext } from "@/lib/admin-context";
@@ -19,7 +19,7 @@ import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization
 import { todayDateInput } from "@/lib/format";
 import { firstParam, normalizeDateInput, normalizeView } from "@/lib/url-context";
 import { dayBoundsUtc, shiftDateKey, weekStartDateKey } from "@/modules/agenda";
-import { contextoSuscripcion } from "@/modules/billing/queries";
+import { contextoSuscripcionCache } from "@/modules/billing/queries";
 import { alergiasPorCliente, conAlergias } from "@/modules/expedientes/alergias";
 import { avisosRecientes, type AvisoReciente } from "@/modules/notificaciones/service";
 
@@ -94,7 +94,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
     );
   }
 
-  const [staffRows, clientRows, serviceRows, horarioRows, bloqueoRows, recursoRows, citaRows] = await Promise.all([
+  const [staffRows, serviceRows, horarioRows, bloqueoRows, recursoRows, citaRows] = await Promise.all([
     getDatabase()
       .select({ id: usuarios.id, nombre: usuarios.nombre })
       .from(relUsuariosSucursales)
@@ -115,11 +115,6 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
         ),
       )
       .orderBy(asc(usuarios.nombre)),
-    getDatabase()
-      .select({ id: clientes.id, nombre: clientes.nombre, telefono: clientes.telefono })
-      .from(clientes)
-      .where(and(eq(clientes.organizacionId, organization.id), eq(clientes.activo, true)))
-      .orderBy(asc(clientes.nombre)),
     getDatabase()
       .select({ id: servicios.id, nombre: servicios.nombre, precioBase: servicios.precioBase, duracionMinutos: servicios.duracionMinutos })
       .from(servicios)
@@ -142,6 +137,9 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
         and(
           eq(bloqueosAgenda.organizacionId, organization.id),
           eq(bloqueosAgenda.sucursalId, branch.id),
+          // El panel solo administra bloqueos vigentes/recientes; el historial
+          // remoto no aporta y encarece cada navegación.
+          gte(bloqueosAgenda.terminaAt, new Date(inicioBounds.iniciaAt.getTime() - 30 * 86_400_000)),
         ),
       )
       .orderBy(asc(bloqueosAgenda.iniciaAt)),
@@ -183,20 +181,24 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   ]);
 
   const citaIds = citaRows.map((row) => row.id);
-  const [detalles, detallesRecursos] = citaIds.length > 0
-    ? await Promise.all([
-        getDatabase()
+  const clienteIdsVisibles = [...new Set(citaRows.map((row) => row.clienteId).filter((id): id is string => Boolean(id)))];
+  const [detalles, detallesRecursos, alergias] = await Promise.all([
+    citaIds.length > 0
+      ? getDatabase()
           .select({ citaId: detalleCitasServicios.citaId, servicioId: detalleCitasServicios.servicioId, nombre: servicios.nombre, precio: detalleCitasServicios.precio })
           .from(detalleCitasServicios)
           .innerJoin(servicios, eq(detalleCitasServicios.servicioId, servicios.id))
-          .where(and(inArray(detalleCitasServicios.citaId, citaIds), eq(detalleCitasServicios.activo, true))),
-        getDatabase()
+          .where(and(inArray(detalleCitasServicios.citaId, citaIds), eq(detalleCitasServicios.activo, true)))
+      : Promise.resolve([] as Array<{ citaId: string; servicioId: string; nombre: string; precio: string }>),
+    citaIds.length > 0
+      ? getDatabase()
           .select({ citaId: citaRecursos.citaId, recursoId: citaRecursos.recursoId, nombre: recursos.nombre })
           .from(citaRecursos)
           .innerJoin(recursos, eq(citaRecursos.recursoId, recursos.id))
-          .where(and(inArray(citaRecursos.citaId, citaIds), eq(citaRecursos.activo, true))),
-      ])
-    : [[], []];
+          .where(and(inArray(citaRecursos.citaId, citaIds), eq(citaRecursos.activo, true)))
+      : Promise.resolve([] as Array<{ citaId: string; recursoId: string; nombre: string }>),
+    alergiasPorCliente(getDatabase(), organization.id, clienteIdsVisibles, context.access),
+  ]);
 
   const serviciosPorCita = new Map<string, Array<{ id: string; nombre: string; precio: string }>>();
   for (const detalle of detalles) {
@@ -211,15 +213,6 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
     recursosPorCita.set(detalle.citaId, list);
   }
   const staffPorId = new Map(staffRows.map((staff) => [staff.id, staff.nombre]));
-
-  // Alergias del expediente anexadas a las notas del cliente — solo si el
-  // usuario puede verlas (`expedientes.alergias_ver`/`expedientes.privado`).
-  const alergias = await alergiasPorCliente(
-    getDatabase(),
-    organization.id,
-    [...new Set(citaRows.map((row) => row.clienteId).filter((id): id is string => Boolean(id)))],
-    context.access,
-  );
 
   const citasSerializadas: AgendaCita[] = citaRows
     .map((row) => ({
@@ -279,29 +272,11 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
     motivo: row.motivo,
     activo: row.activo,
   }));
-  const [sucursalRow] = await getDatabase()
-    .select({
-      capacidadSinAsignar: sucursales.capacidadSinAsignar,
-      reservasOnline: sucursales.reservasOnline,
-      reservasAutoConfirmar: sucursales.reservasAutoConfirmar,
-      reservasCancelacionHoras: sucursales.reservasCancelacionHoras,
-      reservasAnticipacionMinutos: sucursales.reservasAnticipacionMinutos,
-      reservasHorizonteDias: sucursales.reservasHorizonteDias,
-    })
-    .from(sucursales)
-    .where(eq(sucursales.id, branch.id))
-    .limit(1);
-  const [orgRow] = await getDatabase()
-    .select({
-      recordatoriosActivos: organizaciones.recordatoriosActivos,
-      recordatoriosHorasAntes: organizaciones.recordatoriosHorasAntes,
-    })
-    .from(organizaciones)
-    .where(eq(organizaciones.id, organization.id))
-    .limit(1);
-  const suscripcion = await contextoSuscripcion(organization.id);
   const puedeEditar = hasPermission(context.access, "agenda.editar");
-  const avisos: AvisoReciente[] = puedeEditar ? await avisosRecientes(organization.id) : [];
+  const [suscripcion, avisos] = await Promise.all([
+    contextoSuscripcionCache(organization.id),
+    puedeEditar ? avisosRecientes(organization.id) : Promise.resolve([] as AvisoReciente[]),
+  ]);
   const recursosConfig: RecursoConfig[] = recursoRows;
   const recursosActivos = recursoRows.filter((r) => r.activo);
   const weekDays = vista === "semana"
@@ -325,7 +300,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
       {puedeEditar ? (
         <DisponibilidadPanel
           bloqueos={bloqueosConfig}
-          capacidadSinAsignar={sucursalRow?.capacidadSinAsignar ?? 1}
+          capacidadSinAsignar={branch.capacidadSinAsignar}
           horarios={horariosConfig}
           organizacionSlug={organization.slug}
           organizationId={organizationId ?? organization.id}
@@ -333,13 +308,13 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
           permiteRecordatorios={suscripcion.capacidades.has("recordatorios_email")}
           permiteReservasOnline={suscripcion.capacidades.has("reservas_online")}
           avisos={avisos}
-          recordatoriosActivos={orgRow?.recordatoriosActivos ?? false}
-          recordatoriosHorasAntes={orgRow?.recordatoriosHorasAntes ?? 24}
-          reservasAutoConfirmar={sucursalRow?.reservasAutoConfirmar ?? false}
-          reservasAnticipacionMinutos={sucursalRow?.reservasAnticipacionMinutos ?? 0}
-          reservasCancelacionHoras={sucursalRow?.reservasCancelacionHoras ?? 24}
-          reservasHorizonteDias={sucursalRow?.reservasHorizonteDias ?? 30}
-          reservasOnline={sucursalRow?.reservasOnline ?? false}
+          recordatoriosActivos={organization.recordatoriosActivos}
+          recordatoriosHorasAntes={organization.recordatoriosHorasAntes}
+          reservasAutoConfirmar={branch.reservasAutoConfirmar}
+          reservasAnticipacionMinutos={branch.reservasAnticipacionMinutos}
+          reservasCancelacionHoras={branch.reservasCancelacionHoras}
+          reservasHorizonteDias={branch.reservasHorizonteDias}
+          reservasOnline={branch.reservasOnline}
           recursos={recursosConfig}
           staff={staffRows}
           sucursalId={branch.id}
@@ -349,7 +324,6 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
       <AgendaBoard
         bloqueos={bloqueos}
         citas={citasSerializadas}
-        clientes={clientRows}
         currency={currency}
         fecha={fecha}
         horarios={horarios}

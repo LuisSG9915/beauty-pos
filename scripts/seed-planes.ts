@@ -15,7 +15,10 @@ async function main() {
     await sincronizarCatalogoPlanes(tx);
   });
   for (const plan of PLANES_CATALOGO) {
-    console.log(`Plan sincronizado: ${plan.clave} — ${plan.nombre} ($${plan.precioMensual}/mes por sucursal)`);
+    console.log(
+      `Plan sincronizado: ${plan.clave} — ${plan.nombre} ($${plan.precioMensual}/mes, incluye ${plan.sucursalesIncluidas} sucursal(es)` +
+        `${plan.precioSucursalExtra ? `, extra $${plan.precioSucursalExtra}/mes` : ""})`,
+    );
   }
 }
 

@@ -10,6 +10,12 @@ export const defaultPermissions = [
   { clave: "roles.editar", nombre: "Editar roles", modulo: "roles" },
   { clave: "clientes.ver", nombre: "Ver clientes", modulo: "clientes" },
   { clave: "clientes.editar", nombre: "Editar clientes", modulo: "clientes" },
+  { clave: "clientes.exportar", nombre: "Exportar clientes", modulo: "clientes" },
+  {
+    clave: "clientes.exportar_sensible",
+    nombre: "Exportar datos sensibles de clientes",
+    modulo: "clientes",
+  },
   { clave: "expedientes.alergias_ver", nombre: "Ver alergias", modulo: "expedientes" },
   { clave: "expedientes.privado", nombre: "Ver notas privadas del expediente", modulo: "expedientes" },
   { clave: "agenda.ver", nombre: "Ver agenda", modulo: "agenda" },

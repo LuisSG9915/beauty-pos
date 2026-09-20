@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
@@ -16,6 +17,8 @@ export type AdminOrganization = {
   activo: boolean;
   zonaHoraria: string;
   moneda: string;
+  recordatoriosActivos: boolean;
+  recordatoriosHorasAntes: number;
 };
 
 export type AdminBranch = {
@@ -25,6 +28,12 @@ export type AdminBranch = {
   clave: string;
   activo: boolean;
   zonaHoraria: string | null;
+  capacidadSinAsignar: number;
+  reservasOnline: boolean;
+  reservasAutoConfirmar: boolean;
+  reservasCancelacionHoras: number;
+  reservasAnticipacionMinutos: number;
+  reservasHorizonteDias: number;
 };
 
 type AuthenticatedUser = Awaited<ReturnType<typeof requireAuthenticatedUser>>["user"];
@@ -47,7 +56,7 @@ export type AdminContext = {
  * Organizaciones visibles para el usuario. Los administradores de plataforma
  * ven todas; los miembros solo organizaciones con membresía activa.
  */
-export async function getAccessibleOrganizations(
+async function queryAccessibleOrganizations(
   db: ReturnType<typeof getDatabase>,
   user: AuthenticatedUser,
 ): Promise<AdminOrganization[]> {
@@ -58,6 +67,8 @@ export async function getAccessibleOrganizations(
     activo: organizaciones.activo,
     zonaHoraria: organizaciones.zonaHoraria,
     moneda: organizaciones.moneda,
+    recordatoriosActivos: organizaciones.recordatoriosActivos,
+    recordatoriosHorasAntes: organizaciones.recordatoriosHorasAntes,
   };
 
   if (user.esAdministradorPlataforma) {
@@ -75,6 +86,23 @@ export async function getAccessibleOrganizations(
       ),
     )
     .orderBy(asc(organizaciones.nombre));
+}
+
+// Dedup por request entre el layout (shell) y las páginas.
+const accessibleOrganizationsCache = cache(
+  async (userId: string, esPlataforma: boolean): Promise<AdminOrganization[]> =>
+    queryAccessibleOrganizations(getDatabase(), {
+      id: userId,
+      esAdministradorPlataforma: esPlataforma,
+    } as AuthenticatedUser),
+);
+
+export async function getAccessibleOrganizations(
+  db: ReturnType<typeof getDatabase>,
+  user: AuthenticatedUser,
+): Promise<AdminOrganization[]> {
+  void db;
+  return accessibleOrganizationsCache(user.id, user.esAdministradorPlataforma);
 }
 
 /**
@@ -138,6 +166,12 @@ export async function getAdminContext(
         clave: sucursales.clave,
         activo: sucursales.activo,
         zonaHoraria: sucursales.zonaHoraria,
+        capacidadSinAsignar: sucursales.capacidadSinAsignar,
+        reservasOnline: sucursales.reservasOnline,
+        reservasAutoConfirmar: sucursales.reservasAutoConfirmar,
+        reservasCancelacionHoras: sucursales.reservasCancelacionHoras,
+        reservasAnticipacionMinutos: sucursales.reservasAnticipacionMinutos,
+        reservasHorizonteDias: sucursales.reservasHorizonteDias,
       })
       .from(sucursales)
       .where(and(...conditions))

@@ -76,10 +76,14 @@ export type PlanCatalogo = {
   clave: string;
   nombre: string;
   descripcion: string;
-  /** MXN por sucursal al mes, IVA incluido. */
+  /** MXN al mes con la cobertura incluida, IVA incluido. */
   precioMensual: string;
-  /** MXN por sucursal al año, IVA incluido; null = solo mensual. */
+  /** MXN al año con la cobertura incluida (= 10 mensualidades); null = solo mensual. */
   precioAnual: string | null;
+  /** Sucursales que cubre el precio base (sin costo adicional). */
+  sucursalesIncluidas: number;
+  /** MXN/mes por sucursal adicional a las incluidas; null = no permite extras. */
+  precioSucursalExtra: string | null;
   trialDias: number;
   /** null = sin límite. */
   maxSucursales: number | null;
@@ -90,17 +94,23 @@ export type PlanCatalogo = {
 };
 
 /**
- * Catálogo de lanzamiento (precios por sucursal, IVA incluido). Es la fuente
- * del seed idempotente y del fallback del registro: la tabla `planes` se
- * sincroniza con estos valores.
+ * Catálogo comercial vigente (MXN, IVA incluido). Modelo: el precio base
+ * cubre `sucursalesIncluidas` sucursales y cada adicional cuesta
+ * `precioSucursalExtra`/mes; el anual equivale a 10 mensualidades.
+ * Es la fuente del seed idempotente y del fallback del registro: la tabla
+ * `planes` se sincroniza con estos valores. Los contratos ya activos guardan
+ * su propio snapshot en `suscripciones`/`pagos_suscripcion`, así que editar
+ * este catálogo solo afecta contrataciones nuevas.
  */
 export const PLANES_CATALOGO: readonly PlanCatalogo[] = [
   {
     clave: "esencial",
     nombre: "Esencial",
-    descripcion: "Ordena la operación diaria: agenda, clientes, POS, caja y reportes básicos.",
-    precioMensual: "299",
-    precioAnual: "2990",
+    descripcion: "Ordena la operación diaria: agenda, clientes, cobro, caja y reportes básicos.",
+    precioMensual: "199",
+    precioAnual: "1990",
+    sucursalesIncluidas: 1,
+    precioSucursalExtra: null,
     trialDias: 0,
     maxSucursales: 1,
     maxUsuarios: 3,
@@ -113,10 +123,12 @@ export const PLANES_CATALOGO: readonly PlanCatalogo[] = [
     nombre: "Crecimiento",
     descripcion:
       "Reservas en línea, recordatorios, gastos, comisiones y reportes avanzados para el salón que quiere crecer.",
-    precioMensual: "599",
-    precioAnual: "5990",
+    precioMensual: "399",
+    precioAnual: "3990",
+    sucursalesIncluidas: 2,
+    precioSucursalExtra: null,
     trialDias: 14,
-    maxSucursales: 1,
+    maxSucursales: 2,
     maxUsuarios: 8,
     capacidades: CAPACIDADES_CRECIMIENTO,
     recomendado: true,
@@ -126,8 +138,10 @@ export const PLANES_CATALOGO: readonly PlanCatalogo[] = [
     clave: "profesional",
     nombre: "Profesional",
     descripcion: "Varias sucursales, supervisión centralizada y reportes consolidados para equipos grandes.",
-    precioMensual: "999",
-    precioAnual: "9990",
+    precioMensual: "899",
+    precioAnual: "8990",
+    sucursalesIncluidas: 3,
+    precioSucursalExtra: "249",
     trialDias: 0,
     maxSucursales: null,
     maxUsuarios: 20,

@@ -25,7 +25,7 @@ export function PaymentMethodForm({ organizationId, initial }: { organizationId:
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
       <h2 className="text-xl font-semibold">{initial ? "Editar medio de pago" : "Nuevo medio de pago"}</h2>
-      <p className="mt-1 text-sm text-[#625b55]">Define cómo se puede pagar en el POS: efectivo, tarjeta, transferencia, etc.</p>
+      <p className="mt-1 text-sm text-[#625b55]">Define cómo se puede pagar en Cobrar: efectivo, tarjeta, transferencia, etc.</p>
       <div className="mt-5 space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field>

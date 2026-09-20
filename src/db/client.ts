@@ -43,5 +43,10 @@ export function getDatabase() {
 
   pools.set(connectionString, pool);
 
-  return drizzle({ client: pool, schema });
+  return drizzle({
+    client: pool,
+    schema,
+    // Diagnóstico local: DB_LOG_QUERIES=1 imprime cada consulta y su duración.
+    logger: process.env.DB_LOG_QUERIES === "1",
+  });
 }

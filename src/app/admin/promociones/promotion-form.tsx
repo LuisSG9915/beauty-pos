@@ -83,7 +83,7 @@ export function PromotionForm({ organizationId, initial }: { organizationId: str
 
   const futuro = (
     <p className="rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55]">
-      La selección de productos, servicios, sucursales y restricciones específicas se habilitará al conectar el POS y la agenda.
+      La selección de productos, servicios, sucursales y restricciones específicas se habilitará al conectar el cobro y la agenda.
     </p>
   );
 

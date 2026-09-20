@@ -14,12 +14,13 @@ import { getDatabase } from "@/db/client";
 import { catRoles } from "@/db/schema/access";
 import { billingEventos, planes, suscripciones } from "@/db/schema/billing";
 import { organizaciones, sucursales } from "@/db/schema/core";
+import { ventas } from "@/db/schema/operations";
 import { getAccessibleOrganizations } from "@/lib/admin-context";
 import { requireAuthenticatedUser, requirePlatformAdmin } from "@/lib/auth/access";
 import { resolveAccessSafe } from "@/lib/auth/authorization";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { CAPACIDADES } from "@/modules/billing/capacidades";
-import { getSuscripcionActual } from "@/modules/billing/queries";
+import { getSuscripcionActualCache } from "@/modules/billing/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
 import { cargarEstadoNegocio, cargarProgresoGuia } from "@/modules/onboarding/queries";
 import { evaluarPasos, pasosParaPermisos, resumenGuia } from "@/modules/onboarding/rules";
@@ -124,7 +125,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     for (const org of organizations) {
       const [resolved, suscripcion] = await Promise.all([
         resolveAccessSafe(org.id, user),
-        getSuscripcionActual(org.id),
+        getSuscripcionActualCache(org.id),
       ]);
       permissionsByOrg[org.id] = resolved ? [...resolved.permissions] : [];
       if (suscripcion && estadoEfectivoSuscripcion(suscripcion) === "vigente") {
@@ -177,7 +178,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   }
 
   const { session: platformSession } = await requirePlatformAdmin();
-  const [organizations, roles, branches, suscripcionRows, solicitudes, planesCatalogo] = await Promise.all([
+  const [organizations, roles, branches, suscripcionRows, solicitudes, planesCatalogo, orgsConVenta] = await Promise.all([
     db
       .select({ id: organizaciones.id, nombre: organizaciones.nombre, slug: organizaciones.slug, activo: organizaciones.activo })
       .from(organizaciones)
@@ -208,10 +209,23 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       .orderBy(desc(billingEventos.createdAt))
       .limit(20),
     db
-      .select({ clave: planes.clave, nombre: planes.nombre, precioMensual: planes.precioMensual, precioAnual: planes.precioAnual })
+      .select({
+        clave: planes.clave,
+        nombre: planes.nombre,
+        precioMensual: planes.precioMensual,
+        precioAnual: planes.precioAnual,
+        sucursalesIncluidas: planes.sucursalesIncluidas,
+        precioSucursalExtra: planes.precioSucursalExtra,
+      })
       .from(planes)
       .where(eq(planes.activo, true))
       .orderBy(planes.orden),
+    // Activación: organizaciones que ya cobraron al menos una venta.
+    db
+      .select({ organizacionId: ventas.organizacionId })
+      .from(ventas)
+      .where(and(eq(ventas.estado, "completada"), eq(ventas.activo, true)))
+      .groupBy(ventas.organizacionId),
   ]);
 
   // Última solicitud de cambio por organización: pre-llena el formulario del
@@ -236,6 +250,32 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   }
   const ahora = new Date();
 
+  // Embudo del piloto: registro → trial → activación (primer cobro) →
+  // conversión (suscripción activa). Métricas derivadas de datos reales —
+  // sin eventos sintéticos.
+  const activadas = new Set(orgsConVenta.map((row) => row.organizacionId)).size;
+  let trialsVigentes = 0;
+  let convertidas = 0;
+  let vencidasOCanceladas = 0;
+  for (const row of suscripcionPorOrg.values()) {
+    if (row.estado === "trialing" && estadoEfectivoSuscripcion(row, ahora) === "vigente") {
+      trialsVigentes += 1;
+    } else if (row.estado === "activa" && estadoEfectivoSuscripcion(row, ahora) === "vigente") {
+      convertidas += 1;
+    } else if (estadoEfectivoSuscripcion(row, ahora) === "vencida" || row.estado === "cancelada" || row.estado === "vencida") {
+      vencidasOCanceladas += 1;
+    }
+  }
+  const registradas = organizations.length;
+  const pct = (parte: number, total: number) => (total > 0 ? Math.round((parte / total) * 100) : 0);
+  const embudo = [
+    { etiqueta: "Registradas", valor: registradas },
+    { etiqueta: "En prueba", valor: trialsVigentes },
+    { etiqueta: "Activadas (1er cobro)", valor: activadas, pct: pct(activadas, registradas) },
+    { etiqueta: "Convertidas (pagando)", valor: convertidas, pct: pct(convertidas, registradas) },
+    { etiqueta: "Vencidas / canceladas", valor: vencidasOCanceladas },
+  ];
+
   return (
     <div className="space-y-6">
       <AccessError error={error} />
@@ -243,6 +283,22 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         description={`Hola, ${platformSession.user.name}. Crea negocios y prepara su primera sucursal.`}
         title="Organizaciones y sucursales"
       />
+      <AdminCard
+        description="Registro → prueba → primer cobro → pago. Sobre datos reales de suscripciones y ventas."
+        title="Embudo del piloto"
+      >
+        <dl className="grid gap-3 sm:grid-cols-5">
+          {embudo.map((etapa) => (
+            <div className="rounded-xl bg-[#faf6f3] px-3 py-2" key={etapa.etiqueta}>
+              <dt className="text-[11px] uppercase tracking-wide text-[#81746c]">{etapa.etiqueta}</dt>
+              <dd className="mt-0.5 text-lg font-semibold text-[#2d2926]">
+                {etapa.valor}
+                {etapa.pct != null ? <span className="ml-1 text-xs font-normal text-[#95877e]">{etapa.pct}%</span> : null}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </AdminCard>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <OrganizationForm />
         <AdminCard description={`${organizations.length} organización(es)`} title="Organizaciones registradas">
