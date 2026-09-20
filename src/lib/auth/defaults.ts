@@ -34,6 +34,7 @@ export const defaultPermissions = [
   { clave: "comisiones.editar", nombre: "Liquidar y revertir comisiones", modulo: "comisiones" },
   { clave: "reportes.operativos", nombre: "Ver reportes operativos", modulo: "reportes" },
   { clave: "reportes.financieros", nombre: "Ver reportes financieros", modulo: "reportes" },
+  { clave: "reportes.exportar", nombre: "Exportar reportes", modulo: "reportes" },
   { clave: "facturacion.ver", nombre: "Ver comprobantes fiscales", modulo: "facturacion" },
   { clave: "facturacion.emitir", nombre: "Emitir comprobantes fiscales", modulo: "facturacion" },
   { clave: "facturacion.cancelar", nombre: "Cancelar comprobantes fiscales", modulo: "facturacion" },

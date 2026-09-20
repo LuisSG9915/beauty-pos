@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
@@ -6,32 +6,26 @@ import { BarChart, HBarChart } from "@/components/charts";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
-import { catMediosPago } from "@/db/schema/catalogs";
-import { clientes, usuarios } from "@/db/schema/core";
-import {
-  ajustesPagosVenta,
-  citas,
-  cortesCaja,
-  detalleCortes,
-  detalleVentasComisiones,
-  detalleVentasMediosPagos,
-  detalleVentasPropinas,
-  detalleVentasServicios,
-  liquidacionesComisiones,
-  ventas,
-} from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate, formatTime, todayDateInput } from "@/lib/format";
 import { normalizeDateInput } from "@/lib/url-context";
-import { dayBoundsUtc, shiftDateKey } from "@/modules/agenda";
-import { resumenGastos } from "@/modules/gastos/queries";
+import { shiftDateKey } from "@/modules/agenda";
+import { cargarAgregadosAnteriores, cargarReporte, num } from "@/modules/reportes/queries";
+import {
+  deltaKpi,
+  derivarAvisos,
+  derivarCitas,
+  derivarReservasWeb,
+  derivarVentas,
+  etiquetaDelta,
+  periodoAnterior,
+  presetsPeriodo,
+} from "@/modules/reportes/rules";
 
 export const dynamic = "force-dynamic";
 
 type Props = { searchParams: Promise<AdminSearchParams> };
-
-const num = (v: string | number | null | undefined) => Number(v ?? 0);
 
 const ESTADO_LABEL: Record<string, string> = {
   pendiente: "Pendiente",
@@ -40,6 +34,11 @@ const ESTADO_LABEL: Record<string, string> = {
   completada: "Completada",
   cancelada: "Cancelada",
   no_asistio: "No asistió",
+};
+
+const ORIGEN_LABEL: Record<string, string> = {
+  panel: "Agenda interna",
+  web: "Reserva en línea",
 };
 
 function Tabla({
@@ -101,43 +100,34 @@ export default async function ReportesPage({ searchParams }: Props) {
 
   const puedeOperativos = hasPermission(context.access, "reportes.operativos");
   const puedeFinancieros = hasPermission(context.access, "reportes.financieros");
+  const puedeExportar = hasPermission(context.access, "reportes.exportar");
   if (!puedeOperativos && !puedeFinancieros) notFound();
 
   const hoy = todayDateInput(timeZone);
   let desde = normalizeDateInput(params.desde, shiftDateKey(hoy, -29) ?? hoy) ?? hoy;
   let hasta = normalizeDateInput(params.hasta, hoy) ?? hoy;
   if (desde > hasta) [desde, hasta] = [hasta, desde];
-  const boundsDesde = dayBoundsUtc(desde, timeZone);
-  const boundsHasta = dayBoundsUtc(hasta, timeZone);
-  if (!boundsDesde || !boundsHasta) notFound();
-  const iniciaAt = boundsDesde.iniciaAt;
-  const terminaAt = boundsHasta.terminaAt;
+  const anterior = periodoAnterior(desde, hasta);
 
   const db = getDatabase();
   const fmt = (v: string | number | null | undefined) => formatCurrency(num(v), { currency });
-  const fechaVenta = sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`;
-  const scopeVenta = () =>
-    and(
-      eq(ventas.organizacionId, organization.id),
-      eq(ventas.sucursalId, branch.id),
-      eq(ventas.estado, "completada"),
-      eq(ventas.activo, true),
-      gte(fechaVenta, iniciaAt),
-      lt(fechaVenta, terminaAt),
-    );
-  const scopeCita = () =>
-    and(
-      eq(citas.organizacionId, organization.id),
-      eq(citas.sucursalId, branch.id),
-      eq(citas.activo, true),
-      gte(citas.fechaHora, iniciaAt),
-      lt(citas.fechaHora, terminaAt),
-    );
-  const [
+  const reporte = await cargarReporte(db, {
+    organizacionId: organization.id,
+    sucursalId: branch.id,
+    timeZone,
+    desde,
+    hasta,
+    operativos: puedeOperativos,
+    financieros: puedeFinancieros,
+  });
+  if (!reporte) notFound();
+  const {
     citasPorEstado,
     clientesNuevos,
     topServicios,
     profesionales,
+    citasPorOrigen,
+    avisosMetricas,
     ventasPorDia,
     pagosPorMedio,
     descuentos,
@@ -146,253 +136,70 @@ export default async function ReportesPage({ searchParams }: Props) {
     diferenciasCorte,
     gastosResumen,
     liquidadoPorUsuario,
-  ] = await Promise.all([
-    puedeOperativos
-      ? db
-          .select({ estado: citas.estado, total: sql<number>`count(*)::int` })
-          .from(citas)
-          .where(scopeCita())
-          .groupBy(citas.estado)
-      : Promise.resolve([]),
-    puedeOperativos
-      ? db
-          .select({ total: sql<number>`count(*)::int` })
-          .from(clientes)
-          .where(
-            and(
-              eq(clientes.organizacionId, organization.id),
-              eq(clientes.activo, true),
-              gte(clientes.createdAt, iniciaAt),
-              lt(clientes.createdAt, terminaAt),
-            ),
-          )
-      : Promise.resolve([{ total: 0 }]),
-    puedeOperativos
-      ? db
-          .select({
-            nombre: detalleVentasServicios.nombre,
-            unidades: sql<number>`coalesce(sum(${detalleVentasServicios.cantidad}), 0)::int`,
-            importe: sql<string>`coalesce(sum(${detalleVentasServicios.precio} * ${detalleVentasServicios.cantidad}), 0)`,
-          })
-          .from(detalleVentasServicios)
-          .innerJoin(ventas, eq(detalleVentasServicios.ventaId, ventas.id))
-          .where(and(scopeVenta(), eq(detalleVentasServicios.activo, true)))
-          .groupBy(detalleVentasServicios.nombre)
-          .orderBy(desc(sql`sum(${detalleVentasServicios.precio} * ${detalleVentasServicios.cantidad})`))
-          .limit(10)
-      : Promise.resolve([]),
-    puedeOperativos
-      ? db
-          .select({
-            nombre: usuarios.nombre,
-            total: sql<number>`count(*)::int`,
-            completadas: sql<number>`count(*) filter (where ${citas.estado} = 'completada')::int`,
-            minutos: sql<number>`coalesce(sum(${citas.duracionMinutos}), 0)::int`,
-          })
-          .from(citas)
-          .innerJoin(usuarios, eq(citas.usuarioId, usuarios.id))
-          .where(scopeCita())
-          .groupBy(usuarios.nombre)
-          .orderBy(desc(sql`count(*)`))
-      : Promise.resolve([]),
-    puedeFinancieros
-      ? db
-          .select({
-            dia: sql<string>`(${fechaVenta} at time zone ${timeZone})::date::text`,
-            operaciones: sql<number>`count(*)::int`,
-            descuentos: sql<string>`coalesce(sum(${ventas.descuento} + ${ventas.descuentoPromocion} + ${ventas.descuentoMembresia}), 0)`,
-            propinas: sql<string>`coalesce(sum(${ventas.propina}), 0)`,
-            total: sql<string>`coalesce(sum(${ventas.total}), 0)`,
-          })
-          .from(ventas)
-          .where(scopeVenta())
-          // GROUP BY 1 = primera columna del SELECT: con parámetros, Postgres
-          // no equipara ($1) y ($8) aunque la expresión sea idéntica.
-          .groupBy(sql`1`)
-          .orderBy(sql`1 desc`)
-      : Promise.resolve([]),
-    puedeFinancieros
-      ? Promise.all([
-          db
-            .select({
-              medioPagoId: detalleVentasMediosPagos.medioPagoId,
-              nombre: catMediosPago.nombre,
-              operaciones: sql<number>`count(*)::int`,
-              total: sql<string>`coalesce(sum(${detalleVentasMediosPagos.monto}), 0)`,
-            })
-            .from(detalleVentasMediosPagos)
-            .innerJoin(ventas, eq(detalleVentasMediosPagos.ventaId, ventas.id))
-            .innerJoin(catMediosPago, eq(detalleVentasMediosPagos.medioPagoId, catMediosPago.id))
-            .where(and(scopeVenta(), eq(detalleVentasMediosPagos.activo, true)))
-            .groupBy(detalleVentasMediosPagos.medioPagoId, catMediosPago.nombre)
-            .orderBy(desc(sql`sum(${detalleVentasMediosPagos.monto})`)),
-          db
-            .select({
-              origenId: ajustesPagosVenta.medioPagoOrigenId,
-              destinoId: ajustesPagosVenta.medioPagoDestinoId,
-              total: sql<string>`coalesce(sum(${ajustesPagosVenta.monto}), 0)`,
-            })
-            .from(ajustesPagosVenta)
-            .innerJoin(detalleVentasMediosPagos, eq(ajustesPagosVenta.detalleVentaMedioPagoId, detalleVentasMediosPagos.id))
-            .innerJoin(ventas, eq(ajustesPagosVenta.ventaId, ventas.id))
-            .where(and(scopeVenta(), eq(detalleVentasMediosPagos.activo, true)))
-            .groupBy(ajustesPagosVenta.medioPagoOrigenId, ajustesPagosVenta.medioPagoDestinoId),
-          db
-            .select({ id: catMediosPago.id, nombre: catMediosPago.nombre })
-            .from(catMediosPago)
-            .where(eq(catMediosPago.organizacionId, organization.id)),
-        ]).then(([originales, ajustes, medios]) => {
-          const nombres = new Map(medios.map((medio) => [medio.id, medio.nombre]));
-          const porMedio = new Map<string, { nombre: string; operaciones: number; total: number }>();
-          for (const row of originales) {
-            porMedio.set(row.medioPagoId, { nombre: row.nombre, operaciones: row.operaciones, total: num(row.total) });
-          }
-          for (const ajuste of ajustes) {
-            const origen = porMedio.get(ajuste.origenId);
-            if (origen) origen.total -= num(ajuste.total);
-            const destino = porMedio.get(ajuste.destinoId) ?? {
-              nombre: nombres.get(ajuste.destinoId) ?? "Medio inactivo",
-              operaciones: 0,
-              total: 0,
-            };
-            destino.operaciones += 1;
-            destino.total += num(ajuste.total);
-            porMedio.set(ajuste.destinoId, destino);
-          }
-          return [...porMedio.values()]
-            .filter((row) => row.total > 0.005)
-            .sort((a, b) => b.total - a.total);
-        })
-      : Promise.resolve([]),
-    puedeFinancieros
-      ? db
-          .select({
-            manual: sql<string>`coalesce(sum(${ventas.descuento}), 0)`,
-            promocion: sql<string>`coalesce(sum(${ventas.descuentoPromocion}), 0)`,
-            membresia: sql<string>`coalesce(sum(${ventas.descuentoMembresia}), 0)`,
-          })
-          .from(ventas)
-          .where(scopeVenta())
-      : Promise.resolve([]),
-    puedeFinancieros
-      ? db
-          .select({
-            nombre: usuarios.nombre,
-            total: sql<string>`coalesce(sum(${detalleVentasComisiones.monto}), 0)`,
-          })
-          .from(detalleVentasComisiones)
-          .innerJoin(ventas, eq(detalleVentasComisiones.ventaId, ventas.id))
-          .innerJoin(usuarios, eq(detalleVentasComisiones.usuarioId, usuarios.id))
-          .where(and(scopeVenta(), eq(detalleVentasComisiones.activo, true)))
-          .groupBy(usuarios.nombre)
-          .orderBy(desc(sql`sum(${detalleVentasComisiones.monto})`))
-      : Promise.resolve([]),
-    puedeFinancieros
-      ? db
-          .select({
-            nombre: usuarios.nombre,
-            total: sql<string>`coalesce(sum(${detalleVentasPropinas.monto}), 0)`,
-          })
-          .from(detalleVentasPropinas)
-          .innerJoin(ventas, eq(detalleVentasPropinas.ventaId, ventas.id))
-          .innerJoin(usuarios, eq(detalleVentasPropinas.usuarioId, usuarios.id))
-          .where(and(scopeVenta(), eq(detalleVentasPropinas.activo, true)))
-          .groupBy(usuarios.nombre)
-          .orderBy(desc(sql`sum(${detalleVentasPropinas.monto})`))
-      : Promise.resolve([]),
-    puedeFinancieros
-      ? db
-          .select({
-            cerradoAt: cortesCaja.cerradoAt,
-            cajero: usuarios.nombre,
-            medio: catMediosPago.nombre,
-            esperado: detalleCortes.esperado,
-            contado: detalleCortes.contado,
-            diferencia: detalleCortes.diferencia,
-          })
-          .from(detalleCortes)
-          .innerJoin(cortesCaja, eq(detalleCortes.corteId, cortesCaja.id))
-          .innerJoin(catMediosPago, eq(detalleCortes.medioPagoId, catMediosPago.id))
-          .leftJoin(usuarios, eq(cortesCaja.usuarioId, usuarios.id))
-          .where(
-            and(
-              eq(cortesCaja.organizacionId, organization.id),
-              eq(cortesCaja.sucursalId, branch.id),
-              eq(cortesCaja.estado, "cerrado"),
-              eq(detalleCortes.activo, true),
-              sql`${detalleCortes.diferencia} <> 0`,
-              gte(cortesCaja.cerradoAt, iniciaAt),
-              lt(cortesCaja.cerradoAt, terminaAt),
-            ),
-          )
-          .orderBy(desc(cortesCaja.cerradoAt))
-          .limit(20)
-      : Promise.resolve([]),
-    puedeFinancieros
-      ? resumenGastos(db, { organizacionId: organization.id, sucursalId: branch.id, desde, hasta })
-      : Promise.resolve({ totalConfirmado: 0, totalRevertido: 0, porCategoria: [] }),
-    // Pagado en el periodo = liquidaciones confirmadas por su fecha de
-    // registro (el pago puede cubrir comisiones devengadas antes del rango).
-    puedeFinancieros
-      ? db
-          .select({
-            nombre: usuarios.nombre,
-            total: sql<string>`coalesce(sum(${liquidacionesComisiones.total}), 0)`,
-          })
-          .from(liquidacionesComisiones)
-          .innerJoin(usuarios, eq(liquidacionesComisiones.usuarioId, usuarios.id))
-          .where(
-            and(
-              eq(liquidacionesComisiones.organizacionId, organization.id),
-              eq(liquidacionesComisiones.sucursalId, branch.id),
-              eq(liquidacionesComisiones.estado, "confirmada"),
-              gte(liquidacionesComisiones.createdAt, iniciaAt),
-              lt(liquidacionesComisiones.createdAt, terminaAt),
-            ),
-          )
-          .groupBy(usuarios.nombre)
-          .orderBy(desc(sql`sum(${liquidacionesComisiones.total})`))
-      : Promise.resolve([]),
-  ]);
+    devolucionesResumen,
+    anticiposResumen,
+    productosSinCosto,
+  } = reporte;
+  const { ventasAnt, citasAnt } = anterior
+    ? await cargarAgregadosAnteriores(db, {
+        organizacionId: organization.id,
+        sucursalId: branch.id,
+        timeZone,
+        desde: anterior.desde,
+        hasta: anterior.hasta,
+        operativos: puedeOperativos,
+        financieros: puedeFinancieros,
+      })
+    : { ventasAnt: [{ total: "0", operaciones: 0 }], citasAnt: [] };
 
   // KPIs operativos
-  const totalCitas = citasPorEstado.reduce((acc, row) => acc + row.total, 0);
-  const completadas = citasPorEstado.find((row) => row.estado === "completada")?.total ?? 0;
-  const finalizadas = citasPorEstado
-    .filter((row) => ["completada", "cancelada", "no_asistio"].includes(row.estado))
-    .reduce((acc, row) => acc + row.total, 0);
-  const asistencia = finalizadas > 0 ? Math.round((completadas / finalizadas) * 100) : null;
+  const { totalCitas, asistencia } = derivarCitas(citasPorEstado);
 
   // KPIs financieros
-  const vendido = ventasPorDia.reduce((acc, row) => acc + num(row.total), 0);
-  const propinasTotal = ventasPorDia.reduce((acc, row) => acc + num(row.propinas), 0);
-  const operaciones = ventasPorDia.reduce((acc, row) => acc + row.operaciones, 0);
+  const { vendido, propinasTotal, operaciones } = derivarVentas(ventasPorDia);
   const descuentosRow = descuentos[0];
   const descuentosTotal = descuentosRow ? num(descuentosRow.manual) + num(descuentosRow.promocion) + num(descuentosRow.membresia) : 0;
   // Resultado estimado: ventas cobradas menos gastos confirmados. No es la
   // utilidad real — faltan comisiones pagadas y costos de insumos.
   const resultadoEstimado = vendido - gastosResumen.totalConfirmado;
 
-  // Comisiones devengadas/pagadas + propinas por profesional (mapa unificado)
-  const profesionalFinanciero = new Map<string, { comisiones: number; liquidadas: number; propinas: number }>();
-  for (const row of comisionPorUsuario) {
-    const actual = profesionalFinanciero.get(row.nombre) ?? { comisiones: 0, liquidadas: 0, propinas: 0 };
-    actual.comisiones = num(row.total);
-    profesionalFinanciero.set(row.nombre, actual);
-  }
-  for (const row of liquidadoPorUsuario) {
-    const actual = profesionalFinanciero.get(row.nombre) ?? { comisiones: 0, liquidadas: 0, propinas: 0 };
-    actual.liquidadas = num(row.total);
-    profesionalFinanciero.set(row.nombre, actual);
-  }
-  for (const row of propinaPorUsuario) {
-    const actual = profesionalFinanciero.get(row.nombre) ?? { comisiones: 0, liquidadas: 0, propinas: 0 };
-    actual.propinas = num(row.total);
-    profesionalFinanciero.set(row.nombre, actual);
-  }
-  const profesionalRows = [...profesionalFinanciero.entries()].sort(
-    (a, b) => b[1].comisiones + b[1].propinas - (a[1].comisiones + a[1].propinas),
+  // Comisiones devengadas/pagadas + propinas por profesional (mapa por ID —
+  // dos personas pueden compartir nombre y jamás deben consolidarse).
+  const profesionalFinanciero = new Map<string, { nombre: string; comisiones: number; liquidadas: number; propinas: number }>();
+  const mergeProfesional = (usuarioId: string, nombre: string, key: "comisiones" | "liquidadas" | "propinas", total: string) => {
+    const actual = profesionalFinanciero.get(usuarioId) ?? { nombre, comisiones: 0, liquidadas: 0, propinas: 0 };
+    actual[key] = num(total);
+    profesionalFinanciero.set(usuarioId, actual);
+  };
+  for (const row of comisionPorUsuario) mergeProfesional(row.usuarioId, row.nombre, "comisiones", row.total);
+  for (const row of liquidadoPorUsuario) mergeProfesional(row.usuarioId, row.nombre, "liquidadas", row.total);
+  for (const row of propinaPorUsuario) mergeProfesional(row.usuarioId, row.nombre, "propinas", row.total);
+  const profesionalRows = [...profesionalFinanciero.values()].sort(
+    (a, b) => b.comisiones + b.propinas - (a.comisiones + a.propinas),
   );
+
+  // Comparación con el periodo anterior (mismo largo, inmediatamente previo).
+  const vendidoAnt = num(ventasAnt[0]?.total);
+  const operacionesAnt = num(ventasAnt[0]?.operaciones);
+  const { totalCitas: totalCitasAnt, asistencia: asistenciaAntRaw } = derivarCitas(citasAnt);
+  const asistenciaAnt = asistenciaAntRaw == null ? null : asistenciaAntRaw;
+
+  // Métricas de reservas públicas y avisos.
+  const reservasWeb = derivarReservasWeb(citasPorOrigen);
+  const { avisosEnviados, avisosFallidos, avisosOmitidos, avisosPendientes, avisosReintentos } =
+    derivarAvisos(avisosMetricas);
+
+  const devolucionesTotal = num(devolucionesResumen[0]?.total);
+  const devolucionesOps = devolucionesResumen[0]?.operaciones ?? 0;
+  const anticiposRow = anticiposResumen[0];
+
+  const filtrosExport = new URLSearchParams({
+    organizationId: organization.id,
+    sucursalId: branch.id,
+    desde,
+    hasta,
+  }).toString();
+  const presets = presetsPeriodo(hoy);
 
   return (
     <div className="space-y-6">
@@ -410,14 +217,69 @@ export default async function ReportesPage({ searchParams }: Props) {
           <Input defaultValue={hasta} name="hasta" type="date" />
         </Field>
         <Button className="rounded-xl" type="submit">Aplicar</Button>
+        {puedeExportar ? (
+          <a
+            className="inline-flex h-10 items-center rounded-xl border border-[#d9cdc4] px-4 text-sm font-medium text-[#5f5347] transition hover:bg-[#f6efe9]"
+            href={`/admin/reportes/export?${filtrosExport}`}
+          >
+            Exportar CSV
+          </a>
+        ) : null}
+        <div className="flex w-full flex-wrap items-center gap-2 pt-1 text-xs text-[#81746c]">
+          <span className="font-medium text-[#6f665e]">Rangos rápidos:</span>
+          {presets.map((preset) => {
+            const href = `?${new URLSearchParams({
+              organizationId: organization.id,
+              sucursalId: branch.id,
+              desde: preset.desde,
+              hasta: preset.hasta,
+            }).toString()}`;
+            const activo = preset.desde === desde && preset.hasta === hasta;
+            return (
+              <Link
+                className={`rounded-full border px-3 py-1.5 font-medium transition ${
+                  activo
+                    ? "border-[#b5563f] bg-[#f7e8e2] text-[#8f3f2c]"
+                    : "border-[#e4d8cf] text-[#6f665e] hover:bg-[#f6efe9]"
+                }`}
+                href={href}
+                key={preset.clave}
+              >
+                {preset.etiqueta}
+              </Link>
+            );
+          })}
+          {anterior ? (
+            <span className="ml-auto text-[#9c9188]">
+              Comparando contra {anterior.desde} → {anterior.hasta}
+            </span>
+          ) : null}
+        </div>
       </form>
 
       {puedeOperativos ? (
         <>
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <Kpi label="Citas en el rango" value={String(totalCitas)} />
-            <Kpi label="Asistencia" value={asistencia == null ? "—" : `${asistencia}%`} hint="completadas / finalizadas" />
-            <Kpi label="Clientes nuevos" value={String(clientesNuevos[0]?.total ?? 0)} />
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <Kpi
+              hint={etiquetaDelta(deltaKpi(totalCitas, totalCitasAnt))}
+              label="Citas en el rango"
+              value={String(totalCitas)}
+            />
+            <Kpi
+              hint={asistencia == null || asistenciaAnt == null ? "completadas / finalizadas" : `${etiquetaDelta(deltaKpi(asistencia, asistenciaAnt))} · completadas / finalizadas`}
+              label="Asistencia"
+              value={asistencia == null ? "—" : `${asistencia}%`}
+            />
+            <Kpi
+              hint="primera atención completada en el rango"
+              label="Clientes nuevos"
+              value={String(clientesNuevos[0]?.total ?? 0)}
+            />
+            <Kpi
+              hint={`${reservasWeb} llegaron por reserva web`}
+              label="Reservas en línea"
+              value={String(reservasWeb)}
+            />
             <Kpi label="Profesionales con agenda" value={String(profesionales.length)} />
           </section>
 
@@ -431,7 +293,15 @@ export default async function ReportesPage({ searchParams }: Props) {
                 vacio="Sin citas en el rango."
               />
             </AdminCard>
-            <AdminCard description="Por importe vendido en ventas cobradas" title="Servicios más vendidos">
+            <AdminCard
+              actions={
+                <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/ventas?${filtrosExport}`}>
+                  Ver ventas →
+                </Link>
+              }
+              description="Por importe vendido en ventas cobradas"
+              title="Servicios más vendidos"
+            >
               <Tabla
                 encabezados={["Servicio", "Unidades", "Importe"]}
                 filas={topServicios.map((row) => [row.nombre ?? "Servicio", String(row.unidades), fmt(row.importe)])}
@@ -440,7 +310,15 @@ export default async function ReportesPage({ searchParams }: Props) {
             </AdminCard>
           </div>
 
-          <AdminCard description="Citas agendadas por profesional" title="Productividad del equipo">
+          <AdminCard
+            actions={
+              <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/agenda?${filtrosExport}`}>
+                Ver agenda →
+              </Link>
+            }
+            description="Citas agendadas por profesional"
+            title="Productividad del equipo"
+          >
             <Tabla
               encabezados={["Profesional", "Citas", "Completadas", "Minutos agendados"]}
               filas={profesionales.map((row) => [
@@ -452,19 +330,70 @@ export default async function ReportesPage({ searchParams }: Props) {
               vacio="Sin citas asignadas en el rango."
             />
           </AdminCard>
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <AdminCard description="De dónde vienen las citas del período" title="Origen de las citas">
+              <Tabla
+                encabezados={["Origen", "Citas"]}
+                filas={citasPorOrigen
+                  .sort((a, b) => b.total - a.total)
+                  .map((row) => [ORIGEN_LABEL[row.origen] ?? row.origen, String(row.total)])}
+                vacio="Sin citas en el rango."
+              />
+            </AdminCard>
+            <AdminCard
+              description="Avisos de correo generados en el período. «Aceptado» significa que el proveedor recibió el envío; no garantiza lectura."
+              title="Avisos por correo"
+            >
+              <Tabla
+                encabezados={["Estado", "Avisos"]}
+                filas={[
+                  ["Aceptados por el proveedor", String(avisosEnviados)],
+                  ["Fallidos", String(avisosFallidos)],
+                  ["Omitidos (obsoletos)", String(avisosOmitidos)],
+                  ["En cola / enviando", String(avisosPendientes)],
+                  ["Reintentos acumulados", String(avisosReintentos)],
+                ]}
+                vacio="Sin avisos generados en el rango."
+              />
+              {avisosFallidos > 0 ? (
+                <p className="mt-3 rounded-xl bg-[#fbeaea] px-4 py-3 text-xs font-medium text-[#8f3f2c]">
+                  {avisosFallidos} aviso(s) agotaron sus reintentos. Revisa los correos de tus clientes o contacta soporte.
+                </p>
+              ) : null}
+            </AdminCard>
+          </div>
         </>
       ) : null}
 
       {puedeFinancieros ? (
         <>
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <Kpi label="Vendido" value={fmt(vendido)} />
-            <Kpi label="Ticket promedio" value={operaciones > 0 ? fmt(vendido / operaciones) : "—"} hint={`${operaciones} venta(s)`} />
+          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Kpi
+              hint={etiquetaDelta(deltaKpi(vendido, vendidoAnt))}
+              label="Vendido"
+              value={fmt(vendido)}
+            />
+            <Kpi
+              hint={`${operaciones} venta(s)${operacionesAnt > 0 ? ` · ${etiquetaDelta(deltaKpi(operaciones, operacionesAnt))}` : ""}`}
+              label="Ticket promedio"
+              value={operaciones > 0 ? fmt(vendido / operaciones) : "—"}
+            />
             <Kpi label="Propinas" value={fmt(propinasTotal)} />
+            <Kpi
+              hint={devolucionesOps > 0 ? `${devolucionesOps} devolución(es) por ${fmt(devolucionesTotal)} en el periodo` : "sin devoluciones en el periodo"}
+              label="Devoluciones"
+              value={fmt(devolucionesTotal)}
+            />
             <Kpi
               label="Descuentos"
               value={fmt(descuentosTotal)}
               hint={`manual ${fmt(descuentosRow?.manual)} · promo ${fmt(descuentosRow?.promocion)} · membresía ${fmt(descuentosRow?.membresia)}`}
+            />
+            <Kpi
+              hint={`${fmt(anticiposRow?.aplicados)} aplicados a ventas · ${fmt(anticiposRow?.vigentes)} vigentes`}
+              label="Anticipos cobrados"
+              value={fmt(anticiposRow?.cobrados)}
             />
             <Kpi
               label="Gastos"
@@ -478,8 +407,24 @@ export default async function ReportesPage({ searchParams }: Props) {
             />
           </section>
 
+          {num(productosSinCosto[0]?.unidades) > 0 ? (
+            <p className="rounded-xl border border-[#efd9a8] bg-[#fdf6e7] px-4 py-3 text-sm text-[#7a5b23]">
+              {productosSinCosto[0]?.productos} producto(s) vendidos en el periodo no tienen costo capturado
+              ({productosSinCosto[0]?.unidades} unidad(es)). El «resultado estimado» no descuenta costo de
+              insumos — captura el costo en el catálogo para márgenes reales.
+            </p>
+          ) : null}
+
           <div className="grid gap-6 lg:grid-cols-2">
-            <AdminCard description="Ventas cobradas por día" title="Ventas por día">
+            <AdminCard
+              actions={
+                <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/ventas?${filtrosExport}`}>
+                  Ver historial →
+                </Link>
+              }
+              description="Ventas cobradas por día"
+              title="Ventas por día"
+            >
               <div className="mb-4">
                 <BarChart
                   formato={(v) => fmt(v)}
@@ -523,19 +468,35 @@ export default async function ReportesPage({ searchParams }: Props) {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <AdminCard description="Devengado en ventas cobradas vs. pagado (liquidaciones del periodo)" title="Comisiones y propinas por profesional">
+            <AdminCard
+              actions={
+                <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/comisiones?${filtrosExport}`}>
+                  Ver detalle →
+                </Link>
+              }
+              description="Devengado en ventas cobradas vs. pagado (liquidaciones del periodo)"
+              title="Comisiones y propinas por profesional"
+            >
               <Tabla
                 encabezados={["Profesional", "Devengado", "Pagado", "Propinas"]}
-                filas={profesionalRows.map(([nombre, valores]) => [
-                  nombre,
-                  fmt(valores.comisiones),
-                  fmt(valores.liquidadas),
-                  fmt(valores.propinas),
+                filas={profesionalRows.map((row) => [
+                  row.nombre,
+                  fmt(row.comisiones),
+                  fmt(row.liquidadas),
+                  fmt(row.propinas),
                 ])}
                 vacio="Sin comisiones ni propinas en el rango."
               />
             </AdminCard>
-            <AdminCard description="Gastos confirmados del periodo por categoría" title="Gastos por categoría">
+            <AdminCard
+              actions={
+                <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/gastos?${filtrosExport}`}>
+                  Ver detalle →
+                </Link>
+              }
+              description="Gastos confirmados del periodo por categoría"
+              title="Gastos por categoría"
+            >
               <div className="mb-4">
                 <HBarChart
                   color="#a76348"
@@ -579,11 +540,17 @@ export default async function ReportesPage({ searchParams }: Props) {
             ["Vendido", "Suma del total de ventas cobradas en el rango, por fecha de cobro. Las ventas canceladas no suman."],
             ["Ticket promedio", "Vendido ÷ número de ventas cobradas del rango."],
             ["Asistencia", "Citas completadas ÷ citas finalizadas (completadas + no asistió + canceladas tardías)."],
+            ["Clientes nuevos", "Personas cuya primera atención completada cayó dentro del rango (no la fecha de alta en el sistema)."],
+            ["Reservas en línea", "Citas creadas desde el portal público de reservas (origen web)."],
+            ["Devoluciones", "Dinero devuelto a clientes por devoluciones registradas en el rango."],
+            ["Anticipos cobrados", "Apartados cobrados en el rango. No son venta: se vuelven venta al aplicarse contra un cobro completado."],
+            ["Periodo anterior", "Rango de la misma duración inmediatamente previo al seleccionado; se calcula idéntico."],
             ["Devengado", "Comisión generada por las ventas cobradas del rango, aunque aún no se pague."],
             ["Pagado", "Comisiones cuya liquidación se confirmó dentro del rango, aunque la venta sea de otra fecha."],
             ["Resultado estimado", "Vendido − gastos confirmados. No es utilidad contable: falta costo de productos e impuestos."],
             ["Diferencias de corte", "Cierres donde el efectivo contado no coincidió con el esperado del sistema."],
             ["Cobros por medio", "Pagos del rango por medio de pago, incluyendo correcciones de medio posteriores al cobro."],
+            ["Avisos", "Correos de confirmación, cambio, cancelación y recordatorio generados en el rango. «Aceptado» = el proveedor recibió el envío; no garantiza que el cliente lo haya leído."],
           ].map(([termino, definicion]) => (
             <div key={termino}>
               <dt className="font-medium text-[#403a35]">{termino}</dt>
