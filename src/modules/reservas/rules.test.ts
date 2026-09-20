@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { slotsDisponiblesDia, validarDatosReserva, normalizarContacto } from "./rules";
+import {
+  dentroDeVentanaReserva,
+  normalizarContacto,
+  puedeGestionarCita,
+  rateLimitExcedido,
+  slotsDisponiblesDia,
+  validarDatosReserva,
+} from "./rules";
+import { generarTokenGestion, hashTokenGestion } from "./gestion";
 
 const TZ = "America/Mexico_City";
 
@@ -119,5 +127,96 @@ describe("normalizarContacto", () => {
     expect(normalizarContacto(" Maria@Correo.COM ")).toBe("maria@correo.com");
     expect(normalizarContacto("  ")).toBeNull();
     expect(normalizarContacto(undefined)).toBeNull();
+  });
+});
+
+describe("dentroDeVentanaReserva", () => {
+  const politica = { cancelacionHoras: 24, anticipacionMinutos: 120, horizonteDias: 14 };
+  const ahora = new Date("2026-03-01T18:00:00Z");
+
+  it("acepta un horario dentro de la ventana", () => {
+    const fecha = new Date(ahora.getTime() + 3 * 24 * 60 * 60_000);
+    expect(dentroDeVentanaReserva(fecha, politica, ahora).ok).toBe(true);
+  });
+
+  it("rechaza horarios dentro de la anticipación mínima", () => {
+    const fecha = new Date(ahora.getTime() + 60 * 60_000); // 1 h < 2 h mínimas
+    const res = dentroDeVentanaReserva(fecha, politica, ahora);
+    expect(res.ok).toBe(false);
+  });
+
+  it("rechaza fechas más allá del horizonte", () => {
+    const fecha = new Date(ahora.getTime() + 20 * 24 * 60 * 60_000);
+    expect(dentroDeVentanaReserva(fecha, politica, ahora).ok).toBe(false);
+  });
+
+  it("acepta el límite exacto del horizonte", () => {
+    const fecha = new Date(ahora.getTime() + politica.horizonteDias * 24 * 60 * 60_000);
+    expect(dentroDeVentanaReserva(fecha, politica, ahora).ok).toBe(true);
+  });
+});
+
+describe("puedeGestionarCita", () => {
+  const ahora = new Date("2026-03-01T18:00:00Z");
+  const politica = { cancelacionHoras: 24 };
+
+  it("permite gestionar una cita confirmada fuera del corte", () => {
+    const cita = { fechaHora: new Date(ahora.getTime() + 48 * 60 * 60_000), estado: "confirmada", activo: true };
+    expect(puedeGestionarCita(cita, politica, ahora).puede).toBe(true);
+  });
+
+  it("rechaza dentro del plazo de corte", () => {
+    const cita = { fechaHora: new Date(ahora.getTime() + 12 * 60 * 60_000), estado: "confirmada", activo: true };
+    const res = puedeGestionarCita(cita, politica, ahora);
+    expect(res.puede).toBe(false);
+    if (!res.puede) expect(res.motivo).toContain("24 h");
+  });
+
+  it("rechaza citas canceladas o completadas", () => {
+    const base = { fechaHora: new Date(ahora.getTime() + 48 * 60 * 60_000), activo: true };
+    expect(puedeGestionarCita({ ...base, estado: "cancelada" }, politica, ahora).puede).toBe(false);
+    expect(puedeGestionarCita({ ...base, estado: "completada" }, politica, ahora).puede).toBe(false);
+  });
+
+  it("rechaza citas inactivas", () => {
+    const cita = { fechaHora: new Date(ahora.getTime() + 48 * 60 * 60_000), estado: "confirmada", activo: false };
+    expect(puedeGestionarCita(cita, politica, ahora).puede).toBe(false);
+  });
+});
+
+describe("rateLimitExcedido", () => {
+  const ahora = new Date("2026-03-01T18:00:00Z");
+  const limite = { limite: 3, ventanaMs: 60 * 60_000 };
+
+  it("no excede con menos eventos que el límite", () => {
+    const eventos = [new Date(ahora.getTime() - 10_000), new Date(ahora.getTime() - 20_000)];
+    expect(rateLimitExcedido(eventos, limite, ahora)).toBe(false);
+  });
+
+  it("excede al alcanzar el límite dentro de la ventana", () => {
+    const eventos = [1, 2, 3].map((i) => new Date(ahora.getTime() - i * 1000));
+    expect(rateLimitExcedido(eventos, limite, ahora)).toBe(true);
+  });
+
+  it("ignora eventos fuera de la ventana", () => {
+    const eventos = [1, 2, 3].map((i) => new Date(ahora.getTime() - (limite.ventanaMs + i * 1000)));
+    expect(rateLimitExcedido(eventos, limite, ahora)).toBe(false);
+  });
+});
+
+describe("tokens de gestión", () => {
+  it("el hash es sha256 hex de 64 caracteres y determinista", () => {
+    const hash = hashTokenGestion("token-de-prueba");
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(hashTokenGestion("token-de-prueba")).toBe(hash);
+    expect(hashTokenGestion("otro")).not.toBe(hash);
+  });
+
+  it("genera tokens únicos de 64 caracteres hex", () => {
+    const a = generarTokenGestion();
+    const b = generarTokenGestion();
+    expect(a).toMatch(/^[0-9a-f]{64}$/);
+    expect(b).toMatch(/^[0-9a-f]{64}$/);
+    expect(a).not.toBe(b);
   });
 });

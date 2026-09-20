@@ -35,6 +35,10 @@ export function slotsDisponiblesDia(params: {
   /** Instante actual; slots que inicien antes se omiten. */
   ahora?: Date;
   pasoMinutos?: number;
+  /** Profesional asignado; null/omitido = carril "sin asignar". */
+  usuarioId?: string | null;
+  /** Cita a ignorar al medir traslapes (p.ej. la que se reagenda). */
+  ignoreCitaId?: string;
 }): Date[] {
   const {
     diaKey,
@@ -43,6 +47,8 @@ export function slotsDisponiblesDia(params: {
     zonaHoraria,
     capacidadSinAsignar,
     pasoMinutos = 30,
+    usuarioId = null,
+    ignoreCitaId,
   } = params;
   const ahoraMs = params.ahora?.getTime() ?? 0;
   if (!Number.isInteger(duracionMinutos) || duracionMinutos <= 0 || pasoMinutos <= 0) return [];
@@ -61,7 +67,7 @@ export function slotsDisponiblesDia(params: {
       const inicio = localDateTimeToUtc(`${diaKey}T${hh}:${mm}`, zonaHoraria);
       if (!inicio || inicio.getTime() <= ahoraMs) continue;
 
-      const candidato = { ...intervalFromDates(inicio, duracionMinutos), usuarioId: null };
+      const candidato = { ...intervalFromDates(inicio, duracionMinutos), usuarioId };
       const disponible = validateCitaAvailability({
         candidato,
         diaSemana,
@@ -72,6 +78,7 @@ export function slotsDisponiblesDia(params: {
         citas: ocupacion.citas,
         recursos: ocupacion.recursos,
         capacidadSinAsignar,
+        ignoreCitaId,
       });
       if (disponible.ok) slots.push(inicio);
     }
@@ -112,3 +119,92 @@ export function validarDatosReserva(input: ReservaClienteInput): { ok: true } | 
   }
   return { ok: true };
 }
+
+/* ------------------------------------------------------------------ */
+/* Autogestión pública: ventana de reserva, edición y antiabuso          */
+/* ------------------------------------------------------------------ */
+
+export type PoliticaReservas = {
+  /** Horas mínimas antes de la cita para cancelar/reagendar en línea. */
+  cancelacionHoras: number;
+  /** Minutos mínimos de anticipación para reservar. */
+  anticipacionMinutos: number;
+  /** Días máximos hacia adelante en que se puede reservar. */
+  horizonteDias: number;
+};
+
+export type CitaGestionable = {
+  fechaHora: Date;
+  estado: string;
+  activo: boolean;
+};
+
+/** Estados de cita que el cliente puede cancelar o reagendar en línea. */
+const ESTADOS_GESTIONABLES = new Set(["pendiente", "confirmada"]);
+
+/**
+ * Ventana de creación: la fecha elegida debe estar al menos
+ * `anticipacionMinutos` en el futuro y no más allá de `horizonteDias`.
+ */
+export function dentroDeVentanaReserva(
+  fechaHora: Date,
+  politica: PoliticaReservas,
+  ahora: Date,
+): { ok: true } | { ok: false; error: string } {
+  const minMs = ahora.getTime() + politica.anticipacionMinutos * 60_000;
+  const maxMs = ahora.getTime() + politica.horizonteDias * 24 * 60 * 60_000;
+  const t = fechaHora.getTime();
+  if (t <= minMs) {
+    return { ok: false, error: "Elige un horario con más anticipación." };
+  }
+  if (t > maxMs) {
+    return { ok: false, error: `Las reservas en línea se abren hasta ${politica.horizonteDias} días.` };
+  }
+  return { ok: true };
+}
+
+/**
+ * Decide si la cita puede editarse desde el enlace público: activa, en estado
+ * gestionable y fuera del plazo de corte (`fechaHora - ahora >= cancelacionHoras`).
+ */
+export function puedeGestionarCita(
+  cita: CitaGestionable,
+  politica: Pick<PoliticaReservas, "cancelacionHoras">,
+  ahora: Date,
+): { puede: true } | { puede: false; motivo: string } {
+  if (!cita.activo) return { puede: false, motivo: "Esta cita ya no está disponible." };
+  if (!ESTADOS_GESTIONABLES.has(cita.estado)) {
+    return { puede: false, motivo: `La cita ya está ${cita.estado} y no puede modificarse en línea.` };
+  }
+  const limiteMs = cita.fechaHora.getTime() - politica.cancelacionHoras * 60 * 60_000;
+  if (ahora.getTime() > limiteMs) {
+    return {
+      puede: false,
+      motivo: `Los cambios en línea cierran ${politica.cancelacionHoras} h antes de la cita. Comunícate con el negocio.`,
+    };
+  }
+  return { puede: true };
+}
+
+/** Evalúa un límite de ventana deslizante sobre timestamps ya cargados. */
+export function rateLimitExcedido(
+  eventos: readonly Date[],
+  params: { limite: number; ventanaMs: number },
+  ahora: Date,
+): boolean {
+  const corte = ahora.getTime() - params.ventanaMs;
+  const recientes = eventos.filter((e) => e.getTime() > corte);
+  return recientes.length >= params.limite;
+}
+
+/** Límites por defecto del antiabuso de reservas. */
+export const LIMITES_RESERVAS = {
+  /** Reservas creadas por contacto (correo/teléfono normalizado) por hora. */
+  porContactoHora: { limite: 6, ventanaMs: 60 * 60_000 },
+  /** Reservas creadas por IP por hora y por organización. */
+  porIpHora: { limite: 30, ventanaMs: 60 * 60_000 },
+  /** Consultas de token por IP por minuto (frena fuerza bruta del enlace). */
+  tokenPorIpMinuto: { limite: 20, ventanaMs: 60_000 },
+  /** Mutaciones (cancelar/reagendar) por token por hora. */
+  gestionPorTokenHora: { limite: 12, ventanaMs: 60 * 60_000 },
+} as const;

@@ -22,6 +22,8 @@ export type AvisoCitaInput = {
   servicioNombre?: string | null;
   /** Nota del negocio (p.ej. política de cancelación), ya en texto plano. */
   nota?: string | null;
+  /** Enlace público de autogestión (`/mi-cita/[token]`) para el correo. */
+  gestionUrl?: string | null;
 };
 
 type Plantilla = { subject: string; titulo: string; mensaje: string };
@@ -88,6 +90,7 @@ export async function sendAvisoCita(tipo: string, input: AvisoCitaInput): Promis
   const antes = input.fechaHoraPreviaTexto ? escapeHtml(input.fechaHoraPreviaTexto) : null;
   const servicio = input.servicioNombre ? escapeHtml(input.servicioNombre) : null;
   const nota = input.nota ? escapeHtml(input.nota) : null;
+  const gestion = input.gestionUrl ? escapeHtml(input.gestionUrl) : null;
   const plantilla = plantillaPorTipo(tipo, input);
 
   const response = await fetch("https://api.brevo.com/v3/smtp/email", {
@@ -113,7 +116,12 @@ export async function sendAvisoCita(tipo: string, input: AvisoCitaInput): Promis
             ${servicio ? `<tr><td style="padding: 4px 12px 4px 0; color: #81746c">Servicio</td><td><strong>${servicio}</strong></td></tr>` : ""}
           </table>
           ${nota ? `<p style="color: #57534e">${nota}</p>` : ""}
-          <p>Si necesitas cambiar o cancelar tu cita, comunícate con el negocio.</p>
+          ${
+            gestion
+              ? `<p style="margin: 20px 0"><a href="${gestion}" style="background: #292522; color: #ffffff; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block">Consultar o modificar mi cita</a></p>
+                 <p style="color: #a8958a; font-size: 12px">Guarda este enlace: con él puedes consultar el estado de tu cita, reagendarla o cancelarla según la política del negocio.</p>`
+              : `<p>Si necesitas cambiar o cancelar tu cita, comunícate con el negocio.</p>`
+          }
           <p style="color: #a8958a; font-size: 12px">Enviado por Beauty POS a nombre de ${escapeHtml(input.nombreNegocio)}.</p>
         </main>
       `,

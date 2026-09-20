@@ -9,9 +9,10 @@ import type { NodePgDatabase, NodePgTransaction } from "drizzle-orm/node-postgre
 
 import { clientes, organizaciones, relUsuariosSucursales, sucursales } from "@/db/schema/core";
 import { bloqueosAgenda, citaRecursos, citas, citasHistorial, horariosSucursales, recursos } from "@/db/schema/operations";
-import { ESTADOS_CITA_INACTIVOS } from "./types";
+import { ESTADOS_CITA_INACTIVOS, intervalFromDates, type DisponibilidadResult } from "./types";
 import type { BloqueoLike, CitaLike, RecursoLike, TurnoDia } from "./rules";
-import { resolveTimeZone } from "./timezone";
+import { validateCitaAvailability } from "./rules";
+import { getZonedParts, resolveTimeZone } from "./timezone";
 
 type Schema = typeof import("@/db/schema");
 
@@ -289,4 +290,61 @@ export function toCitaLike(row: {
     estado: row.estado,
     activo: row.activo ?? true,
   };
+}
+
+/** Recursos activos asignados actualmente a la cita. */
+export async function recursosDeCita(db: AgendaDb, citaId: string): Promise<string[]> {
+  const rows = await db
+    .select({ recursoId: citaRecursos.recursoId })
+    .from(citaRecursos)
+    .where(and(eq(citaRecursos.citaId, citaId), eq(citaRecursos.activo, true)));
+  return rows.map((r) => r.recursoId);
+}
+
+/** Convierte las violaciones de disponibilidad en un mensaje para el usuario. */
+export function violacionesAError(disponibilidad: DisponibilidadResult): string {
+  return disponibilidad.violaciones.map((v) => v.mensaje).join(" ") || "La cita no está disponible en ese horario.";
+}
+
+/**
+ * Valida la disponibilidad de una cita candidata contra la agenda real de la
+ * sucursal: horario de atención, bloqueos, traslapes, profesional y recursos.
+ * Debe llamarse dentro de la transacción que ya tomó `lockSucursalAgenda`.
+ */
+export async function validarDisponibilidadCita(
+  db: AgendaDb,
+  params: {
+    organizacionId: string;
+    sucursalId: string;
+    usuarioId: string | null;
+    fechaHora: Date;
+    duracionMinutos: number;
+    zonaHoraria: string;
+    ignoreCitaId?: string | null;
+    capacidadSinAsignar?: number;
+    /** Recursos que ocupará la cita (default: los que ya tiene asignados). */
+    recursoIds?: readonly string[];
+  },
+): Promise<DisponibilidadResult> {
+  const candidato = intervalFromDates(params.fechaHora, params.duracionMinutos);
+  const partes = getZonedParts(params.fechaHora, params.zonaHoraria);
+  const ocupacion = await getOcupacionAgenda(db, {
+    organizacionId: params.organizacionId,
+    sucursalId: params.sucursalId,
+    desde: new Date(candidato.iniciaAtMs),
+    hasta: new Date(candidato.terminaAtMs),
+  });
+  return validateCitaAvailability({
+    candidato: { ...candidato, usuarioId: params.usuarioId },
+    diaSemana: partes.diaSemana,
+    iniciaMinutosLocal: partes.minutosDelDia,
+    duracionMinutos: params.duracionMinutos,
+    horarios: ocupacion.horarios,
+    bloqueos: ocupacion.bloqueos,
+    citas: ocupacion.citas,
+    recursoIds: params.recursoIds,
+    recursos: ocupacion.recursos,
+    ignoreCitaId: params.ignoreCitaId,
+    capacidadSinAsignar: params.capacidadSinAsignar,
+  });
 }

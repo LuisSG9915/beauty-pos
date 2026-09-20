@@ -30,7 +30,6 @@ import {
   canTransitionEstado,
   isCitaEditable,
   sugerirHorariosLibres,
-  validateCitaAvailability,
   type AgendaDb,
   type CitaRow,
 } from "@/modules/agenda";
@@ -41,12 +40,15 @@ import {
   getOcupacionAgenda,
   lockSucursalAgenda,
   profesionalAsignadoASucursal,
+  recursosDeCita,
   registrarHistorialCita,
+  validarDisponibilidadCita,
   versionCoincide,
+  violacionesAError,
 } from "@/modules/agenda/service";
-import { getZonedParts, parseFechaHoraInput } from "@/modules/agenda/timezone";
-import { intervalFromDates, type DisponibilidadResult } from "@/modules/agenda/types";
+import { parseFechaHoraInput } from "@/modules/agenda/timezone";
 import { requiereCapacidad } from "@/modules/billing/queries";
+import { emitirTokenGestion } from "@/modules/reservas/gestion";
 import { encolarAvisoCita } from "@/modules/notificaciones/service";
 import { TIPO_CAMBIO, TIPO_CANCELACION, TIPO_CONFIRMACION } from "@/modules/notificaciones/rules";
 
@@ -79,48 +81,6 @@ const citaSchema = z.object({
   // Concurrencia optimista: versión leída al abrir el formulario.
   version: z.coerce.number().int().min(1).optional(),
 });
-
-function violacionesAError(disponibilidad: DisponibilidadResult): string {
-  return disponibilidad.violaciones.map((v) => v.mensaje).join(" ") || "La cita no está disponible en ese horario.";
-}
-
-async function validarDisponibilidadCita(
-  tx: AgendaDb,
-  params: {
-    organizacionId: string;
-    sucursalId: string;
-    usuarioId: string | null;
-    fechaHora: Date;
-    duracionMinutos: number;
-    zonaHoraria: string;
-    ignoreCitaId?: string | null;
-    capacidadSinAsignar?: number;
-    /** Recursos que ocupará la cita (default: los que ya tiene asignados). */
-    recursoIds?: readonly string[];
-  },
-): Promise<DisponibilidadResult> {
-  const candidato = intervalFromDates(params.fechaHora, params.duracionMinutos);
-  const partes = getZonedParts(params.fechaHora, params.zonaHoraria);
-  const ocupacion = await getOcupacionAgenda(tx, {
-    organizacionId: params.organizacionId,
-    sucursalId: params.sucursalId,
-    desde: new Date(candidato.iniciaAtMs),
-    hasta: new Date(candidato.terminaAtMs),
-  });
-  return validateCitaAvailability({
-    candidato: { ...candidato, usuarioId: params.usuarioId },
-    diaSemana: partes.diaSemana,
-    iniciaMinutosLocal: partes.minutosDelDia,
-    duracionMinutos: params.duracionMinutos,
-    horarios: ocupacion.horarios,
-    bloqueos: ocupacion.bloqueos,
-    citas: ocupacion.citas,
-    recursoIds: params.recursoIds,
-    recursos: ocupacion.recursos,
-    ignoreCitaId: params.ignoreCitaId,
-    capacidadSinAsignar: params.capacidadSinAsignar,
-  });
-}
 
 /** Días calendario que explora la búsqueda de sugerencias tras un conflicto. */
 const SUGERENCIA_DIAS = 4;
@@ -159,15 +119,6 @@ async function sugerenciasEnConflicto(
     capacidadSinAsignar: params.capacidadSinAsignar,
     ignoreCitaId: params.ignoreCitaId,
   }).map((inicio) => inicio.toISOString());
-}
-
-/** Recursos activos asignados actualmente a la cita. */
-async function recursosDeCita(tx: AgendaDb, citaId: string): Promise<string[]> {
-  const rows = await tx
-    .select({ recursoId: citaRecursos.recursoId })
-    .from(citaRecursos)
-    .where(and(eq(citaRecursos.citaId, citaId), eq(citaRecursos.activo, true)));
-  return rows.map((r) => r.recursoId);
 }
 
 /** Upsert de asignaciones cita↔recurso (mismo patrón que servicios). */
@@ -391,7 +342,18 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
         },
       });
       if (!previa) {
-        await encolarAvisoCita(tx, { organizacionId: input.organizacionId, citaId, tipo: TIPO_CONFIRMACION });
+        // El cliente puede autogestionar la cita: el enlace llega en el correo
+        // de confirmación (mismo canal que las reservas web).
+        const gestion = await emitirTokenGestion(tx, {
+          organizacionId: input.organizacionId,
+          citaId,
+        });
+        await encolarAvisoCita(tx, {
+          organizacionId: input.organizacionId,
+          citaId,
+          tipo: TIPO_CONFIRMACION,
+          gestionUrl: gestion?.url ?? null,
+        });
       } else if (fechaHora.getTime() !== previa.fechaHora.getTime()) {
         await encolarAvisoCita(tx, {
           organizacionId: input.organizacionId,
@@ -603,7 +565,18 @@ export async function updateCitaEstado(formData: FormData): Promise<CitaMutation
       if (input.estado === "cancelada") {
         await encolarAvisoCita(tx, { organizacionId: input.organizacionId, citaId: cita.id, tipo: TIPO_CANCELACION });
       } else if (input.estado === "confirmada") {
-        await encolarAvisoCita(tx, { organizacionId: input.organizacionId, citaId: cita.id, tipo: TIPO_CONFIRMACION });
+        // Citas sin token (legadas o internas) reciben su enlace de
+        // autogestión en el correo de confirmación.
+        const gestion = await emitirTokenGestion(tx, {
+          organizacionId: input.organizacionId,
+          citaId: cita.id,
+        });
+        await encolarAvisoCita(tx, {
+          organizacionId: input.organizacionId,
+          citaId: cita.id,
+          tipo: TIPO_CONFIRMACION,
+          gestionUrl: gestion?.url ?? null,
+        });
       } else if (input.estado === "pendiente" && fechaHora.getTime() !== cita.fechaHora.getTime()) {
         await encolarAvisoCita(tx, {
           organizacionId: input.organizacionId,
@@ -773,11 +746,18 @@ async function moverCitaEnTx(
     },
   });
   if (fechaHora.getTime() !== cita.fechaHora.getTime()) {
+    // Si la cita aún no tiene enlace de autogestión (legada), el correo de
+    // cambio lo entrega; si ya lo tiene, el enlace original sigue vigente.
+    const gestion = await emitirTokenGestion(tx, {
+      organizacionId: input.organizacionId,
+      citaId: cita.id,
+    });
     await encolarAvisoCita(tx, {
       organizacionId: input.organizacionId,
       citaId: cita.id,
       tipo: TIPO_CAMBIO,
       fechaHoraPrevia: cita.fechaHora,
+      gestionUrl: gestion?.url ?? null,
     });
   }
   return { success: true, message: opts.reactivarAPendiente ? "Cita reagendada a pendiente." : "Cita movida." };
@@ -1091,6 +1071,9 @@ export async function updateReservasConfig(formData: FormData): Promise<CitaMuta
       sucursalId: z.string().uuid(),
       reservasOnline: z.coerce.boolean(),
       reservasAutoConfirmar: z.coerce.boolean(),
+      reservasCancelacionHoras: z.coerce.number().int().min(0).max(720).optional(),
+      reservasAnticipacionMinutos: z.coerce.number().int().min(0).max(10080).optional(),
+      reservasHorizonteDias: z.coerce.number().int().min(1).max(365).optional(),
     })
     .safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) return { success: false, error: "Configuración inválida." };
@@ -1115,6 +1098,15 @@ export async function updateReservasConfig(formData: FormData): Promise<CitaMuta
       .set({
         reservasOnline: input.reservasOnline,
         reservasAutoConfirmar: input.reservasOnline ? input.reservasAutoConfirmar : false,
+        ...(input.reservasCancelacionHoras !== undefined
+          ? { reservasCancelacionHoras: input.reservasCancelacionHoras }
+          : {}),
+        ...(input.reservasAnticipacionMinutos !== undefined
+          ? { reservasAnticipacionMinutos: input.reservasAnticipacionMinutos }
+          : {}),
+        ...(input.reservasHorizonteDias !== undefined
+          ? { reservasHorizonteDias: input.reservasHorizonteDias }
+          : {}),
         updatedBy: access.user.id,
       })
       .where(and(eq(sucursales.id, input.sucursalId), eq(sucursales.organizacionId, input.organizacionId)));
@@ -1128,6 +1120,9 @@ export async function updateReservasConfig(formData: FormData): Promise<CitaMuta
       detalle: {
         reservasOnline: input.reservasOnline,
         reservasAutoConfirmar: input.reservasAutoConfirmar,
+        reservasCancelacionHoras: input.reservasCancelacionHoras,
+        reservasAnticipacionMinutos: input.reservasAnticipacionMinutos,
+        reservasHorizonteDias: input.reservasHorizonteDias,
       },
     });
   });

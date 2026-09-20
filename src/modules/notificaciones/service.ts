@@ -33,7 +33,7 @@ const FRECUENCIA_CRON_MINUTOS = 30;
 const LOTE_SCAN = 400;
 const LOTE_DRAIN = 100;
 
-type AvisoDetalle = { fechaHoraPrevia?: string | null } | null;
+type AvisoDetalle = { fechaHoraPrevia?: string | null; gestionUrl?: string | null } | null;
 
 /**
  * Encola un aviso ligado a la versión actual de la cita, dentro de la misma
@@ -49,6 +49,8 @@ export async function encolarAvisoCita(
     tipo: TipoNotificacion;
     /** Solo para `cambio`: horario previo para el correo. */
     fechaHoraPrevia?: Date | null;
+    /** Enlace de autogestión `/mi-cita/[token]` para el correo (solo claro). */
+    gestionUrl?: string | null;
     ahora?: Date;
   },
 ): Promise<void> {
@@ -87,7 +89,13 @@ export async function encolarAvisoCita(
       fechaHoraSnapshot: row.fechaHora,
       versionCita: row.version,
       programadoPara,
-      detalle: params.fechaHoraPrevia ? { fechaHoraPrevia: params.fechaHoraPrevia.toISOString() } : null,
+      detalle:
+        params.fechaHoraPrevia || params.gestionUrl
+          ? {
+              fechaHoraPrevia: params.fechaHoraPrevia?.toISOString() ?? null,
+              gestionUrl: params.gestionUrl ?? null,
+            }
+          : null,
     })
     .onConflictDoNothing({
       target: [notificacionesEnvios.citaId, notificacionesEnvios.tipo, notificacionesEnvios.versionCita],
@@ -347,6 +355,7 @@ export async function procesarNotificaciones(ahora = new Date()): Promise<Result
           ? formatoFechaHora(new Date(detalleAviso.fechaHoraPrevia), zonaHoraria)
           : null,
         servicioNombre: detalle?.nombre ?? null,
+        gestionUrl: detalleAviso?.gestionUrl ?? null,
       });
 
       await db

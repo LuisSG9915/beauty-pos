@@ -114,6 +114,9 @@ export async function getSucursalReservable(organizacionId: string, sucursalId: 
       reservasOnline: sucursales.reservasOnline,
       autoConfirmar: sucursales.reservasAutoConfirmar,
       capacidadSinAsignar: sucursales.capacidadSinAsignar,
+      anticipacionMinutos: sucursales.reservasAnticipacionMinutos,
+      horizonteDias: sucursales.reservasHorizonteDias,
+      cancelacionHoras: sucursales.reservasCancelacionHoras,
       zonaHoraria: sucursales.zonaHoraria,
       orgZonaHoraria: organizaciones.zonaHoraria,
     })
@@ -134,6 +137,9 @@ export async function getSucursalReservable(organizacionId: string, sucursalId: 
     nombre: row.nombre,
     autoConfirmar: row.autoConfirmar && tieneCapacidad(suscripcion, "reservas_auto_confirmar"),
     capacidadSinAsignar: row.capacidadSinAsignar,
+    anticipacionMinutos: row.anticipacionMinutos,
+    horizonteDias: row.horizonteDias,
+    cancelacionHoras: row.cancelacionHoras,
     zonaHoraria: resolveTimeZone(row.zonaHoraria, row.orgZonaHoraria),
   };
 }

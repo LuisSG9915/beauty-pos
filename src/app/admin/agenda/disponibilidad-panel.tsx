@@ -138,6 +138,9 @@ export function DisponibilidadPanel({
   capacidadSinAsignar,
   reservasOnline,
   reservasAutoConfirmar,
+  reservasCancelacionHoras,
+  reservasAnticipacionMinutos,
+  reservasHorizonteDias,
   recordatoriosActivos,
   recordatoriosHorasAntes,
   permiteReservasOnline,
@@ -157,6 +160,10 @@ export function DisponibilidadPanel({
   capacidadSinAsignar: number;
   reservasOnline: boolean;
   reservasAutoConfirmar: boolean;
+  /** Política pública de la sucursal: corte de cambios, anticipación y horizonte. */
+  reservasCancelacionHoras: number;
+  reservasAnticipacionMinutos: number;
+  reservasHorizonteDias: number;
   recordatoriosActivos: boolean;
   recordatoriosHorasAntes: number;
   /** Capacidades del plan vigente: la UI deshabilita lo que el plan no incluye. */
@@ -173,6 +180,9 @@ export function DisponibilidadPanel({
   const [capacidad, setCapacidad] = useState(String(capacidadSinAsignar));
   const [reservas, setReservas] = useState(reservasOnline);
   const [autoConfirmar, setAutoConfirmar] = useState(reservasAutoConfirmar);
+  const [cancelacionHoras, setCancelacionHoras] = useState(String(reservasCancelacionHoras));
+  const [anticipacionMinutos, setAnticipacionMinutos] = useState(String(reservasAnticipacionMinutos));
+  const [horizonteDias, setHorizonteDias] = useState(String(reservasHorizonteDias));
   const [recordatorios, setRecordatorios] = useState(recordatoriosActivos);
   const [horasAntes, setHorasAntes] = useState(String(recordatoriosHorasAntes));
   const [bloqueoTipo, setBloqueoTipo] = useState<(typeof BLOQUEO_TIPOS)[number]>("personal");
@@ -279,6 +289,9 @@ export function DisponibilidadPanel({
     data.set("sucursalId", sucursalId);
     data.set("reservasOnline", String(reservas));
     data.set("reservasAutoConfirmar", String(autoConfirmar));
+    data.set("reservasCancelacionHoras", cancelacionHoras);
+    data.set("reservasAnticipacionMinutos", anticipacionMinutos);
+    data.set("reservasHorizonteDias", horizonteDias);
     run(updateReservasConfig(data), "No se pudo actualizar las reservas en línea.");
   };
 
@@ -437,6 +450,47 @@ export function DisponibilidadPanel({
                     ) : null}
                   </span>
                 </label>
+                <div className="grid gap-3 pl-6 sm:grid-cols-3">
+                  <label className="text-xs font-medium text-[#625b55]">
+                    Anticipación mínima (min)
+                    <input
+                      className="mt-1 w-full rounded-lg border border-[#e5d9d0] px-3 py-2 text-sm disabled:opacity-50"
+                      min={0}
+                      onChange={(event) => setAnticipacionMinutos(event.target.value)}
+                      type="number"
+                      value={anticipacionMinutos}
+                    />
+                    <span className="mt-0.5 block font-normal text-[#81746c]">
+                      Reservas con al menos esta anticipación.
+                    </span>
+                  </label>
+                  <label className="text-xs font-medium text-[#625b55]">
+                    Horizonte (días)
+                    <input
+                      className="mt-1 w-full rounded-lg border border-[#e5d9d0] px-3 py-2 text-sm disabled:opacity-50"
+                      min={1}
+                      onChange={(event) => setHorizonteDias(event.target.value)}
+                      type="number"
+                      value={horizonteDias}
+                    />
+                    <span className="mt-0.5 block font-normal text-[#81746c]">
+                      Qué tan adelante pueden reservar.
+                    </span>
+                  </label>
+                  <label className="text-xs font-medium text-[#625b55]">
+                    Corte de cambios (h)
+                    <input
+                      className="mt-1 w-full rounded-lg border border-[#e5d9d0] px-3 py-2 text-sm disabled:opacity-50"
+                      min={0}
+                      onChange={(event) => setCancelacionHoras(event.target.value)}
+                      type="number"
+                      value={cancelacionHoras}
+                    />
+                    <span className="mt-0.5 block font-normal text-[#81746c]">
+                      Cancelar/reagendar en línea hasta antes de la cita.
+                    </span>
+                  </label>
+                </div>
                 <p className="break-all rounded-lg bg-[#f4f1ee] px-3 py-2 text-xs text-[#625b55]">
                   Enlace para tus clientes:{" "}
                   <span className="font-medium text-[#8a5140]">/reservar/{organizacionSlug}</span>
@@ -447,7 +501,11 @@ export function DisponibilidadPanel({
               className="rounded-xl"
               disabled={
                 pending ||
-                (reservas === reservasOnline && (autoConfirmar === reservasAutoConfirmar || !reservas))
+                (reservas === reservasOnline &&
+                  (autoConfirmar === reservasAutoConfirmar || !reservas) &&
+                  cancelacionHoras === String(reservasCancelacionHoras) &&
+                  anticipacionMinutos === String(reservasAnticipacionMinutos) &&
+                  horizonteDias === String(reservasHorizonteDias))
               }
               onClick={guardarReservas}
               type="button"

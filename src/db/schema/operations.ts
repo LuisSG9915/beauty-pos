@@ -964,3 +964,47 @@ export const notificacionesEnvios = pgTable(
     ),
   ],
 );
+
+/**
+ * Token de autogestión de una cita pública (/mi-cita/[token]). Se guarda solo
+ * el hash SHA-256 del token; el enlace con el token en claro se entrega una
+ * sola vez (pantalla de éxito y correo). Quien tiene el enlace puede consultar
+ * el estado, cancelar y reagendar según la política de la sucursal.
+ */
+export const reservasGestionTokens = pgTable(
+  "reservas_gestion_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizacionId: uuid("organizacion_id").notNull().references(() => organizaciones.id),
+    citaId: uuid("cita_id").notNull().references(() => citas.id),
+    tokenHash: varchar("token_hash", { length: 64 }).notNull(),
+    ultimoUsoAt: timestamp("ultimo_uso_at", { withTimezone: true }),
+    revocadoAt: timestamp("revocado_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("reservas_gestion_tokens_cita_uq").on(table.citaId),
+    uniqueIndex("reservas_gestion_tokens_hash_uq").on(table.tokenHash),
+    index("reservas_gestion_tokens_organizacion_idx").on(table.organizacionId),
+  ],
+);
+
+/**
+ * Eventos para rate limiting persistente (antiabuso de reservas públicas y
+ * búsquedas por token). Sobrevive a reinicios del servidor a diferencia de un
+ * contador en memoria. Se podan filas viejas en cada escritura.
+ */
+export const rateLimitEventos = pgTable(
+  "rate_limit_eventos",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    /** Ámbito: reserva_create | reserva_manage | token_lookup */
+    bucket: varchar("bucket", { length: 40 }).notNull(),
+    /** Clave del límite, p.ej. `org:ip` o `contacto:<hash>`. */
+    clave: varchar("clave", { length: 160 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("rate_limit_eventos_bucket_clave_idx").on(table.bucket, table.clave, table.createdAt),
+  ],
+);

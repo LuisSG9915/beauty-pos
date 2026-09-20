@@ -58,6 +58,13 @@ export const sucursales = pgTable(
     // true = la reserva web queda confirmada de inmediato; false = pendiente
     // hasta que el equipo la confirme desde la agenda.
     reservasAutoConfirmar: boolean("reservas_auto_confirmar").default(false).notNull(),
+    // Horas mínimas antes de la cita para que el cliente pueda cancelarla o
+    // reagendarla desde su enlace público. 0 = hasta el mismo momento.
+    reservasCancelacionHoras: integer("reservas_cancelacion_horas").default(24).notNull(),
+    // Minutos mínimos de anticipación para crear una reserva web.
+    reservasAnticipacionMinutos: integer("reservas_anticipacion_minutos").default(0).notNull(),
+    // Días máximos hacia adelante en que se puede reservar en línea.
+    reservasHorizonteDias: integer("reservas_horizonte_dias").default(30).notNull(),
     // Política de caja: true = el POS rechaza cobros sin un corte abierto en
     // la sucursal; false = cobra libre y asocia la venta al corte si existe.
     exigirCorteParaCobrar: boolean("exigir_corte_para_cobrar").default(false).notNull(),

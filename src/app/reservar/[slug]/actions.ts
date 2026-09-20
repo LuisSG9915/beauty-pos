@@ -1,6 +1,7 @@
 "use server";
 
 import { getDatabase } from "@/db/client";
+import { clientIp } from "@/lib/client-ip";
 import { getOcupacionAgenda } from "@/modules/agenda/service";
 import { dayBoundsUtc } from "@/modules/agenda/timezone";
 import { getServiciosReservables, getSucursalReservable } from "@/modules/reservas/queries";
@@ -28,6 +29,12 @@ export async function obtenerSlotsReserva(input: {
   const bounds = dayBoundsUtc(input.diaKey, sucursal.zonaHoraria);
   if (!bounds) return { ok: false, error: "Fecha inválida." };
 
+  const ahora = new Date();
+  // Horizonte máximo: días fuera de la ventana no exponen horarios.
+  if (bounds.terminaAt.getTime() > ahora.getTime() + sucursal.horizonteDias * 24 * 60 * 60_000) {
+    return { ok: true, slots: [] };
+  }
+
   const db = getDatabase();
   const ocupacion = await getOcupacionAgenda(db, {
     organizacionId: input.organizacionId,
@@ -42,7 +49,8 @@ export async function obtenerSlotsReserva(input: {
     ocupacion,
     zonaHoraria: sucursal.zonaHoraria,
     capacidadSinAsignar: sucursal.capacidadSinAsignar,
-    ahora: new Date(),
+    // La anticipación mínima corre el "ahora" efectivo hacia adelante.
+    ahora: new Date(ahora.getTime() + sucursal.anticipacionMinutos * 60_000),
     pasoMinutos: 30,
   });
 
@@ -58,7 +66,7 @@ export async function confirmarReserva(input: {
   telefono: string;
   correo?: string;
   notas?: string;
-}): Promise<{ ok: true; confirmada: boolean } | { ok: false; error: string }> {
+}): Promise<{ ok: true; confirmada: boolean; gestionUrl: string | null } | { ok: false; error: string }> {
   const fechaHora = new Date(input.fechaHora);
   if (Number.isNaN(fechaHora.getTime())) {
     return { ok: false, error: "Horario inválido." };
@@ -80,7 +88,8 @@ export async function confirmarReserva(input: {
       correo: input.correo,
       notas: input.notas,
     },
+    ip: await clientIp(),
   });
   if (!result.ok) return { ok: false, error: result.error };
-  return { ok: true, confirmada: result.confirmada };
+  return { ok: true, confirmada: result.confirmada, gestionUrl: result.gestionUrl };
 }

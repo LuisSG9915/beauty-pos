@@ -26,8 +26,8 @@ type Servicio = {
 type Dia = { diaKey: string; etiqueta: string };
 
 type Resultado =
-  | { tipo: "confirmada" }
-  | { tipo: "pendiente" }
+  | { tipo: "confirmada"; gestionUrl: string | null }
+  | { tipo: "pendiente"; gestionUrl: string | null }
   | { tipo: "error"; mensaje: string };
 
 function formatoHora(iso: string, zonaHoraria: string) {
@@ -122,8 +122,8 @@ export function ReservaFlow({
       setResultado(
         res.ok
           ? res.confirmada
-            ? { tipo: "confirmada" }
-            : { tipo: "pendiente" }
+            ? { tipo: "confirmada", gestionUrl: res.gestionUrl }
+            : { tipo: "pendiente", gestionUrl: res.gestionUrl }
           : { tipo: "error", mensaje: res.error },
       );
     });
@@ -159,6 +159,20 @@ export function ReservaFlow({
               <dd className="font-medium">{sucursal.nombre}</dd>
             </div>
           </dl>
+          {resultado.gestionUrl ? (
+            <>
+              <a
+                className="mt-6 inline-block rounded-xl bg-[#2c2522] px-5 py-2.5 text-sm font-medium text-[#f6eadf] transition-colors hover:bg-[#453c37]"
+                href={resultado.gestionUrl}
+              >
+                Consultar o modificar mi cita
+              </a>
+              <p className="mx-auto mt-3 max-w-sm text-xs leading-5 text-[#a8958a]">
+                Guarda este enlace: con él puedes ver el estado de tu cita, reagendarla o cancelarla
+                según la política del negocio. También llega en tu correo de confirmación.
+              </p>
+            </>
+          ) : null}
         </div>
       </section>
     );

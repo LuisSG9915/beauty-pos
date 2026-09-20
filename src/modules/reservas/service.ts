@@ -12,10 +12,16 @@ import { getZonedParts } from "@/modules/agenda/timezone";
 import { intervalFromDates } from "@/modules/agenda/types";
 import { encolarAvisoCita } from "@/modules/notificaciones/service";
 import { TIPO_CONFIRMACION, TIPO_SOLICITUD } from "@/modules/notificaciones/rules";
-import { normalizarContacto, validarDatosReserva, type ReservaClienteInput } from "./rules";
+import { emitirTokenGestion, verificarAbusoReserva } from "./gestion";
+import {
+  dentroDeVentanaReserva,
+  normalizarContacto,
+  validarDatosReserva,
+  type ReservaClienteInput,
+} from "./rules";
 
 export type ReservaResult =
-  | { ok: true; citaId: string; confirmada: boolean }
+  | { ok: true; citaId: string; confirmada: boolean; gestionUrl: string | null }
   | { ok: false; error: string };
 
 type Tx = Parameters<Parameters<ReturnType<typeof getDatabase>["transaction"]>[0]>[0];
@@ -72,6 +78,8 @@ export async function crearReservaPublica(input: {
   /** Instante UTC elegido por el cliente. */
   fechaHora: Date;
   cliente: ReservaClienteInput;
+  /** IP del solicitante (cabeceras del request) para el antiabuso. */
+  ip?: string | null;
 }): Promise<ReservaResult> {
   const datos = validarDatosReserva(input.cliente);
   if (!datos.ok) return { ok: false, error: datos.error };
@@ -93,6 +101,9 @@ export async function crearReservaPublica(input: {
         .select({
           reservasOnline: sucursales.reservasOnline,
           autoConfirmar: sucursales.reservasAutoConfirmar,
+          anticipacionMinutos: sucursales.reservasAnticipacionMinutos,
+          horizonteDias: sucursales.reservasHorizonteDias,
+          cancelacionHoras: sucursales.reservasCancelacionHoras,
         })
         .from(sucursales)
         .where(eq(sucursales.id, input.sucursalId))
@@ -100,6 +111,19 @@ export async function crearReservaPublica(input: {
       if (!config?.reservasOnline) {
         return { ok: false, error: "Esta sucursal no acepta reservas en línea por ahora." };
       }
+
+      // Ventana de reserva: anticipación mínima y horizonte máximo por sucursal.
+      const ventana = dentroDeVentanaReserva(input.fechaHora, config, new Date());
+      if (!ventana.ok) return { ok: false, error: ventana.error };
+
+      // Antiabuso persistente: por IP de la conexión y por contacto normalizado.
+      const abuso = await verificarAbusoReserva(tx, {
+        organizacionId: input.organizacionId,
+        ip: input.ip ?? null,
+        telefono: normalizarContacto(input.cliente.telefono),
+        correo: normalizarContacto(input.cliente.correo),
+      });
+      if (!abuso.ok) return { ok: false, error: abuso.error };
 
       // Re-verificación dentro del lock: el plan o la suscripción pudieron
       // cambiar entre el render del portal y el submit del cliente.
@@ -202,13 +226,22 @@ export async function crearReservaPublica(input: {
         detalle: { servicioId: servicio.id, autoConfirmada: autoConfirmar },
       });
 
+      // Token de autogestión: el cliente cancela o reagenda sin cuenta.
+      // En BD queda solo el hash; el claro viaja en pantalla y en el correo.
+      const gestion = await emitirTokenGestion(tx, {
+        organizacionId: input.organizacionId,
+        citaId: cita.id,
+      });
+      const gestionUrl = gestion?.url ?? null;
+
       await encolarAvisoCita(tx, {
         organizacionId: input.organizacionId,
         citaId: cita.id,
         tipo: autoConfirmar ? TIPO_CONFIRMACION : TIPO_SOLICITUD,
+        gestionUrl,
       });
 
-      return { ok: true, citaId: cita.id, confirmada: autoConfirmar };
+      return { ok: true, citaId: cita.id, confirmada: autoConfirmar, gestionUrl };
     });
   } catch (error) {
     console.error("crearReservaPublica", error);

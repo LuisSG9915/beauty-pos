@@ -284,6 +284,9 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
       capacidadSinAsignar: sucursales.capacidadSinAsignar,
       reservasOnline: sucursales.reservasOnline,
       reservasAutoConfirmar: sucursales.reservasAutoConfirmar,
+      reservasCancelacionHoras: sucursales.reservasCancelacionHoras,
+      reservasAnticipacionMinutos: sucursales.reservasAnticipacionMinutos,
+      reservasHorizonteDias: sucursales.reservasHorizonteDias,
     })
     .from(sucursales)
     .where(eq(sucursales.id, branch.id))
@@ -333,6 +336,9 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
           recordatoriosActivos={orgRow?.recordatoriosActivos ?? false}
           recordatoriosHorasAntes={orgRow?.recordatoriosHorasAntes ?? 24}
           reservasAutoConfirmar={sucursalRow?.reservasAutoConfirmar ?? false}
+          reservasAnticipacionMinutos={sucursalRow?.reservasAnticipacionMinutos ?? 0}
+          reservasCancelacionHoras={sucursalRow?.reservasCancelacionHoras ?? 24}
+          reservasHorizonteDias={sucursalRow?.reservasHorizonteDias ?? 30}
           reservasOnline={sucursalRow?.reservasOnline ?? false}
           recursos={recursosConfig}
           staff={staffRows}

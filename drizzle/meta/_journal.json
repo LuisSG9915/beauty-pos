@@ -302,6 +302,13 @@
       "when": 1789935215803,
       "tag": "0042_notificaciones-tipo-solicitud",
       "breakpoints": true
+    },
+    {
+      "idx": 43,
+      "version": "7",
+      "when": 1789936164515,
+      "tag": "0043_reservas-gestion",
+      "breakpoints": true
     }
   ]
 }
