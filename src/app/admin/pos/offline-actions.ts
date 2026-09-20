@@ -223,6 +223,7 @@ export async function sincronizarVentaOffline(raw: unknown): Promise<ActionState
             usuarioId: user.id,
             corteId: corteAbierto?.id ?? null,
             estado: "completada",
+            cobradaAt: new Date(),
             subtotal: subtotal.toFixed(2),
             descuento: "0",
             descuentoPromocion: "0",

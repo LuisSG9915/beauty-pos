@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getDatabase } from "@/db/client";
 import { catMediosPago } from "@/db/schema/catalogs";
 import { checkPermission } from "@/lib/auth/authorization";
+import { revalidateCatalogos } from "@/lib/catalogo-cache";
 
 const paymentMethodSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -43,6 +44,7 @@ export async function savePaymentMethod(_previousState: PaymentMethodActionState
   else await db.insert(catMediosPago).values({ ...values, createdBy: user.id });
 
   revalidatePath("/admin/medios-pago");
+  revalidateCatalogos(input.organizacionId);
   return { success: true };
 }
 
@@ -56,4 +58,5 @@ export async function togglePaymentMethod(formData: FormData) {
   const db = getDatabase();
   await db.update(catMediosPago).set({ activo: !active, updatedBy: user.id }).where(and(eq(catMediosPago.id, id), eq(catMediosPago.organizacionId, organizationId)));
   revalidatePath("/admin/medios-pago");
+  revalidateCatalogos(organizationId);
 }

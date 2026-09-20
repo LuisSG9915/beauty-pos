@@ -1,8 +1,10 @@
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import Link from "next/link";
 
+import { GuiaChecklistCard } from "@/app/admin/guia/checklist-card";
 import { InvitationForm } from "@/app/admin/invitation-form";
 import { OrganizationForm } from "@/app/admin/organization-form";
+import { SuscripcionAdminRow, type EstadoSuscripcionAdmin } from "@/app/admin/suscripcion-form";
 import { AdminNav } from "@/components/admin-nav";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
@@ -10,11 +12,16 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
 import { catRoles } from "@/db/schema/access";
+import { billingEventos, suscripciones } from "@/db/schema/billing";
 import { organizaciones, sucursales } from "@/db/schema/core";
 import { getAccessibleOrganizations } from "@/lib/admin-context";
 import { requireAuthenticatedUser, requirePlatformAdmin } from "@/lib/auth/access";
 import { resolveAccessSafe } from "@/lib/auth/authorization";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
+import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
+import { cargarEstadoNegocio, cargarProgresoGuia } from "@/modules/onboarding/queries";
+import { evaluarPasos, pasosParaPermisos, resumenGuia } from "@/modules/onboarding/rules";
+import type { ResumenGuia } from "@/modules/onboarding/types";
 
 export const dynamic = "force-dynamic";
 
@@ -38,12 +45,14 @@ function MemberDashboard({
   access,
   error,
   permissionsByOrg,
+  checklist,
 }: {
   name: string;
   email: string;
   access: Array<{ organization: string; branch: string; branchKey: string; organizationId: string; branchId: string }>;
   error?: string;
   permissionsByOrg: Record<string, string[]>;
+  checklist: ResumenGuia | null;
 }) {
   const first = access[0];
   return (
@@ -60,6 +69,13 @@ function MemberDashboard({
         description="Tu acceso fue configurado correctamente. Estas son las sucursales asignadas a tu cuenta."
         title={`Bienvenido, ${name}`}
       />
+      {first && checklist ? (
+        <GuiaChecklistCard
+          organizationId={first.organizationId}
+          resumen={checklist}
+          sucursalId={first.branchId}
+        />
+      ) : null}
       {access.length === 0 ? (
         <EmptyState description="Tu cuenta todavía no tiene una sucursal asignada. Contacta al administrador." title="Sin sucursal asignada" />
       ) : (
@@ -124,18 +140,65 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       }
     }
 
-    return <MemberDashboard access={access} email={session.user.email} error={error} name={session.user.name} permissionsByOrg={permissionsByOrg} />;
+    // Checklist de primera configuración sobre la primera sucursal visible:
+    // se muestra mientras queden pasos requeridos y la guía no esté omitida.
+    let checklist: ResumenGuia | null = null;
+    const firstAccess = access[0];
+    if (firstAccess) {
+      const pasos = pasosParaPermisos(new Set(permissionsByOrg[firstAccess.organizationId] ?? []));
+      if (pasos.length > 0) {
+        const [estadoNegocio, progreso] = await Promise.all([
+          cargarEstadoNegocio(db, firstAccess.organizationId, firstAccess.branchId),
+          cargarProgresoGuia(db, firstAccess.organizationId, user.id),
+        ]);
+        const resumen = resumenGuia(evaluarPasos(pasos, estadoNegocio));
+        if (!resumen.terminada && progreso?.estado !== "omitida") {
+          checklist = resumen;
+        }
+      }
+    }
+
+    return <MemberDashboard access={access} checklist={checklist} email={session.user.email} error={error} name={session.user.name} permissionsByOrg={permissionsByOrg} />;
   }
 
   const { session: platformSession } = await requirePlatformAdmin();
-  const [organizations, roles, branches] = await Promise.all([
+  const [organizations, roles, branches, suscripcionRows, solicitudes] = await Promise.all([
     db
       .select({ id: organizaciones.id, nombre: organizaciones.nombre, slug: organizaciones.slug, activo: organizaciones.activo })
       .from(organizaciones)
       .orderBy(desc(organizaciones.createdAt)),
     db.select({ id: catRoles.id, organizacionId: catRoles.organizacionId, nombre: catRoles.nombre }).from(catRoles),
     db.select({ id: sucursales.id, organizacionId: sucursales.organizacionId, nombre: sucursales.nombre, clave: sucursales.clave }).from(sucursales),
+    db
+      .select({
+        organizacionId: suscripciones.organizacionId,
+        estado: suscripciones.estado,
+        trialTerminaAt: suscripciones.trialTerminaAt,
+        periodoTerminaAt: suscripciones.periodoTerminaAt,
+      })
+      .from(suscripciones)
+      .orderBy(desc(suscripciones.createdAt)),
+    db
+      .select({
+        id: billingEventos.id,
+        tipo: billingEventos.tipo,
+        payload: billingEventos.payload,
+        createdAt: billingEventos.createdAt,
+        organizacion: organizaciones.nombre,
+      })
+      .from(billingEventos)
+      .innerJoin(organizaciones, eq(billingEventos.organizacionId, organizaciones.id))
+      .where(inArray(billingEventos.tipo, ["plan.cambio_solicitado", "cancelacion.solicitada"]))
+      .orderBy(desc(billingEventos.createdAt))
+      .limit(20),
   ]);
+
+  // Última suscripción por organización para el estado mostrado al admin.
+  const suscripcionPorOrg = new Map<string, (typeof suscripcionRows)[number]>();
+  for (const row of suscripcionRows) {
+    if (!suscripcionPorOrg.has(row.organizacionId)) suscripcionPorOrg.set(row.organizacionId, row);
+  }
+  const ahora = new Date();
 
   return (
     <div className="space-y-6">
@@ -151,21 +214,64 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             <EmptyState description="Todavía no hay organizaciones. Crea la primera desde el formulario." title="Sin organizaciones" />
           ) : (
             <div className="space-y-3">
-              {organizations.map((organization) => (
-                <div className="flex items-center justify-between rounded-xl border border-[#eee6e0] px-4 py-3" key={organization.id}>
-                  <div>
-                    <p className="font-medium">{organization.nombre}</p>
-                    <p className="mt-1 text-xs text-[#95877e]">{organization.slug}</p>
+              {organizations.map((organization) => {
+                const suscripcion = suscripcionPorOrg.get(organization.id);
+                const efectivo = estadoEfectivoSuscripcion(suscripcion ?? null, ahora);
+                const estado: EstadoSuscripcionAdmin = !suscripcion
+                  ? { tipo: "sin-suscripcion" }
+                  : suscripcion.estado === "trialing" && efectivo === "vigente"
+                    ? { tipo: "trialing", diasRestantes: diasRestantesTrial(suscripcion, ahora) }
+                    : efectivo === "vigente"
+                      ? {
+                          tipo: "activa",
+                          termina: suscripcion.periodoTerminaAt
+                            ? suscripcion.periodoTerminaAt.toISOString().slice(0, 10)
+                            : null,
+                        }
+                      : { tipo: "vencida" };
+                return (
+                  <div className="rounded-xl border border-[#eee6e0] px-4 py-3" key={organization.id}>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{organization.nombre}</p>
+                        <p className="mt-1 text-xs text-[#95877e]">{organization.slug}</p>
+                      </div>
+                      <StatusBadge tone={organization.activo ? "success" : "neutral"}>
+                        {organization.activo ? "Activa" : "Inactiva"}
+                      </StatusBadge>
+                    </div>
+                    <div className="mt-3">
+                      <SuscripcionAdminRow estado={estado} organizationId={organization.id} />
+                    </div>
                   </div>
-                  <StatusBadge tone={organization.activo ? "success" : "neutral"}>
-                    {organization.activo ? "Activa" : "Inactiva"}
-                  </StatusBadge>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </AdminCard>
       </div>
+      {solicitudes.length > 0 ? (
+        <AdminCard description="Últimas solicitudes de las organizaciones" title="Solicitudes de suscripción">
+          <ul className="divide-y divide-[#f2ece7] text-sm">
+            {solicitudes.map((solicitud) => {
+              const payload = (solicitud.payload ?? {}) as Record<string, unknown>;
+              return (
+                <li className="flex flex-wrap items-center justify-between gap-2 py-2.5" key={solicitud.id}>
+                  <div>
+                    <p className="font-medium text-[#2d2926]">{solicitud.organizacion}</p>
+                    <p className="text-xs text-[#81746c]">
+                      {solicitud.tipo === "plan.cambio_solicitado"
+                        ? `Cambio a ${String(payload.planNombre ?? payload.planClave ?? "?")} (${String(payload.periodicidad ?? "mensual")})`
+                        : `Cancelación${payload.motivo ? ` — ${String(payload.motivo)}` : ""}`}
+                    </p>
+                  </div>
+                  <span className="text-xs text-[#95877e]">{solicitud.createdAt.toISOString().slice(0, 10)}</span>
+                </li>
+              );
+            })}
+          </ul>
+        </AdminCard>
+      ) : null}
       <InvitationForm branches={branches} organizations={organizations} roles={roles} />
     </div>
   );

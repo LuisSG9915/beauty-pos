@@ -1,6 +1,8 @@
-import { and, asc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { unstable_cache } from "next/cache";
 
 import { getDatabase } from "@/db/client";
+import { catalogoTag } from "@/lib/catalogo-cache";
 import { todayDateInput } from "@/lib/format";
 import { anticiposAplicables } from "@/modules/pos/anticipos";
 import { membresiaVigente } from "@/modules/pos/membresias";
@@ -24,9 +26,11 @@ import {
   usuarios,
 } from "@/db/schema/core";
 import {
+  ajustesPagosVenta,
   anticipos,
   clienteMembresias,
   clientePaquetes,
+  comprobantes,
   detalleDevoluciones,
   detalleVentasComisiones,
   detalleVentasMediosPagos,
@@ -36,6 +40,7 @@ import {
   detalleVentasPropinas,
   detalleVentasServicios,
   devoluciones,
+  facturacionConfig,
   paqueteUsos,
   ventas,
 } from "@/db/schema/operations";
@@ -133,7 +138,15 @@ export type TicketData = {
     categoriaNombre: string | null;
   }>;
   mediosPago: Array<{ id: string; nombre: string; categoria: string }>;
-  pagos: Array<{ nombre: string; monto: string; recibido: string; cambio: string }>;
+  pagos: Array<{
+    id: string;
+    medioPagoId: string;
+    nombre: string;
+    monto: string;
+    recibido: string;
+    cambio: string;
+    ajustes: Array<{ id: string; destinoNombre: string | null; monto: string; motivo: string; createdAt: Date }>;
+  }>;
   staff: Array<{ id: string; nombre: string }>;
   propinas: Array<{ usuarioNombre: string; monto: string }>;
   comisiones: Array<{ usuarioNombre: string; monto: string }>;
@@ -162,116 +175,80 @@ export type TicketData = {
   anticipoPorAplicar: number;
   /** Lo fija `cargarTicket` según el permiso del usuario que consulta. */
   puedeCancelar?: boolean;
+  /** Permiso para reclasificar un pago con motivo y auditoría. */
+  puedeAjustarPago?: boolean;
+  /** Ídem para facturacion.emitir. */
+  puedeFacturar?: boolean;
+  /** Comprobante fiscal activo más reciente ligado a la venta (si hay). */
+  comprobante: {
+    id: string;
+    estado: string;
+    serie: string | null;
+    folio: number | null;
+    uuid: string | null;
+    receptorRfc: string;
+    receptorNombre: string;
+    total: string;
+    error: string | null;
+    timbradoAt: Date | null;
+  } | null;
+  /** Datos fiscales del cliente de la venta (null si están incompletos). */
+  clienteFiscal: {
+    rfc: string;
+    razonSocial: string;
+    regimenFiscal: string;
+    codigoPostalFiscal: string;
+    usoCfdi: string | null;
+  } | null;
+  /** La organización ya configuró sus datos de emisor. */
+  facturacionConfigurada: boolean;
 };
 
 /**
- * Arma el ticket completo de una venta (líneas, catálogos POS, medios de pago,
- * pagos registrados, staff de la sucursal y comisiones/propinas devengadas).
- * Lo usan la página `/admin/pos` y la action `cargarTicket` del cobro inline.
+ * Catálogos del ticket que cambian poco durante una sesión de cobro
+ * (servicios, productos, paquetes, membresías, medios, staff, clientes y
+ * promociones del catálogo). Solo datos serializables: nada de `Date`.
  */
-export async function getTicketData(
-  organizacionId: string,
-  ventaId: string,
-): Promise<TicketData | null> {
+type CatalogosTicket = {
+  catalogoMembresias: Array<{
+    id: string;
+    nombre: string;
+    precio: string;
+    duracionDias: number;
+    descuentoPorcentaje: string;
+    aplica: string;
+  }>;
+  catalogoServicios: TicketData["catalogoServicios"];
+  catalogoProductos: TicketData["catalogoProductos"];
+  catalogoPaquetes: TicketData["catalogoPaquetes"];
+  catalogoClientes: TicketData["catalogoClientes"];
+  mediosPago: TicketData["mediosPago"];
+  staff: TicketData["staff"];
+  /** Filas crudas de promociones; la vigencia se evalúa fuera del cache. */
+  promocionesRows: Array<{
+    id: string;
+    nombre: string;
+    tipo: string;
+    valor: string;
+    aplica: string;
+    activo: boolean;
+    vigenciaDesde: string;
+    vigenciaHasta: string | null;
+  }>;
+};
+
+async function loadCatalogosTicket(organizacionId: string, sucursalId: string): Promise<CatalogosTicket> {
   const db = getDatabase();
-
-  const [venta] = await db
-    .select({
-      id: ventas.id,
-      estado: ventas.estado,
-      citaId: ventas.citaId,
-      sucursalId: ventas.sucursalId,
-      clienteId: ventas.clienteId,
-      clienteNombre: clientes.nombre,
-      subtotal: ventas.subtotal,
-      descuento: ventas.descuento,
-      total: ventas.total,
-      propina: ventas.propina,
-      promocionId: ventas.promocionId,
-      promocionNombre: promociones.nombre,
-      descuentoPromocion: ventas.descuentoPromocion,
-      membresiaId: ventas.membresiaId,
-      membresiaNombre: membresias.nombre,
-      descuentoMembresia: ventas.descuentoMembresia,
-      sucursalZonaHoraria: sucursales.zonaHoraria,
-    })
-    .from(ventas)
-    .leftJoin(clientes, eq(ventas.clienteId, clientes.id))
-    .leftJoin(promociones, eq(ventas.promocionId, promociones.id))
-    .leftJoin(membresias, eq(ventas.membresiaId, membresias.id))
-    .innerJoin(sucursales, eq(ventas.sucursalId, sucursales.id))
-    .where(and(eq(ventas.id, ventaId), eq(ventas.organizacionId, organizacionId), eq(ventas.activo, true)))
-    .limit(1);
-  if (!venta) return null;
-
   const [
-    lineasServicios,
-    lineasProductos,
-    lineasPaquetes,
-    lineasMembresias,
     catalogoMembresias,
-    membresiasClienteRows,
     catalogoServicios,
     catalogoProductos,
     catalogoPaquetes,
-    paquetesClienteRows,
-    usosRows,
     catalogoClientes,
     mediosPago,
-    pagos,
     staff,
-    propinas,
-    comisiones,
-    devolucionesRows,
-    detalleDevolucionesRows,
-    anticipoRows,
     promocionesRows,
   ] = await Promise.all([
-    db
-      .select({
-        id: detalleVentasServicios.id,
-        servicioId: detalleVentasServicios.servicioId,
-        // Snapshot con fallback al catálogo (líneas históricas sin snapshot).
-        nombre: sql<string>`coalesce(${detalleVentasServicios.nombre}, ${servicios.nombre})`,
-        precio: detalleVentasServicios.precio,
-        cantidad: detalleVentasServicios.cantidad,
-        usuarioId: detalleVentasServicios.usuarioId,
-      })
-      .from(detalleVentasServicios)
-      .innerJoin(servicios, eq(detalleVentasServicios.servicioId, servicios.id))
-      .where(and(eq(detalleVentasServicios.ventaId, venta.id), eq(detalleVentasServicios.activo, true))),
-    db
-      .select({
-        id: detalleVentasProductos.id,
-        nombre: sql<string>`coalesce(${detalleVentasProductos.nombre}, ${productos.nombre})`,
-        precio: detalleVentasProductos.precio,
-        cantidad: detalleVentasProductos.cantidad,
-      })
-      .from(detalleVentasProductos)
-      .innerJoin(productos, eq(detalleVentasProductos.productoId, productos.id))
-      .where(and(eq(detalleVentasProductos.ventaId, venta.id), eq(detalleVentasProductos.activo, true))),
-    db
-      .select({
-        id: detalleVentasPaquetes.id,
-        paqueteId: detalleVentasPaquetes.paqueteId,
-        nombre: sql<string>`coalesce(${detalleVentasPaquetes.nombre}, ${paquetes.nombre})`,
-        precio: detalleVentasPaquetes.precio,
-        cantidad: detalleVentasPaquetes.cantidad,
-      })
-      .from(detalleVentasPaquetes)
-      .innerJoin(paquetes, eq(detalleVentasPaquetes.paqueteId, paquetes.id))
-      .where(and(eq(detalleVentasPaquetes.ventaId, venta.id), eq(detalleVentasPaquetes.activo, true))),
-    db
-      .select({
-        id: detalleVentasMembresias.id,
-        membresiaId: detalleVentasMembresias.membresiaId,
-        nombre: sql<string>`coalesce(${detalleVentasMembresias.nombre}, ${membresias.nombre})`,
-        precio: detalleVentasMembresias.precio,
-        cantidad: detalleVentasMembresias.cantidad,
-      })
-      .from(detalleVentasMembresias)
-      .innerJoin(membresias, eq(detalleVentasMembresias.membresiaId, membresias.id))
-      .where(and(eq(detalleVentasMembresias.ventaId, venta.id), eq(detalleVentasMembresias.activo, true))),
     db
       .select({
         id: membresias.id,
@@ -284,28 +261,6 @@ export async function getTicketData(
       .from(membresias)
       .where(and(eq(membresias.organizacionId, organizacionId), eq(membresias.activo, true)))
       .orderBy(asc(membresias.nombre)),
-    venta.clienteId
-      ? db
-          .select({
-            id: clienteMembresias.id,
-            nombre: membresias.nombre,
-            descuentoPorcentaje: membresias.descuentoPorcentaje,
-            aplica: membresias.aplica,
-            estado: clienteMembresias.estado,
-            vigenciaDesde: clienteMembresias.vigenciaDesde,
-            vigenciaHasta: clienteMembresias.vigenciaHasta,
-          })
-          .from(clienteMembresias)
-          .innerJoin(membresias, eq(clienteMembresias.membresiaId, membresias.id))
-          .where(
-            and(
-              eq(clienteMembresias.organizacionId, organizacionId),
-              eq(clienteMembresias.clienteId, venta.clienteId),
-              eq(clienteMembresias.activo, true),
-            ),
-          )
-          .orderBy(asc(clienteMembresias.createdAt))
-      : Promise.resolve([]),
     db
       .select({
         id: servicios.id,
@@ -352,6 +307,210 @@ export async function getTicketData(
       .innerJoin(servicios, eq(paquetes.servicioId, servicios.id))
       .where(and(eq(paquetes.organizacionId, organizacionId), eq(paquetes.activo, true)))
       .orderBy(asc(paquetes.nombre)),
+    db
+      .select({ id: clientes.id, nombre: clientes.nombre, telefono: clientes.telefono })
+      .from(clientes)
+      .where(and(eq(clientes.organizacionId, organizacionId), eq(clientes.activo, true)))
+      .orderBy(asc(clientes.nombre))
+      .limit(500),
+    db
+      .select({ id: catMediosPago.id, nombre: catMediosPago.nombre, categoria: catMediosPago.categoria })
+      .from(catMediosPago)
+      .where(and(eq(catMediosPago.organizacionId, organizacionId), eq(catMediosPago.activo, true)))
+      .orderBy(asc(catMediosPago.nombre)),
+    db
+      .select({ id: usuarios.id, nombre: usuarios.nombre })
+      .from(relUsuariosSucursales)
+      .innerJoin(usuarios, eq(relUsuariosSucursales.usuarioId, usuarios.id))
+      .innerJoin(
+        miembrosOrganizaciones,
+        and(
+          eq(miembrosOrganizaciones.usuarioId, usuarios.id),
+          eq(miembrosOrganizaciones.organizacionId, organizacionId),
+          eq(miembrosOrganizaciones.estado, "activo"),
+        ),
+      )
+      .where(
+        and(
+          eq(relUsuariosSucursales.organizacionId, organizacionId),
+          eq(relUsuariosSucursales.sucursalId, sucursalId),
+          eq(usuarios.activo, true),
+        ),
+      )
+      .orderBy(asc(usuarios.nombre)),
+    db
+      .select({
+        id: promociones.id,
+        nombre: promociones.nombre,
+        tipo: promociones.tipo,
+        valor: promociones.valor,
+        aplica: promociones.aplica,
+        activo: promociones.activo,
+        vigenciaDesde: promociones.vigenciaDesde,
+        vigenciaHasta: promociones.vigenciaHasta,
+      })
+      .from(promociones)
+      .where(eq(promociones.organizacionId, organizacionId))
+      .orderBy(asc(promociones.nombre)),
+  ]);
+
+  return {
+    catalogoMembresias,
+    catalogoServicios,
+    catalogoProductos,
+    catalogoPaquetes,
+    catalogoClientes,
+    mediosPago,
+    staff,
+    promocionesRows,
+  };
+}
+
+/**
+ * Cache de catálogos del ticket por organización+sucursal. Las mutaciones de
+ * catálogos llaman `revalidateCatalogos(org)`; los 60 s son el respaldo ante
+ * escrituras que no pasen por las actions (p. ej. edición directa en BD).
+ */
+const catalogosTicketCached = (organizacionId: string, sucursalId: string) =>
+  unstable_cache(
+    async () => loadCatalogosTicket(organizacionId, sucursalId),
+    ["ticket-catalogos", organizacionId, sucursalId],
+    { tags: [catalogoTag(organizacionId)], revalidate: 60 },
+  )();
+
+/**
+ * Arma el ticket completo de una venta (líneas, catálogos POS, medios de pago,
+ * pagos registrados, staff de la sucursal y comisiones/propinas devengadas).
+ * Lo usan la página `/admin/pos` y la action `cargarTicket` del cobro inline.
+ */
+export async function getTicketData(
+  organizacionId: string,
+  ventaId: string,
+): Promise<TicketData | null> {
+  const db = getDatabase();
+
+  const [venta] = await db
+    .select({
+      id: ventas.id,
+      estado: ventas.estado,
+      citaId: ventas.citaId,
+      sucursalId: ventas.sucursalId,
+      clienteId: ventas.clienteId,
+      clienteNombre: clientes.nombre,
+      clienteRfc: clientes.rfc,
+      clienteRazonSocial: clientes.razonSocial,
+      clienteRegimenFiscal: clientes.regimenFiscal,
+      clienteCodigoPostalFiscal: clientes.codigoPostalFiscal,
+      clienteUsoCfdi: clientes.usoCfdi,
+      subtotal: ventas.subtotal,
+      descuento: ventas.descuento,
+      total: ventas.total,
+      propina: ventas.propina,
+      promocionId: ventas.promocionId,
+      promocionNombre: promociones.nombre,
+      descuentoPromocion: ventas.descuentoPromocion,
+      membresiaId: ventas.membresiaId,
+      membresiaNombre: membresias.nombre,
+      descuentoMembresia: ventas.descuentoMembresia,
+      sucursalZonaHoraria: sucursales.zonaHoraria,
+    })
+    .from(ventas)
+    .leftJoin(clientes, eq(ventas.clienteId, clientes.id))
+    .leftJoin(promociones, eq(ventas.promocionId, promociones.id))
+    .leftJoin(membresias, eq(ventas.membresiaId, membresias.id))
+    .innerJoin(sucursales, eq(ventas.sucursalId, sucursales.id))
+    .where(and(eq(ventas.id, ventaId), eq(ventas.organizacionId, organizacionId), eq(ventas.activo, true)))
+    .limit(1);
+  if (!venta) return null;
+
+  const [
+    lineasServicios,
+    lineasProductos,
+    lineasPaquetes,
+    lineasMembresias,
+    catalogos,
+    membresiasClienteRows,
+    paquetesClienteRows,
+    usosRows,
+    pagos,
+    ajustesPagoRows,
+    propinas,
+    comisiones,
+    devolucionesRows,
+    detalleDevolucionesRows,
+    anticipoRows,
+    comprobanteRows,
+    facturacionConfigRows,
+  ] = await Promise.all([
+    db
+      .select({
+        id: detalleVentasServicios.id,
+        servicioId: detalleVentasServicios.servicioId,
+        // Snapshot con fallback al catálogo (líneas históricas sin snapshot).
+        nombre: sql<string>`coalesce(${detalleVentasServicios.nombre}, ${servicios.nombre})`,
+        precio: detalleVentasServicios.precio,
+        cantidad: detalleVentasServicios.cantidad,
+        usuarioId: detalleVentasServicios.usuarioId,
+      })
+      .from(detalleVentasServicios)
+      .innerJoin(servicios, eq(detalleVentasServicios.servicioId, servicios.id))
+      .where(and(eq(detalleVentasServicios.ventaId, venta.id), eq(detalleVentasServicios.activo, true))),
+    db
+      .select({
+        id: detalleVentasProductos.id,
+        nombre: sql<string>`coalesce(${detalleVentasProductos.nombre}, ${productos.nombre})`,
+        precio: detalleVentasProductos.precio,
+        cantidad: detalleVentasProductos.cantidad,
+      })
+      .from(detalleVentasProductos)
+      .innerJoin(productos, eq(detalleVentasProductos.productoId, productos.id))
+      .where(and(eq(detalleVentasProductos.ventaId, venta.id), eq(detalleVentasProductos.activo, true))),
+    db
+      .select({
+        id: detalleVentasPaquetes.id,
+        paqueteId: detalleVentasPaquetes.paqueteId,
+        nombre: sql<string>`coalesce(${detalleVentasPaquetes.nombre}, ${paquetes.nombre})`,
+        precio: detalleVentasPaquetes.precio,
+        cantidad: detalleVentasPaquetes.cantidad,
+      })
+      .from(detalleVentasPaquetes)
+      .innerJoin(paquetes, eq(detalleVentasPaquetes.paqueteId, paquetes.id))
+      .where(and(eq(detalleVentasPaquetes.ventaId, venta.id), eq(detalleVentasPaquetes.activo, true))),
+    db
+      .select({
+        id: detalleVentasMembresias.id,
+        membresiaId: detalleVentasMembresias.membresiaId,
+        nombre: sql<string>`coalesce(${detalleVentasMembresias.nombre}, ${membresias.nombre})`,
+        precio: detalleVentasMembresias.precio,
+        cantidad: detalleVentasMembresias.cantidad,
+      })
+      .from(detalleVentasMembresias)
+      .innerJoin(membresias, eq(detalleVentasMembresias.membresiaId, membresias.id))
+      .where(and(eq(detalleVentasMembresias.ventaId, venta.id), eq(detalleVentasMembresias.activo, true))),
+    // Catálogos del POS cacheados por org+sucursal (tag `catalogos:{org}`).
+    catalogosTicketCached(organizacionId, venta.sucursalId),
+    venta.clienteId
+      ? db
+          .select({
+            id: clienteMembresias.id,
+            nombre: membresias.nombre,
+            descuentoPorcentaje: membresias.descuentoPorcentaje,
+            aplica: membresias.aplica,
+            estado: clienteMembresias.estado,
+            vigenciaDesde: clienteMembresias.vigenciaDesde,
+            vigenciaHasta: clienteMembresias.vigenciaHasta,
+          })
+          .from(clienteMembresias)
+          .innerJoin(membresias, eq(clienteMembresias.membresiaId, membresias.id))
+          .where(
+            and(
+              eq(clienteMembresias.organizacionId, organizacionId),
+              eq(clienteMembresias.clienteId, venta.clienteId),
+              eq(clienteMembresias.activo, true),
+            ),
+          )
+          .orderBy(asc(clienteMembresias.createdAt))
+      : Promise.resolve([]),
     venta.clienteId
       ? db
           .select({
@@ -385,18 +544,9 @@ export async function getTicketData(
       .innerJoin(paquetes, eq(clientePaquetes.paqueteId, paquetes.id))
       .where(and(eq(paqueteUsos.ventaId, venta.id), eq(paqueteUsos.activo, true))),
     db
-      .select({ id: clientes.id, nombre: clientes.nombre, telefono: clientes.telefono })
-      .from(clientes)
-      .where(and(eq(clientes.organizacionId, organizacionId), eq(clientes.activo, true)))
-      .orderBy(asc(clientes.nombre))
-      .limit(500),
-    db
-      .select({ id: catMediosPago.id, nombre: catMediosPago.nombre, categoria: catMediosPago.categoria })
-      .from(catMediosPago)
-      .where(and(eq(catMediosPago.organizacionId, organizacionId), eq(catMediosPago.activo, true)))
-      .orderBy(asc(catMediosPago.nombre)),
-    db
       .select({
+        id: detalleVentasMediosPagos.id,
+        medioPagoId: detalleVentasMediosPagos.medioPagoId,
         nombre: catMediosPago.nombre,
         monto: detalleVentasMediosPagos.monto,
         recibido: detalleVentasMediosPagos.recibido,
@@ -406,25 +556,18 @@ export async function getTicketData(
       .innerJoin(catMediosPago, eq(detalleVentasMediosPagos.medioPagoId, catMediosPago.id))
       .where(and(eq(detalleVentasMediosPagos.ventaId, venta.id), eq(detalleVentasMediosPagos.activo, true))),
     db
-      .select({ id: usuarios.id, nombre: usuarios.nombre })
-      .from(relUsuariosSucursales)
-      .innerJoin(usuarios, eq(relUsuariosSucursales.usuarioId, usuarios.id))
-      .innerJoin(
-        miembrosOrganizaciones,
-        and(
-          eq(miembrosOrganizaciones.usuarioId, usuarios.id),
-          eq(miembrosOrganizaciones.organizacionId, organizacionId),
-          eq(miembrosOrganizaciones.estado, "activo"),
-        ),
-      )
-      .where(
-        and(
-          eq(relUsuariosSucursales.organizacionId, organizacionId),
-          eq(relUsuariosSucursales.sucursalId, venta.sucursalId),
-          eq(usuarios.activo, true),
-        ),
-      )
-      .orderBy(asc(usuarios.nombre)),
+      .select({
+        pagoId: ajustesPagosVenta.detalleVentaMedioPagoId,
+        id: ajustesPagosVenta.id,
+        destinoNombre: catMediosPago.nombre,
+        monto: ajustesPagosVenta.monto,
+        motivo: ajustesPagosVenta.motivo,
+        createdAt: ajustesPagosVenta.createdAt,
+      })
+      .from(ajustesPagosVenta)
+      .leftJoin(catMediosPago, eq(ajustesPagosVenta.medioPagoDestinoId, catMediosPago.id))
+      .where(and(eq(ajustesPagosVenta.ventaId, venta.id), eq(ajustesPagosVenta.organizacionId, organizacionId)))
+      .orderBy(asc(ajustesPagosVenta.createdAt)),
     db
       .select({ usuarioNombre: usuarios.nombre, monto: detalleVentasPropinas.monto })
       .from(detalleVentasPropinas)
@@ -510,27 +653,52 @@ export async function getTicketData(
             ),
           )
           .orderBy(asc(anticipos.createdAt)),
-    // Catálogo de promociones activas; la vigencia se evalúa con la fecha de
-    // hoy en la zona horaria de la sucursal de la venta.
+    // Comprobante fiscal activo más reciente de la venta (si se emitió).
     db
       .select({
-        id: promociones.id,
-        nombre: promociones.nombre,
-        tipo: promociones.tipo,
-        valor: promociones.valor,
-        aplica: promociones.aplica,
-        activo: promociones.activo,
-        vigenciaDesde: promociones.vigenciaDesde,
-        vigenciaHasta: promociones.vigenciaHasta,
+        id: comprobantes.id,
+        estado: comprobantes.estado,
+        serie: comprobantes.serie,
+        folio: comprobantes.folio,
+        uuid: comprobantes.uuid,
+        receptorRfc: comprobantes.receptorRfc,
+        receptorNombre: comprobantes.receptorNombre,
+        total: comprobantes.total,
+        error: comprobantes.error,
+        timbradoAt: comprobantes.timbradoAt,
       })
-      .from(promociones)
-      .where(eq(promociones.organizacionId, organizacionId))
-      .orderBy(asc(promociones.nombre)),
+      .from(comprobantes)
+      .where(and(eq(comprobantes.ventaId, venta.id), eq(comprobantes.organizacionId, organizacionId), eq(comprobantes.activo, true)))
+      .orderBy(desc(comprobantes.createdAt))
+      .limit(1),
+    db
+      .select({ id: facturacionConfig.id })
+      .from(facturacionConfig)
+      .where(and(eq(facturacionConfig.organizacionId, organizacionId), eq(facturacionConfig.activo, true)))
+      .limit(1),
   ]);
 
-  const { sucursalZonaHoraria, ...ventaData } = venta;
+  const {
+    sucursalZonaHoraria,
+    clienteRfc,
+    clienteRazonSocial,
+    clienteRegimenFiscal,
+    clienteCodigoPostalFiscal,
+    clienteUsoCfdi,
+    ...ventaData
+  } = venta;
+  const clienteFiscal =
+    clienteRfc && clienteRegimenFiscal && clienteCodigoPostalFiscal
+      ? {
+          rfc: clienteRfc,
+          razonSocial: clienteRazonSocial ?? "",
+          regimenFiscal: clienteRegimenFiscal,
+          codigoPostalFiscal: clienteCodigoPostalFiscal,
+          usoCfdi: clienteUsoCfdi,
+        }
+      : null;
   const hoySucursal = todayDateInput(sucursalZonaHoraria ?? undefined);
-  const promocionesDisponibles = promocionesRows
+  const promocionesDisponibles = catalogos.promocionesRows
     .filter((p) => promocionVigente(p, hoySucursal))
     .map(({ id, nombre, tipo, valor, aplica }) => ({ id, nombre, tipo, valor, aplica }));
 
@@ -552,6 +720,22 @@ export async function getTicketData(
   }
 
   const usoPorDetalle = new Map(usosRows.map((u) => [u.detalleVentaServicioId, u.paqueteNombre]));
+  const ajustesPorPago = new Map<string, TicketData["pagos"][number]["ajustes"]>();
+  for (const ajuste of ajustesPagoRows) {
+    const list = ajustesPorPago.get(ajuste.pagoId) ?? [];
+    list.push({
+      id: ajuste.id,
+      destinoNombre: ajuste.destinoNombre,
+      monto: ajuste.monto,
+      motivo: ajuste.motivo,
+      createdAt: ajuste.createdAt,
+    });
+    ajustesPorPago.set(ajuste.pagoId, list);
+  }
+  const pagosConAjustes = pagos.map((pago) => ({
+    ...pago,
+    ajustes: ajustesPorPago.get(pago.id) ?? [],
+  }));
 
   return {
     venta: { ...ventaData, sucursalId: venta.sucursalId ?? "" },
@@ -564,18 +748,18 @@ export async function getTicketData(
     lineasProductos,
     lineasPaquetes,
     lineasMembresias,
-    catalogoMembresias,
+    catalogoMembresias: catalogos.catalogoMembresias,
     membresiasCliente: membresiasClienteRows
       .filter((m) => membresiaVigente(m, hoySucursal))
       .map(({ id, nombre, descuentoPorcentaje, aplica, vigenciaHasta }) => ({ id, nombre, descuentoPorcentaje, aplica, vigenciaHasta })),
-    catalogoPaquetes,
+    catalogoPaquetes: catalogos.catalogoPaquetes,
     paquetesCliente: paquetesClienteRows,
-    catalogoClientes,
-    catalogoServicios,
-    catalogoProductos,
-    mediosPago,
-    pagos,
-    staff,
+    catalogoClientes: catalogos.catalogoClientes,
+    catalogoServicios: catalogos.catalogoServicios,
+    catalogoProductos: catalogos.catalogoProductos,
+    mediosPago: catalogos.mediosPago,
+    pagos: pagosConAjustes,
+    staff: catalogos.staff,
     propinas,
     comisiones,
     devoluciones: devolucionesRows.map((row) => ({
@@ -602,6 +786,9 @@ export async function getTicketData(
       anticipoRows.filter((a) => a.estado === "vigente"),
       Number(venta.total),
     ).suma,
+    comprobante: comprobanteRows[0] ?? null,
+    clienteFiscal,
+    facturacionConfigurada: facturacionConfigRows.length > 0,
   };
 }
 

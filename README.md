@@ -42,14 +42,14 @@ POS SaaS multiempresa para salones de belleza en México. La aplicación usa Nex
 6. Para crear el primer administrador de plataforma, define temporalmente estas variables en tu terminal y ejecuta el bootstrap:
 
    ```bash
-   export BOOTSTRAP_ADMIN_EMAIL="luis.sg9915@gmail.com"
-   export BOOTSTRAP_ADMIN_NAME="luis"
-   export BOOTSTRAP_ADMIN_PASSWORD="Lusaga2281316145"
+   export BOOTSTRAP_ADMIN_EMAIL="admin@example.com"
+   export BOOTSTRAP_ADMIN_NAME="Administrador local"
+   export BOOTSTRAP_ADMIN_PASSWORD="usa-una-contraseña-local-segura"
    pnpm bootstrap:admin
    unset BOOTSTRAP_ADMIN_EMAIL BOOTSTRAP_ADMIN_NAME BOOTSTRAP_ADMIN_PASSWORD
    ```
 
-   No agregues esas variables a `.env.example` ni al repositorio. Después podrás ingresar en <http://localhost:3000/login>.
+   Usa valores locales propios y nunca agregues credenciales reales a `.env.example`, al README ni al repositorio. Después podrás ingresar en <http://localhost:3000/login>.
 
 ## Verificación para Cloudflare Workers
 

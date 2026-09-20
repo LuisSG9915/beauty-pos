@@ -39,9 +39,20 @@ export default function Home() {
             <p className="text-xs text-[#8a7b72]">Gestión para tu belleza</p>
           </div>
         </div>
-        <Link className="inline-flex h-8 items-center rounded-lg border border-[#ded5ce] bg-white px-4 text-sm font-medium transition-colors hover:bg-[#f4f1ee]" href="/login">
-          Acceso administrativo
-        </Link>
+        <nav className="flex items-center gap-2">
+          <Link
+            className="hidden h-8 items-center rounded-lg px-3 text-sm font-medium text-[#6b5d54] transition-colors hover:bg-[#f4f1ee] sm:inline-flex"
+            href="/precios"
+          >
+            Precios
+          </Link>
+          <Link
+            className="inline-flex h-8 items-center rounded-lg border border-[#ded5ce] bg-white px-4 text-sm font-medium transition-colors hover:bg-[#f4f1ee]"
+            href="/login"
+          >
+            Iniciar sesión
+          </Link>
+        </nav>
       </header>
 
       <section className="mx-auto grid w-full max-w-7xl flex-1 items-center gap-16 px-6 py-16 lg:grid-cols-[1.1fr_0.9fr] lg:px-10 lg:py-24">
@@ -58,14 +69,27 @@ export default function Home() {
             inventario y ventas en cada sucursal de tu salón.
           </p>
           <div className="mt-9 flex flex-wrap gap-3">
-            <Button size="lg" className="h-11 rounded-xl bg-[#2c2522] px-6 text-[#fffaf5] hover:bg-[#463a34]">
-              Preparar mi operación
+            <Button
+              nativeButton={false}
+              render={<Link href="/registro" />}
+              size="lg"
+              className="h-11 rounded-xl bg-[#2c2522] px-6 text-[#fffaf5] hover:bg-[#463a34]"
+            >
+              Prueba gratis 14 días
             </Button>
-            <Button size="lg" variant="outline" className="h-11 rounded-xl border-[#ded5ce] bg-white px-6">
-              Conocer módulos
+            <Button
+              nativeButton={false}
+              render={<Link href="/precios" />}
+              size="lg"
+              variant="outline"
+              className="h-11 rounded-xl border-[#ded5ce] bg-white px-6"
+            >
+              Ver planes y precios
             </Button>
           </div>
-          <p className="mt-5 text-sm text-[#988b82]">Diseñado para México · Multiempresa · Multisucursal</p>
+          <p className="mt-5 text-sm text-[#988b82]">
+            Diseñado para México · Sin tarjeta · Tus datos se conservan al contratar
+          </p>
         </div>
 
         <div className="relative">
@@ -128,6 +152,18 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      <footer className="border-t border-[#eee6e0]">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-8 text-sm text-[#8a7b72] lg:px-10">
+          <p>© Beauty POS · Hecho para estéticas y salones en México</p>
+          <nav className="flex flex-wrap gap-x-6 gap-y-2">
+            <Link className="hover:text-[#5d524b]" href="/precios">Precios</Link>
+            <Link className="hover:text-[#5d524b]" href="/soporte">Soporte</Link>
+            <Link className="hover:text-[#5d524b]" href="/terminos">Términos</Link>
+            <Link className="hover:text-[#5d524b]" href="/privacidad">Privacidad</Link>
+          </nav>
+        </div>
+      </footer>
     </main>
   );
 }

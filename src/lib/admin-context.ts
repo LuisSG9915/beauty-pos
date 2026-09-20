@@ -110,6 +110,7 @@ export async function getAdminContext(
         permissions: new Set(),
         branchIds: null,
         esPlataforma: user.esAdministradorPlataforma,
+        soloLectura: false,
       },
       timeZone: DEFAULT_TIME_ZONE,
       currency: "MXN",

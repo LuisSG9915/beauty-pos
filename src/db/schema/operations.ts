@@ -36,6 +36,8 @@ export const citas = pgTable(
     fechaHora: timestamp("fecha_hora", { withTimezone: true }).notNull(),
     duracionMinutos: integer("duracion_minutos").default(60).notNull(),
     estado: varchar("estado", { length: 30 }).default("pendiente").notNull(),
+    // Canal de creación: "panel" (equipo) o "web" (portal público de reservas).
+    origen: varchar("origen", { length: 20 }).default("panel").notNull(),
     notas: text("notas"),
     totalEstimado: numeric("total_estimado", { precision: 12, scale: 2 }).default("0").notNull(),
     // Concurrencia optimista: cada mutación la incrementa; el formulario de
@@ -144,6 +146,8 @@ export const ventas = pgTable(
     clienteId: uuid("cliente_id").references(() => clientes.id),
     usuarioId: uuid("usuario_id").references(() => usuarios.id),
     corteId: uuid("corte_id").references(() => cortesCaja.id),
+    /** Momento confirmado del cobro; null en ventas históricas aún no migradas. */
+    cobradaAt: timestamp("cobrada_at", { withTimezone: true }),
     estado: varchar("estado", { length: 30 }).default("en_proceso").notNull(),
     subtotal: numeric("subtotal", { precision: 12, scale: 2 }).default("0").notNull(),
     descuento: numeric("descuento", { precision: 12, scale: 2 }).default("0").notNull(),
@@ -166,6 +170,7 @@ export const ventas = pgTable(
     index("ventas_sucursal_idx").on(table.sucursalId),
     index("ventas_cita_idx").on(table.citaId),
     index("ventas_corte_idx").on(table.corteId),
+    index("ventas_sucursal_cobrada_idx").on(table.sucursalId, table.cobradaAt),
     index("ventas_estado_idx").on(table.estado),
   ],
 );
@@ -229,6 +234,31 @@ export const detalleVentasMediosPagos = pgTable(
   ],
 );
 
+export const ajustesPagosVenta = pgTable(
+  "ajustes_pagos_venta",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizacionId: uuid("organizacion_id").notNull().references(() => organizaciones.id),
+    sucursalId: uuid("sucursal_id").notNull().references(() => sucursales.id),
+    ventaId: uuid("venta_id").notNull().references(() => ventas.id),
+    detalleVentaMedioPagoId: uuid("detalle_venta_medio_pago_id").notNull().references(() => detalleVentasMediosPagos.id),
+    medioPagoOrigenId: uuid("medio_pago_origen_id").notNull().references(() => catMediosPago.id),
+    medioPagoDestinoId: uuid("medio_pago_destino_id").notNull().references(() => catMediosPago.id),
+    monto: numeric("monto", { precision: 12, scale: 2 }).notNull(),
+    motivo: text("motivo").notNull(),
+    usuarioId: uuid("usuario_id").notNull().references(() => usuarios.id),
+    corteOrigenId: uuid("corte_origen_id").references(() => cortesCaja.id),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    createdBy: uuid("created_by"),
+  },
+  (table) => [
+    index("ajustes_pagos_venta_organizacion_idx").on(table.organizacionId),
+    index("ajustes_pagos_venta_venta_idx").on(table.ventaId),
+    index("ajustes_pagos_venta_pago_idx").on(table.detalleVentaMedioPagoId),
+    check("ajustes_pagos_venta_monto_chk", sql`${table.monto} > 0`),
+  ],
+);
+
 // Propinas repartidas por profesional al cobrar una venta.
 export const detalleVentasPropinas = pgTable(
   "detalle_ventas_propinas",
@@ -246,6 +276,41 @@ export const detalleVentasPropinas = pgTable(
   ],
 );
 
+/**
+ * Pago de comisiones a un profesional por un periodo. Documento confirmado e
+ * inmutable: las correcciones se hacen por reversión (estado `revertida` +
+ * motivo) y las líneas devengadas vuelven a quedar pendientes.
+ */
+export const liquidacionesComisiones = pgTable(
+  "liquidaciones_comisiones",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizacionId: uuid("organizacion_id").notNull().references(() => organizaciones.id),
+    sucursalId: uuid("sucursal_id").notNull().references(() => sucursales.id),
+    /** Profesional al que se le pagan las comisiones del periodo. */
+    usuarioId: uuid("usuario_id").notNull().references(() => usuarios.id),
+    periodoDesde: date("periodo_desde").notNull(),
+    periodoHasta: date("periodo_hasta").notNull(),
+    total: numeric("total", { precision: 12, scale: 2 }).notNull(),
+    medioPagoId: uuid("medio_pago_id").notNull().references(() => catMediosPago.id),
+    /** Salida de efectivo del corte abierto cuando el medio es efectivo. */
+    movimientoCajaId: uuid("movimiento_caja_id").references(() => movimientosCaja.id),
+    notas: text("notas"),
+    estado: varchar("estado", { length: 20 }).default("confirmada").notNull(),
+    revertidaAt: timestamp("revertida_at", { withTimezone: true }),
+    revertidaPor: uuid("revertida_por").references(() => usuarios.id),
+    motivoReversion: text("motivo_reversion"),
+    ...opAuditColumns,
+  },
+  (table) => [
+    index("liquidaciones_comisiones_organizacion_idx").on(table.organizacionId),
+    index("liquidaciones_comisiones_sucursal_idx").on(table.sucursalId, table.periodoHasta),
+    index("liquidaciones_comisiones_usuario_idx").on(table.usuarioId),
+    check("liquidaciones_comisiones_estado_chk", sql`${table.estado} in ('confirmada','revertida')`),
+    check("liquidaciones_comisiones_total_chk", sql`${table.total} > 0`),
+  ],
+);
+
 // Comisiones devengadas por línea de servicio al cobrar una venta.
 export const detalleVentasComisiones = pgTable(
   "detalle_ventas_comisiones",
@@ -259,6 +324,8 @@ export const detalleVentasComisiones = pgTable(
     valor: numeric("valor", { precision: 12, scale: 3 }).notNull(),
     base: numeric("base", { precision: 12, scale: 2 }).notNull(),
     monto: numeric("monto", { precision: 12, scale: 2 }).notNull(),
+    /** Liquidación que pagó esta línea; null = comisión pendiente de pago. */
+    liquidacionId: uuid("liquidacion_id").references(() => liquidacionesComisiones.id),
     activo: boolean("activo").default(true).notNull(),
     ...opAuditColumns,
   },
@@ -266,6 +333,7 @@ export const detalleVentasComisiones = pgTable(
     index("detalle_ventas_comisiones_venta_idx").on(table.ventaId),
     index("detalle_ventas_comisiones_usuario_idx").on(table.usuarioId),
     index("detalle_ventas_comisiones_linea_idx").on(table.detalleVentaServicioId),
+    index("detalle_ventas_comisiones_liquidacion_idx").on(table.liquidacionId),
   ],
 );
 
@@ -723,5 +791,114 @@ export const clienteMembresias = pgTable(
     index("cliente_membresias_venta_idx").on(table.ventaId),
     check("cliente_membresias_estado_chk", sql`${table.estado} in ('vigente','vencida','cancelado')`),
     check("cliente_membresias_vigencia_chk", sql`${table.vigenciaHasta} >= ${table.vigenciaDesde}`),
+  ],
+);
+
+// ── Facturación (CFDI) ─────────────────────────────────────────────────────
+// Datos del emisor por organización. Las credenciales/sello digital las
+// maneja el PAC — aquí solo va la identidad fiscal y la serie/folio.
+export const facturacionConfig = pgTable(
+  "facturacion_config",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizacionId: uuid("organizacion_id")
+      .notNull()
+      .references(() => organizaciones.id)
+      .unique(),
+    rfc: varchar("rfc", { length: 13 }),
+    razonSocial: varchar("razon_social", { length: 254 }),
+    regimenFiscal: varchar("regimen_fiscal", { length: 3 }),
+    codigoPostal: varchar("codigo_postal", { length: 5 }),
+    serie: varchar("serie", { length: 10 }).default("A"),
+    folioActual: integer("folio_actual").default(0).notNull(),
+    // Los precios del POS normalmente llevan IVA incluido: al emitir se
+    // desglosa subtotal = total / (1 + tasa). Si es false, el IVA se suma.
+    preciosIncluyenIva: boolean("precios_incluyen_iva").default(true).notNull(),
+    tasaIva: numeric("tasa_iva", { precision: 5, scale: 4 }).default("0.16").notNull(),
+    pacProveedor: varchar("pac_proveedor", { length: 40 }).default("stub"),
+    activo: boolean("activo").default(true).notNull(),
+    ...opAuditColumns,
+  },
+  (table) => [index("facturacion_config_organizacion_idx").on(table.organizacionId)],
+);
+
+export const COMPROBANTE_ESTADOS = ["borrador", "timbrada", "cancelada", "error"] as const;
+export type ComprobanteEstado = (typeof COMPROBANTE_ESTADOS)[number];
+
+// Comprobante fiscal ligado a una venta cobrada. El receptor se guarda como
+// snapshot (el cliente puede editar sus datos después sin alterar el CFDI).
+export const comprobantes = pgTable(
+  "comprobantes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizacionId: uuid("organizacion_id").notNull().references(() => organizaciones.id),
+    sucursalId: uuid("sucursal_id").notNull().references(() => sucursales.id),
+    ventaId: uuid("venta_id").notNull().references(() => ventas.id),
+    clienteId: uuid("cliente_id").references(() => clientes.id),
+    estado: varchar("estado", { length: 20 }).default("borrador").notNull(),
+    receptorRfc: varchar("receptor_rfc", { length: 13 }).notNull(),
+    receptorNombre: varchar("receptor_nombre", { length: 254 }).notNull(),
+    receptorRegimen: varchar("receptor_regimen", { length: 3 }).notNull(),
+    receptorCp: varchar("receptor_cp", { length: 5 }).notNull(),
+    usoCfdi: varchar("uso_cfdi", { length: 4 }).notNull(),
+    metodoPago: varchar("metodo_pago", { length: 3 }).default("PUE").notNull(),
+    formaPago: varchar("forma_pago", { length: 2 }).notNull(),
+    serie: varchar("serie", { length: 10 }),
+    folio: integer("folio"),
+    subtotal: numeric("subtotal", { precision: 12, scale: 2 }).notNull(),
+    impuestos: numeric("impuestos", { precision: 12, scale: 2 }).default("0").notNull(),
+    total: numeric("total", { precision: 12, scale: 2 }).notNull(),
+    moneda: varchar("moneda", { length: 3 }).default("MXN").notNull(),
+    // Folio fiscal (UUID) que devuelve el PAC al timbrar.
+    uuid: varchar("uuid", { length: 36 }),
+    pacProveedor: varchar("pac_proveedor", { length: 40 }),
+    pacRespuesta: jsonb("pac_respuesta"),
+    error: text("error"),
+    motivoCancelacion: varchar("motivo_cancelacion", { length: 2 }),
+    uuidSustitucion: varchar("uuid_sustitucion", { length: 36 }),
+    timbradoAt: timestamp("timbrado_at", { withTimezone: true }),
+    canceladoAt: timestamp("cancelado_at", { withTimezone: true }),
+    activo: boolean("activo").default(true).notNull(),
+    ...opAuditColumns,
+  },
+  (table) => [
+    index("comprobantes_organizacion_idx").on(table.organizacionId),
+    index("comprobantes_venta_idx").on(table.ventaId),
+    index("comprobantes_organizacion_estado_idx").on(table.organizacionId, table.estado),
+    check("comprobantes_estado_chk", sql`${table.estado} in ('borrador','timbrada','cancelada','error')`),
+  ],
+);
+
+export const RECORDATORIO_ESTADOS = ["pendiente", "enviado", "fallido", "omitido"] as const;
+
+/**
+ * Recordatorio de cita enviado por correo. La clave única (cita_id, tipo)
+ * garantiza un solo envío por cita aunque el cron corra varias veces; si la
+ * cita se reagenda después del envío no se reenvía (queda registrado el
+ * `fecha_hora_snapshot` del momento en que se envió).
+ */
+export const recordatoriosEnvios = pgTable(
+  "recordatorios_envios",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizacionId: uuid("organizacion_id").notNull().references(() => organizaciones.id),
+    citaId: uuid("cita_id").notNull().references(() => citas.id),
+    /** p.ej. "cita_24h". Reservado para futuros tipos (confirmación, WhatsApp). */
+    tipo: varchar("tipo", { length: 30 }).notNull(),
+    correoDestino: varchar("correo_destino", { length: 254 }).notNull(),
+    fechaHoraSnapshot: timestamp("fecha_hora_snapshot", { withTimezone: true }).notNull(),
+    estado: varchar("estado", { length: 20 }).default("pendiente").notNull(),
+    enviadoAt: timestamp("enviado_at", { withTimezone: true }),
+    error: text("error"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("recordatorios_envios_cita_tipo_uq").on(table.citaId, table.tipo),
+    index("recordatorios_envios_organizacion_idx").on(table.organizacionId),
+    index("recordatorios_envios_estado_idx").on(table.estado),
+    check(
+      "recordatorios_envios_estado_chk",
+      sql`${table.estado} in ('pendiente','enviado','fallido','omitido')`,
+    ),
   ],
 );

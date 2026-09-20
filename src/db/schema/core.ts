@@ -26,6 +26,10 @@ export const organizaciones = pgTable(
     slug: varchar("slug", { length: 120 }).notNull(),
     zonaHoraria: varchar("zona_horaria", { length: 80 }).default("America/Mexico_City").notNull(),
     moneda: varchar("moneda", { length: 3 }).default("MXN").notNull(),
+    // Recordatorios automáticos de citas por correo (a toda la organización).
+    recordatoriosActivos: boolean("recordatorios_activos").default(false).notNull(),
+    // Horas antes de la cita en que se envía el recordatorio.
+    recordatoriosHorasAntes: integer("recordatorios_horas_antes").default(24).notNull(),
     activo: boolean("activo").default(true).notNull(),
     ...auditColumns,
   },
@@ -48,6 +52,12 @@ export const sucursales = pgTable(
     // Capacidad del carril "sin asignar": cuántas citas sin profesional pueden
     // traslaparse en la misma sucursal y horario. 1 = una sola a la vez.
     capacidadSinAsignar: integer("capacidad_sin_asignar").default(1).notNull(),
+    // Portal público de reservas (/reservar/[slug]). Las reservas web ocupan
+    // el carril "sin asignar" y el equipo asigna profesional al confirmar.
+    reservasOnline: boolean("reservas_online").default(false).notNull(),
+    // true = la reserva web queda confirmada de inmediato; false = pendiente
+    // hasta que el equipo la confirme desde la agenda.
+    reservasAutoConfirmar: boolean("reservas_auto_confirmar").default(false).notNull(),
     // Política de caja: true = el POS rechaza cobros sin un corte abierto en
     // la sucursal; false = cobra libre y asocia la venta al corte si existe.
     exigirCorteParaCobrar: boolean("exigir_corte_para_cobrar").default(false).notNull(),

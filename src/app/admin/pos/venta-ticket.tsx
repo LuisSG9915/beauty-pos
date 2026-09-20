@@ -8,6 +8,7 @@ import { useActionState, useEffect, useRef, useState, useTransition } from "reac
 import {
   aplicarDescuento,
   aplicarMembresiaVenta,
+  ajustarMedioPagoVenta,
   aplicarPromocionVenta,
   asignarClienteVenta,
   asignarEstilistaLinea,
@@ -25,6 +26,7 @@ import {
 } from "@/app/admin/pos/actions";
 import { CatalogoSelector } from "@/app/admin/pos/catalogo-selector";
 import { CobroForm } from "@/app/admin/pos/cobro-form";
+import { FacturarPanel } from "@/app/admin/pos/facturar-panel";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
@@ -32,6 +34,7 @@ import { Field, FieldLabel, Input } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
 import { initialActionState, type ActionState } from "@/lib/action-state";
 import { formatCurrency } from "@/lib/format";
+import { formaPagoDesdeCategoria } from "@/modules/facturacion/sat";
 import type { TicketData } from "@/modules/pos/ticket";
 
 type LineaServicio = {
@@ -80,7 +83,7 @@ type VentaTicketProps = {
   paquetesCliente?: TicketData["paquetesCliente"];
   catalogoClientes?: TicketData["catalogoClientes"];
   mediosPago: Array<{ id: string; nombre: string; categoria: string }>;
-  pagos: Array<{ nombre: string; monto: string; recibido: string; cambio: string }>;
+  pagos: TicketData["pagos"];
   staff: Array<{ id: string; nombre: string }>;
   propinas: Array<{ usuarioNombre: string; monto: string }>;
   comisiones: Array<{ usuarioNombre: string; monto: string }>;
@@ -93,6 +96,16 @@ type VentaTicketProps = {
   returnTo: string;
   /** Permiso ventas.cancelar (lo resuelve la página/llamante). */
   puedeCancelar?: boolean;
+  /** Permiso ventas.ajustar_pago (lo resuelve la página/llamante). */
+  puedeAjustarPago?: boolean;
+  /** Permiso facturacion.emitir/cancelar (lo resuelve la página/llamante). */
+  puedeFacturar?: boolean;
+  /** Comprobante fiscal activo de la venta (si se emitió). */
+  comprobante?: TicketData["comprobante"];
+  /** Datos fiscales del cliente de la venta (null si incompletos). */
+  clienteFiscal?: TicketData["clienteFiscal"];
+  /** La organización ya configuró los datos del emisor. */
+  facturacionConfigurada?: boolean;
   /** "inline" = dentro del sheet de agenda (sin redirect al cobrar). */
   modo?: "page" | "inline";
   /** modo inline: cerrar el sheet al cobrar. */
@@ -392,6 +405,74 @@ function PaqueteQuitarButton({
   );
 }
 
+function AjusteMedioPagoForm({
+  currency,
+  mediosPago,
+  onChanged,
+  organizationId,
+  pago,
+  ventaId,
+}: {
+  currency: string;
+  mediosPago: Array<{ id: string; nombre: string; categoria: string }>;
+  onChanged?: () => void;
+  organizationId: string;
+  pago: TicketData["pagos"][number];
+  ventaId: string;
+}) {
+  const [state, action, pending] = useActionState(ajustarMedioPagoVenta, initialActionState);
+  const [abierto, setAbierto] = useState(false);
+  const [medioPagoId, setMedioPagoId] = useState("");
+  const [monto, setMonto] = useState(() => Number(pago.monto).toFixed(2));
+  const [motivo, setMotivo] = useState("");
+  const ajustado = pago.ajustes.reduce((sum, ajuste) => sum + Number(ajuste.monto), 0);
+  const restante = Math.max(Math.round((Number(pago.monto) - ajustado) * 100) / 100, 0);
+  const destinos = mediosPago.filter((medio) => medio.id !== pago.medioPagoId);
+
+  useEffect(() => {
+    if (state.success) onChanged?.();
+  }, [onChanged, state.success]);
+
+  if (destinos.length === 0 || restante <= 0) return null;
+  if (!abierto) {
+    return (
+      <Button className="min-h-8 rounded-lg text-xs" onClick={() => { setMonto(restante.toFixed(2)); setAbierto(true); }} type="button" variant="outline">
+        Corregir medio
+      </Button>
+    );
+  }
+
+  return (
+    <form action={action} className="mt-3 space-y-3 rounded-xl border border-[#eadfd8] bg-[#faf9f7] p-3">
+      <input name="organizacionId" type="hidden" value={organizationId} />
+      <input name="ventaId" type="hidden" value={ventaId} />
+      <input name="pagoId" type="hidden" value={pago.id} />
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="space-y-1.5 text-xs font-medium text-[#625b55]">
+          <span>Nuevo medio</span>
+          <select className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal" name="medioPagoId" onChange={(event) => setMedioPagoId(event.target.value)} required value={medioPagoId}>
+            <option value="">Selecciona…</option>
+            {destinos.map((medio) => <option key={medio.id} value={medio.id}>{medio.nombre}</option>)}
+          </select>
+        </label>
+        <label className="space-y-1.5 text-xs font-medium text-[#625b55]">
+          <span>Monto máximo {formatCurrency(restante, { currency })}</span>
+          <input className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal tabular-nums" inputMode="decimal" max={restante} min="0.01" name="monto" onChange={(event) => setMonto(event.target.value)} step="0.01" type="number" value={monto} />
+        </label>
+      </div>
+      <label className="block space-y-1.5 text-xs font-medium text-[#625b55]">
+        <span>Motivo</span>
+        <textarea className="min-h-20 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm font-normal" maxLength={500} name="motivo" onChange={(event) => setMotivo(event.target.value)} placeholder="Ej. Se capturó transferencia en lugar de tarjeta." required value={motivo} />
+      </label>
+      <ActionFeedback state={state} />
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button disabled={pending} onClick={() => setAbierto(false)} type="button" variant="ghost">Cerrar</Button>
+        <Button disabled={pending || !medioPagoId || !motivo.trim() || !(Number(monto) > 0)} type="submit">{pending ? "Guardando…" : "Guardar corrección"}</Button>
+      </div>
+    </form>
+  );
+}
+
 export function VentaTicket({
   organizationId,
   venta,
@@ -420,12 +501,25 @@ export function VentaTicket({
   currency,
   returnTo,
   puedeCancelar = false,
+  puedeAjustarPago = false,
+  puedeFacturar = false,
+  comprobante = null,
+  clienteFiscal = null,
+  facturacionConfigurada = false,
   modo = "page",
   onCobrada,
   onChanged,
 }: VentaTicketProps) {
   const editable = venta.estado === "en_proceso";
   const cancelada = venta.estado === "cancelada";
+  // Forma de pago SAT sugerida: categoría del medio con mayor monto pagado.
+  const pagoPrincipal = pagos.reduce<(typeof pagos)[number] | null>(
+    (mayor, p) => (Number(p.monto) > Number(mayor?.monto ?? -1) ? p : mayor),
+    null,
+  );
+  const formaPagoSugerida = formaPagoDesdeCategoria(
+    mediosPago.find((m) => m.nombre === pagoPrincipal?.nombre)?.categoria,
+  );
   const [descuentoState, descuentoAction, descuentoPending] = useActionState(
     aplicarDescuento,
     initialActionState,
@@ -1058,26 +1152,57 @@ export function VentaTicket({
         {pagos.length > 0 ? (
           <section className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-[#2d2926]">Pagos registrados</h3>
-            <div className="mt-3 space-y-2">
-              {pagos.map((pago, index) => (
-                <div className="flex justify-between text-sm" key={`${pago.nombre}-${index}`}>
-                  <span>
-                    {pago.nombre}
-                    {Number(pago.cambio) > 0 ? (
-                      <span className="text-xs text-[#81746c]">
-                        {" "}
-                        · recibió {formatCurrency(pago.recibido, { currency })}, cambio{" "}
-                        {formatCurrency(pago.cambio, { currency })}
-                      </span>
-                    ) : null}
-                  </span>
-                  <span className="tabular-nums">
-                    {formatCurrency(pago.monto, { currency })}
-                  </span>
+            <div className="mt-3 space-y-3">
+              {pagos.map((pago) => (
+                <div className="rounded-xl border border-[#eee8e3] px-3 py-2.5" key={pago.id}>
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span>
+                      {pago.nombre}
+                      {Number(pago.cambio) > 0 ? (
+                        <span className="text-xs text-[#81746c]">
+                          {" "}
+                          · recibió {formatCurrency(pago.recibido, { currency })}, cambio{" "}
+                          {formatCurrency(pago.cambio, { currency })}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="tabular-nums">{formatCurrency(pago.monto, { currency })}</span>
+                  </div>
+                  {pago.ajustes.length > 0 ? (
+                    <ul className="mt-2 space-y-1 text-xs text-[#81746c]">
+                      {pago.ajustes.map((ajuste) => (
+                        <li key={ajuste.id}>
+                          Reclasificado a <span className="font-medium text-[#60392e]">{ajuste.destinoNombre ?? "medio inactivo"}</span> por {formatCurrency(ajuste.monto, { currency })} · {ajuste.motivo}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {!editable && !cancelada && puedeAjustarPago ? (
+                    <AjusteMedioPagoForm
+                      currency={currency}
+                      mediosPago={mediosPago}
+                      onChanged={onChanged}
+                      organizationId={organizationId}
+                      pago={pago}
+                      ventaId={venta.id}
+                    />
+                  ) : null}
                 </div>
               ))}
             </div>
           </section>
+        ) : null}
+
+        {!editable && !cancelada && puedeFacturar ? (
+          <FacturarPanel
+            clienteFiscal={clienteFiscal}
+            comprobante={comprobante}
+            currency={currency}
+            facturacionConfigurada={facturacionConfigurada}
+            formaPagoSugerida={formaPagoSugerida}
+            organizationId={organizationId}
+            ventaId={venta.id}
+          />
         ) : null}
 
         {propinas.length > 0 || comisiones.length > 0 ? (

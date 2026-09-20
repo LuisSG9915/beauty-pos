@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getDatabase } from "@/db/client";
 import { servicios } from "@/db/schema/catalogs";
 import { checkPermission } from "@/lib/auth/authorization";
+import { revalidateCatalogos } from "@/lib/catalogo-cache";
 
 const serviceSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -51,6 +52,7 @@ export async function saveService(_previousState: ServiceActionState, formData: 
   else await db.insert(servicios).values({ ...values, createdBy: user.id });
 
   revalidatePath("/admin/servicios");
+  revalidateCatalogos(input.organizacionId);
   return { success: true };
 }
 
@@ -64,4 +66,5 @@ export async function toggleService(formData: FormData) {
   const db = getDatabase();
   await db.update(servicios).set({ activo: !active, updatedBy: user.id }).where(and(eq(servicios.id, id), eq(servicios.organizacionId, organizationId)));
   revalidatePath("/admin/servicios");
+  revalidateCatalogos(organizationId);
 }

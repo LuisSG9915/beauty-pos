@@ -1,4 +1,4 @@
-import { and, desc, eq, ne, or } from "drizzle-orm";
+import { and, desc, eq, ne, or, sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -79,10 +79,10 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
       .orderBy(desc(citas.fechaHora))
       .limit(50),
     db
-      .select({ id: ventas.id, createdAt: ventas.createdAt, estado: ventas.estado, total: ventas.total, propina: ventas.propina })
+      .select({ id: ventas.id, fecha: sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`, estado: ventas.estado, total: ventas.total, propina: ventas.propina })
       .from(ventas)
       .where(and(eq(ventas.clienteId, cliente.id), eq(ventas.organizacionId, organization.id), eq(ventas.activo, true)))
-      .orderBy(desc(ventas.createdAt))
+      .orderBy(desc(sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`))
       .limit(50),
     db
       .select({
@@ -173,7 +173,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
           <ul className="mt-3 divide-y divide-[#eee8e3] rounded-xl border border-[#eee8e3]">
             {ventaRows.map((venta) => (
               <li className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm" key={venta.id}>
-                <span className="tabular-nums text-[#625b55]">{formatDate(venta.createdAt, { timeZone })}</span>
+                <span className="tabular-nums text-[#625b55]">{formatDate(venta.fecha, { timeZone })}</span>
                 <span className="text-xs font-medium uppercase tracking-wide text-[#81746c]">{venta.estado}</span>
                 <span className="font-semibold tabular-nums">
                   {formatCurrency(venta.total, { currency })}

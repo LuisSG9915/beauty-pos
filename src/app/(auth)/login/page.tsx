@@ -2,7 +2,19 @@ import Link from "next/link";
 
 import { LoginForm } from "@/app/(auth)/login/login-form";
 
-export default function LoginPage() {
+const AVISOS: Record<string, string> = {
+  verifica: "Tu cuenta está lista. Te enviamos un correo con un enlace para verificarla — revísalo antes de iniciar sesión.",
+  registrado: "Tu cuenta está lista. Inicia sesión para continuar.",
+};
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+  const avisoKey = typeof params.verifica === "string" ? "verifica" : typeof params.registrado === "string" ? "registrado" : null;
+  const aviso = avisoKey ? AVISOS[avisoKey] : null;
   return (
     <main className="grid min-h-screen bg-[#faf9f7] lg:grid-cols-[1.05fr_0.95fr]">
       <section className="relative hidden overflow-hidden bg-[#2c2522] px-10 py-10 text-[#fffaf5] lg:flex lg:flex-col lg:justify-between">
@@ -37,6 +49,11 @@ export default function LoginPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#b8795d]">Bienvenido de vuelta</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-[#2c2522]">Ingresa a tu operación</h1>
             <p className="mt-4 text-sm leading-6 text-[#81746c]">Usa las credenciales de tu invitación administrativa para continuar.</p>
+            {aviso ? (
+              <p className="mt-5 rounded-xl border border-[#d8e6d3] bg-[#f0f7ec] px-4 py-3 text-sm text-[#3d6b4a]" role="status">
+                {aviso}
+              </p>
+            ) : null}
             <LoginForm />
           </div>
         </div>

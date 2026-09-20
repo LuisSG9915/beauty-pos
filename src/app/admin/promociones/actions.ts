@@ -7,6 +7,8 @@ import { z } from "zod";
 import { getDatabase } from "@/db/client";
 import { promociones } from "@/db/schema/catalogs";
 import { checkPermission } from "@/lib/auth/authorization";
+import { revalidateCatalogos } from "@/lib/catalogo-cache";
+import { requiereCapacidad } from "@/modules/billing/queries";
 
 const promotionSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -29,6 +31,8 @@ export async function savePromotion(_previousState: PromotionActionState, formDa
   const input = result.data;
   const access = await checkPermission(input.organizacionId, "catalogos.editar");
   if (!access) return { error: "No tienes permiso para editar catálogos." };
+  const negado = await requiereCapacidad(input.organizacionId, "promociones");
+  if (negado) return { error: negado };
   const { user } = access;
   const db = getDatabase();
   const conditions = [eq(promociones.organizacionId, input.organizacionId), eq(promociones.clave, input.clave)];
@@ -55,6 +59,7 @@ export async function savePromotion(_previousState: PromotionActionState, formDa
   else await db.insert(promociones).values({ ...values, createdBy: user.id });
 
   revalidatePath("/admin/promociones");
+  revalidateCatalogos(input.organizacionId);
   return { success: true };
 }
 
@@ -64,8 +69,10 @@ export async function togglePromotion(formData: FormData) {
   const active = formData.get("activo") === "true";
   const access = await checkPermission(organizationId, "catalogos.editar");
   if (!access) return;
+  if (await requiereCapacidad(organizationId, "promociones")) return;
   const { user } = access;
   const db = getDatabase();
   await db.update(promociones).set({ activo: !active, updatedBy: user.id }).where(and(eq(promociones.id, id), eq(promociones.organizacionId, organizationId)));
   revalidatePath("/admin/promociones");
+  revalidateCatalogos(organizationId);
 }

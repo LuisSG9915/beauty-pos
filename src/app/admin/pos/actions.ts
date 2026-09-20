@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq, inArray, ne } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -10,6 +10,7 @@ import { withDbRetry } from "@/db/retry";
 import { catMediosPago, comisiones, membresias, paquetes, productos, promociones, relServiciosInsumos, servicios } from "@/db/schema/catalogs";
 import { clientes, miembrosOrganizaciones, sucursales, usuarios } from "@/db/schema/core";
 import {
+  ajustesPagosVenta,
   anticipos,
   citas,
   citasHistorial,
@@ -41,9 +42,13 @@ import {
   hasPermission,
 } from "@/lib/auth/authorization";
 import { canTransitionEstado } from "@/modules/agenda";
+import { contextoSuscripcion, requiereCapacidad, tieneCapacidad } from "@/modules/billing/queries";
 import { applyInventoryMovement, type InventoryDb } from "@/modules/inventory";
+import { motivoBloqueoCancelacion } from "@/modules/pos/cancelacion";
 import { anticiposAplicables } from "@/modules/pos/anticipos";
 import { calcularDescuentoMembresia, membresiaVigente, sumarDias } from "@/modules/pos/membresias";
+import { resolverLineasDevolucion } from "@/modules/pos/devoluciones";
+import { resolverCobroPagos } from "@/modules/pos/pagos";
 import { elegirPaqueteParaServicio, estadoTrasUso, restarSesiones } from "@/modules/pos/paquetes";
 import { calcularComisiones, repartirPropina } from "@/modules/pos/comisiones";
 import { calcularDescuentoPromocion, promocionVigente } from "@/modules/pos/promociones";
@@ -430,7 +435,12 @@ export async function cargarTicket(
   if (!access) return null;
   const ticket = await getTicketData(organizacionId, ventaId);
   if (!ticket || !canAccessBranch(access, ticket.venta.sucursalId)) return null;
-  return { ...ticket, puedeCancelar: hasPermission(access, "ventas.cancelar") };
+  return {
+    ...ticket,
+    puedeCancelar: hasPermission(access, "ventas.cancelar"),
+    puedeAjustarPago: hasPermission(access, "ventas.ajustar_pago") || hasPermission(access, "ventas.cancelar"),
+    puedeFacturar: hasPermission(access, "facturacion.emitir"),
+  };
 }
 
 const lineaSchema = z.object({
@@ -726,15 +736,6 @@ export async function cobrarVenta(_previousState: CobroActionState, formData: Fo
         .from(catMediosPago)
         .where(and(inArray(catMediosPago.id, medioIds), eq(catMediosPago.organizacionId, input.organizacionId), eq(catMediosPago.activo, true)));
       const mediosPorId = new Map(medios.map((m) => [m.id, m]));
-      for (const pago of pagosInput) {
-        const medio = mediosPorId.get(pago.medioPagoId);
-        if (!medio) return actionError("Uno de los medios de pago no es válido.");
-        if (medio.categoria !== "efectivo" && !pago.referencia) {
-          return actionError(`El medio "${medio.nombre}" requiere referencia.`, {
-            fieldErrors: { pagos: [`Falta la referencia de ${medio.nombre}.`] },
-          });
-        }
-      }
 
       // `total` puede quedar en $0 cuando todas las líneas están cubiertas
       // por sesiones de paquete; el cobro sigue siendo válido sin pagos.
@@ -756,6 +757,20 @@ export async function cobrarVenta(_previousState: CobroActionState, formData: Fo
         .where(and(eq(detalleVentasMembresias.ventaId, venta.id), eq(detalleVentasMembresias.activo, true)));
       if (lineasMembresias.length > 0 && !venta.clienteId) {
         return actionError("Asigna un cliente a la venta: la membresía queda registrada a su nombre.");
+      }
+
+      // Última verificación de entitlements dentro del lock: un ticket
+      // compuesto antes de un cambio de plan no puede cobrar lo que el plan
+      // ya no incluye. El canje de sesiones/vigencias ya pagadas sí se honra.
+      const suscripcion = await contextoSuscripcion(input.organizacionId, tx);
+      if (lineasPaquetes.length > 0 && !tieneCapacidad(suscripcion, "paquetes")) {
+        return actionError("El ticket vende un paquete y tu plan actual no los incluye. Quita la línea o cambia de plan.");
+      }
+      if (lineasMembresias.length > 0 && !tieneCapacidad(suscripcion, "membresias")) {
+        return actionError("El ticket vende una membresía y tu plan actual no las incluye. Quita la línea o cambia de plan.");
+      }
+      if (venta.promocionId && !tieneCapacidad(suscripcion, "promociones")) {
+        return actionError("El ticket tiene una promoción aplicada y tu plan actual no las incluye. Quita la promoción o cambia de plan.");
       }
 
       // Política de sucursal: si exige corte abierto para cobrar, el cobro se
@@ -811,59 +826,21 @@ export async function cobrarVenta(_previousState: CobroActionState, formData: Fo
 
       const propina = Math.round(input.propina * 100) / 100;
       const aCubrir = Math.max(Math.round((total + propina - anticipoAplicado) * 100) / 100, 0);
-      if (aCubrir > 0.005 && pagosInput.length === 0) {
-        return actionError(`Falta cubrir ${aCubrir.toFixed(2)} del total.`, {
-          fieldErrors: { pagos: ["Agrega al menos un pago."] },
-        });
+      const cobro = resolverCobroPagos({ pagos: pagosInput, aCubrir, mediosPorId });
+      if (!cobro.ok) {
+        return actionError(cobro.error, { fieldErrors: { pagos: [cobro.detalle ?? cobro.error] } });
       }
-      if (aCubrir <= 0.005 && pagosInput.length > 0) {
-        return actionError("El total ya está cubierto; cobra sin pagos adicionales.", {
-          fieldErrors: { pagos: ["Quita los pagos: el total ya está cubierto."] },
-        });
-      }
-      const esEfectivo = (medioPagoId: string) => mediosPorId.get(medioPagoId)?.categoria === "efectivo";
-      const recibidoEfectivo = Math.round(
-        pagosInput.filter((p) => esEfectivo(p.medioPagoId)).reduce((s, p) => s + p.monto, 0) * 100,
-      ) / 100;
-      const recibidoNoEfectivo = Math.round(
-        pagosInput.filter((p) => !esEfectivo(p.medioPagoId)).reduce((s, p) => s + p.monto, 0) * 100,
-      ) / 100;
-      const recibido = recibidoEfectivo + recibidoNoEfectivo;
-      // Solo el efectivo puede exceder el total (genera cambio); los pagos con
-      // tarjeta/transferencia/wallet deben ser exactos respecto a lo cubierto.
-      if (recibidoNoEfectivo > aCubrir + 0.005) {
-        return actionError(`Los pagos sin efectivo exceden el total (${aCubrir.toFixed(2)}).`, {
-          fieldErrors: { pagos: ["Un pago sin efectivo no puede generar cambio."] },
-        });
-      }
-      if (recibido + 0.005 < aCubrir) {
-        return actionError(`Los pagos no cubren el total (${aCubrir.toFixed(2)}).`, {
-          fieldErrors: { pagos: ["Completa el monto restante."] },
-        });
-      }
-      if (recibidoEfectivo === 0 && Math.abs(recibidoNoEfectivo - aCubrir) > 0.005) {
-        return actionError(`Sin efectivo el pago debe ser exacto (${aCubrir.toFixed(2)}).`, {
-          fieldErrors: { pagos: ["Ajusta el monto al total exacto."] },
-        });
-      }
-      const cambioTotal = Math.max(Math.round((recibido - aCubrir) * 100) / 100, 0);
 
-      // El cambio se imputa a los pagos en efectivo (en orden); el `monto`
-      // persistido es lo aplicado a la venta y `recibido` lo entregado.
-      let cambioPendiente = cambioTotal;
-      for (const pago of pagosInput) {
-        const cambioPago = esEfectivo(pago.medioPagoId)
-          ? Math.min(pago.monto, cambioPendiente)
-          : 0;
-        cambioPendiente = Math.round((cambioPendiente - cambioPago) * 100) / 100;
-        const aplicado = Math.round((pago.monto - cambioPago) * 100) / 100;
+      // El `monto` persistido es lo aplicado a la venta y `recibido` lo
+      // entregado; el cambio solo existe en pagos en efectivo.
+      for (const linea of cobro.lineas) {
         await tx.insert(detalleVentasMediosPagos).values({
           ventaId: venta.id,
-          medioPagoId: pago.medioPagoId,
-          monto: aplicado.toFixed(2),
-          recibido: pago.monto.toFixed(2),
-          cambio: cambioPago.toFixed(2),
-          referencia: pago.referencia || null,
+          medioPagoId: linea.medioPagoId,
+          monto: linea.aplicado.toFixed(2),
+          recibido: linea.recibido.toFixed(2),
+          cambio: linea.cambio.toFixed(2),
+          referencia: linea.referencia,
           createdBy: user.id,
         });
       }
@@ -881,6 +858,7 @@ export async function cobrarVenta(_previousState: CobroActionState, formData: Fo
         .update(ventas)
         .set({
           estado: "completada",
+          cobradaAt: new Date(),
           corteId: corteAbierto?.id ?? null,
           subtotal: subtotal.toFixed(2),
           total: total.toFixed(2),
@@ -1020,7 +998,7 @@ export async function cobrarVenta(_previousState: CobroActionState, formData: Fo
           total,
           subtotal,
           propina,
-          cambio: cambioTotal,
+          cambio: cobro.cambioTotal,
           anticipo: anticipoAplicado,
           medios: pagosInput.map((p) => p.medioPagoId).length,
           paquetes: lineasPaquetes.length,
@@ -1055,6 +1033,107 @@ export async function cobrarVenta(_previousState: CobroActionState, formData: Fo
     redirect(
       safeAdminReturnTo(input.returnTo, `/admin/pos?organizationId=${input.organizacionId}`),
     );
+  }
+  return outcome;
+}
+
+const ajusteMedioPagoSchema = z.object({
+  organizacionId: z.string().uuid(),
+  ventaId: z.string().uuid(),
+  pagoId: z.string().uuid(),
+  medioPagoId: z.string().uuid(),
+  monto: z.coerce.number().positive().max(9_999_999),
+  motivo: z.string().trim().min(3, "Indica el motivo de la corrección.").max(500),
+});
+
+/** Reclasifica un pago sin editar el registro original ni alterar un corte cerrado. */
+export async function ajustarMedioPagoVenta(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = parseWithSchema(ajusteMedioPagoSchema, Object.fromEntries(formData.entries()), "Revisa la corrección del medio de pago.");
+  if (!parsed.success) return parsed.state;
+  const input = parsed.data;
+
+  // `ventas.ajustar_pago` es el permiso explícito. El fallback temporal permite
+  // operar organizaciones creadas antes de que se agregara el permiso; `access:seed`
+  // sincroniza la relación para dejar solo el permiso específico.
+  let access = await checkPermission(input.organizacionId, "ventas.ajustar_pago");
+  if (!access) access = await checkPermission(input.organizacionId, "ventas.cancelar");
+  if (!access) return actionError("No tienes permiso para corregir medios de pago.");
+  const { user } = access;
+  const db = getDatabase();
+
+  let outcome: ActionState;
+  try {
+    outcome = await withDbRetry(() =>
+      db.transaction(async (tx): Promise<ActionState> => {
+        const [venta] = await tx
+          .select({ id: ventas.id, sucursalId: ventas.sucursalId, estado: ventas.estado, corteId: ventas.corteId })
+          .from(ventas)
+          .where(and(eq(ventas.id, input.ventaId), eq(ventas.organizacionId, input.organizacionId), eq(ventas.activo, true)))
+          .limit(1)
+          .for("update");
+        if (!venta) return actionError("La venta no existe.");
+        if (venta.estado !== "completada") return actionError("Solo se pueden corregir pagos de ventas cobradas.");
+        if (!canAccessBranch(access, venta.sucursalId)) return actionError("La venta pertenece a otra sucursal.");
+
+        const [pago] = await tx
+          .select({ id: detalleVentasMediosPagos.id, medioPagoId: detalleVentasMediosPagos.medioPagoId, monto: detalleVentasMediosPagos.monto })
+          .from(detalleVentasMediosPagos)
+          .where(and(eq(detalleVentasMediosPagos.id, input.pagoId), eq(detalleVentasMediosPagos.ventaId, venta.id), eq(detalleVentasMediosPagos.activo, true)))
+          .limit(1)
+          .for("update");
+        if (!pago) return actionError("El pago no existe o ya no está activo.");
+        if (pago.medioPagoId === input.medioPagoId) return actionError("Selecciona un medio de pago diferente.");
+
+        const [medioDestino] = await tx
+          .select({ id: catMediosPago.id })
+          .from(catMediosPago)
+          .where(and(eq(catMediosPago.id, input.medioPagoId), eq(catMediosPago.organizacionId, input.organizacionId), eq(catMediosPago.activo, true)))
+          .limit(1);
+        if (!medioDestino) return actionError("El medio de pago destino no es válido.");
+
+        const [ajustesPrevios] = await tx
+          .select({ total: sql<string>`coalesce(sum(${ajustesPagosVenta.monto}), 0)` })
+          .from(ajustesPagosVenta)
+          .where(and(eq(ajustesPagosVenta.detalleVentaMedioPagoId, pago.id), eq(ajustesPagosVenta.ventaId, venta.id)));
+        const restante = Math.round((Number(pago.monto) - Number(ajustesPrevios?.total ?? 0)) * 100) / 100;
+        if (input.monto > restante + 0.005) {
+          return actionError(`Solo quedan ${Math.max(restante, 0).toFixed(2)} por reclasificar en este pago.`);
+        }
+
+        await tx.insert(ajustesPagosVenta).values({
+          organizacionId: input.organizacionId,
+          sucursalId: venta.sucursalId,
+          ventaId: venta.id,
+          detalleVentaMedioPagoId: pago.id,
+          medioPagoOrigenId: pago.medioPagoId,
+          medioPagoDestinoId: input.medioPagoId,
+          monto: input.monto.toFixed(2),
+          motivo: input.motivo,
+          usuarioId: user.id,
+          corteOrigenId: venta.corteId,
+          createdBy: user.id,
+        });
+        await auditEvent(tx, {
+          organizacionId: input.organizacionId,
+          sucursalId: venta.sucursalId,
+          usuarioId: user.id,
+          accion: "venta.medio_pago_ajustado",
+          entidad: "venta",
+          entidadId: venta.id,
+          detalle: { pagoId: pago.id, medioPagoOrigenId: pago.medioPagoId, medioPagoDestinoId: input.medioPagoId, monto: input.monto, motivo: input.motivo, corteOrigenId: venta.corteId },
+        });
+        return actionSuccess("Corrección de medio de pago registrada.", { ventaId: venta.id });
+      }),
+    );
+  } catch (error) {
+    console.error("ajustarMedioPagoVenta", error);
+    return actionError("No se pudo corregir el medio de pago. Intenta de nuevo.");
+  }
+
+  if (outcome.success) {
+    revalidatePath("/admin/pos");
+    revalidatePath("/admin/ventas");
+    revalidatePath("/admin/reportes");
   }
   return outcome;
 }
@@ -1113,6 +1192,8 @@ export async function aplicarPromocionVenta(_previousState: ActionState, formDat
   const input = parsed.data;
   const access = await checkPermission(input.organizacionId, "ventas.crear");
   if (!access) return actionError("No tienes permiso para editar ventas.");
+  const negado = await requiereCapacidad(input.organizacionId, "promociones");
+  if (negado) return actionError(negado);
   const { user } = access;
   const db = getDatabase();
 
@@ -1288,18 +1369,6 @@ export async function cancelarVentaCobrada(_previousState: ActionState, formData
           .from(detalleVentasMediosPagos)
           .where(and(eq(detalleVentasMediosPagos.ventaId, venta.id), eq(detalleVentasMediosPagos.activo, true)));
         const montoRetiro = Math.round(pagosVenta.reduce((s, p) => s + Number(p.monto), 0) * 100) / 100;
-        const [devolucion] = await tx
-          .insert(devoluciones)
-          .values({
-            organizacionId: input.organizacionId,
-            sucursalId: venta.sucursalId,
-            ventaId: venta.id,
-            monto: montoDevuelto.toFixed(2),
-            motivo: input.motivo,
-            usuarioId: user.id,
-            createdBy: user.id,
-          })
-          .returning({ id: devoluciones.id });
 
         const [lineasServicios, lineasProductos, lineasPaquetes, lineasMembresias, usosVenta] = await Promise.all([
           tx
@@ -1330,15 +1399,14 @@ export async function cancelarVentaCobrada(_previousState: ActionState, formData
           .select({ id: clientePaquetes.id })
           .from(clientePaquetes)
           .where(and(eq(clientePaquetes.ventaId, venta.id), eq(clientePaquetes.organizacionId, input.organizacionId), ne(clientePaquetes.estado, "cancelado"), eq(clientePaquetes.activo, true)));
+        let bloqueoPaquete = false;
         if (paquetesComprados.length > 0) {
           const [usoExterno] = await tx
             .select({ id: paqueteUsos.id })
             .from(paqueteUsos)
             .where(and(inArray(paqueteUsos.clientePaqueteId, paquetesComprados.map((p) => p.id)), eq(paqueteUsos.activo, true), ne(paqueteUsos.ventaId, venta.id)))
             .limit(1);
-          if (usoExterno) {
-            return actionError("El paquete vendido en esta venta ya consumió sesiones en otra venta. Cancela primero esa venta o registra una devolución parcial.");
-          }
+          bloqueoPaquete = Boolean(usoExterno);
         }
 
         // Ídem membresías: si el beneficio ya se aplicó en otra venta
@@ -1348,16 +1416,36 @@ export async function cancelarVentaCobrada(_previousState: ActionState, formData
           .select({ id: clienteMembresias.id, membresiaId: clienteMembresias.membresiaId })
           .from(clienteMembresias)
           .where(and(eq(clienteMembresias.ventaId, venta.id), eq(clienteMembresias.organizacionId, input.organizacionId), ne(clienteMembresias.estado, "cancelado"), eq(clienteMembresias.activo, true)));
+        let bloqueoMembresia = false;
         if (membresiasCompradas.length > 0 && venta.clienteId) {
           const [aplicadaEnOtra] = await tx
             .select({ id: ventas.id })
             .from(ventas)
             .where(and(inArray(ventas.membresiaId, membresiasCompradas.map((m) => m.membresiaId)), eq(ventas.clienteId, venta.clienteId), eq(ventas.estado, "completada"), eq(ventas.activo, true), ne(ventas.id, venta.id)))
             .limit(1);
-          if (aplicadaEnOtra) {
-            return actionError("La membresía vendida en esta venta ya aplicó su descuento en otra venta cobrada. Cancela primero esa venta o registra una devolución parcial.");
-          }
+          bloqueoMembresia = Boolean(aplicadaEnOtra);
         }
+        const motivo = motivoBloqueoCancelacion({
+          paqueteTieneUsosExternos: bloqueoPaquete,
+          membresiaTieneAplicacionExterna: bloqueoMembresia,
+        });
+        if (motivo) return actionError(motivo);
+
+        // Todas las validaciones que pueden rechazar la cancelación terminan
+        // antes de crear la devolución. Así un `return actionError(...)` dentro
+        // de la transacción no confirma un documento parcial.
+        const [devolucion] = await tx
+          .insert(devoluciones)
+          .values({
+            organizacionId: input.organizacionId,
+            sucursalId: venta.sucursalId,
+            ventaId: venta.id,
+            monto: montoDevuelto.toFixed(2),
+            motivo: input.motivo,
+            usuarioId: user.id,
+            createdBy: user.id,
+          })
+          .returning({ id: devoluciones.id });
 
         for (const linea of lineasServicios) {
           await tx.insert(detalleDevoluciones).values({
@@ -1609,35 +1697,23 @@ export async function devolverLineasVenta(_previousState: ActionState, formData:
 
         const subtotalNum = Number(venta.subtotal);
         const factorNeto = subtotalNum > 0 ? Number(venta.total) / subtotalNum : 1;
-        const redondear = (v: number) => Math.round(v * 100) / 100;
 
         // Resuelve y valida cada línea pedida contra el ticket y lo ya devuelto.
         // Líneas cubiertas por paquete no regresan dinero: restauran sesiones.
-        const resueltas: Array<{ tipo: "servicio" | "producto" | "paquete" | "membresia"; detalleId: string; cantidad: number; monto: number; productoId?: string; paqueteId?: string; membresiaId?: string; completa: boolean }> = [];
-        for (const linea of lineasInput) {
-          const origen = linea.tipo === "servicio" ? lineasServicios : linea.tipo === "producto" ? lineasProductos : linea.tipo === "membresia" ? lineasMembresias : lineasPaquetes;
-          const ticket = origen.find((l) => l.id === linea.detalleId);
-          if (!ticket) return actionError("Una de las líneas ya no pertenece a la venta.");
-          const pendiente = ticket.cantidad - (devueltoPorDetalle.get(linea.detalleId) ?? 0);
-          if (linea.cantidad > pendiente + 1e-6) {
-            return actionError(`Solo quedan ${pendiente} pieza(s) por devolver en una línea.`);
-          }
-          const cubierta = linea.tipo === "servicio" && usoPorDetalle.has(linea.detalleId);
-          resueltas.push({
-            tipo: linea.tipo,
-            detalleId: linea.detalleId,
-            cantidad: linea.cantidad,
-            monto: cubierta ? 0 : redondear(Number(ticket.precio) * linea.cantidad * factorNeto),
-            productoId: linea.tipo === "producto" ? (ticket as (typeof lineasProductos)[number]).productoId : undefined,
-            paqueteId: linea.tipo === "paquete" ? (ticket as (typeof lineasPaquetes)[number]).paqueteId : undefined,
-            membresiaId: linea.tipo === "membresia" ? (ticket as (typeof lineasMembresias)[number]).membresiaId : undefined,
-            completa: linea.cantidad >= ticket.cantidad,
-          });
-        }
-
-        const montoDevuelto = redondear(resueltas.reduce((s, l) => s + l.monto, 0));
-        const huboRestauracion = resueltas.some((l) => l.tipo === "servicio" && usoPorDetalle.has(l.detalleId));
-        if (montoDevuelto <= 0 && !huboRestauracion) return actionError("El monto a devolver debe ser mayor a cero.");
+        const resultado = resolverLineasDevolucion({
+          solicitadas: lineasInput,
+          ticketPorTipo: {
+            servicio: lineasServicios,
+            producto: lineasProductos,
+            paquete: lineasPaquetes,
+            membresia: lineasMembresias,
+          },
+          devueltasPrevias: devueltoPorDetalle,
+          serviciosCubiertosPorPaquete: new Set(usosVenta.map((u) => u.detalleVentaServicioId)),
+          factorNeto,
+        });
+        if (!resultado.ok) return actionError(resultado.error);
+        const { resueltas, montoDevuelto } = resultado;
 
         const [devolucion] = await tx
           .insert(devoluciones)
@@ -1832,6 +1908,8 @@ export async function agregarPaqueteVenta(_previousState: ActionState, formData:
   const input = parsed.data;
   const access = await checkPermission(input.organizacionId, "ventas.crear");
   if (!access) return actionError("No tienes permiso para editar ventas.");
+  const negado = await requiereCapacidad(input.organizacionId, "paquetes");
+  if (negado) return actionError(negado);
   const { user } = access;
   const db = getDatabase();
 
@@ -2036,6 +2114,8 @@ export async function agregarMembresiaVenta(_previousState: ActionState, formDat
   const input = parsed.data;
   const access = await checkPermission(input.organizacionId, "ventas.crear");
   if (!access) return actionError("No tienes permiso para editar ventas.");
+  const negado = await requiereCapacidad(input.organizacionId, "membresias");
+  if (negado) return actionError(negado);
   const { user } = access;
   const db = getDatabase();
 

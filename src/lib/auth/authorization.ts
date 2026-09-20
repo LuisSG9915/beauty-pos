@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
 import { catPermisos, catRoles, relMiembrosRoles, relRolesPermisos } from "@/db/schema/access";
+import { suscripciones } from "@/db/schema/billing";
 import { miembrosOrganizaciones, relUsuariosSucursales, sucursales } from "@/db/schema/core";
 import { requireAuthenticatedUser } from "@/lib/auth/access";
+import { esPermisoSoloLectura, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
 
 type AuthUser = Awaited<ReturnType<typeof requireAuthenticatedUser>>["user"];
 
@@ -21,10 +23,18 @@ export type ResolvedAccess = {
   /** null = todas las sucursales; Set = solo las asignadas. */
   branchIds: ReadonlySet<string> | null;
   esPlataforma: boolean;
+  /**
+   * true cuando la suscripción de la organización venció: las lecturas
+   * (`*.ver`, `reportes.*`) siguen permitidas y toda escritura se bloquea.
+   */
+  soloLectura: boolean;
 };
 
 export function hasPermission(access: ResolvedAccess, clave: string): boolean {
-  return access.esPlataforma || access.permissions.has(clave);
+  if (access.esPlataforma) return true;
+  if (!access.permissions.has(clave)) return false;
+  if (access.soloLectura && !esPermisoSoloLectura(clave)) return false;
+  return true;
 }
 
 export function canAccessBranch(access: ResolvedAccess, sucursalId: string): boolean {
@@ -60,6 +70,7 @@ export async function resolveAccessSafe(
       permissions: new Set(),
       branchIds: null,
       esPlataforma: true,
+      soloLectura: false,
     };
   }
 
@@ -77,7 +88,7 @@ export async function resolveAccessSafe(
 
   if (!membership) return null;
 
-  const [permissionRows, branchRows] = await Promise.all([
+  const [permissionRows, branchRows, suscripcionRows] = await Promise.all([
     db
       .select({ clave: catPermisos.clave })
       .from(relMiembrosRoles)
@@ -102,6 +113,16 @@ export async function resolveAccessSafe(
           eq(sucursales.activo, true),
         ),
       ),
+    db
+      .select({
+        estado: suscripciones.estado,
+        trialTerminaAt: suscripciones.trialTerminaAt,
+        periodoTerminaAt: suscripciones.periodoTerminaAt,
+      })
+      .from(suscripciones)
+      .where(eq(suscripciones.organizacionId, organizationId))
+      .orderBy(desc(suscripciones.createdAt))
+      .limit(1),
   ]);
 
   return {
@@ -111,6 +132,7 @@ export async function resolveAccessSafe(
     permissions: new Set(permissionRows.map((row) => row.clave)),
     branchIds: branchRows.length ? new Set(branchRows.map((row) => row.sucursalId)) : null,
     esPlataforma: false,
+    soloLectura: estadoEfectivoSuscripcion(suscripcionRows[0] ?? null) === "vencida",
   };
 }
 

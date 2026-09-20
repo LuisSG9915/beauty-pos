@@ -73,6 +73,7 @@ function accessOf(partial: Partial<ResolvedAccess>): ResolvedAccess {
     permissions: new Set(),
     branchIds: null,
     esPlataforma: false,
+    soloLectura: false,
     ...partial,
   };
 }
@@ -135,11 +136,13 @@ describe("resolveAccessSafe", () => {
       [{ id: "mem-1" }], // membresía
       [], // permisos
       [], // asignaciones de sucursal
+      [], // sin suscripción → vigente (no solo lectura)
     ];
     const access = await resolveAccessSafe(ORG_A, member());
     expect(access).not.toBeNull();
     expect(access?.permissions.size).toBe(0);
     expect(access?.branchIds).toBeNull(); // sin asignaciones = org-wide
+    expect(access?.soloLectura).toBe(false);
   });
 
   it("miembro con roles: unión de permisos y sucursales asignadas", async () => {
@@ -147,6 +150,7 @@ describe("resolveAccessSafe", () => {
       [{ id: "mem-1" }],
       [{ clave: "agenda.ver" }, { clave: "ventas.crear" }],
       [{ sucursalId: SUC_A1 }],
+      [],
     ];
     const access = await resolveAccessSafe(ORG_A, member());
     expect(access?.permissions.has("agenda.ver")).toBe(true);
@@ -154,6 +158,25 @@ describe("resolveAccessSafe", () => {
     expect(access?.permissions.has("ventas.cobrar")).toBe(false);
     expect(access?.branchIds?.has(SUC_A1)).toBe(true);
     expect(canAccessBranch(access!, SUC_A2)).toBe(false);
+  });
+
+  it("trial vencido marca la organización como solo lectura", async () => {
+    mocks.state.results = [
+      [{ id: "mem-1" }],
+      [{ clave: "agenda.ver" }, { clave: "ventas.crear" }],
+      [],
+      [
+        {
+          estado: "trialing",
+          trialTerminaAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+          periodoTerminaAt: null,
+        },
+      ],
+    ];
+    const access = await resolveAccessSafe(ORG_A, member());
+    expect(access?.soloLectura).toBe(true);
+    expect(hasPermission(access!, "agenda.ver")).toBe(true);
+    expect(hasPermission(access!, "ventas.crear")).toBe(false);
   });
 });
 

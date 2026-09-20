@@ -10,6 +10,7 @@ import { clientesConsentimientos, clientesFichasTecnicas, citas, FICHA_TIPOS } f
 import { servicios } from "@/db/schema/catalogs";
 import { auditEvent } from "@/lib/audit";
 import { checkPermission, hasPermission } from "@/lib/auth/authorization";
+import { revalidateCatalogos } from "@/lib/catalogo-cache";
 
 const clientSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -80,6 +81,7 @@ export async function saveClient(_previousState: ClientActionState, formData: Fo
   else await db.insert(clientes).values(values);
 
   revalidatePath("/admin/clientes");
+  revalidateCatalogos(input.organizacionId);
   return { success: true };
 }
 
@@ -326,5 +328,6 @@ export async function importClients(_previousState: ImportClientsState, formData
 
   if (rows.length > 0) await db.insert(clientes).values(rows);
   revalidatePath("/admin/clientes");
+  revalidateCatalogos(organizationId);
   return { success: `${rows.length} cliente(s) importado(s).${errors.length > 0 ? ` ${errors.length} fila(s) omitida(s).` : ""}` };
 }

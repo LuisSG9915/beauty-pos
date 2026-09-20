@@ -15,6 +15,8 @@ import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/format";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
+import { PlanUpgradeNotice } from "@/components/plan-gate";
+import { contextoSuscripcion } from "@/modules/billing/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +34,16 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
   if (!context.organization) notFound();
   requireAccessPermission(context.access, "catalogos.ver");
   const organizationId = context.organization.id;
+  const suscripcion = await contextoSuscripcion(organizationId);
+  if (!suscripcion.capacidades.has("membresias")) {
+    return (
+      <PlanUpgradeNotice
+        capacidad="membresias"
+        planNombre={suscripcion.plan?.nombre}
+        suscripcionHref={buildAdminHref("/suscripcion", { organizationId })}
+      />
+    );
+  }
   const db = getDatabase();
 
   const query = firstParam(params.q) ?? "";

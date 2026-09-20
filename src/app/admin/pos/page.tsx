@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt } from "drizzle-orm";
+import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -111,7 +111,12 @@ export default async function PosPage({ searchParams }: { searchParams: SearchPa
         paquetesCliente={ticket.paquetesCliente}
         promocionesDisponibles={ticket.promocionesDisponibles}
         propinas={ticket.propinas}
+        clienteFiscal={ticket.clienteFiscal}
+        comprobante={ticket.comprobante}
+        facturacionConfigurada={ticket.facturacionConfigurada}
         puedeCancelar={hasPermission(context.access, "ventas.cancelar")}
+        puedeAjustarPago={hasPermission(context.access, "ventas.ajustar_pago") || hasPermission(context.access, "ventas.cancelar")}
+        puedeFacturar={hasPermission(context.access, "facturacion.emitir")}
         returnTo={returnTo}
         staff={ticket.staff}
         venta={ticket.venta}
@@ -128,10 +133,11 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
   const sucursalId = context.sucursalId;
   const day = dayKey(new Date(), context.timeZone);
   const bounds = dayBoundsUtc(day, context.timeZone);
+  const fechaVenta = sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`;
   const ventasHoy =
     sucursalId && bounds
       ? await db
-          .select({ id: ventas.id, estado: ventas.estado, total: ventas.total, createdAt: ventas.createdAt, clienteNombre: clientes.nombre })
+          .select({ id: ventas.id, estado: ventas.estado, total: ventas.total, fecha: fechaVenta, clienteNombre: clientes.nombre })
           .from(ventas)
           .leftJoin(clientes, eq(ventas.clienteId, clientes.id))
           .where(
@@ -139,11 +145,11 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
               eq(ventas.organizacionId, organizationId),
               eq(ventas.sucursalId, sucursalId),
               eq(ventas.activo, true),
-              gte(ventas.createdAt, bounds.iniciaAt),
-              lt(ventas.createdAt, bounds.terminaAt),
+              gte(fechaVenta, bounds.iniciaAt),
+              lt(fechaVenta, bounds.terminaAt),
             ),
           )
-          .orderBy(desc(ventas.createdAt))
+          .orderBy(desc(fechaVenta))
       : [];
 
   const currentHref = buildAdminHref("/pos", { organizationId, sucursalId });
@@ -151,6 +157,15 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        actions={
+          <Button
+            nativeButton={false}
+            render={<Link href={buildAdminHref("/ventas", { organizationId, sucursalId })} />}
+            variant="outline"
+          >
+            Ver historial
+          </Button>
+        }
         description="Abre una venta directa o continúa una venta del día en la sucursal seleccionada."
         title="Punto de venta"
       />
@@ -214,7 +229,7 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
                 key={venta.id}
               >
                 <span className="min-w-0 truncate">
-                  {venta.clienteNombre ?? "Walk-in"} · {formatTime(venta.createdAt, { timeZone: context.timeZone })}
+                  {venta.clienteNombre ?? "Walk-in"} · {formatTime(venta.fecha, { timeZone: context.timeZone })}
                 </span>
                 <span className="flex items-center gap-2">
                   <StatusBadge

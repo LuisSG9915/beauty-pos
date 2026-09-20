@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 
 import { MiDiaBoard, type MiDiaCita } from "@/app/admin/mi-dia/mi-dia-board";
 import { AdminPageHeader } from "@/components/admin/page-header";
@@ -130,7 +130,8 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
     serviciosPorCita.set(detalle.citaId, list);
   }
 
-  // Ventas del día de la sucursal para acotar propinas/comisiones al turno.
+  // Ventas cobradas del día de la sucursal para acotar propinas/comisiones al turno.
+  const fechaVenta = sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`;
   const ventasDelDia = await db
     .select({ id: ventas.id })
     .from(ventas)
@@ -139,8 +140,8 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
         eq(ventas.organizacionId, organization.id),
         eq(ventas.sucursalId, branch.id),
         eq(ventas.activo, true),
-        gte(ventas.createdAt, bounds.iniciaAt),
-        lt(ventas.createdAt, bounds.terminaAt),
+        gte(fechaVenta, bounds.iniciaAt),
+        lt(fechaVenta, bounds.terminaAt),
       ),
     );
   const ventaIds = ventasDelDia.map((row) => row.id);

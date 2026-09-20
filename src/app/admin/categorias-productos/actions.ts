@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getDatabase } from "@/db/client";
 import { catCategoriasProductos } from "@/db/schema/catalogs";
 import { checkPermission } from "@/lib/auth/authorization";
+import { revalidateCatalogos } from "@/lib/catalogo-cache";
 
 const categorySchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -35,6 +36,7 @@ export async function saveProductCategory(_previousState: ProductCategoryActionS
   else await db.insert(catCategoriasProductos).values({ ...values, createdBy: user.id });
   revalidatePath("/admin/categorias-productos");
   revalidatePath("/admin/productos");
+  revalidateCatalogos(input.organizacionId);
   return { success: true };
 }
 
@@ -49,4 +51,5 @@ export async function toggleProductCategory(formData: FormData) {
   await db.update(catCategoriasProductos).set({ activo: !active, updatedBy: user.id }).where(and(eq(catCategoriasProductos.id, id), eq(catCategoriasProductos.organizacionId, organizationId)));
   revalidatePath("/admin/categorias-productos");
   revalidatePath("/admin/productos");
+  revalidateCatalogos(organizationId);
 }

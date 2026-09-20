@@ -18,6 +18,7 @@ export const defaultPermissions = [
   { clave: "ventas.crear", nombre: "Crear ventas", modulo: "ventas" },
   { clave: "ventas.cobrar", nombre: "Cobrar ventas", modulo: "ventas" },
   { clave: "ventas.cancelar", nombre: "Cancelar ventas cobradas", modulo: "ventas" },
+  { clave: "ventas.ajustar_pago", nombre: "Corregir medios de pago", modulo: "ventas" },
   { clave: "caja.ver", nombre: "Ver caja y cortes", modulo: "caja" },
   { clave: "caja.abrir", nombre: "Abrir caja", modulo: "caja" },
   { clave: "caja.cerrar", nombre: "Cerrar caja", modulo: "caja" },
@@ -27,8 +28,15 @@ export const defaultPermissions = [
   { clave: "catalogos.editar", nombre: "Editar catálogos", modulo: "catalogos" },
   { clave: "inventario.ver", nombre: "Ver inventario", modulo: "inventario" },
   { clave: "inventario.editar", nombre: "Editar inventario", modulo: "inventario" },
+  { clave: "gastos.ver", nombre: "Ver gastos", modulo: "gastos" },
+  { clave: "gastos.editar", nombre: "Registrar y revertir gastos", modulo: "gastos" },
+  { clave: "comisiones.ver", nombre: "Ver comisiones y liquidaciones", modulo: "comisiones" },
+  { clave: "comisiones.editar", nombre: "Liquidar y revertir comisiones", modulo: "comisiones" },
   { clave: "reportes.operativos", nombre: "Ver reportes operativos", modulo: "reportes" },
   { clave: "reportes.financieros", nombre: "Ver reportes financieros", modulo: "reportes" },
+  { clave: "facturacion.ver", nombre: "Ver comprobantes fiscales", modulo: "facturacion" },
+  { clave: "facturacion.emitir", nombre: "Emitir comprobantes fiscales", modulo: "facturacion" },
+  { clave: "facturacion.cancelar", nombre: "Cancelar comprobantes fiscales", modulo: "facturacion" },
   { clave: "auditoria.ver", nombre: "Ver bitácora de auditoría", modulo: "auditoria" },
 ] as const;
 
@@ -63,6 +71,8 @@ export const defaultRoles = [
       "catalogos.ver",
       "ventas.ver",
       "ventas.crear",
+      "facturacion.ver",
+      "facturacion.emitir",
     ],
   },
   {
@@ -78,6 +88,8 @@ export const defaultRoles = [
       "caja.abrir",
       "caja.cerrar",
       "caja.movimientos",
+      "facturacion.ver",
+      "facturacion.emitir",
     ],
   },
   {

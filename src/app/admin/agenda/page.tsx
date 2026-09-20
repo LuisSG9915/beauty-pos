@@ -11,7 +11,7 @@ import {
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { getDatabase } from "@/db/client";
-import { clientes, miembrosOrganizaciones, relUsuariosSucursales, sucursales, usuarios } from "@/db/schema/core";
+import { clientes, miembrosOrganizaciones, organizaciones, relUsuariosSucursales, sucursales, usuarios } from "@/db/schema/core";
 import { bloqueosAgenda, citaRecursos, citas, detalleCitasServicios, horariosSucursales, recursos, ventas } from "@/db/schema/operations";
 import { servicios } from "@/db/schema/catalogs";
 import { getAdminContext } from "@/lib/admin-context";
@@ -19,6 +19,7 @@ import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization
 import { todayDateInput } from "@/lib/format";
 import { firstParam, normalizeDateInput, normalizeView } from "@/lib/url-context";
 import { dayBoundsUtc, shiftDateKey, weekStartDateKey } from "@/modules/agenda";
+import { contextoSuscripcion } from "@/modules/billing/queries";
 import { alergiasPorCliente, conAlergias } from "@/modules/expedientes/alergias";
 
 export const dynamic = "force-dynamic";
@@ -278,10 +279,23 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
     activo: row.activo,
   }));
   const [sucursalRow] = await getDatabase()
-    .select({ capacidadSinAsignar: sucursales.capacidadSinAsignar })
+    .select({
+      capacidadSinAsignar: sucursales.capacidadSinAsignar,
+      reservasOnline: sucursales.reservasOnline,
+      reservasAutoConfirmar: sucursales.reservasAutoConfirmar,
+    })
     .from(sucursales)
     .where(eq(sucursales.id, branch.id))
     .limit(1);
+  const [orgRow] = await getDatabase()
+    .select({
+      recordatoriosActivos: organizaciones.recordatoriosActivos,
+      recordatoriosHorasAntes: organizaciones.recordatoriosHorasAntes,
+    })
+    .from(organizaciones)
+    .where(eq(organizaciones.id, organization.id))
+    .limit(1);
+  const suscripcion = await contextoSuscripcion(organization.id);
   const puedeEditar = hasPermission(context.access, "agenda.editar");
   const recursosConfig: RecursoConfig[] = recursoRows;
   const recursosActivos = recursoRows.filter((r) => r.activo);
@@ -308,7 +322,15 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
           bloqueos={bloqueosConfig}
           capacidadSinAsignar={sucursalRow?.capacidadSinAsignar ?? 1}
           horarios={horariosConfig}
+          organizacionSlug={organization.slug}
           organizationId={organizationId ?? organization.id}
+          permiteAutoConfirmar={suscripcion.capacidades.has("reservas_auto_confirmar")}
+          permiteRecordatorios={suscripcion.capacidades.has("recordatorios_email")}
+          permiteReservasOnline={suscripcion.capacidades.has("reservas_online")}
+          recordatoriosActivos={orgRow?.recordatoriosActivos ?? false}
+          recordatoriosHorasAntes={orgRow?.recordatoriosHorasAntes ?? 24}
+          reservasAutoConfirmar={sucursalRow?.reservasAutoConfirmar ?? false}
+          reservasOnline={sucursalRow?.reservasOnline ?? false}
           recursos={recursosConfig}
           staff={staffRows}
           sucursalId={branch.id}

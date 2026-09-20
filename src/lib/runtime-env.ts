@@ -8,6 +8,8 @@ type RuntimeEnv = {
   BREVO_FROM_EMAIL?: string;
   BREVO_FROM_NAME?: string;
   ALLOW_DEV_INVITATION_LINK?: string;
+  /** Bearer que protege /api/cron/*; debe configurarse en el scheduler externo. */
+  CRON_SECRET?: string;
 };
 
 export function getRuntimeEnv(): RuntimeEnv {

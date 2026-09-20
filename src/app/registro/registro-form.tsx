@@ -1,0 +1,151 @@
+"use client";
+
+import { ArrowRight, Building2, LockKeyhole, Mail, User } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { FormEvent, useState, useTransition } from "react";
+
+import { registrarNegocio } from "@/app/registro/actions";
+import { Button } from "@/components/ui/button";
+import { Field, FieldLabel, Input } from "@/components/ui/field";
+import { authClient } from "@/lib/auth/client";
+
+/**
+ * Formulario de registro self-service. El server action crea la cuenta y la
+ * organización con trial. Si el correo de verificación está activo redirige
+ * al login con el aviso de "revisa tu correo"; en desarrollo sin Brevo
+ * inicia sesión directo desde el cliente.
+ */
+export function RegistroForm() {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setErrorMessage(null);
+
+    const formData = new FormData(event.currentTarget);
+    const correo = String(formData.get("correo") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
+
+    startTransition(async () => {
+      const result = await registrarNegocio({}, formData);
+      if (result.error) {
+        setErrorMessage(result.error);
+        return;
+      }
+
+      if (result.verificacionPendiente) {
+        router.push("/login?verifica=1");
+        return;
+      }
+
+      const { error } = await authClient.signIn.email({
+        email: correo,
+        password,
+        callbackURL: "/admin",
+      });
+      if (error) {
+        router.push("/login?registrado=1");
+        return;
+      }
+      router.push("/admin");
+      router.refresh();
+    });
+  }
+
+  return (
+    <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
+      <Field className="space-y-2" name="negocio">
+        <FieldLabel className="text-[#4b403a]" required>
+          Nombre de tu negocio
+        </FieldLabel>
+        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#b8795d] focus-within:ring-3 focus-within:ring-[#b8795d]/10">
+          <Building2 className="size-4 text-[#a18d81]" />
+          <Input
+            required
+            autoComplete="organization"
+            className="border-0 bg-transparent px-0 focus-visible:ring-0"
+            maxLength={160}
+            name="negocio"
+            placeholder="Estética Aurora"
+            type="text"
+          />
+        </div>
+      </Field>
+
+      <Field className="space-y-2" name="nombre">
+        <FieldLabel className="text-[#4b403a]" required>
+          Tu nombre
+        </FieldLabel>
+        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#b8795d] focus-within:ring-3 focus-within:ring-[#b8795d]/10">
+          <User className="size-4 text-[#a18d81]" />
+          <Input
+            required
+            autoComplete="name"
+            className="border-0 bg-transparent px-0 focus-visible:ring-0"
+            maxLength={160}
+            name="nombre"
+            placeholder="María López"
+            type="text"
+          />
+        </div>
+      </Field>
+
+      <Field className="space-y-2" name="correo">
+        <FieldLabel className="text-[#4b403a]" required>
+          Correo de acceso
+        </FieldLabel>
+        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#b8795d] focus-within:ring-3 focus-within:ring-[#b8795d]/10">
+          <Mail className="size-4 text-[#a18d81]" />
+          <Input
+            required
+            autoComplete="email"
+            className="border-0 bg-transparent px-0 focus-visible:ring-0"
+            maxLength={254}
+            name="correo"
+            placeholder="tu@salon.com"
+            type="email"
+          />
+        </div>
+      </Field>
+
+      <Field className="space-y-2" name="password">
+        <FieldLabel className="text-[#4b403a]" required>
+          Contraseña
+        </FieldLabel>
+        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#b8795d] focus-within:ring-3 focus-within:ring-[#b8795d]/10">
+          <LockKeyhole className="size-4 text-[#a18d81]" />
+          <Input
+            required
+            autoComplete="new-password"
+            className="border-0 bg-transparent px-0 focus-visible:ring-0"
+            minLength={12}
+            name="password"
+            placeholder="Mínimo 12 caracteres"
+            type="password"
+          />
+        </div>
+      </Field>
+
+      {errorMessage ? (
+        <p className="rounded-xl border border-[#efc9b8] bg-[#fdf0ea] px-4 py-3 text-sm text-[#8a3c1d]" role="alert">
+          {errorMessage}
+        </p>
+      ) : null}
+
+      <Button
+        className="w-full rounded-xl bg-[#2c2522] py-3 text-sm font-semibold text-[#fffaf5] hover:bg-[#44382f]"
+        disabled={isPending}
+        type="submit"
+      >
+        {isPending ? "Creando tu espacio…" : "Crear mi cuenta gratis"}
+        <ArrowRight className="ml-2 size-4" />
+      </Button>
+
+      <p className="text-center text-xs leading-5 text-[#8a7b72]">
+        14 días de prueba sin tarjeta. Tus datos se conservan al contratar.
+      </p>
+    </form>
+  );
+}

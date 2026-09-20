@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Banknote,
   BarChart3,
   Boxes,
   Calendar,
@@ -8,10 +9,15 @@ import {
   Clipboard,
   CreditCard,
   Crown,
+  FileText,
+  Gem,
+  HandCoins,
   Landmark,
+  LifeBuoy,
   Package,
   PackageCheck,
   Percent,
+  ReceiptText,
   Ruler,
   Scissors,
   ScrollText,
@@ -47,12 +53,13 @@ const OPERACION: AdminNavItem[] = [
   { path: "/admin/agenda", label: "Agenda", description: "Citas, estados y venta en proceso", icon: Calendar, permiso: "agenda.ver" },
   { path: "/admin/mi-dia", label: "Mi día", description: "Tus citas, propinas y comisiones de hoy", icon: CalendarCheck, permiso: "agenda.ver" },
   { path: "/admin/pos", label: "POS", description: "Ventas directas y cobro de citas", icon: ShoppingCart, permiso: "ventas.ver" },
+  { path: "/admin/ventas", label: "Historial", description: "Busca tickets, devoluciones y cancelaciones", icon: ReceiptText, permiso: "ventas.ver" },
   { path: "/admin/caja", label: "Caja", description: "Apertura, cierre ciego y discrepancias", icon: Wallet, permiso: "caja.ver" },
   { path: "/admin/clientes", label: "Clientes", description: "Expedientes, contacto y seguimiento", icon: Users, permiso: "clientes.ver" },
   { path: "/admin/servicios", label: "Servicios", description: "Catálogo de servicios del salón", icon: Scissors, permiso: "catalogos.ver" },
   { path: "/admin/productos", label: "Productos", description: "Venta, consumo e inventario", icon: ShoppingBag, permiso: "catalogos.ver" },
   { path: "/admin/inventario", label: "Inventario", description: "Stock, entradas, salidas y consumos", icon: Package, permiso: "inventario.ver" },
-  { path: "/admin/reportes", label: "Reportes", description: "Operativos y financieros por rango", icon: BarChart3, permiso: ["reportes.operativos", "reportes.financieros"] },
+  { path: "/admin/facturacion", label: "Comprobantes", description: "Comprobantes internos de ventas", icon: FileText, permiso: "facturacion.ver" },
 ];
 
 const CATALOGOS: AdminNavItem[] = [
@@ -66,14 +73,27 @@ const CATALOGOS: AdminNavItem[] = [
   { path: "/admin/membresias", label: "Membresías", description: "Descuento por vigencia para clientes", icon: Crown, permiso: "catalogos.ver" },
 ];
 
+const DINERO: AdminNavItem[] = [
+  { path: "/admin/gastos", label: "Gastos", description: "Salidas del negocio por categoría y medio", icon: Banknote, permiso: "gastos.ver" },
+  { path: "/admin/comisiones", label: "Comisiones", description: "Pago de comisiones al equipo", icon: HandCoins, permiso: "comisiones.ver" },
+  { path: "/admin/reportes", label: "Reportes", description: "Operativos y financieros por rango", icon: BarChart3, permiso: ["reportes.operativos", "reportes.financieros"] },
+];
+
 const EQUIPO: AdminNavItem[] = [
   { path: "/admin/usuarios", label: "Equipo", description: "Miembros, roles y sucursales", icon: Users, permiso: "usuarios.ver" },
   { path: "/admin/roles", label: "Roles", description: "Permisos por rol", icon: ShieldCheck, permiso: "roles.ver" },
   { path: "/admin/auditoria", label: "Auditoría", description: "Bitácora de eventos", icon: ScrollText, permiso: "auditoria.ver" },
+  { path: "/admin/suscripcion", label: "Suscripción", description: "Plan, uso y pagos del negocio", icon: Gem, permiso: "organizaciones.ver" },
 ];
 
 const PLATAFORMA: AdminNavItem[] = [
   { path: "/admin", label: "Plataforma", description: "Organizaciones y sucursales", icon: Landmark },
+];
+
+// Ayuda va al final y no requiere permiso: cualquier miembro puede abrir la
+// guía, la práctica o la información de soporte.
+const AYUDA: AdminNavItem[] = [
+  { path: "/admin/ayuda", label: "Ayuda", description: "Guía, práctica y soporte", icon: LifeBuoy },
 ];
 
 /** `/admin/…` → `/…` para usarlo con `buildAdminHref`. */
@@ -102,7 +122,9 @@ export function getAdminNavSections(
   const sections: AdminNavSection[] = [
     { title: "Operación", items: visible(OPERACION) },
     { title: "Catálogos", items: visible(CATALOGOS) },
+    { title: "Dinero", items: visible(DINERO) },
     { title: "Equipo", items: visible(EQUIPO) },
+    { title: "Ayuda", items: visible(AYUDA) },
   ].filter((section) => section.items.length > 0);
   if (platformAdmin) sections.push({ title: "Plataforma", items: PLATAFORMA });
   return sections;

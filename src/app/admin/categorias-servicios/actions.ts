@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getDatabase } from "@/db/client";
 import { catCategoriasServicios } from "@/db/schema/catalogs";
 import { checkPermission } from "@/lib/auth/authorization";
+import { revalidateCatalogos } from "@/lib/catalogo-cache";
 
 const categorySchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -36,6 +37,7 @@ export async function saveServiceCategory(_previousState: CategoryActionState, f
   else await db.insert(catCategoriasServicios).values({ ...values, createdBy: user.id });
   revalidatePath("/admin/categorias-servicios");
   revalidatePath("/admin/servicios");
+  revalidateCatalogos(input.organizacionId);
   return { success: true };
 }
 
@@ -50,4 +52,5 @@ export async function toggleServiceCategory(formData: FormData) {
   await db.update(catCategoriasServicios).set({ activo: !active, updatedBy: user.id }).where(and(eq(catCategoriasServicios.id, id), eq(catCategoriasServicios.organizacionId, organizationId)));
   revalidatePath("/admin/categorias-servicios");
   revalidatePath("/admin/servicios");
+  revalidateCatalogos(organizationId);
 }

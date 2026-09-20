@@ -2,9 +2,10 @@ import { and, eq } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
 import { catRoles, invitacionesUsuarios } from "@/db/schema/access";
-import { sucursales } from "@/db/schema/core";
+import { organizaciones, sucursales } from "@/db/schema/core";
 import { sendAuthEmail } from "@/lib/email/auth-email";
 import { getRuntimeEnv } from "@/lib/runtime-env";
+import { validarLimiteUsuarios } from "@/modules/billing/queries";
 
 export type InvitationInput = {
   organizacionId: string;
@@ -31,20 +32,6 @@ export async function issueInvitation(
   input: InvitationInput,
 ): Promise<{ invitationUrl?: string; invitationId?: string; error?: string }> {
   const db = getDatabase();
-  const [role] = await db
-    .select({ id: catRoles.id })
-    .from(catRoles)
-    .where(and(eq(catRoles.id, input.rolId), eq(catRoles.organizacionId, input.organizacionId), eq(catRoles.activo, true)))
-    .limit(1);
-  const [branch] = await db
-    .select({ id: sucursales.id })
-    .from(sucursales)
-    .where(and(eq(sucursales.id, input.sucursalId), eq(sucursales.organizacionId, input.organizacionId), eq(sucursales.activo, true)))
-    .limit(1);
-
-  if (!role || !branch) {
-    return { error: "El rol o la sucursal no pertenecen a la organización seleccionada." };
-  }
 
   const token = `${crypto.randomUUID()}${crypto.randomUUID()}`;
   const tokenHash = await hashInvitationToken(token);
@@ -54,31 +41,70 @@ export async function issueInvitation(
   const isLocalUrl = baseUrl.startsWith("http://localhost") || baseUrl.startsWith("http://127.0.0.1");
   const useLocalInvitationLink = env.ALLOW_DEV_INVITATION_LINK === "true" && isLocalUrl;
 
+  // El lock de la organización serializa invitaciones concurrentes para que
+  // el límite de usuarios del plan se respete siempre.
+  const creada = await db.transaction(async (tx) => {
+    await tx
+      .select({ id: organizaciones.id })
+      .from(organizaciones)
+      .where(eq(organizaciones.id, input.organizacionId))
+      .for("update");
+
+    const [role] = await tx
+      .select({ id: catRoles.id })
+      .from(catRoles)
+      .where(and(eq(catRoles.id, input.rolId), eq(catRoles.organizacionId, input.organizacionId), eq(catRoles.activo, true)))
+      .limit(1);
+    const [branch] = await tx
+      .select({ id: sucursales.id })
+      .from(sucursales)
+      .where(and(eq(sucursales.id, input.sucursalId), eq(sucursales.organizacionId, input.organizacionId), eq(sucursales.activo, true)))
+      .limit(1);
+
+    if (!role || !branch) {
+      return { error: "El rol o la sucursal no pertenecen a la organización seleccionada." } as const;
+    }
+
+    const limite = await validarLimiteUsuarios(input.organizacionId, tx);
+    if (!limite.ok) return { error: limite.error } as const;
+
+    const [invitation] = await tx
+      .insert(invitacionesUsuarios)
+      .values({
+        organizacionId: input.organizacionId,
+        rolId: input.rolId,
+        sucursalId: input.sucursalId,
+        correo: input.correo,
+        nombre: input.nombre,
+        tokenHash,
+        expiraAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        createdBy: input.createdBy,
+      })
+      .returning({ id: invitacionesUsuarios.id });
+
+    return { invitation } as const;
+  });
+
+  if ("error" in creada) return { error: creada.error };
+
   if (!useLocalInvitationLink) {
-    await sendAuthEmail({
-      to: input.correo,
-      subject: "Invitación a Beauty POS",
-      title: `Hola ${input.nombre}, tienes una invitación a Beauty POS`,
-      url: invitationUrl,
-    });
+    try {
+      await sendAuthEmail({
+        to: input.correo,
+        subject: "Invitación a Beauty POS",
+        title: `Hola ${input.nombre}, tienes una invitación a Beauty POS`,
+        url: invitationUrl,
+      });
+    } catch (error) {
+      // Sin correo enviado la invitación quedaría inalcanzable: se revierte
+      // para mantener la regla "fallo de correo = no queda invitación".
+      await db.delete(invitacionesUsuarios).where(eq(invitacionesUsuarios.id, creada.invitation.id));
+      throw error;
+    }
   }
 
-  const [invitation] = await db
-    .insert(invitacionesUsuarios)
-    .values({
-      organizacionId: input.organizacionId,
-      rolId: input.rolId,
-      sucursalId: input.sucursalId,
-      correo: input.correo,
-      nombre: input.nombre,
-      tokenHash,
-      expiraAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      createdBy: input.createdBy,
-    })
-    .returning({ id: invitacionesUsuarios.id });
-
   return {
-    invitationId: invitation?.id,
+    invitationId: creada.invitation?.id,
     invitationUrl: useLocalInvitationLink ? invitationUrl : undefined,
   };
 }

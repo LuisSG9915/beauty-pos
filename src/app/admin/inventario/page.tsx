@@ -94,6 +94,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
 
   // Consumo backbar teórico por servicio vendido en los últimos 30 días
   // (rel_servicios_insumos × líneas de servicio cobradas en esta sucursal).
+  const fechaVenta = sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`;
   const hace30 = sql`now() - interval '30 days'`;
   const consumoPorServicio = await db
     .select({
@@ -110,7 +111,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
         eq(ventas.sucursalId, branch.id),
         eq(ventas.estado, "completada"),
         eq(ventas.activo, true),
-        gte(ventas.createdAt, hace30),
+        gte(fechaVenta, hace30),
       ),
     )
     .innerJoin(servicios, eq(detalleVentasServicios.servicioId, servicios.id))

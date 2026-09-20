@@ -29,7 +29,11 @@ export function LoginForm() {
       });
 
       if (error) {
-        setErrorMessage("El correo o la contraseña no son correctos.");
+        setErrorMessage(
+          error.status === 403
+            ? "Tu correo aún no está verificado. Te reenviamos el enlace — revísalo e inténtalo de nuevo."
+            : "El correo o la contraseña no son correctos.",
+        );
         return;
       }
 

@@ -1,0 +1,336 @@
+"use client";
+
+import { CalendarCheck2, CheckCircle2, ChevronLeft, Clock3, MapPin } from "lucide-react";
+import { useEffect, useMemo, useState, useTransition } from "react";
+
+import { confirmarReserva, obtenerSlotsReserva } from "@/app/reservar/[slug]/actions";
+import { Button } from "@/components/ui/button";
+import { Field, FieldLabel, Input, Textarea } from "@/components/ui/field";
+
+type Sucursal = {
+  id: string;
+  nombre: string;
+  direccion: string | null;
+  autoConfirmar: boolean;
+  zonaHoraria: string;
+};
+
+type Servicio = {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  duracionMinutos: number;
+  precio: string;
+};
+
+type Dia = { diaKey: string; etiqueta: string };
+
+type Resultado =
+  | { tipo: "confirmada" }
+  | { tipo: "pendiente" }
+  | { tipo: "error"; mensaje: string };
+
+function formatoHora(iso: string, zonaHoraria: string) {
+  return new Intl.DateTimeFormat("es-MX", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: zonaHoraria,
+  }).format(new Date(iso));
+}
+
+function formatoPrecio(precio: string) {
+  return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(Number(precio));
+}
+
+/**
+ * Flujo de reserva pública: sucursal → servicio → día → horario → datos.
+ * Los horarios se piden al servidor por día elegido (no se precargan todos).
+ */
+export function ReservaFlow({
+  dias,
+  organizacion,
+  servicios,
+  sucursales,
+}: {
+  dias: Dia[];
+  organizacion: { id: string; nombre: string; slug: string };
+  servicios: Servicio[];
+  sucursales: Sucursal[];
+}) {
+  const [sucursalId, setSucursalId] = useState(sucursales[0]?.id ?? "");
+  const [servicioId, setServicioId] = useState("");
+  const [diaKey, setDiaKey] = useState("");
+  const [slotIso, setSlotIso] = useState("");
+  const [slots, setSlots] = useState<string[] | null>(null);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
+  const [resultado, setResultado] = useState<Resultado | null>(null);
+  const [pending, startTransition] = useTransition();
+
+  const sucursal = useMemo(
+    () => sucursales.find((s) => s.id === sucursalId) ?? sucursales[0],
+    [sucursalId, sucursales],
+  );
+  const servicio = servicios.find((s) => s.id === servicioId);
+
+  // Al cambiar sucursal/servicio/día se reinicia la selección de horario.
+  const elegir = (fn: (v: string) => void) => (v: string) => {
+    setSlotIso("");
+    setSlots(null);
+    setSlotsError(null);
+    setResultado(null);
+    fn(v);
+  };
+
+  useEffect(() => {
+    if (!diaKey || !servicioId || !sucursal) return;
+    let cancelado = false;
+    startTransition(async () => {
+      const res = await obtenerSlotsReserva({
+        organizacionId: organizacion.id,
+        sucursalId: sucursal.id,
+        servicioId,
+        diaKey,
+      });
+      if (cancelado) return;
+      if (res.ok) {
+        setSlots(res.slots);
+        setSlotsError(null);
+      } else {
+        setSlots([]);
+        setSlotsError(res.error);
+      }
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [diaKey, servicioId, sucursal, organizacion.id]);
+
+  function enviar(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    startTransition(async () => {
+      const res = await confirmarReserva({
+        organizacionId: organizacion.id,
+        sucursalId: sucursal.id,
+        servicioId,
+        fechaHora: slotIso,
+        nombre: String(data.get("nombre") ?? ""),
+        telefono: String(data.get("telefono") ?? ""),
+        correo: String(data.get("correo") ?? ""),
+        notas: String(data.get("notas") ?? ""),
+      });
+      setResultado(
+        res.ok
+          ? res.confirmada
+            ? { tipo: "confirmada" }
+            : { tipo: "pendiente" }
+          : { tipo: "error", mensaje: res.error },
+      );
+    });
+  }
+
+  if (resultado?.tipo === "confirmada" || resultado?.tipo === "pendiente") {
+    return (
+      <section className="mx-auto w-full max-w-3xl px-6 pb-16">
+        <div className="rounded-3xl border border-[#e4d9cf] bg-white p-8 text-center shadow-sm">
+          <CheckCircle2 className="mx-auto size-12 text-[#5d9a76]" />
+          <h1 className="mt-4 text-2xl font-semibold tracking-tight">
+            {resultado.tipo === "confirmada" ? "¡Cita confirmada!" : "Reserva recibida"}
+          </h1>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#74675f]">
+            {resultado.tipo === "confirmada"
+              ? `Te esperamos en ${sucursal.nombre}. Llega unos minutos antes de tu horario.`
+              : `${organizacion.nombre} revisará tu solicitud y te confirmará por teléfono.`}
+          </p>
+          <dl className="mx-auto mt-6 max-w-sm space-y-2 rounded-2xl bg-[#faf6f3] p-5 text-left text-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="text-[#8a7b72]">Servicio</dt>
+              <dd className="font-medium">{servicio?.nombre}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-[#8a7b72]">Horario</dt>
+              <dd className="font-medium">
+                {dias.find((d) => d.diaKey === diaKey)?.etiqueta ?? diaKey} ·{" "}
+                {formatoHora(slotIso, sucursal.zonaHoraria)}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-[#8a7b72]">Sucursal</dt>
+              <dd className="font-medium">{sucursal.nombre}</dd>
+            </div>
+          </dl>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="mx-auto w-full max-w-3xl space-y-8 px-6 pb-16">
+      {/* Paso 1: sucursal (solo si hay más de una reservable) */}
+      {sucursales.length > 1 ? (
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#a76348]">Sucursal</h2>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {sucursales.map((s) => (
+              <button
+                className={`rounded-2xl border p-4 text-left transition-colors ${
+                  s.id === sucursal.id
+                    ? "border-[#b8795d] bg-[#fdf6f1]"
+                    : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
+                }`}
+                key={s.id}
+                onClick={() => elegir(setSucursalId)(s.id)}
+                type="button"
+              >
+                <p className="font-medium">{s.nombre}</p>
+                {s.direccion ? (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-[#8a7b72]">
+                    <MapPin className="size-3" /> {s.direccion}
+                  </p>
+                ) : null}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Paso 2: servicio */}
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#a76348]">Servicio</h2>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          {servicios.map((s) => (
+            <button
+              className={`rounded-2xl border p-4 text-left transition-colors ${
+                s.id === servicioId
+                  ? "border-[#b8795d] bg-[#fdf6f1]"
+                  : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
+              }`}
+              key={s.id}
+              onClick={() => elegir(setServicioId)(s.id)}
+              type="button"
+            >
+              <p className="font-medium">{s.nombre}</p>
+              <p className="mt-1 flex items-center gap-2 text-xs text-[#8a7b72]">
+                <Clock3 className="size-3" />
+                {s.duracionMinutos} min · {formatoPrecio(s.precio)}
+              </p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Paso 3: día */}
+      {servicioId ? (
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#a76348]">Día</h2>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {dias.map((dia) => (
+              <button
+                className={`rounded-xl border px-4 py-2 text-sm transition-colors ${
+                  dia.diaKey === diaKey
+                    ? "border-[#b8795d] bg-[#fdf6f1] font-semibold"
+                    : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
+                }`}
+                key={dia.diaKey}
+                onClick={() => elegir(setDiaKey)(dia.diaKey)}
+                type="button"
+              >
+                {dia.etiqueta}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {/* Paso 4: horario */}
+      {diaKey ? (
+        <div>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#a76348]">Horario</h2>
+          {pending && slots === null ? (
+            <p className="mt-3 text-sm text-[#8a7b72]">Buscando horarios disponibles…</p>
+          ) : null}
+          {slotsError ? (
+            <p className="mt-3 text-sm text-[#a8443a]">{slotsError}</p>
+          ) : null}
+          {slots !== null && slots.length === 0 && !slotsError ? (
+            <p className="mt-3 text-sm text-[#8a7b72]">
+              No quedan horarios libres ese día. Prueba con otra fecha.
+            </p>
+          ) : null}
+          {slots && slots.length > 0 ? (
+            <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+              {slots.map((iso) => (
+                <button
+                  className={`rounded-xl border px-3 py-2 text-sm tabular-nums transition-colors ${
+                    iso === slotIso
+                      ? "border-[#b8795d] bg-[#2c2522] font-semibold text-[#fffaf5]"
+                      : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
+                  }`}
+                  key={iso}
+                  onClick={() => setSlotIso(iso)}
+                  type="button"
+                >
+                  {formatoHora(iso, sucursal.zonaHoraria)}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Paso 5: datos */}
+      {slotIso ? (
+        <form className="rounded-3xl border border-[#e4d9cf] bg-white p-6 shadow-sm" onSubmit={enviar}>
+          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-[#a76348]">
+            <CalendarCheck2 className="size-4" /> Tus datos
+          </h2>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <Field className="sm:col-span-2">
+              <FieldLabel required>Nombre completo</FieldLabel>
+              <Input autoComplete="name" maxLength={160} name="nombre" required />
+            </Field>
+            <Field>
+              <FieldLabel required>Teléfono</FieldLabel>
+              <Input autoComplete="tel" maxLength={30} name="telefono" required type="tel" />
+            </Field>
+            <Field>
+              <FieldLabel>Correo (opcional)</FieldLabel>
+              <Input autoComplete="email" maxLength={254} name="correo" type="email" />
+            </Field>
+            <Field className="sm:col-span-2">
+              <FieldLabel>Notas (alergias, preferencias…)</FieldLabel>
+              <Textarea maxLength={2000} name="notas" rows={2} />
+            </Field>
+          </div>
+          {resultado?.tipo === "error" ? (
+            <p className="mt-4 rounded-xl border border-[#efc9b8] bg-[#fdf0ea] px-4 py-3 text-sm text-[#8a3c1d]" role="alert">
+              {resultado.mensaje}
+            </p>
+          ) : null}
+          <div className="mt-5 flex items-center gap-3">
+            <Button
+              className="rounded-xl border-[#ded5ce] bg-white"
+              onClick={() => setSlotIso("")}
+              type="button"
+              variant="outline"
+            >
+              <ChevronLeft className="size-4" /> Cambiar horario
+            </Button>
+            <Button
+              className="flex-1 rounded-xl bg-[#2c2522] py-3 text-sm font-semibold text-[#fffaf5] hover:bg-[#463a34]"
+              disabled={pending}
+              type="submit"
+            >
+              {pending ? "Reservando…" : "Confirmar reserva"}
+            </Button>
+          </div>
+          <p className="mt-3 text-xs leading-5 text-[#8a7b72]">
+            {sucursal.autoConfirmar
+              ? "Tu cita queda confirmada al instante."
+              : "El equipo revisará tu solicitud y te confirmará por teléfono."}
+          </p>
+        </form>
+      ) : null}
+    </section>
+  );
+}

@@ -4,6 +4,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useId, type ReactNode } from "react";
 
 import { AdminNavCompact, AdminTabBar } from "@/components/admin-nav";
+import {
+  SubscriptionBanner,
+  type BillingBadge,
+} from "@/components/admin/subscription-banner";
 import { ToastProvider } from "@/components/ui/toast";
 import { buildHref, firstParam } from "@/lib/url-context";
 
@@ -22,6 +26,8 @@ export type AdminShellProps = {
   organizations: AdminShellOrganization[];
   /** Permisos por organización (id → claves). null = sin filtro (plataforma). */
   permissionsByOrg?: Record<string, string[]> | null;
+  /** Estado de suscripción por organización para el banner (trial / vencida). */
+  billingByOrg?: Record<string, BillingBadge>;
   children: ReactNode;
 };
 
@@ -158,6 +164,7 @@ export function AdminShell({
   isPlatformAdmin,
   organizations,
   permissionsByOrg,
+  billingByOrg,
   children,
 }: AdminShellProps) {
   return (
@@ -219,6 +226,14 @@ export function AdminShell({
           className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-6 pb-24 sm:px-6 md:pb-6 lg:px-10"
           id="contenido-admin"
         >
+          {billingByOrg ? (
+            <Suspense fallback={null}>
+              <SubscriptionBanner
+                billingByOrg={billingByOrg}
+                organizations={organizations}
+              />
+            </Suspense>
+          ) : null}
           {children}
         </main>
 

@@ -14,13 +14,15 @@ describe("getAdminNavSections", () => {
     expect(paths).toContain("/admin/pos");
     expect(paths).toContain("/admin/caja");
     expect(paths).toContain("/admin/inventario");
+    expect(paths).toContain("/admin/gastos");
+    expect(paths).toContain("/admin/comisiones");
     expect(paths).toContain("/admin");
     expect(sections.some((s) => s.title === "Plataforma")).toBe(true);
   });
 
-  it("miembro sin permisos no ve ningún módulo", () => {
+  it("miembro sin permisos solo ve Ayuda", () => {
     const sections = getAdminNavSections(false, new Set());
-    expect(allPaths(sections)).toHaveLength(0);
+    expect(allPaths(sections)).toEqual(["/admin/ayuda"]);
   });
 
   it("miembro con permisos parciales solo ve sus módulos", () => {
@@ -30,12 +32,14 @@ describe("getAdminNavSections", () => {
     );
     const paths = allPaths(sections);
     expect(paths).toEqual(
-      expect.arrayContaining(["/admin/agenda", "/admin/mi-dia", "/admin/clientes"]),
+      expect.arrayContaining(["/admin/agenda", "/admin/mi-dia", "/admin/clientes", "/admin/ayuda"]),
     );
     expect(paths).not.toContain("/admin/pos");
     expect(paths).not.toContain("/admin/caja");
     expect(paths).not.toContain("/admin/inventario");
     expect(paths).not.toContain("/admin/servicios");
+    expect(paths).not.toContain("/admin/gastos");
+    expect(paths).not.toContain("/admin/comisiones");
     expect(sections.some((s) => s.title === "Catálogos")).toBe(false);
   });
 
@@ -44,7 +48,8 @@ describe("getAdminNavSections", () => {
     const catalogos = sections.find((s) => s.title === "Catálogos");
     expect(catalogos).toBeUndefined();
     const paths = allPaths(sections);
-    expect(paths).toEqual(["/admin/pos"]);
+    expect(paths).toEqual(expect.arrayContaining(["/admin/pos", "/admin/ventas"]));
+    expect(paths).not.toContain("/admin/servicios");
   });
 
   it("permissions null sin ser plataforma muestra módulos pero no Plataforma", () => {

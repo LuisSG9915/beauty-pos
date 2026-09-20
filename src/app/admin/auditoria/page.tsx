@@ -11,6 +11,8 @@ import { auditoriaEventos } from "@/db/schema/access";
 import { sucursales, usuarios } from "@/db/schema/core";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { requireAccessPermission } from "@/lib/auth/authorization";
+import { PlanUpgradeNotice } from "@/components/plan-gate";
+import { contextoSuscripcion } from "@/modules/billing/queries";
 import { formatDate, formatTime } from "@/lib/format";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 
@@ -26,6 +28,16 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
   if (!context.organization) notFound();
   requireAccessPermission(context.access, "auditoria.ver");
   const organizationId = context.organization.id;
+  const suscripcion = await contextoSuscripcion(organizationId);
+  if (!suscripcion.capacidades.has("auditoria")) {
+    return (
+      <PlanUpgradeNotice
+        capacidad="auditoria"
+        planNombre={suscripcion.plan?.nombre}
+        suscripcionHref={buildAdminHref("/suscripcion", { organizationId })}
+      />
+    );
+  }
   const db = getDatabase();
 
   const desde = firstParam(params.desde) ?? "";

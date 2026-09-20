@@ -7,6 +7,8 @@ import { z } from "zod";
 import { getDatabase } from "@/db/client";
 import { paquetes, servicios } from "@/db/schema/catalogs";
 import { checkPermission } from "@/lib/auth/authorization";
+import { revalidateCatalogos } from "@/lib/catalogo-cache";
+import { requiereCapacidad } from "@/modules/billing/queries";
 
 const paqueteSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -27,6 +29,8 @@ export async function savePaquete(_previousState: PaqueteActionState, formData: 
   const input = result.data;
   const access = await checkPermission(input.organizacionId, "catalogos.editar");
   if (!access) return { error: "No tienes permiso para editar catálogos." };
+  const negado = await requiereCapacidad(input.organizacionId, "paquetes");
+  if (negado) return { error: negado };
   const { user } = access;
   const db = getDatabase();
 
@@ -58,6 +62,7 @@ export async function savePaquete(_previousState: PaqueteActionState, formData: 
 
   revalidatePath("/admin/paquetes");
   revalidatePath("/admin/pos");
+  revalidateCatalogos(input.organizacionId);
   return { success: true };
 }
 
@@ -67,9 +72,11 @@ export async function togglePaquete(formData: FormData) {
   const active = formData.get("activo") === "true";
   const access = await checkPermission(organizationId, "catalogos.editar");
   if (!access) return;
+  if (await requiereCapacidad(organizationId, "paquetes")) return;
   const { user } = access;
   const db = getDatabase();
   await db.update(paquetes).set({ activo: !active, updatedBy: user.id }).where(and(eq(paquetes.id, id), eq(paquetes.organizacionId, organizationId)));
   revalidatePath("/admin/paquetes");
   revalidatePath("/admin/pos");
+  revalidateCatalogos(organizationId);
 }

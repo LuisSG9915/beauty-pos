@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getDatabase } from "@/db/client";
 import { productos } from "@/db/schema/catalogs";
 import { checkPermission } from "@/lib/auth/authorization";
+import { revalidateCatalogos } from "@/lib/catalogo-cache";
 
 const productSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -59,6 +60,7 @@ export async function saveProduct(_previousState: ProductActionState, formData: 
   else await db.insert(productos).values({ ...values, createdBy: user.id });
 
   revalidatePath("/admin/productos");
+  revalidateCatalogos(input.organizacionId);
   return { success: true };
 }
 
@@ -72,4 +74,5 @@ export async function toggleProduct(formData: FormData) {
   const db = getDatabase();
   await db.update(productos).set({ activo: !active, updatedBy: user.id }).where(and(eq(productos.id, id), eq(productos.organizacionId, organizationId)));
   revalidatePath("/admin/productos");
+  revalidateCatalogos(organizationId);
 }

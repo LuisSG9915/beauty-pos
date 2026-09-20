@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
-import { sucursales, usuarios } from "@/db/schema/core";
+import { organizaciones, sucursales, usuarios } from "@/db/schema/core";
 import {
   bloqueosAgenda,
   citaRecursos,
@@ -46,6 +46,7 @@ import {
 } from "@/modules/agenda/service";
 import { getZonedParts, parseFechaHoraInput } from "@/modules/agenda/timezone";
 import { intervalFromDates, type DisponibilidadResult } from "@/modules/agenda/types";
+import { requiereCapacidad } from "@/modules/billing/queries";
 
 const CITA_ESTADOS = ["pendiente", "confirmada", "en_proceso", "completada", "cancelada", "no_asistio"] as const;
 
@@ -1041,6 +1042,119 @@ export async function updateCapacidadSinAsignar(formData: FormData): Promise<Cit
   });
   revalidatePath("/admin/agenda");
   return { success: true, message: "Capacidad actualizada." };
+}
+
+/**
+ * Portal público de reservas (/reservar/[slug]): activa/desactiva la
+ * sucursal y define si las reservas web se confirman al instante o quedan
+ * pendientes de confirmación por el equipo.
+ */
+export async function updateReservasConfig(formData: FormData): Promise<CitaMutationResult> {
+  const parsed = z
+    .object({
+      organizacionId: z.string().uuid(),
+      sucursalId: z.string().uuid(),
+      reservasOnline: z.coerce.boolean(),
+      reservasAutoConfirmar: z.coerce.boolean(),
+    })
+    .safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return { success: false, error: "Configuración inválida." };
+  const input = parsed.data;
+  const access = await checkPermission(input.organizacionId, "agenda.editar");
+  if (!access) return { success: false, error: "No tienes permiso para configurar la agenda." };
+  if (!(await assertBranchScope(access, input.sucursalId))) {
+    return { success: false, error: "No tienes acceso a esta sucursal." };
+  }
+  if (input.reservasOnline) {
+    const negado = await requiereCapacidad(input.organizacionId, "reservas_online");
+    if (negado) return { success: false, error: negado };
+  }
+  if (input.reservasOnline && input.reservasAutoConfirmar) {
+    const negado = await requiereCapacidad(input.organizacionId, "reservas_auto_confirmar");
+    if (negado) return { success: false, error: negado };
+  }
+  const db = getDatabase();
+  await db.transaction(async (tx) => {
+    await tx
+      .update(sucursales)
+      .set({
+        reservasOnline: input.reservasOnline,
+        reservasAutoConfirmar: input.reservasOnline ? input.reservasAutoConfirmar : false,
+        updatedBy: access.user.id,
+      })
+      .where(and(eq(sucursales.id, input.sucursalId), eq(sucursales.organizacionId, input.organizacionId)));
+    await auditEvent(tx, {
+      organizacionId: input.organizacionId,
+      sucursalId: input.sucursalId,
+      usuarioId: access.user.id,
+      accion: "agenda.reservas_config",
+      entidad: "sucursales",
+      entidadId: input.sucursalId,
+      detalle: {
+        reservasOnline: input.reservasOnline,
+        reservasAutoConfirmar: input.reservasAutoConfirmar,
+      },
+    });
+  });
+  revalidatePath("/admin/agenda");
+  return {
+    success: true,
+    message: input.reservasOnline
+      ? "Reservas en línea activadas. Comparte el enlace con tus clientes."
+      : "Reservas en línea desactivadas.",
+  };
+}
+
+/**
+ * Recordatorios automáticos por correo (config a nivel organización):
+ * activar/desactivar y horas de anticipación (1–168). El cron
+ * `/api/cron/recordatorios` respeta esta configuración.
+ */
+export async function updateRecordatoriosConfig(formData: FormData): Promise<CitaMutationResult> {
+  const parsed = z
+    .object({
+      organizacionId: z.string().uuid(),
+      recordatoriosActivos: z.coerce.boolean(),
+      recordatoriosHorasAntes: z.coerce.number().int().min(1).max(168),
+    })
+    .safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return { success: false, error: "Indica entre 1 y 168 horas de anticipación." };
+  const input = parsed.data;
+  const access = await checkPermission(input.organizacionId, "agenda.editar");
+  if (!access) return { success: false, error: "No tienes permiso para configurar la agenda." };
+  if (input.recordatoriosActivos) {
+    const negado = await requiereCapacidad(input.organizacionId, "recordatorios_email");
+    if (negado) return { success: false, error: negado };
+  }
+  const db = getDatabase();
+  await db.transaction(async (tx) => {
+    await tx
+      .update(organizaciones)
+      .set({
+        recordatoriosActivos: input.recordatoriosActivos,
+        recordatoriosHorasAntes: input.recordatoriosHorasAntes,
+        updatedBy: access.user.id,
+      })
+      .where(eq(organizaciones.id, input.organizacionId));
+    await auditEvent(tx, {
+      organizacionId: input.organizacionId,
+      usuarioId: access.user.id,
+      accion: "agenda.recordatorios_config",
+      entidad: "organizaciones",
+      entidadId: input.organizacionId,
+      detalle: {
+        recordatoriosActivos: input.recordatoriosActivos,
+        recordatoriosHorasAntes: input.recordatoriosHorasAntes,
+      },
+    });
+  });
+  revalidatePath("/admin/agenda");
+  return {
+    success: true,
+    message: input.recordatoriosActivos
+      ? `Recordatorios activados: se enviarán ${input.recordatoriosHorasAntes} h antes de cada cita con correo.`
+      : "Recordatorios por correo desactivados.",
+  };
 }
 
 /* ------------------------------------------------------------------ */

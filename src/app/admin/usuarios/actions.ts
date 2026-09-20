@@ -10,6 +10,7 @@ import { miembrosOrganizaciones, relUsuariosSucursales, sucursales } from "@/db/
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
 import { auditEvent } from "@/lib/audit";
 import { assertBranchScope, canAccessBranch, checkPermission } from "@/lib/auth/authorization";
+import { revalidateCatalogos } from "@/lib/catalogo-cache";
 import { issueInvitation } from "@/lib/invitations";
 
 const inviteSchema = z.object({
@@ -58,6 +59,7 @@ export async function inviteMember(
   });
 
   revalidatePath("/admin/usuarios");
+  revalidateCatalogos(input.organizacionId);
   return actionSuccess("Invitación enviada.", { invitationUrl: issued.invitationUrl });
 }
 
@@ -163,6 +165,7 @@ export async function setMemberRoles(
   }
 
   revalidatePath("/admin/usuarios");
+  revalidateCatalogos(input.organizacionId);
   return actionSuccess("Roles actualizados.");
 }
 
@@ -253,6 +256,7 @@ export async function setMemberBranches(
   }
 
   revalidatePath("/admin/usuarios");
+  revalidateCatalogos(input.organizacionId);
   return actionSuccess("Sucursales actualizadas.");
 }
 
@@ -293,6 +297,7 @@ export async function toggleMember(
   });
 
   revalidatePath("/admin/usuarios");
+  revalidateCatalogos(input.organizacionId);
   return actionSuccess(input.estado === "activo" ? "Miembro reactivado." : "Miembro suspendido.");
 }
 

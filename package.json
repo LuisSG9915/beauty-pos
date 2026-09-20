@@ -21,6 +21,7 @@
     "bootstrap:admin": "tsx scripts/bootstrap-admin.ts",
     "auth:verify-admin": "tsx scripts/verify-admin.ts",
     "access:seed": "tsx scripts/seed-access.ts",
+    "plans:seed": "tsx scripts/seed-planes.ts",
     "cf:typegen": "wrangler types"
   },
   "dependencies": {

@@ -1,11 +1,14 @@
 import { and, asc, eq } from "drizzle-orm";
 
 import { AdminShell } from "@/components/admin/admin-shell";
+import type { BillingBadge } from "@/components/admin/subscription-banner";
 import { OfflineSyncBadge } from "@/components/offline-sync";
 import { getDatabase } from "@/db/client";
 import { miembrosOrganizaciones, organizaciones } from "@/db/schema/core";
 import { requireAuthenticatedUser } from "@/lib/auth/access";
 import { resolveAccessSafe } from "@/lib/auth/authorization";
+import { getSuscripcionActual } from "@/modules/billing/queries";
+import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
 
 export const dynamic = "force-dynamic";
 
@@ -51,18 +54,35 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   // Permisos por organización para filtrar la navegación del shell.
   // Admin de plataforma → null (sin filtro).
   let permissionsByOrg: Record<string, string[]> | null = null;
+  const billingByOrg: Record<string, BillingBadge> = {};
   if (!user.esAdministradorPlataforma) {
     permissionsByOrg = {};
     const resolved = await Promise.all(
-      organizations.map(async (org) => [org.id, await resolveAccessSafe(org.id, user)] as const),
+      organizations.map(
+        async (org) =>
+          [
+            org.id,
+            await resolveAccessSafe(org.id, user),
+            await getSuscripcionActual(org.id),
+          ] as const,
+      ),
     );
-    for (const [orgId, access] of resolved) {
+    for (const [orgId, access, suscripcion] of resolved) {
       permissionsByOrg[orgId] = access ? [...access.permissions] : [];
+      if (estadoEfectivoSuscripcion(suscripcion) === "vencida") {
+        billingByOrg[orgId] = { estado: "vencida", diasRestantes: null };
+      } else if (suscripcion?.estado === "trialing") {
+        billingByOrg[orgId] = {
+          estado: "trialing",
+          diasRestantes: diasRestantesTrial(suscripcion),
+        };
+      }
     }
   }
 
   return (
     <AdminShell
+      billingByOrg={billingByOrg}
       isPlatformAdmin={user.esAdministradorPlataforma}
       organizations={organizations}
       permissionsByOrg={permissionsByOrg}

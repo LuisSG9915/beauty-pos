@@ -66,5 +66,20 @@ export function createAuth({ allowSignUp = false, sendEmails = true }: AuthOptio
       }),
       nextCookies(),
     ],
+    advanced: {
+      // En Cloudflare la IP real del cliente llega en cf-connecting-ip (la
+      // cabecera la fija el edge, no es falsificable por el cliente). El
+      // fallback cubre despliegues tras otros proxies y desarrollo local.
+      // Sin IP el rate limiter cae a un bucket compartido para toda la app.
+      ipAddress: {
+        ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for", "x-real-ip"],
+      },
+    },
+    // Rate limiting activo solo en producción (default de better-auth):
+    // sign-in/sign-up/change-password → 3 req / 10 s por IP+path;
+    // reset y verificación por correo → 3 / 60 s; resto → 100 / 10 s.
+    rateLimit: {
+      storage: "memory",
+    },
   });
 }

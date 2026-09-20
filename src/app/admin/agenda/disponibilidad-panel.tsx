@@ -12,6 +12,8 @@ import {
   toggleHorarioSucursal,
   toggleRecurso,
   updateCapacidadSinAsignar,
+  updateRecordatoriosConfig,
+  updateReservasConfig,
   type CitaMutationResult,
 } from "@/app/admin/agenda/actions";
 import { StatusBadge } from "@/components/status-badge";
@@ -102,27 +104,49 @@ function textoAMinutos(value: string): number | null {
  */
 export function DisponibilidadPanel({
   organizationId,
+  organizacionSlug,
   sucursalId,
   horarios,
   bloqueos,
   recursos,
   staff,
   capacidadSinAsignar,
+  reservasOnline,
+  reservasAutoConfirmar,
+  recordatoriosActivos,
+  recordatoriosHorasAntes,
+  permiteReservasOnline,
+  permiteAutoConfirmar,
+  permiteRecordatorios,
   timeZone,
 }: {
   organizationId: string;
+  /** Slug público de la organización para construir el enlace de reservas. */
+  organizacionSlug: string;
   sucursalId: string;
   horarios: HorarioConfig[];
   bloqueos: BloqueoConfig[];
   recursos: RecursoConfig[];
   staff: Array<{ id: string; nombre: string }>;
   capacidadSinAsignar: number;
+  reservasOnline: boolean;
+  reservasAutoConfirmar: boolean;
+  recordatoriosActivos: boolean;
+  recordatoriosHorasAntes: number;
+  /** Capacidades del plan vigente: la UI deshabilita lo que el plan no incluye. */
+  permiteReservasOnline: boolean;
+  permiteAutoConfirmar: boolean;
+  permiteRecordatorios: boolean;
   timeZone: string;
 }) {
   const toast = useToast();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [capacidad, setCapacidad] = useState(String(capacidadSinAsignar));
+  const [reservas, setReservas] = useState(reservasOnline);
+  const [autoConfirmar, setAutoConfirmar] = useState(reservasAutoConfirmar);
+  const [recordatorios, setRecordatorios] = useState(recordatoriosActivos);
+  const [horasAntes, setHorasAntes] = useState(String(recordatoriosHorasAntes));
   const [bloqueoTipo, setBloqueoTipo] = useState<(typeof BLOQUEO_TIPOS)[number]>("personal");
   const [bloqueoUsuario, setBloqueoUsuario] = useState("");
 
@@ -219,6 +243,23 @@ export function DisponibilidadPanel({
     data.set("sucursalId", sucursalId);
     data.set("capacidadSinAsignar", capacidad);
     run(updateCapacidadSinAsignar(data), "No se pudo actualizar la capacidad.");
+  };
+
+  const guardarReservas = () => {
+    const data = new FormData();
+    data.set("organizacionId", organizationId);
+    data.set("sucursalId", sucursalId);
+    data.set("reservasOnline", String(reservas));
+    data.set("reservasAutoConfirmar", String(autoConfirmar));
+    run(updateReservasConfig(data), "No se pudo actualizar las reservas en línea.");
+  };
+
+  const guardarRecordatorios = () => {
+    const data = new FormData();
+    data.set("organizacionId", organizationId);
+    data.set("recordatoriosActivos", String(recordatorios));
+    data.set("recordatoriosHorasAntes", horasAntes);
+    run(updateRecordatoriosConfig(data), "No se pudo actualizar los recordatorios.");
   };
 
   const bloqueosOrdenados = [...bloqueos].sort(
@@ -319,6 +360,128 @@ export function DisponibilidadPanel({
               Cuántas citas sin asignar pueden coexistir en el mismo horario. 1 = solo una a la vez;
               súbelo si recepción agenda varias y asigna profesional al llegar.
             </p>
+          </section>
+
+          {/* ---------------------- Reservas en línea ---------------------- */}
+          <section className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+              Reservas en línea
+            </h3>
+            <label className="flex items-start gap-2 text-sm text-[#403a35]">
+              <input
+                checked={reservas}
+                className="mt-0.5 size-4 accent-[#8a5140] disabled:opacity-50"
+                disabled={!permiteReservasOnline}
+                onChange={(event) => setReservas(event.target.checked)}
+                type="checkbox"
+              />
+              <span>
+                Permitir que clientes reserven desde el portal público.
+                <span className="block text-xs text-[#81746c]">
+                  Las reservas web usan el carril «sin asignar» y aparecen en la agenda.
+                </span>
+                {!permiteReservasOnline ? (
+                  <span className="block text-xs font-medium text-[#a76348]">
+                    No está incluido en tu plan actual.
+                  </span>
+                ) : null}
+              </span>
+            </label>
+            {reservas ? (
+              <>
+                <label className="flex items-start gap-2 pl-6 text-sm text-[#403a35]">
+                  <input
+                    checked={autoConfirmar}
+                    className="mt-0.5 size-4 accent-[#8a5140] disabled:opacity-50"
+                    disabled={!permiteAutoConfirmar}
+                    onChange={(event) => setAutoConfirmar(event.target.checked)}
+                    type="checkbox"
+                  />
+                  <span>
+                    Confirmar automáticamente.
+                    <span className="block text-xs text-[#81746c]">
+                      Si lo desactivas, cada reserva queda pendiente hasta que el equipo la confirme.
+                    </span>
+                    {!permiteAutoConfirmar ? (
+                      <span className="block text-xs font-medium text-[#a76348]">
+                        Disponible en el plan Crecimiento.
+                      </span>
+                    ) : null}
+                  </span>
+                </label>
+                <p className="break-all rounded-lg bg-[#f4f1ee] px-3 py-2 text-xs text-[#625b55]">
+                  Enlace para tus clientes:{" "}
+                  <span className="font-medium text-[#8a5140]">/reservar/{organizacionSlug}</span>
+                </p>
+              </>
+            ) : null}
+            <Button
+              className="rounded-xl"
+              disabled={
+                pending ||
+                (reservas === reservasOnline && (autoConfirmar === reservasAutoConfirmar || !reservas))
+              }
+              onClick={guardarReservas}
+              type="button"
+              variant="outline"
+            >
+              Guardar reservas
+            </Button>
+          </section>
+
+          {/* --------------------- Recordatorios por correo --------------------- */}
+          <section className="space-y-2">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+              Recordatorios por correo
+            </h3>
+            <label className="flex items-start gap-2 text-sm text-[#403a35]">
+              <input
+                checked={recordatorios}
+                className="mt-0.5 size-4 accent-[#8a5140] disabled:opacity-50"
+                disabled={!permiteRecordatorios}
+                onChange={(event) => setRecordatorios(event.target.checked)}
+                type="checkbox"
+              />
+              <span>
+                Enviar recordatorio automático a clientes con correo.
+                <span className="block text-xs text-[#81746c]">
+                  Aplica a toda la organización; solo citas pendientes o confirmadas.
+                </span>
+                {!permiteRecordatorios ? (
+                  <span className="block text-xs font-medium text-[#a76348]">
+                    Disponible en el plan Crecimiento.
+                  </span>
+                ) : null}
+              </span>
+            </label>
+            {recordatorios ? (
+              <div className="flex items-end gap-2 pl-6">
+                <Field className="w-36">
+                  <FieldLabel>Horas antes</FieldLabel>
+                  <Input
+                    min={1}
+                    max={168}
+                    onChange={(event) => setHorasAntes(event.target.value)}
+                    type="number"
+                    value={horasAntes}
+                  />
+                </Field>
+                <p className="pb-2 text-xs text-[#81746c]">24 = un día antes de la cita.</p>
+              </div>
+            ) : null}
+            <Button
+              className="rounded-xl"
+              disabled={
+                pending ||
+                (recordatorios === recordatoriosActivos &&
+                  horasAntes === String(recordatoriosHorasAntes))
+              }
+              onClick={guardarRecordatorios}
+              type="button"
+              variant="outline"
+            >
+              Guardar recordatorios
+            </Button>
           </section>
 
           {/* ---------------------------- Bloqueos ---------------------------- */}
