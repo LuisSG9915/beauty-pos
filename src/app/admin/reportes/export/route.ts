@@ -1,12 +1,13 @@
 import { and, eq } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
-import { sucursales } from "@/db/schema/core";
+import { organizaciones, sucursales } from "@/db/schema/core";
 import { auditEvent } from "@/lib/audit";
 import { hasPermission, resolveAccess } from "@/lib/auth/authorization";
 import { todayDateInput } from "@/lib/format";
 import { normalizeDateInput } from "@/lib/url-context";
-import { shiftDateKey } from "@/modules/agenda";
+import { resolveTimeZone, shiftDateKey } from "@/modules/agenda";
+import { tieneCapacidadOrganizacion } from "@/modules/billing/queries";
 import { cargarAgregadosAnteriores, cargarReporte, num } from "@/modules/reportes/queries";
 import {
   derivarAvisos,
@@ -62,19 +63,39 @@ export async function GET(request: Request) {
   if (!hasPermission(access, "reportes.exportar") || (!operativos && !financieros)) {
     return Response.json({ error: "Sin permiso para exportar reportes" }, { status: 403 });
   }
-  if (access.branchIds && !access.branchIds.has(sucursalId)) {
+
+  const db = getDatabase();
+  // `sucursalId=todas` = consolidado de todas las sucursales del alcance del
+  // usuario (requiere la capacidad multisucursal y zona de la organización).
+  const consolidado = sucursalId === "todas";
+  if (consolidado) {
+    if (!(await tieneCapacidadOrganizacion(organizationId, "multisucursal", db))) {
+      return Response.json({ error: "El consolidado requiere el plan Profesional" }, { status: 403 });
+    }
+  } else if (access.branchIds && !access.branchIds.has(sucursalId)) {
     return Response.json({ error: "Sin acceso a esta sucursal" }, { status: 403 });
   }
 
-  const db = getDatabase();
-  const [branch] = await db
-    .select({ nombre: sucursales.nombre, zonaHoraria: sucursales.zonaHoraria })
-    .from(sucursales)
-    .where(and(eq(sucursales.id, sucursalId), eq(sucursales.organizacionId, organizationId)))
-    .limit(1);
-  if (!branch) return Response.json({ error: "Sucursal no encontrada" }, { status: 404 });
+  let sucursalNombre = "Todas las sucursales";
+  let timeZone: string;
+  if (consolidado) {
+    const [org] = await db
+      .select({ zonaHoraria: organizaciones.zonaHoraria })
+      .from(organizaciones)
+      .where(eq(organizaciones.id, organizationId))
+      .limit(1);
+    timeZone = resolveTimeZone(org?.zonaHoraria);
+  } else {
+    const [branch] = await db
+      .select({ nombre: sucursales.nombre, zonaHoraria: sucursales.zonaHoraria })
+      .from(sucursales)
+      .where(and(eq(sucursales.id, sucursalId), eq(sucursales.organizacionId, organizationId)))
+      .limit(1);
+    if (!branch) return Response.json({ error: "Sucursal no encontrada" }, { status: 404 });
+    sucursalNombre = branch.nombre;
+    timeZone = resolveTimeZone(branch.zonaHoraria);
+  }
 
-  const timeZone = branch.zonaHoraria ?? "America/Mexico_City";
   const hoy = todayDateInput(timeZone);
   let desde = normalizeDateInput(url.searchParams.get("desde") ?? undefined, shiftDateKey(hoy, -29) ?? hoy) ?? hoy;
   let hasta = normalizeDateInput(url.searchParams.get("hasta") ?? undefined, hoy) ?? hoy;
@@ -82,12 +103,13 @@ export async function GET(request: Request) {
 
   const reporte = await cargarReporte(db, {
     organizacionId: organizationId,
-    sucursalId,
+    sucursalId: consolidado ? null : sucursalId,
     timeZone,
     desde,
     hasta,
     operativos,
     financieros,
+    sucursalesPermitidas: access.branchIds,
   });
   if (!reporte) return Response.json({ error: "Rango de fechas inválido" }, { status: 400 });
 
@@ -95,12 +117,13 @@ export async function GET(request: Request) {
   const { ventasAnt, citasAnt } = anterior
     ? await cargarAgregadosAnteriores(db, {
         organizacionId: organizationId,
-        sucursalId,
+        sucursalId: consolidado ? null : sucursalId,
         timeZone,
         desde: anterior.desde,
         hasta: anterior.hasta,
         operativos,
         financieros,
+        sucursalesPermitidas: access.branchIds,
       })
     : { ventasAnt: [{ total: "0", operaciones: 0 }], citasAnt: [] };
 
@@ -110,7 +133,7 @@ export async function GET(request: Request) {
   };
 
   seccion("Parámetros");
-  lineas.push(filaCsv(["Sucursal", branch.nombre]));
+  lineas.push(filaCsv(["Sucursal", sucursalNombre]));
   lineas.push(filaCsv(["Zona horaria", timeZone]));
   lineas.push(filaCsv(["Desde", desde]));
   lineas.push(filaCsv(["Hasta", hasta]));
@@ -240,11 +263,11 @@ export async function GET(request: Request) {
 
   await auditEvent(db, {
     organizacionId: organizationId,
-    sucursalId,
+    sucursalId: consolidado ? null : sucursalId,
     usuarioId: access.user.id,
     accion: "reporte.exportado",
     entidad: "reporte",
-    detalle: { desde, hasta, secciones: { operativos, financieros } },
+    detalle: { desde, hasta, consolidado, secciones: { operativos, financieros } },
   });
 
   const csv = `\ufeff${lineas.join("\r\n")}`;

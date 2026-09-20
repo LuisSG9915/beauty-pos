@@ -4,14 +4,20 @@ import { notFound } from "next/navigation";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { BarChart, HBarChart } from "@/components/charts";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input } from "@/components/ui/field";
+import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate, formatTime, todayDateInput } from "@/lib/format";
-import { normalizeDateInput } from "@/lib/url-context";
-import { shiftDateKey } from "@/modules/agenda";
-import { cargarAgregadosAnteriores, cargarReporte, num } from "@/modules/reportes/queries";
+import { firstParam, normalizeDateInput } from "@/lib/url-context";
+import { resolveTimeZone, shiftDateKey } from "@/modules/agenda";
+import { tieneCapacidadOrganizacion } from "@/modules/billing/queries";
+import {
+  cargarAgregadosAnteriores,
+  cargarReporte,
+  comparativoSucursales,
+  num,
+} from "@/modules/reportes/queries";
 import {
   deltaKpi,
   derivarAvisos,
@@ -103,22 +109,34 @@ export default async function ReportesPage({ searchParams }: Props) {
   const puedeExportar = hasPermission(context.access, "reportes.exportar");
   if (!puedeOperativos && !puedeFinancieros) notFound();
 
-  const hoy = todayDateInput(timeZone);
+  const db = getDatabase();
+  // Vista consolidada (Profesional): `sucursalId=todas` suma todas las
+  // sucursales del alcance del usuario. La zona del reporte es explícita —
+  // la de la organización — para no mezclar días de zonas distintas.
+  const multisucursal = await tieneCapacidadOrganizacion(organization.id, "multisucursal", db);
+  const consolidado =
+    firstParam(params.sucursalId) === "todas" && multisucursal && context.branches.length > 1;
+  const reportTimeZone = consolidado ? resolveTimeZone(null, organization.zonaHoraria) : timeZone;
+  const sucursalReporte = consolidado ? null : branch.id;
+  const sucursalNombre = consolidado ? "Todas las sucursales" : branch.nombre;
+  const permitidas = context.access.branchIds;
+
+  const hoy = todayDateInput(reportTimeZone);
   let desde = normalizeDateInput(params.desde, shiftDateKey(hoy, -29) ?? hoy) ?? hoy;
   let hasta = normalizeDateInput(params.hasta, hoy) ?? hoy;
   if (desde > hasta) [desde, hasta] = [hasta, desde];
   const anterior = periodoAnterior(desde, hasta);
 
-  const db = getDatabase();
   const fmt = (v: string | number | null | undefined) => formatCurrency(num(v), { currency });
   const reporte = await cargarReporte(db, {
     organizacionId: organization.id,
-    sucursalId: branch.id,
-    timeZone,
+    sucursalId: sucursalReporte,
+    timeZone: reportTimeZone,
     desde,
     hasta,
     operativos: puedeOperativos,
     financieros: puedeFinancieros,
+    sucursalesPermitidas: permitidas,
   });
   if (!reporte) notFound();
   const {
@@ -143,14 +161,28 @@ export default async function ReportesPage({ searchParams }: Props) {
   const { ventasAnt, citasAnt } = anterior
     ? await cargarAgregadosAnteriores(db, {
         organizacionId: organization.id,
-        sucursalId: branch.id,
-        timeZone,
+        sucursalId: sucursalReporte,
+        timeZone: reportTimeZone,
         desde: anterior.desde,
         hasta: anterior.hasta,
         operativos: puedeOperativos,
         financieros: puedeFinancieros,
+        sucursalesPermitidas: permitidas,
       })
     : { ventasAnt: [{ total: "0", operaciones: 0 }], citasAnt: [] };
+
+  // Comparativo por sucursal: solo en vista consolidada.
+  const comparativo = consolidado
+    ? await comparativoSucursales(db, {
+        organizacionId: organization.id,
+        sucursalesPermitidas: permitidas,
+        timeZone: reportTimeZone,
+        desde,
+        hasta,
+        operativos: puedeOperativos,
+        financieros: puedeFinancieros,
+      })
+    : [];
 
   // KPIs operativos
   const { totalCitas, asistencia } = derivarCitas(citasPorEstado);
@@ -193,9 +225,10 @@ export default async function ReportesPage({ searchParams }: Props) {
   const devolucionesOps = devolucionesResumen[0]?.operaciones ?? 0;
   const anticiposRow = anticiposResumen[0];
 
+  const sucursalParam = consolidado ? "todas" : branch.id;
   const filtrosExport = new URLSearchParams({
     organizationId: organization.id,
-    sucursalId: branch.id,
+    sucursalId: sucursalParam,
     desde,
     hasta,
   }).toString();
@@ -203,11 +236,28 @@ export default async function ReportesPage({ searchParams }: Props) {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader description={`${branch.nombre} · ${desde} → ${hasta}`} title="Reportes" />
+      <AdminPageHeader
+        description={`${sucursalNombre} · ${desde} → ${hasta}${consolidado ? ` · zona del reporte: ${reportTimeZone}` : ""}`}
+        title="Reportes"
+      />
 
       <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm" method="get">
         <input name="organizationId" type="hidden" value={organization.id} />
-        <input name="sucursalId" type="hidden" value={branch.id} />
+        {context.branches.length > 1 ? (
+          <Field className="w-56">
+            <FieldLabel>Sucursal</FieldLabel>
+            <Select defaultValue={sucursalParam} name="sucursalId">
+              {context.branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.nombre} · {b.clave}
+                </option>
+              ))}
+              {multisucursal ? <option value="todas">Todas las sucursales</option> : null}
+            </Select>
+          </Field>
+        ) : (
+          <input name="sucursalId" type="hidden" value={branch.id} />
+        )}
         <Field className="w-40">
           <FieldLabel>Desde</FieldLabel>
           <Input defaultValue={desde} name="desde" type="date" />
@@ -230,7 +280,7 @@ export default async function ReportesPage({ searchParams }: Props) {
           {presets.map((preset) => {
             const href = `?${new URLSearchParams({
               organizationId: organization.id,
-              sucursalId: branch.id,
+              sucursalId: sucursalParam,
               desde: preset.desde,
               hasta: preset.hasta,
             }).toString()}`;
@@ -256,6 +306,27 @@ export default async function ReportesPage({ searchParams }: Props) {
           ) : null}
         </div>
       </form>
+
+      {consolidado ? (
+        <AdminCard
+          description={`Ventas cobradas y citas por sucursal, en la zona del reporte (${reportTimeZone}). El consolidado es la suma de estas filas.`}
+          title="Comparativo por sucursal"
+        >
+          <Tabla
+            encabezados={["Sucursal", "Vendido", "Ventas", "Citas", "Completadas", "Canceladas", "No asistió"]}
+            filas={comparativo.map((row) => [
+              row.nombre,
+              fmt(row.vendido),
+              String(row.operaciones),
+              String(row.citas),
+              String(row.completadas),
+              String(row.canceladas),
+              String(row.noShow),
+            ])}
+            vacio="Sin operaciones en el rango."
+          />
+        </AdminCard>
+      ) : null}
 
       {puedeOperativos ? (
         <>
@@ -295,9 +366,11 @@ export default async function ReportesPage({ searchParams }: Props) {
             </AdminCard>
             <AdminCard
               actions={
-                <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/ventas?${filtrosExport}`}>
-                  Ver ventas →
-                </Link>
+                consolidado ? null : (
+                  <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/ventas?${filtrosExport}`}>
+                    Ver ventas →
+                  </Link>
+                )
               }
               description="Por importe vendido en ventas cobradas"
               title="Servicios más vendidos"
@@ -312,9 +385,11 @@ export default async function ReportesPage({ searchParams }: Props) {
 
           <AdminCard
             actions={
-              <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/agenda?${filtrosExport}`}>
-                Ver agenda →
-              </Link>
+              consolidado ? null : (
+                <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/agenda?${filtrosExport}`}>
+                  Ver agenda →
+                </Link>
+              )
             }
             description="Citas agendadas por profesional"
             title="Productividad del equipo"
@@ -418,9 +493,11 @@ export default async function ReportesPage({ searchParams }: Props) {
           <div className="grid gap-6 lg:grid-cols-2">
             <AdminCard
               actions={
-                <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/ventas?${filtrosExport}`}>
-                  Ver historial →
-                </Link>
+                consolidado ? null : (
+                  <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/ventas?${filtrosExport}`}>
+                    Ver historial →
+                  </Link>
+                )
               }
               description="Ventas cobradas por día"
               title="Ventas por día"
@@ -470,9 +547,11 @@ export default async function ReportesPage({ searchParams }: Props) {
           <div className="grid gap-6 lg:grid-cols-2">
             <AdminCard
               actions={
-                <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/comisiones?${filtrosExport}`}>
-                  Ver detalle →
-                </Link>
+                consolidado ? null : (
+                  <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/comisiones?${filtrosExport}`}>
+                    Ver detalle →
+                  </Link>
+                )
               }
               description="Devengado en ventas cobradas vs. pagado (liquidaciones del periodo)"
               title="Comisiones y propinas por profesional"
@@ -490,9 +569,11 @@ export default async function ReportesPage({ searchParams }: Props) {
             </AdminCard>
             <AdminCard
               actions={
-                <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/gastos?${filtrosExport}`}>
-                  Ver detalle →
-                </Link>
+                consolidado ? null : (
+                  <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/gastos?${filtrosExport}`}>
+                    Ver detalle →
+                  </Link>
+                )
               }
               description="Gastos confirmados del periodo por categoría"
               title="Gastos por categoría"
@@ -517,7 +598,7 @@ export default async function ReportesPage({ searchParams }: Props) {
               <Tabla
                 encabezados={["Cierre", "Cajero", "Medio", "Esperado", "Contado", "Diferencia"]}
                 filas={diferenciasCorte.map((row) => [
-                  row.cerradoAt ? `${formatDate(row.cerradoAt, { timeZone })} ${formatTime(row.cerradoAt, { timeZone })}` : "—",
+                  row.cerradoAt ? `${formatDate(row.cerradoAt, { timeZone: reportTimeZone })} ${formatTime(row.cerradoAt, { timeZone: reportTimeZone })}` : "—",
                   row.cajero ?? "—",
                   row.medio,
                   fmt(row.esperado),
@@ -551,6 +632,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             ["Diferencias de corte", "Cierres donde el efectivo contado no coincidió con el esperado del sistema."],
             ["Cobros por medio", "Pagos del rango por medio de pago, incluyendo correcciones de medio posteriores al cobro."],
             ["Avisos", "Correos de confirmación, cambio, cancelación y recordatorio generados en el rango. «Aceptado» = el proveedor recibió el envío; no garantiza que el cliente lo haya leído."],
+            ["Todas las sucursales", "Vista consolidada: suma las operaciones de todas tus sucursales usando la zona horaria de la organización. El comparativo desglosa el aporte de cada sucursal con los mismos filtros."],
           ].map(([termino, definicion]) => (
             <div key={termino}>
               <dt className="font-medium text-[#403a35]">{termino}</dt>

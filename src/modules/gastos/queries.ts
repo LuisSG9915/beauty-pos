@@ -90,12 +90,15 @@ export type ResumenGastos = {
 /** Totales del periodo para el listado y para el reporte financiero. */
 export async function resumenGastos(
   db: Db,
-  filtro: Pick<FiltroGastos, "organizacionId" | "sucursalId" | "desde" | "hasta">,
+  filtro: Pick<FiltroGastos, "organizacionId" | "desde" | "hasta"> & {
+    /** null = consolidado de toda la organización. */
+    sucursalId: string | null;
+  },
 ): Promise<ResumenGastos> {
   const scope = () =>
     and(
       eq(gastos.organizacionId, filtro.organizacionId),
-      eq(gastos.sucursalId, filtro.sucursalId),
+      filtro.sucursalId ? eq(gastos.sucursalId, filtro.sucursalId) : undefined,
       gte(gastos.fechaGasto, filtro.desde),
       lte(gastos.fechaGasto, filtro.hasta),
     );

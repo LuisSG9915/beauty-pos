@@ -12,6 +12,7 @@ import {
   FileText,
   Gem,
   HandCoins,
+  Building2,
   Landmark,
   LifeBuoy,
   Package,
@@ -83,6 +84,7 @@ const DINERO: AdminNavItem[] = [
 
 const EQUIPO: AdminNavItem[] = [
   { path: "/admin/usuarios", label: "Equipo", description: "Miembros, roles y sucursales", icon: Users, permiso: "usuarios.ver" },
+  { path: "/admin/sucursales", label: "Sucursales", description: "Alta, políticas y asignación de miembros", icon: Building2, permiso: "sucursales.ver" },
   { path: "/admin/roles", label: "Roles", description: "Permisos por rol", icon: ShieldCheck, permiso: "roles.ver" },
   { path: "/admin/auditoria", label: "Auditoría", description: "Bitácora de eventos", icon: ScrollText, permiso: "auditoria.ver", capacidad: "auditoria" },
   { path: "/admin/suscripcion", label: "Suscripción", description: "Plan, uso y pagos del negocio", icon: Gem, permiso: "organizaciones.ver" },

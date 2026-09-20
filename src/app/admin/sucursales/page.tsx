@@ -1,0 +1,212 @@
+import { and, asc, eq } from "drizzle-orm";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+
+import { SucursalAsignacionForm } from "@/app/admin/sucursales/asignacion-form";
+import { SucursalEditarForm, SucursalNuevaForm } from "@/app/admin/sucursales/sucursal-form";
+import { SucursalToggleForm } from "@/app/admin/sucursales/toggle-form";
+import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { getDatabase } from "@/db/client";
+import { planes } from "@/db/schema/billing";
+import { miembrosOrganizaciones, relUsuariosSucursales, sucursales, usuarios } from "@/db/schema/core";
+import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
+import { hasPermission } from "@/lib/auth/authorization";
+import { formatCurrency } from "@/lib/format";
+import { contextoSuscripcion, getSuscripcionActual, tieneCapacidad } from "@/modules/billing/queries";
+import { motivoBloqueoSucursal, puedeCrearOtraSucursal } from "@/modules/sucursales/rules";
+
+export const dynamic = "force-dynamic";
+
+type Props = { searchParams: Promise<AdminSearchParams> };
+
+/** Gestión de sucursales: alta, edición, políticas y asignación de miembros. */
+export default async function SucursalesPage({ searchParams }: Props) {
+  const params = await searchParams;
+  const context = await getAdminContext(params);
+  const { organization, currency } = context;
+  if (!organization) notFound();
+  if (!hasPermission(context.access, "sucursales.ver")) notFound();
+
+  const puedeEditar = hasPermission(context.access, "sucursales.editar") && !context.access.soloLectura;
+  const db = getDatabase();
+
+  const [lista, miembros, asignaciones, ctx] = await Promise.all([
+    db
+      .select()
+      .from(sucursales)
+      .where(eq(sucursales.organizacionId, organization.id))
+      .orderBy(asc(sucursales.nombre)),
+    db
+      .select({
+        usuarioId: usuarios.id,
+        nombre: usuarios.nombre,
+        correo: usuarios.correo,
+      })
+      .from(miembrosOrganizaciones)
+      .innerJoin(usuarios, eq(miembrosOrganizaciones.usuarioId, usuarios.id))
+      .where(
+        and(
+          eq(miembrosOrganizaciones.organizacionId, organization.id),
+          eq(miembrosOrganizaciones.estado, "activo"),
+        ),
+      )
+      .orderBy(asc(usuarios.nombre)),
+    db
+      .select({
+        usuarioId: relUsuariosSucursales.usuarioId,
+        sucursalId: relUsuariosSucursales.sucursalId,
+      })
+      .from(relUsuariosSucursales)
+      .where(eq(relUsuariosSucursales.organizacionId, organization.id)),
+    contextoSuscripcion(organization.id, db),
+  ]);
+
+  const [planRow] = ctx.plan?.clave
+    ? await db
+        .select({ precioMensual: planes.precioMensual, precioAnual: planes.precioAnual })
+        .from(planes)
+        .where(eq(planes.clave, ctx.plan.clave))
+        .limit(1)
+    : [];
+
+  const activas = lista.filter((row) => row.activo).length;
+  const maxSucursales = ctx.plan?.maxSucursales ?? null;
+  const multisucursal = tieneCapacidad(ctx, "multisucursal");
+  const suscripcion = ctx.plan ? await getSuscripcionActual(organization.id, db) : null;
+  const cubiertas = suscripcion?.sucursalesFacturadas ?? null;
+  const capacidad = { activas, multisucursal, maxSucursales, cubiertas };
+  const puedeCrearOtra = puedeEditar && puedeCrearOtraSucursal(capacidad);
+  const asignacionesPorSucursal = new Map<string, Set<string>>();
+  const usuariosConAsignacion = new Set<string>();
+  for (const row of asignaciones) {
+    usuariosConAsignacion.add(row.usuarioId);
+    const set = asignacionesPorSucursal.get(row.sucursalId) ?? new Set<string>();
+    set.add(row.usuarioId);
+    asignacionesPorSucursal.set(row.sucursalId, set);
+  }
+
+  return (
+    <div className="space-y-6">
+      <AdminPageHeader
+        description={`${organization.nombre} · ${activas} sucursal(es) activa(s)`}
+        title="Sucursales"
+      />
+
+      <AdminCard
+        description="Cada sucursal activa se cobra por separado según tu plan. Desactivar conserva todo el historial."
+        title="Cobertura del plan"
+      >
+        <dl className="grid gap-3 sm:grid-cols-3">
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-[#81746c]">Plan</dt>
+            <dd className="mt-0.5 font-semibold text-[#2d2926]">{ctx.plan?.nombre ?? "Sin suscripción"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-[#81746c]">Sucursales activas</dt>
+            <dd className="mt-0.5 font-semibold text-[#2d2926]">
+              {activas}
+              {maxSucursales != null ? ` de ${maxSucursales} permitidas` : ""}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-[#81746c]">Cobertura facturada</dt>
+            <dd className="mt-0.5 font-semibold text-[#2d2926]">
+              {cubiertas != null ? `${cubiertas} sucursal(es)` : "—"}
+            </dd>
+          </div>
+        </dl>
+        {planRow ? (
+          <p className="mt-3 text-sm text-[#625b55]">
+            Precio por sucursal: {formatCurrency(Number(planRow.precioMensual), { currency })} MXN/mes
+            {planRow.precioAnual ? ` · ${formatCurrency(Number(planRow.precioAnual), { currency })} MXN/año` : ""}.
+          </p>
+        ) : null}
+        {!multisucursal && ctx.efectivo === "vigente" ? (
+          <p className="mt-4 rounded-xl bg-[#f6efe9] px-4 py-3 text-sm text-[#5f5347]">
+            Tu plan actual permite una sola sucursal.{" "}
+            <Link className="font-medium text-[#8f3f2c] underline" href={`/admin/suscripcion?organizationId=${organization.id}`}>
+              Cambia a Profesional
+            </Link>{" "}
+            para multisucursal con reportes consolidados.
+          </p>
+        ) : null}
+        {cubiertas != null && activas >= cubiertas ? (
+          <p className="mt-3 rounded-xl bg-[#fdf6e7] px-4 py-3 text-sm text-[#7a5b23]">
+            Ya usas las {cubiertas} sucursal(es) cubiertas por tu suscripción. Para activar o crear otra,
+            solicita ampliar la cobertura en{" "}
+            <Link className="font-medium text-[#8f3f2c] underline" href={`/admin/suscripcion?organizationId=${organization.id}`}>
+              Suscripción
+            </Link>
+            .
+          </p>
+        ) : null}
+      </AdminCard>
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="space-y-6">
+          {lista.map((sucursal) => (
+            <AdminCard
+              actions={<SucursalToggleForm activo={sucursal.activo} organizationId={organization.id} sucursalId={sucursal.id} />}
+              description={`${sucursal.clave} · ${sucursal.zonaHoraria ?? "zona de la organización"}${sucursal.direccion ? ` · ${sucursal.direccion}` : ""}`}
+              key={sucursal.id}
+              title={`${sucursal.nombre}${sucursal.activo ? "" : " (inactiva)"}`}
+            >
+              {puedeEditar ? (
+                <details className="group">
+                  <summary className="cursor-pointer text-sm font-medium text-[#8f3f2c] select-none">
+                    Editar datos y políticas
+                  </summary>
+                  <div className="mt-4">
+                    <SucursalEditarForm organizationId={organization.id} sucursal={sucursal} />
+                  </div>
+                </details>
+              ) : null}
+              {puedeEditar ? (
+                <details className="group mt-3">
+                  <summary className="cursor-pointer text-sm font-medium text-[#8f3f2c] select-none">
+                    Miembros con acceso ({asignacionesPorSucursal.get(sucursal.id)?.size ?? 0})
+                  </summary>
+                  <div className="mt-4">
+                    <SucursalAsignacionForm
+                      miembros={miembros.map((miembro) => ({
+                        usuarioId: miembro.usuarioId,
+                        nombre: miembro.nombre,
+                        correo: miembro.correo,
+                        asignado: asignacionesPorSucursal.get(sucursal.id)?.has(miembro.usuarioId) ?? false,
+                        sinRestriccion: !usuariosConAsignacion.has(miembro.usuarioId),
+                      }))}
+                      organizationId={organization.id}
+                      sucursalId={sucursal.id}
+                    />
+                  </div>
+                </details>
+              ) : null}
+            </AdminCard>
+          ))}
+        </div>
+
+        {puedeEditar ? (
+          <AdminCard
+            description={
+              puedeCrearOtra
+                ? "Datos básicos de la nueva sucursal; las políticas se editan después."
+                : "Tu plan actual no permite más sucursales activas."
+            }
+            title="Nueva sucursal"
+          >
+            {puedeCrearOtra ? (
+              <SucursalNuevaForm organizationId={organization.id} />
+            ) : (
+              <p className="rounded-xl bg-[#f6efe9] px-4 py-3 text-sm text-[#5f5347]">
+                {motivoBloqueoSucursal(capacidad)}{" "}
+                <Link className="font-medium text-[#8f3f2c] underline" href={`/admin/suscripcion?organizationId=${organization.id}`}>
+                  Revisar suscripción
+                </Link>
+              </p>
+            )}
+          </AdminCard>
+        ) : null}
+      </div>
+    </div>
+  );
+}

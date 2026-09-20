@@ -1,11 +1,12 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { billingEventos, planes, suscripciones } from "@/db/schema/billing";
+import { sucursales } from "@/db/schema/core";
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
 import { auditEvent } from "@/lib/audit";
 import { checkPermission } from "@/lib/auth/authorization";
@@ -52,6 +53,18 @@ export async function solicitarCambioPlan(_previousState: ActionState, formData:
   }
   if (plan.maxSucursales != null && input.sucursalesFacturadas > plan.maxSucursales) {
     return actionError(`${plan.nombre} permite hasta ${plan.maxSucursales} sucursal(es). Elige un plan con más cobertura.`);
+  }
+
+  // La cobertura no puede quedar por debajo del uso real: primero se
+  // desactivan las sucursales excedentes, luego se reduce la suscripción.
+  const [{ activas }] = await db
+    .select({ activas: count() })
+    .from(sucursales)
+    .where(and(eq(sucursales.organizacionId, input.organizacionId), eq(sucursales.activo, true)));
+  if (input.sucursalesFacturadas < activas) {
+    return actionError(
+      `Tienes ${activas} sucursal(es) activa(s) y pediste cobertura para ${input.sucursalesFacturadas}. Desactiva las excedentes en Sucursales antes de reducir el plan.`,
+    );
   }
 
   await db.transaction(async (tx) => {

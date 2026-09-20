@@ -1,10 +1,11 @@
 "use server";
 
-import { desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { billingEventos, pagosSuscripcion, planes, suscripciones } from "@/db/schema/billing";
+import { sucursales } from "@/db/schema/core";
 import { auditEvent } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth/access";
 import { revalidatePath } from "next/cache";
@@ -57,6 +58,21 @@ export async function registrarPagoSuscripcion(
       if (!plan) throw new Error("plan-invalido");
       if (input.data.periodicidad === "anual" && !plan.precioAnual) {
         throw new Error("plan-sin-anual");
+      }
+
+      // La cobertura aplicada no puede quedar por debajo del uso real:
+      // primero se desactivan las sucursales excedentes.
+      const [{ activas }] = await tx
+        .select({ activas: count() })
+        .from(sucursales)
+        .where(
+          and(
+            eq(sucursales.organizacionId, input.data.organizacionId),
+            eq(sucursales.activo, true),
+          ),
+        );
+      if (input.data.sucursalesFacturadas < activas) {
+        throw new Error("cobertura-insuficiente");
       }
 
       const [suscripcion] = await tx
@@ -155,6 +171,9 @@ export async function registrarPagoSuscripcion(
     }
     if (message === "plan-sin-anual") {
       return { error: "Ese plan no tiene precio anual configurado." };
+    }
+    if (message === "cobertura-insuficiente") {
+      return { error: "La organización tiene más sucursales activas que la cobertura elegida. Desactiva las excedentes primero." };
     }
     return { error: "No se pudo registrar el pago. Inténtalo de nuevo." };
   }

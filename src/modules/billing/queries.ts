@@ -241,16 +241,20 @@ export async function validarLimiteSucursales(
   if (ctx.efectivo !== "vigente") {
     return { ok: false, error: "Tu suscripción no está vigente. Reactiva tu plan para agregar sucursales." };
   }
-  if (!ctx.capacidades.has("multisucursal")) {
-    return { ok: false, error: "Tu plan actual permite una sola sucursal. Cambia a un plan con multisucursal para agregar otra." };
-  }
-  const limite = ctx.plan?.maxSucursales;
-  if (limite == null) return { ok: true };
 
   const [{ activas }] = await db
     .select({ activas: count() })
     .from(sucursales)
     .where(and(eq(sucursales.organizacionId, organizacionId), eq(sucursales.activo, true)));
+
+  // La primera sucursal nunca exige multisucursal: sin sucursal activa no hay
+  // operación. La capacidad aplica de la 2ª en adelante.
+  if (activas >= 1 && !ctx.capacidades.has("multisucursal")) {
+    return { ok: false, error: "Tu plan actual permite una sola sucursal. Cambia a un plan con multisucursal para agregar otra." };
+  }
+  const limite = ctx.plan?.maxSucursales;
+  if (limite == null) return { ok: true };
+
   if (activas + adicionales > limite) {
     return {
       ok: false,

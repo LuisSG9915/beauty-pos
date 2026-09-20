@@ -3,11 +3,11 @@
  * consolidado multisucursal leen los mismos agregados con idénticos filtros —
  * ninguna consulta agrupa por nombre visible, siempre por ID estable.
  */
-import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, sql, type SQLWrapper } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
 import { catMediosPago, productos } from "@/db/schema/catalogs";
-import { usuarios } from "@/db/schema/core";
+import { sucursales, usuarios } from "@/db/schema/core";
 import {
   ajustesPagosVenta,
   anticipos,
@@ -31,13 +31,20 @@ export const num = (v: string | number | null | undefined) => Number(v ?? 0);
 
 export type ReporteFiltros = {
   organizacionId: string;
-  sucursalId: string;
+  /** ID de sucursal, o null = consolidado de TODAS las sucursales de la org. */
+  sucursalId: string | null;
+  /**
+   * Zona del reporte: la de la sucursal en modo individual, la de la
+   * organización en consolidado — nunca se mezclan zonas dentro de un rango.
+   */
   timeZone: string;
-  /** YYYY-MM-DD local de la sucursal (ambos inclusive). */
+  /** YYYY-MM-DD local de la zona del reporte (ambos inclusive). */
   desde: string;
   hasta: string;
   operativos: boolean;
   financieros: boolean;
+  /** Alcance del usuario: cuando existe, limita el consolidado a esas sucursales. */
+  sucursalesPermitidas?: ReadonlySet<string> | null;
 };
 
 export async function cargarReporte(db: ReturnType<typeof getDatabase>, filtros: ReporteFiltros) {
@@ -50,11 +57,20 @@ export async function cargarReporte(db: ReturnType<typeof getDatabase>, filtros:
   const operativos = filtros.operativos;
   const financieros = filtros.financieros;
 
+  // Alcance por sucursal: individual = eq(id); consolidado = solo org (+ la
+  // restricción de asignaciones del usuario cuando existe).
+  const enSucursal = (columna: SQLWrapper) =>
+    sucursalId
+      ? eq(columna, sucursalId)
+      : filtros.sucursalesPermitidas
+        ? inArray(columna, [...filtros.sucursalesPermitidas])
+        : undefined;
+
   const fechaVenta = sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`;
   const scopeVenta = () =>
     and(
       eq(ventas.organizacionId, organizacionId),
-      eq(ventas.sucursalId, sucursalId),
+      enSucursal(ventas.sucursalId),
       eq(ventas.estado, "completada"),
       eq(ventas.activo, true),
       gte(fechaVenta, iniciaAt),
@@ -63,7 +79,7 @@ export async function cargarReporte(db: ReturnType<typeof getDatabase>, filtros:
   const scopeCita = () =>
     and(
       eq(citas.organizacionId, organizacionId),
-      eq(citas.sucursalId, sucursalId),
+      enSucursal(citas.sucursalId),
       eq(citas.activo, true),
       gte(citas.fechaHora, iniciaAt),
       lt(citas.fechaHora, terminaAt),
@@ -97,18 +113,29 @@ export async function cargarReporte(db: ReturnType<typeof getDatabase>, filtros:
       : Promise.resolve([]),
     // Clientes nuevos = primera cita COMPLETADA dentro del rango (no el alta
     // del registro). Un cliente capturado hace meses que hoy se atiende por
-    // primera vez sí es "nuevo" para el negocio.
+    // primera vez sí es "nuevo" para el negocio. Se atribuye a la sucursal
+    // donde ocurrió esa primera atención, así consolidado = Σ sucursales.
     operativos
       ? db
           .select({ total: sql<number>`count(*)::int` })
           .from(
-            sql`(select ${citas.clienteId} as cliente_id, min(${citas.fechaHora}) as primera
+            sql`(select ${citas.clienteId} as cliente_id, min(${citas.fechaHora}) as primera,
+                        (array_agg(${citas.sucursalId} order by ${citas.fechaHora}))[1] as sucursal_primera
                  from ${citas}
                  where ${citas.organizacionId} = ${organizacionId}
                    and ${citas.estado} = 'completada' and ${citas.activo} = true
                  group by ${citas.clienteId}) primera_atencion`,
           )
-          .where(sql`primera >= ${iniciaAt} and primera < ${terminaAt}`)
+          .where(
+            and(
+              sql`primera >= ${iniciaAt} and primera < ${terminaAt}`,
+              sucursalId
+                ? sql`sucursal_primera = ${sucursalId}`
+                : filtros.sucursalesPermitidas
+                  ? inArray(sql`sucursal_primera`, [...filtros.sucursalesPermitidas])
+                  : undefined,
+            ),
+          )
       : Promise.resolve([{ total: 0 }]),
     operativos
       ? db
@@ -163,7 +190,7 @@ export async function cargarReporte(db: ReturnType<typeof getDatabase>, filtros:
           .where(
             and(
               eq(notificacionesEnvios.organizacionId, organizacionId),
-              eq(citas.sucursalId, sucursalId),
+              enSucursal(citas.sucursalId),
               gte(notificacionesEnvios.createdAt, iniciaAt),
               lt(notificacionesEnvios.createdAt, terminaAt),
             ),
@@ -294,7 +321,7 @@ export async function cargarReporte(db: ReturnType<typeof getDatabase>, filtros:
           .where(
             and(
               eq(cortesCaja.organizacionId, organizacionId),
-              eq(cortesCaja.sucursalId, sucursalId),
+              enSucursal(cortesCaja.sucursalId),
               eq(cortesCaja.estado, "cerrado"),
               eq(detalleCortes.activo, true),
               sql`${detalleCortes.diferencia} <> 0`,
@@ -322,7 +349,7 @@ export async function cargarReporte(db: ReturnType<typeof getDatabase>, filtros:
           .where(
             and(
               eq(liquidacionesComisiones.organizacionId, organizacionId),
-              eq(liquidacionesComisiones.sucursalId, sucursalId),
+              enSucursal(liquidacionesComisiones.sucursalId),
               eq(liquidacionesComisiones.estado, "confirmada"),
               gte(liquidacionesComisiones.createdAt, iniciaAt),
               lt(liquidacionesComisiones.createdAt, terminaAt),
@@ -342,7 +369,7 @@ export async function cargarReporte(db: ReturnType<typeof getDatabase>, filtros:
           .where(
             and(
               eq(devoluciones.organizacionId, organizacionId),
-              eq(devoluciones.sucursalId, sucursalId),
+              enSucursal(devoluciones.sucursalId),
               gte(devoluciones.createdAt, iniciaAt),
               lt(devoluciones.createdAt, terminaAt),
             ),
@@ -361,7 +388,7 @@ export async function cargarReporte(db: ReturnType<typeof getDatabase>, filtros:
           .where(
             and(
               eq(anticipos.organizacionId, organizacionId),
-              eq(anticipos.sucursalId, sucursalId),
+              enSucursal(anticipos.sucursalId),
               eq(anticipos.activo, true),
               gte(anticipos.createdAt, iniciaAt),
               lt(anticipos.createdAt, terminaAt),
@@ -415,7 +442,10 @@ export type ReporteDatos = NonNullable<Awaited<ReturnType<typeof cargarReporte>>
 /** Totales agregados del periodo anterior (misma longitud, previo inmediato). */
 export async function cargarAgregadosAnteriores(
   db: ReturnType<typeof getDatabase>,
-  filtros: Pick<ReporteFiltros, "organizacionId" | "sucursalId" | "timeZone"> & {
+  filtros: Pick<
+    ReporteFiltros,
+    "organizacionId" | "sucursalId" | "timeZone" | "sucursalesPermitidas"
+  > & {
     desde: string;
     hasta: string;
     operativos: boolean;
@@ -426,6 +456,13 @@ export async function cargarAgregadosAnteriores(
   const boundsDesde = dayBoundsUtc(desde, timeZone);
   const boundsHasta = dayBoundsUtc(hasta, timeZone);
   if (!boundsDesde || !boundsHasta) return { ventasAnt: [{ total: "0", operaciones: 0 }], citasAnt: [] };
+
+  const enSucursal = (columna: SQLWrapper) =>
+    sucursalId
+      ? eq(columna, sucursalId)
+      : filtros.sucursalesPermitidas
+        ? inArray(columna, [...filtros.sucursalesPermitidas])
+        : undefined;
 
   const fechaVenta = sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`;
   const [ventasAnt, citasAnt] = await Promise.all([
@@ -439,7 +476,7 @@ export async function cargarAgregadosAnteriores(
           .where(
             and(
               eq(ventas.organizacionId, organizacionId),
-              eq(ventas.sucursalId, sucursalId),
+              enSucursal(ventas.sucursalId),
               eq(ventas.estado, "completada"),
               eq(ventas.activo, true),
               gte(fechaVenta, boundsDesde.iniciaAt),
@@ -454,7 +491,7 @@ export async function cargarAgregadosAnteriores(
           .where(
             and(
               eq(citas.organizacionId, organizacionId),
-              eq(citas.sucursalId, sucursalId),
+              enSucursal(citas.sucursalId),
               eq(citas.activo, true),
               gte(citas.fechaHora, boundsDesde.iniciaAt),
               lt(citas.fechaHora, boundsHasta.terminaAt),
@@ -464,4 +501,94 @@ export async function cargarAgregadosAnteriores(
       : Promise.resolve([]),
   ]);
   return { ventasAnt, citasAnt };
+}
+
+/** Comparativo por sucursal para la vista consolidada (Profesional). */
+export async function comparativoSucursales(
+  db: ReturnType<typeof getDatabase>,
+  filtros: Pick<
+    ReporteFiltros,
+    "organizacionId" | "sucursalesPermitidas" | "timeZone" | "operativos" | "financieros"
+  > & { desde: string; hasta: string },
+) {
+  const { organizacionId, timeZone, desde, hasta } = filtros;
+  const boundsDesde = dayBoundsUtc(desde, timeZone);
+  const boundsHasta = dayBoundsUtc(hasta, timeZone);
+  if (!boundsDesde || !boundsHasta) return [];
+  const iniciaAt = boundsDesde.iniciaAt;
+  const terminaAt = boundsHasta.terminaAt;
+
+  const permitidas = (columna: SQLWrapper) =>
+    filtros.sucursalesPermitidas ? inArray(columna, [...filtros.sucursalesPermitidas]) : undefined;
+  const fechaVenta = sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`;
+
+  const [ventasPorSucursal, citasPorSucursal, nombres] = await Promise.all([
+    filtros.financieros
+      ? db
+          .select({
+            sucursalId: ventas.sucursalId,
+            total: sql<string>`coalesce(sum(${ventas.total}), 0)`,
+            operaciones: sql<number>`count(*)::int`,
+          })
+          .from(ventas)
+          .where(
+            and(
+              eq(ventas.organizacionId, organizacionId),
+              permitidas(ventas.sucursalId),
+              eq(ventas.estado, "completada"),
+              eq(ventas.activo, true),
+              gte(fechaVenta, iniciaAt),
+              lt(fechaVenta, terminaAt),
+            ),
+          )
+          .groupBy(ventas.sucursalId)
+      : Promise.resolve([]),
+    filtros.operativos
+      ? db
+          .select({
+            sucursalId: citas.sucursalId,
+            total: sql<number>`count(*)::int`,
+            completadas: sql<number>`count(*) filter (where ${citas.estado} = 'completada')::int`,
+            canceladas: sql<number>`count(*) filter (where ${citas.estado} = 'cancelada')::int`,
+            noShow: sql<number>`count(*) filter (where ${citas.estado} = 'no_show')::int`,
+          })
+          .from(citas)
+          .where(
+            and(
+              eq(citas.organizacionId, organizacionId),
+              permitidas(citas.sucursalId),
+              eq(citas.activo, true),
+              gte(citas.fechaHora, iniciaAt),
+              lt(citas.fechaHora, terminaAt),
+            ),
+          )
+          .groupBy(citas.sucursalId)
+      : Promise.resolve([]),
+    db
+      .select({ id: sucursales.id, nombre: sucursales.nombre })
+      .from(sucursales)
+      .where(and(eq(sucursales.organizacionId, organizacionId), permitidas(sucursales.id))),
+  ]);
+
+  const ids = new Set<string>([
+    ...ventasPorSucursal.map((r) => r.sucursalId),
+    ...citasPorSucursal.map((r) => r.sucursalId),
+    ...nombres.map((r) => r.id),
+  ]);
+  const nombreDe = new Map(nombres.map((r) => [r.id, r.nombre]));
+  const ventaDe = new Map(ventasPorSucursal.map((r) => [r.sucursalId, r]));
+  const citaDe = new Map(citasPorSucursal.map((r) => [r.sucursalId, r]));
+
+  return [...ids]
+    .map((id) => ({
+      sucursalId: id,
+      nombre: nombreDe.get(id) ?? "Sucursal",
+      vendido: num(ventaDe.get(id)?.total),
+      operaciones: ventaDe.get(id)?.operaciones ?? 0,
+      citas: citaDe.get(id)?.total ?? 0,
+      completadas: citaDe.get(id)?.completadas ?? 0,
+      canceladas: citaDe.get(id)?.canceladas ?? 0,
+      noShow: citaDe.get(id)?.noShow ?? 0,
+    }))
+    .sort((a, b) => b.vendido - a.vendido || a.nombre.localeCompare(b.nombre, "es"));
 }
