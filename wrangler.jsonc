@@ -11,5 +11,8 @@
   "observability": {
     "enabled": true
   },
+  // Pendiente: crear la instancia Hyperdrive y declarar el binding para que
+  // `src/db/client.ts` la use en producción (sin esto cae a DATABASE_URL):
+  // "hyperdrive": { "binding": "HYPERDRIVE", "id": "<hyperdrive-config-id>" },
   "upload_source_maps": true
 }

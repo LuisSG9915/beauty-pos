@@ -1,3 +1,16 @@
+# Notas del proyecto
+
+## Base de datos y despliegue
+
+- `src/db/client.ts` usa el binding `HYPERDRIVE` cuando existe y cae a `DATABASE_URL`. **`wrangler.jsonc` aún no declara el binding**: en Cloudflare hay que crear la instancia (`wrangler hyperdrive create beauty-pos --connection-string=…`) y agregar `"hyperdrive": { "binding": "HYPERDRIVE", "id": "<id>" }` al config antes de medir latencia real en Workers.
+- Migraciones: `pnpm db:generate` → `pnpm db:migrate`. Consistencia: `pnpm db:check`.
+- Catálogo de planes: `pnpm plans:seed` (idempotente, sincroniza `src/modules/billing/capacidades.ts`). Permisos/roles en organizaciones existentes: `pnpm tsx scripts/seed-access.ts`.
+- Diagnóstico de consultas: reiniciar el server con `DB_LOG_QUERIES=1`.
+
+## Benchmark de rendimiento
+
+`pnpm tsx scripts/perf-bench.ts` mide TTFB/FCP/load de las rutas admin y navegación cliente con Puppeteer. Requiere `SMOKE_BASE_URL` y una cookie de sesión válida (`scripts/session-cookie.ts` la genera para la cuenta E2E).
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
