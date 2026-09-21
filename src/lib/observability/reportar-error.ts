@@ -1,5 +1,6 @@
 "use client";
 
+import { capturarEnSentry } from "@/lib/observability/sentry";
 import { normalizarRuta } from "@/lib/telemetry/ruta";
 import { rastroReciente, sidActual } from "@/lib/telemetry/cliente";
 
@@ -51,6 +52,14 @@ export function reportarErrorCliente({ error, digest, actionId }: ErrorCliente) 
       release: process.env.NEXT_PUBLIC_APP_RELEASE ?? undefined,
       rastro: [...rastroReciente()],
     };
+    // Espejo opcional en Sentry con el mismo correlationId para cruzar el
+    // incidente interno con el issue/replay externo.
+    capturarEnSentry(err, {
+      actionId: payload.actionId,
+      correlationId,
+      digest: payload.digest,
+      ruta: payload.ruta,
+    });
     const body = JSON.stringify(payload);
     if (navigator.sendBeacon) {
       navigator.sendBeacon(

@@ -226,6 +226,7 @@ export function AdminNav({
                     sucursalId: context.sucursalId,
                   })}
                   key={item.path}
+                  prefetch={false}
                 >
                   <div
                     className={cn(
@@ -376,6 +377,7 @@ function AdminNavList({
                       sucursalId,
                     })}
                     onClick={onNavigate}
+                    prefetch={false}
                   >
                     <item.icon aria-hidden="true" className="size-4 text-[#8a5140]" strokeWidth={1.9} />
                     {item.label}
@@ -407,6 +409,7 @@ function navPill(
   item: AdminNavItem,
   isActive: boolean,
   context: { organizationId?: string; sucursalId?: string },
+  prefetch?: boolean,
 ) {
   return (
     <Link
@@ -422,6 +425,7 @@ function navPill(
         sucursalId: context.sucursalId,
       })}
       key={item.path}
+      prefetch={prefetch}
       title={item.description}
     >
       <item.icon aria-hidden="true" className="size-3.5" strokeWidth={2} />
@@ -515,7 +519,12 @@ export function AdminNavCompact({
                 {section.title}
               </span>
               {section.items.map((item) =>
-                navPill(item, isItemActive(context.pathname, item.path), context),
+                navPill(
+                  item,
+                  isItemActive(context.pathname, item.path),
+                  context,
+                  false,
+                ),
               )}
             </div>
           ))}

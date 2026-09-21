@@ -43,10 +43,26 @@ export async function resetTestPassword(email: string) {
 export async function login(page: Page, email = E2E_EMAIL) {
   const password = await resetTestPassword(email);
   await page.goto(`${BASE_URL}/login`, { waitUntil: "load" });
+  // La cookie de sesión vive en el contexto del navegador: si /login redirige
+  // al panel, la página ya está autenticada y no hay formulario que llenar.
+  const form = await page
+    .waitForSelector('input[name="email"]', { timeout: 5000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!form) {
+    await page.waitForFunction(() => location.pathname.startsWith("/admin"), {
+      timeout: 30000,
+      polling: 100,
+    });
+    return;
+  }
   await page.type('input[name="email"]', email);
   await page.type('input[name="password"]', password);
   await page.click('button[type="submit"]');
+  // polling por intervalo: en headless el rAF puede pausarse y el default
+  // de waitForFunction (raf) se queda esperando aunque la navegación ya ocurrió.
   await page.waitForFunction(() => location.pathname.startsWith("/admin"), {
     timeout: 30000,
+    polling: 100,
   });
 }

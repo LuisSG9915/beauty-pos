@@ -55,9 +55,11 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
       <AdminPageHeader
         actions={
           hasPermission(context.access, "clientes.exportar") ? (
+            // <a> nativo, no <Link>: una descarga no es navegación y nunca
+            // debe prefetchearse — el handler registra auditoría por descarga.
             <Button
               nativeButton={false}
-              render={<Link href={`/admin/clientes/export?organizationId=${organizationId}`} />}
+              render={<a download href={`/admin/clientes/export?organizationId=${organizationId}`} />}
               variant="outline"
             >
               Exportar CSV para Excel
@@ -138,7 +140,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
                   {clientRows.map((client) => (
                     <tr className="border-b border-[#f1eeea] last:border-0" key={client.id}>
                       <td className="px-3 py-4 font-medium">
-                        <Link className="inline-flex min-h-6 items-center hover:text-[#8a5140] hover:underline" href={buildAdminHref(`/clientes/${client.id}`, { organizationId })}>
+                        <Link className="inline-flex min-h-6 items-center hover:text-[#8a5140] hover:underline" href={buildAdminHref(`/clientes/${client.id}`, { organizationId })} prefetch={false}>
                           {[client.nombre, client.apellidoPaterno, client.apellidoMaterno].filter(Boolean).join(" ")}
                         </Link>
                       </td>
@@ -149,7 +151,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
                       </td>
                       <td className="px-3 py-4"><StatusBadge active={client.activo} /></td>
                       <td className="px-3 py-4">
-                        <Link className="inline-flex min-h-9 items-center font-medium text-[#8a5140] hover:underline" href={buildAdminHref("/clientes", { organizationId, extra: { edit: client.id, q: query || null } })}>
+                        <Link className="inline-flex min-h-9 items-center font-medium text-[#8a5140] hover:underline" href={buildAdminHref("/clientes", { organizationId, extra: { edit: client.id, q: query || null } })} prefetch={false}>
                           Editar
                         </Link>
                       </td>

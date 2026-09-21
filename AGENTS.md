@@ -9,9 +9,15 @@
 - Catálogo de planes: `pnpm plans:seed` (idempotente, sincroniza `src/modules/billing/capacidades.ts`). Permisos/roles en organizaciones existentes: `pnpm tsx scripts/seed-access.ts`.
 - Diagnóstico de consultas: reiniciar el server con `DB_LOG_QUERIES=1`.
 
-## Benchmark de rendimiento
+## Benchmark de rendimiento y usabilidad
 
-`pnpm tsx scripts/perf-bench.ts` mide TTFB/FCP/load de las rutas admin y navegación cliente con Puppeteer. Requiere `SMOKE_BASE_URL` y una cookie de sesión válida (`scripts/session-cookie.ts` la genera para la cuenta E2E).
+`pnpm test:perf` (`scripts/perf-bench.ts`) mide TTFB/LCP/CLS de las rutas admin y navegación cliente con Puppeteer, en escritorio (1366px) y móvil (390px). `pnpm test:usability` (`scripts/usability-check.ts`) corre axe WCAG 2.2 AA + heurísticas de acción primaria (`data-action-clave`) + objetivos táctiles ≥24px + rutas por clics. Ambos requieren `pnpm dev` corriendo y la cuenta E2E (`PERF_EMAIL`, default `e2e-salon@test.dev`); `scripts/lib/e2e.ts` hace login regenerando la contraseña de prueba. `scripts/axe-detail.ts` lista los nodos exactos de cada violación.
+
+## Telemetría e incidentes
+
+- Telemetría de producto first-party: `src/lib/telemetry/cliente.ts` (sesión, `sendBeacon`) → `POST /api/telemetria/producto` → tablas `telemetria_*`. Acciones semánticas con `data-action-id` (botones/enlaces) y `data-action-clave="1"` marca la acción primaria de cada pantalla.
+- Errores: listeners cliente + boundaries + `instrumentation.ts/onRequestError` → `POST /api/errores` → `incidentes_error` (fingerprint, prioridad P0–P3). Panel solo-plataforma en `/admin/incidentes` y métricas en `/admin/telemetria`.
+- Sentry opcional: definir `NEXT_PUBLIC_SENTRY_DSN` activa el SDK de navegador con Replay enmascarado (5% sesiones, 100% con error). Los errores de servidor siguen yendo al pipeline interno.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

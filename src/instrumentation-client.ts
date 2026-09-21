@@ -1,4 +1,5 @@
 import { iniciarCapturaErrores } from "@/lib/observability/reportar-error";
+import { iniciarSentry } from "@/lib/observability/sentry";
 import { iniciarTelemetria, trackPageView } from "@/lib/telemetry/cliente";
 
 /**
@@ -10,6 +11,7 @@ import { iniciarTelemetria, trackPageView } from "@/lib/telemetry/cliente";
 try {
   iniciarTelemetria();
   iniciarCapturaErrores();
+  iniciarSentry();
 } catch {
   // Nunca propagar errores de instrumentación.
 }

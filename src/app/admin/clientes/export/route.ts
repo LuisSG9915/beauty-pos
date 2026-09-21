@@ -88,6 +88,9 @@ export async function GET(request: Request) {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": "attachment; filename=clientes.csv",
+      // Datos de clientes por organización: nunca cacheables ni compartibles.
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }

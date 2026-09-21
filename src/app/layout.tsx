@@ -16,6 +16,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Beauty POS",
   description: "Gestión integral para salones de belleza",
+  // Assets estáticos en public/: los sirve el binding ASSETS sin invocar el
+  // Worker (las rutas de metadata dinámicas consumían CPU por cada carga).
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: [{ url: "/icon.png", sizes: "512x512", type: "image/png" }],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+  },
 };
 
 export const viewport: Viewport = {

@@ -275,6 +275,9 @@ export async function GET(request: Request) {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename=reporte-${desde}-a-${hasta}.csv`,
+      // Datos financieros del negocio: nunca cacheables ni compartibles.
+      "Cache-Control": "private, no-store",
+      "X-Content-Type-Options": "nosniff",
     },
   });
 }

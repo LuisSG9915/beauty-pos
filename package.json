@@ -29,6 +29,7 @@
   "dependencies": {
     "@base-ui/react": "^1.8.0",
     "@better-auth/drizzle-adapter": "^1.7.3",
+    "@sentry/browser": "^10.75.0",
     "better-auth": "^1.7.3",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.2.6",

@@ -43,7 +43,7 @@ export function GuiaChecklistCard({
             </p>
           </div>
         </div>
-        <Button nativeButton={false} render={<Link href={href("/guia")} />} size="sm" variant="outline">
+        <Button nativeButton={false} render={<Link href={href("/guia")} prefetch={false} />} size="sm" variant="outline">
           Ver guía completa
         </Button>
       </div>
@@ -69,12 +69,13 @@ export function GuiaChecklistCard({
             <Link
               className="inline-flex min-h-6 min-w-0 flex-1 items-center truncate text-sm font-medium text-[#2d2926] hover:text-[#8a5140]"
               href={href(paso.href)}
+              prefetch={false}
             >
               {paso.titulo}
               {paso.opcional ? <span className="ml-2 text-xs font-normal text-[#6f635a]">Opcional</span> : null}
             </Link>
             {!paso.hecho ? (
-              <Link className="inline-flex min-h-6 shrink-0 items-center text-xs font-medium text-[#8a5140] hover:underline" href={href(paso.href)}>
+              <Link className="inline-flex min-h-6 shrink-0 items-center text-xs font-medium text-[#8a5140] hover:underline" href={href(paso.href)} prefetch={false}>
                 Ir
               </Link>
             ) : null}
@@ -83,7 +84,7 @@ export function GuiaChecklistCard({
       </ol>
 
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#f4eeea] pt-4">
-        <Link className="inline-flex min-h-6 items-center text-sm font-medium text-[#8a5140] hover:underline" href={href("/practica")}>
+        <Link className="inline-flex min-h-6 items-center text-sm font-medium text-[#8a5140] hover:underline" href={href("/practica")} prefetch={false}>
           Practicar con datos de ejemplo
         </Link>
         <form action={omitirGuia} className="ml-auto">

@@ -148,7 +148,7 @@ async function rutaNuevaCita(page: Page): Promise<{ pasos: number; detalle: stri
     return Boolean(link);
   });
   if (!clicked) return { pasos: -1, detalle: "no se encontró el acceso 'Nueva cita' en el inicio" };
-  await page.waitForFunction(() => location.pathname === "/admin/agenda", { timeout: 30000 });
+  await page.waitForFunction(() => location.pathname === "/admin/agenda", { timeout: 30000, polling: 100 });
   const dialogoAbierto = await page
     .waitForSelector('[role="dialog"]', { visible: true, timeout: 15000 })
     .then(() => true)
@@ -169,7 +169,7 @@ async function rutaCobrarDesdeInicio(page: Page): Promise<{ pasos: number; detal
     return Boolean(link);
   });
   if (!clicked) return { pasos: -1, detalle: "no se encontró el acceso 'Cobrar' en el inicio" };
-  await page.waitForFunction(() => location.pathname === "/admin/pos", { timeout: 30000 });
+  await page.waitForFunction(() => location.pathname === "/admin/pos", { timeout: 30000, polling: 100 });
   return { pasos: 1, detalle: "inicio → Cobrar → POS" };
 }
 

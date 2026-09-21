@@ -22,6 +22,35 @@ const VIEWPORTS = [
 
 type Sample = { ttfb: number; total: number; fcp: number; lcp: number; cls: number };
 
+// Conteo de tráfico del Worker por escenario: permite medir prefetch storm,
+// re-descargas de metadata y efectos laterales, no solo Web Vitals.
+type NetStats = {
+  total: number;
+  prefetch: number;
+  metadata: number;
+  paths: Record<string, number>;
+  prefetchPaths: Record<string, number>;
+};
+
+function freshNet(): NetStats {
+  return { total: 0, prefetch: 0, metadata: 0, paths: {}, prefetchPaths: {} };
+}
+
+function watchRequests(page: Page, net: NetStats) {
+  page.on("request", (req) => {
+    const path = new URL(req.url()).pathname;
+    net.total += 1;
+    net.paths[path] = (net.paths[path] ?? 0) + 1;
+    if (req.headers()["next-router-prefetch"]) {
+      net.prefetch += 1;
+      net.prefetchPaths[path] = (net.prefetchPaths[path] ?? 0) + 1;
+    }
+    if (/\/(icon|apple-icon|manifest\.webmanifest|favicon\.ico)$/.test(path)) {
+      net.metadata += 1;
+    }
+  });
+}
+
 function stats(values: number[]) {
   const sorted = [...values].sort((a, b) => a - b);
   const pick = (p: number) => sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * p) - 1)];
@@ -79,18 +108,40 @@ async function main() {
     await login(page, E2E_EMAIL);
     console.log(`\n=== ${viewport.nombre} ${viewport.width}x${viewport.height} — cargas completas ===`);
 
+    const net = freshNet();
+    watchRequests(page, net);
     for (const route of ROUTES) {
       const samples: Sample[] = [];
+      let reqs = 0;
+      let prefetches = 0;
+      let meta = 0;
       for (let i = 0; i < RUNS; i++) {
+        Object.assign(net, freshNet(), { paths: {} });
         samples.push(await measure(page, `${BASE_URL}${route}`));
+        reqs += net.total;
+        prefetches += net.prefetch;
+        meta += net.metadata;
       }
       const t = stats(samples.map((s) => s.ttfb));
       const lcp = stats(samples.map((s) => s.lcp).filter((v) => v > 0));
       const cls = Math.max(...samples.map((s) => s.cls));
       console.log(
-        `${route.padEnd(20)} TTFB p50 ${t.p50}ms (p95 ${t.p95}) | LCP p50 ${lcp.p50}ms | CLS máx ${cls}`,
+        `${route.padEnd(20)} TTFB p50 ${t.p50}ms (p95 ${t.p95}) | LCP p50 ${lcp.p50}ms | CLS máx ${cls} | req/nav ${(reqs / RUNS).toFixed(0)} (prefetch ${(prefetches / RUNS).toFixed(0)}, meta ${(meta / RUNS).toFixed(1)})`,
       );
     }
+
+    // /admin/clientes: las filas no deben prefetchear expedientes ni la
+    // exportación (efecto lateral de auditoría por descarga).
+    Object.assign(net, freshNet(), { paths: {}, prefetchPaths: {} });
+    await measure(page, `${BASE_URL}/admin/clientes`);
+    await page.waitForNetworkIdle({ idleTime: 600, timeout: 15000 }).catch(() => {});
+    const prefetchPaths = Object.keys(net.prefetchPaths).filter((p) =>
+      /^\/admin\/clientes\/.+/.test(p),
+    );
+    const exportHits = net.paths["/admin/clientes/export"] ?? 0;
+    console.log(
+      `check clientes: prefetch de expedientes ${prefetchPaths.length}, export sin clic ${exportHits} ${exportHits === 0 && prefetchPaths.length === 0 ? "OK" : "FALLO"}`,
+    );
     await page.close();
   }
 
@@ -98,31 +149,68 @@ async function main() {
   // del App Router sin el ruido del primer render.
   const page = await browser.newPage();
   await page.setViewport(VIEWPORTS[0]);
+  const navNet = freshNet();
+  watchRequests(page, navNet);
   await login(page, E2E_EMAIL);
   console.log("\n=== Navegación cliente (desktop) ===");
   const clientSamples: Record<string, number[]> = {};
-  for (const route of ROUTES.slice(1)) clientSamples[route] = [];
+  const clientReqs: Record<string, { req: number; prefetch: number }[]> = {};
+  for (const route of ROUTES.slice(1)) {
+    clientSamples[route] = [];
+    clientReqs[route] = [];
+  }
 
   for (let i = 0; i < RUNS; i++) {
     for (const route of ROUTES.slice(1)) {
+      Object.assign(navNet, freshNet(), { paths: {}, prefetchPaths: {} });
       const t0 = Date.now();
-      await page.evaluate((h) => {
+      const clicked = await page.evaluate((h) => {
         const link = [...document.querySelectorAll("a")].find(
-          (a) => new URL(a.href).pathname === h,
+          (a) => new URL(a.href).pathname === h && a.getBoundingClientRect().width > 0,
         );
         link?.click();
+        return Boolean(link);
       }, route);
-      await page.waitForFunction((h) => location.pathname === h, { timeout: 30000 }, route);
-      await page.waitForNetworkIdle({ idleTime: 400, timeout: 30000 }).catch(() => {});
-      clientSamples[route].push(Date.now() - t0);
+      if (!clicked) {
+        // Rutas secundarias viven tras "Más opciones": abrirla y reintentar.
+        await page.click('[data-action-id="nav.mas_opciones"]').catch(() => {});
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        await page.evaluate((h) => {
+          const link = [...document.querySelectorAll("a")].find(
+            (a) => new URL(a.href).pathname === h,
+          );
+          link?.click();
+        }, route);
+      }
+      try {
+        await page.waitForFunction((h) => location.pathname === h, { timeout: 15000, polling: 100 }, route);
+        clientSamples[route].push(Date.now() - t0);
+      } catch {
+        console.log(`  !! ${route}: clicked=${clicked} url=${page.url()}`);
+        clientSamples[route].push(NaN);
+      }
+      // Settle breve para contar requests de la navegación sin medir su
+      // duración: el dev server mantiene conexiones vivas y un idle largo
+      // inflaría el tiempo registrado.
+      await page.waitForNetworkIdle({ idleTime: 300, timeout: 3000 }).catch(() => {});
+      clientReqs[route].push({ req: navNet.total, prefetch: navNet.prefetch });
       // Regresar a /admin para que el siguiente clic parta del mismo origen.
       await page.goto(`${BASE_URL}/admin`, { waitUntil: "load" });
     }
   }
 
   for (const [route, samples] of Object.entries(clientSamples)) {
-    const s = stats(samples);
-    console.log(`nav -> ${route.padEnd(20)} p50 ${s.p50}ms (p95 ${s.p95}, min ${s.min})`);
+    const ok = samples.filter((v) => Number.isFinite(v));
+    const reqs = clientReqs[route];
+    const avgReq = reqs.reduce((a, r) => a + r.req, 0) / reqs.length;
+    const avgPre = reqs.reduce((a, r) => a + r.prefetch, 0) / reqs.length;
+    if (ok.length === 0) {
+      console.log(`nav -> ${route.padEnd(20)} FALLO: ${samples.length}/${samples.length} navegaciones sin completar`);
+      continue;
+    }
+    const s = stats(ok);
+    const fallos = samples.length - ok.length;
+    console.log(`nav -> ${route.padEnd(20)} p50 ${s.p50}ms (p95 ${s.p95}, min ${s.min}) | req ${avgReq.toFixed(0)} (prefetch ${avgPre.toFixed(0)})${fallos ? ` | ${fallos} fallo(s)` : ""}`);
   }
 
   await browser.close();
