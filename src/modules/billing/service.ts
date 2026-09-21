@@ -11,6 +11,7 @@ import {
   sucursales,
   usuarios,
 } from "@/db/schema/core";
+import { horariosSucursales } from "@/db/schema/operations";
 import { auditEvent } from "@/lib/audit";
 import { defaultPermissions, defaultRoles } from "@/lib/auth/defaults";
 import { PLANES_CATALOGO } from "./capacidades";
@@ -195,6 +196,19 @@ export async function provisionarOrganizacionTrial(input: {
         usuarioId: posUser.id,
         sucursalId: branch.id,
       });
+
+      // Sin horario la sucursal no admite citas y el error solo aparece al
+      // agendar. Se siembra un horario base L–S 9:00–19:00 editable después.
+      await tx.insert(horariosSucursales).values(
+        [1, 2, 3, 4, 5, 6].map((diaSemana) => ({
+          organizacionId: organization.id,
+          sucursalId: branch.id,
+          diaSemana,
+          iniciaMinutos: 540,
+          terminaMinutos: 1140,
+          createdBy: posUser.id,
+        })),
+      );
 
       await tx.insert(catMediosPago).values(
         mediosPagoBase.map((m) => ({ organizacionId: organization.id, ...m })),
