@@ -356,7 +356,8 @@ export function AgendaBoard({
   const currentHref = `${pathname}${searchParams.size > 0 ? `?${searchParams.toString()}` : ""}`;
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editing, setEditing] = useState<AgendaCita | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
+  // `?nueva=1` abre el formulario al llegar (acceso directo desde el inicio).
+  const [createOpen, setCreateOpen] = useState(() => searchParams.get("nueva") === "1");
   const [createInitial, setCreateInitial] = useState<{ fechaHora: string; usuarioId: string | null } | null>(null);
   const [moveTarget, setMoveTarget] = useState<AgendaCita | null>(null);
   const [moveMode, setMoveMode] = useState<MoveMode | null>(null);

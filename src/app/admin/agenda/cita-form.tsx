@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useActionState } from "react";
 
 import { saveCita, type CitaActionState } from "@/app/admin/agenda/actions";
-import { FormTabs } from "@/components/form-tabs";
 import { Button } from "@/components/ui/button";
 import { RemoteCombobox } from "@/components/ui/remote-combobox";
 import {
@@ -125,13 +124,18 @@ export function CitaForm({
     });
   };
 
-  const general = (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <Field>
-        <FieldLabel>Sucursal</FieldLabel>
-        <Input readOnly value={`${sucursal.nombre} · ${sucursal.clave}`} />
-        <FieldDescription>Las citas se crean dentro de la sucursal seleccionada.</FieldDescription>
-      </Field>
+  return (
+    <form action={formAction} className="space-y-5">
+      <input name="id" type="hidden" value={initial?.id ?? ""} />
+      <input name="organizacionId" type="hidden" value={organizationId} />
+      <input name="sucursalId" type="hidden" value={sucursal.id} />
+      <input name="duracionMinutos" type="hidden" value={duracionEfectiva} />
+      {initial?.version !== undefined ? (
+        <input name="version" type="hidden" value={initial.version} />
+      ) : null}
+
+      {/* Flujo lineal sin pestañas: cliente → servicios → cuándo/quién →
+          extras plegados. Una sola acción primaria al final. */}
       <RemoteCombobox
         initialItem={
           initial?.clienteId
@@ -147,119 +151,118 @@ export function CitaForm({
         placeholder="Buscar cliente o dejar walk-in"
         searchUrl={`/api/clientes?organizationId=${organizationId}`}
       />
-      <Field>
-        <FieldLabel required>Fecha y hora</FieldLabel>
-        <Input
-          name="fechaHora"
-          onChange={(event) => setInicio(event.target.value)}
-          required
-          type="datetime-local"
-          value={inicio}
-        />
-        <FieldDescription>Hora local de la sucursal ({timeZone}).</FieldDescription>
-      </Field>
-      <Field>
-        <FieldLabel required>
-          Duración (minutos){seleccionados.size > 0 ? " · calculada" : ""}
-        </FieldLabel>
-        <input name="duracionMinutos" type="hidden" value={duracionEfectiva} />
-        <Input
-          disabled={seleccionados.size > 0}
-          max={1440}
-          min={5}
-          onChange={(event) => setDuracionManual(Math.max(5, Number(event.target.value) || 5))}
-          required
-          type="number"
-          value={duracionEfectiva}
-        />
-        <FieldDescription>
-          Al elegir servicios, la duración se suma automáticamente.
-        </FieldDescription>
-      </Field>
-      <Field className="sm:col-span-2">
-        <FieldLabel>Profesional asignado</FieldLabel>
-        <Select
-          name="usuarioId"
-          onChange={(event) => setUsuarioId(event.target.value)}
-          value={usuarioId}
-        >
-          <option value="">Sin asignar</option>
-          {staff.map((profesional) => (
-            <option key={profesional.id} value={profesional.id}>
-              {profesional.nombre}
-            </option>
-          ))}
-        </Select>
-      </Field>
-      <Field className="sm:col-span-2">
-        <FieldLabel>Notas</FieldLabel>
+
+      <div className="space-y-2">
+        <p className="text-sm font-medium text-foreground">Servicios de la cita</p>
+        {servicios.length === 0 ? (
+          <p className="rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55]">
+            No hay servicios activos. Crea servicios primero.
+          </p>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
+            {servicios.map((servicio) => (
+              <label
+                className="flex min-h-11 items-center gap-3 rounded-xl border border-[#eee8e3] p-3 text-sm transition-colors hover:border-[#c9a899]"
+                key={servicio.id}
+              >
+                <input
+                  checked={seleccionados.has(servicio.id)}
+                  className="size-4 accent-[#8a5140]"
+                  name="servicioIds"
+                  onChange={() => toggleServicio(servicio.id)}
+                  type="checkbox"
+                  value={servicio.id}
+                />
+                <span className="flex-1 font-medium">{servicio.nombre}</span>
+                <span className="text-xs tabular-nums text-[#625b55]">
+                  {formatCurrency(servicio.precioBase, { currency })} · {servicio.duracionMinutos} min
+                </span>
+              </label>
+            ))}
+          </div>
+        )}
+        {recursos.length > 0 ? (
+          <details className="rounded-xl border border-[#eee8e3] bg-[#faf9f7] px-4 py-3" open={Boolean(initial?.recursoIds?.length)}>
+            <summary className="cursor-pointer list-none text-sm font-medium text-[#625b55] hover:text-[#8a5140]">
+              Apartar cabina, silla o equipo (opcional)
+            </summary>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {recursos.map((recurso) => (
+                <label
+                  className="flex min-h-11 items-center gap-3 rounded-xl border border-[#eee8e3] bg-white p-3 text-sm transition-colors hover:border-[#c9a899]"
+                  key={recurso.id}
+                >
+                  <input
+                    checked={recursosSel.has(recurso.id)}
+                    className="size-4 accent-[#8a5140]"
+                    name="recursoIds"
+                    onChange={() => toggleRecurso(recurso.id)}
+                    type="checkbox"
+                    value={recurso.id}
+                  />
+                  <span className="flex-1 font-medium">{recurso.nombre}</span>
+                  <span className="text-[10px] uppercase tracking-wide text-[#81746c]">{recurso.tipo}</span>
+                </label>
+              ))}
+            </div>
+          </details>
+        ) : null}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field>
+          <FieldLabel required>Fecha y hora</FieldLabel>
+          <Input
+            name="fechaHora"
+            onChange={(event) => setInicio(event.target.value)}
+            required
+            type="datetime-local"
+            value={inicio}
+          />
+          <FieldDescription>Hora local de la sucursal ({timeZone}).</FieldDescription>
+        </Field>
+        {seleccionados.size === 0 ? (
+          <Field>
+            <FieldLabel required>Duración (minutos)</FieldLabel>
+            <Input
+              max={1440}
+              min={5}
+              onChange={(event) => setDuracionManual(Math.max(5, Number(event.target.value) || 5))}
+              required
+              type="number"
+              value={duracionEfectiva}
+            />
+          </Field>
+        ) : null}
+        <Field className={seleccionados.size === 0 ? "sm:col-span-2" : undefined}>
+          <FieldLabel>Profesional asignado</FieldLabel>
+          <Select
+            name="usuarioId"
+            onChange={(event) => setUsuarioId(event.target.value)}
+            value={usuarioId}
+          >
+            <option value="">Sin asignar</option>
+            {staff.map((profesional) => (
+              <option key={profesional.id} value={profesional.id}>
+                {profesional.nombre}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </div>
+
+      <details className="rounded-xl border border-[#eee8e3] bg-[#faf9f7] px-4 py-3" open={Boolean(initial?.notas)}>
+        <summary className="cursor-pointer list-none text-sm font-medium text-[#625b55] hover:text-[#8a5140]">
+          Agregar nota (opcional)
+        </summary>
         <Textarea
+          className="mt-3"
           defaultValue={initial?.notas ?? ""}
           name="notas"
           placeholder="Preferencias del cliente, alergias, recordatorios…"
         />
-      </Field>
-    </div>
-  );
+      </details>
 
-  const serviciosTab = (
-    <div className="space-y-3">
-      <p className="text-sm text-[#625b55]">
-        Selecciona los servicios de la cita; el total y duración se recalculan.
-      </p>
-      {servicios.length === 0 ? (
-        <p className="rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55]">
-          No hay servicios activos. Crea servicios primero.
-        </p>
-      ) : (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {servicios.map((servicio) => (
-            <label
-              className="flex min-h-11 items-center gap-3 rounded-xl border border-[#eee8e3] p-3 text-sm transition-colors hover:border-[#c9a899]"
-              key={servicio.id}
-            >
-              <input
-                checked={seleccionados.has(servicio.id)}
-                className="size-4 accent-[#8a5140]"
-                name="servicioIds"
-                onChange={() => toggleServicio(servicio.id)}
-                type="checkbox"
-                value={servicio.id}
-              />
-              <span className="flex-1 font-medium">{servicio.nombre}</span>
-              <span className="text-xs tabular-nums text-[#625b55]">
-                {formatCurrency(servicio.precioBase, { currency })} · {servicio.duracionMinutos} min
-              </span>
-            </label>
-          ))}
-        </div>
-      )}
-      {recursos.length > 0 ? (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
-            Recursos de la cita (cabina, silla, equipo)
-          </p>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {recursos.map((recurso) => (
-              <label
-                className="flex min-h-11 items-center gap-3 rounded-xl border border-[#eee8e3] p-3 text-sm transition-colors hover:border-[#c9a899]"
-                key={recurso.id}
-              >
-                <input
-                  checked={recursosSel.has(recurso.id)}
-                  className="size-4 accent-[#8a5140]"
-                  name="recursoIds"
-                  onChange={() => toggleRecurso(recurso.id)}
-                  type="checkbox"
-                  value={recurso.id}
-                />
-                <span className="flex-1 font-medium">{recurso.nombre}</span>
-                <span className="text-[10px] uppercase tracking-wide text-[#81746c]">{recurso.tipo}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-      ) : null}
       <div className="rounded-xl border border-[#e3d9d1] bg-[#faf6f3] p-4">
         <h4 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">Resumen</h4>
         <div className="mt-2 grid grid-cols-3 gap-3 text-sm">
@@ -277,23 +280,7 @@ export function CitaForm({
           </div>
         </div>
       </div>
-    </div>
-  );
 
-  return (
-    <form action={formAction} className="space-y-5">
-      <input name="id" type="hidden" value={initial?.id ?? ""} />
-      <input name="organizacionId" type="hidden" value={organizationId} />
-      <input name="sucursalId" type="hidden" value={sucursal.id} />
-      {initial?.version !== undefined ? (
-        <input name="version" type="hidden" value={initial.version} />
-      ) : null}
-      <FormTabs
-        tabs={[
-          { id: "general", label: "Datos de la cita", content: general },
-          { id: "servicios", label: `Servicios (${seleccionados.size})`, content: serviciosTab },
-        ]}
-      />
       <ActionFeedback state={state} successMessage="Cita guardada correctamente." />
       {state.sugerencias && state.sugerencias.length > 0 ? (
         <div className="rounded-xl border border-[#e3d9d1] bg-[#faf6f3] p-3">

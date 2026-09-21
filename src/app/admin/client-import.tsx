@@ -10,13 +10,10 @@ export function ClientImport({ organizationId }: { organizationId: string }) {
   const [state, formAction, isPending] = useActionState<ImportClientsState, FormData>(importClients, {});
 
   return (
-    <form action={formAction} className="rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm">
+    <form action={formAction}>
       <input name="organizacionId" type="hidden" value={organizationId} />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h2 className="font-semibold">Importar clientes</h2>
-          <p className="mt-1 text-sm text-[#625b55]">Carga un CSV guardado desde Excel.</p>
-        </div>
+        <p className="text-sm text-[#625b55]">Carga un CSV guardado desde Excel.</p>
         <div className="w-full md:max-w-md">
           <FileDropzone accept=".csv,text/csv" name="archivo" required />
         </div>

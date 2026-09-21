@@ -1,11 +1,11 @@
 import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { Calendar, CalendarPlus, ShoppingCart, Users, Wallet, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
 import { GuiaChecklistCard } from "@/app/admin/guia/checklist-card";
 import { InvitationForm } from "@/app/admin/invitation-form";
 import { OrganizationForm } from "@/app/admin/organization-form";
 import { SuscripcionAdminRow, type EstadoSuscripcionAdmin } from "@/app/admin/suscripcion-form";
-import { AdminNav } from "@/components/admin-nav";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
@@ -21,8 +21,6 @@ import { requireAuthenticatedUser, requirePlatformAdmin } from "@/lib/auth/acces
 import { resolveAccessSafe } from "@/lib/auth/authorization";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { cargarAlertas, type AlertaOperativa } from "@/modules/alertas/queries";
-import { CAPACIDADES } from "@/modules/billing/capacidades";
-import { getSuscripcionActualCache } from "@/modules/billing/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
 import { cargarEstadoNegocio, cargarProgresoGuia } from "@/modules/onboarding/queries";
 import { evaluarPasos, pasosParaPermisos, resumenGuia } from "@/modules/onboarding/rules";
@@ -51,16 +49,13 @@ function MemberDashboard({
   alertasByOrg,
   error,
   permissionsByOrg,
-  capacidadesFaltantesByOrg,
   checklist,
 }: {
   name: string;
-  email: string;
   access: Array<{ organization: string; branch: string; branchKey: string; organizationId: string; branchId: string }>;
   alertasByOrg: Record<string, AlertaOperativa[]>;
   error?: string;
   permissionsByOrg: Record<string, string[]>;
-  capacidadesFaltantesByOrg: Record<string, string[]>;
   checklist: ResumenGuia | null;
 }) {
   const first = access[0];
@@ -142,17 +137,63 @@ function MemberDashboard({
           ))}
         </div>
       )}
+      {/* Acciones de hoy: verbos grandes y directos para el flujo diario; el
+          resto de secciones queda en "Más opciones" de la navegación. */}
       {first ? (
-        <AdminNav
-          capacidadesFaltantes={capacidadesFaltantesByOrg[first.organizationId] ?? []}
-          organizationId={first.organizationId}
-          permissions={permissionsByOrg[first.organizationId] ?? []}
-          sucursalId={first.branchId}
-        />
+        <AdminCard title="¿Qué vas a hacer?">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {ACCIONES_HOY.filter(
+              (accion) =>
+                tienePermisoNav(accion.permiso, permissionsByOrg[first.organizationId]),
+            ).map((accion) => (
+              <Link
+                className="flex min-h-20 flex-col items-start justify-between gap-2 rounded-2xl border border-[#eadfd8] bg-white p-4 transition-colors hover:border-[#c9a899] hover:bg-[#faf6f3] focus-visible:outline-2 focus-visible:outline-[#8a5140]"
+                data-action-id={`inicio.accion.${accion.id}`}
+                href={buildAdminHref(accion.href, {
+                  organizationId: first.organizationId,
+                  sucursalId: first.branchId,
+                  extra: accion.extra,
+                })}
+                key={accion.id}
+              >
+                <accion.icon aria-hidden="true" className="size-5 text-[#8a5140]" strokeWidth={1.9} />
+                <span className="text-sm font-semibold text-[#2d2926]">{accion.label}</span>
+                <span className="text-xs leading-4 text-[#81746c]">{accion.ayuda}</span>
+              </Link>
+            ))}
+          </div>
+        </AdminCard>
       ) : null}
     </div>
   );
 }
+
+type PermisoNav = string | readonly string[] | undefined;
+
+function tienePermisoNav(permiso: PermisoNav, permissions: readonly string[] | undefined): boolean {
+  if (!permiso) return true;
+  if (!permissions) return false;
+  const set = new Set(permissions);
+  return Array.isArray(permiso)
+    ? (permiso as readonly string[]).some((clave) => set.has(clave))
+    : set.has(permiso as string);
+}
+
+const ACCIONES_HOY: Array<{
+  id: string;
+  href: "/agenda" | "/pos" | "/caja" | "/clientes";
+  label: string;
+  ayuda: string;
+  icon: LucideIcon;
+  permiso: string;
+  extra?: Record<string, string>;
+}> = [
+  { id: "agenda", href: "/agenda", label: "Ver la agenda", ayuda: "Citas de hoy", icon: Calendar, permiso: "agenda.ver" },
+  { id: "nueva_cita", href: "/agenda", label: "Nueva cita", ayuda: "Agenda a un cliente", icon: CalendarPlus, permiso: "agenda.ver", extra: { nueva: "1" } },
+  { id: "cobrar", href: "/pos", label: "Cobrar", ayuda: "Venta o pago de cita", icon: ShoppingCart, permiso: "ventas.ver" },
+  { id: "caja", href: "/caja", label: "Caja", ayuda: "Abrir o cerrar el turno", icon: Wallet, permiso: "caja.ver" },
+  { id: "clientes", href: "/clientes", label: "Clientes", ayuda: "Buscar o registrar", icon: Users, permiso: "clientes.ver" },
+];
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
@@ -164,14 +205,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     const organizations = await getAccessibleOrganizations(db, user);
     const access: Array<{ organization: string; branch: string; branchKey: string; organizationId: string; branchId: string }> = [];
     const permissionsByOrg: Record<string, string[]> = {};
-    const capacidadesFaltantesByOrg: Record<string, string[]> = {};
     const alertasByOrg: Record<string, AlertaOperativa[]> = {};
 
     for (const org of organizations) {
-      const [resolved, suscripcion] = await Promise.all([
-        resolveAccessSafe(org.id, user),
-        getSuscripcionActualCache(org.id),
-      ]);
+      const resolved = await resolveAccessSafe(org.id, user);
       permissionsByOrg[org.id] = resolved ? [...resolved.permissions] : [];
       alertasByOrg[org.id] = resolved
         ? await cargarAlertas(db, {
@@ -180,12 +217,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             permisos: resolved.permissions,
           })
         : [];
-      if (suscripcion && estadoEfectivoSuscripcion(suscripcion) === "vigente") {
-        const incluidas = new Set(suscripcion.capacidades ?? []);
-        capacidadesFaltantesByOrg[org.id] = Object.keys(CAPACIDADES).filter(
-          (capacidad) => !incluidas.has(capacidad),
-        );
-      }
       const branchConditions = [eq(sucursales.organizacionId, org.id), eq(sucursales.activo, true)];
       // null = alcance de toda la organización; Set = solo asignadas.
       if (resolved?.branchIds) {
@@ -226,7 +257,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       }
     }
 
-    return <MemberDashboard access={access} alertasByOrg={alertasByOrg} capacidadesFaltantesByOrg={capacidadesFaltantesByOrg} checklist={checklist} email={session.user.email} error={error} name={session.user.name} permissionsByOrg={permissionsByOrg} />;
+    return <MemberDashboard access={access} alertasByOrg={alertasByOrg} checklist={checklist} error={error} name={session.user.name} permissionsByOrg={permissionsByOrg} />;
   }
 
   const { session: platformSession } = await requirePlatformAdmin();

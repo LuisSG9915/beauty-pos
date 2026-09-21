@@ -68,30 +68,46 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
         title="Clientes"
       />
 
-      <form className="grid gap-3 rounded-2xl border border-[#eadfd8] bg-white p-4 md:grid-cols-[1fr_220px_160px_auto] md:items-end" method="get">
+      <form className="grid gap-3 rounded-2xl border border-[#eadfd8] bg-white p-4 sm:grid-cols-[1fr_auto] sm:items-end" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <Field>
-          <FieldLabel>Buscar</FieldLabel>
+          <FieldLabel>Buscar cliente</FieldLabel>
           <Input defaultValue={query} key={query} name="q" placeholder="Nombre, teléfono o correo" />
         </Field>
-        <Field>
-          <FieldLabel>Orden</FieldLabel>
-          <Select defaultValue={sortParam ?? "nombre"} key={sortParam ?? "nombre"} name="sort">
-            <option value="nombre">Por nombre</option>
-            <option value="createdAt">Más recientes</option>
-          </Select>
-        </Field>
-        <Field>
-          <FieldLabel>Dirección</FieldLabel>
-          <Select defaultValue={directionParam ?? "asc"} key={directionParam ?? "asc"} name="direction">
-            <option value="asc">Ascendente</option>
-            <option value="desc">Descendente</option>
-          </Select>
-        </Field>
         <Button className="rounded-xl" type="submit">Buscar</Button>
+        {/* Ordenación plegada: ajuste secundario, no parte del flujo diario. */}
+        <details className="sm:col-span-2">
+          <summary className="cursor-pointer list-none text-sm font-medium text-[#625b55] hover:text-[#8a5140]">
+            Cambiar el orden de la lista
+          </summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <Field>
+              <FieldLabel>Orden</FieldLabel>
+              <Select defaultValue={sortParam ?? "nombre"} key={sortParam ?? "nombre"} name="sort">
+                <option value="nombre">Por nombre</option>
+                <option value="createdAt">Más recientes</option>
+              </Select>
+            </Field>
+            <Field>
+              <FieldLabel>Dirección</FieldLabel>
+              <Select defaultValue={directionParam ?? "asc"} key={directionParam ?? "asc"} name="direction">
+                <option value="asc">Ascendente</option>
+                <option value="desc">Descendente</option>
+              </Select>
+            </Field>
+          </div>
+        </details>
       </form>
 
-      <ClientImport organizationId={organizationId} />
+      {/* Importar es una acción de arranque (una vez), no del trabajo diario. */}
+      <details className="rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm">
+        <summary className="cursor-pointer list-none text-sm font-semibold text-[#403a35] hover:text-[#8a5140]">
+          Importar clientes desde Excel (opcional)
+        </summary>
+        <div className="mt-4">
+          <ClientImport organizationId={organizationId} />
+        </div>
+      </details>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <ClientForm initial={editingClient} key={`${editingClient?.id ?? "nuevo"}-${editingClient?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} />

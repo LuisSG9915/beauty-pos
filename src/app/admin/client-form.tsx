@@ -44,13 +44,14 @@ const FISCAL_FIELDS: Array<{ name: keyof ClientData; label: string; placeholder:
 export function ClientForm({ organizationId, initial }: { organizationId: string; initial?: ClientData }) {
   const [state, formAction, isPending] = useActionState(saveClient, {});
   const value = (key: keyof ClientData) => initial?.[key] ?? "";
+  const tieneFiscales = FISCAL_FIELDS.some((field) => Boolean(initial?.[field.name]));
 
   return (
     <form action={formAction} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
       <h2 className="text-xl font-semibold">{initial ? "Editar cliente" : "Nuevo cliente"}</h2>
-      <p className="mt-1 text-sm text-[#81746c]">Los campos fiscales son opcionales mientras CFDI esté pendiente.</p>
+      <p className="mt-1 text-sm text-[#81746c]">Solo el nombre es obligatorio; el teléfono ayuda a confirmar citas.</p>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {PERSONAL_FIELDS.map((field) => (
@@ -63,14 +64,23 @@ export function ClientForm({ organizationId, initial }: { organizationId: string
           <FieldLabel>Notas operativas</FieldLabel>
           <Textarea defaultValue={String(value("notasOperativas"))} name="notasOperativas" />
         </Field>
-        <p className="text-sm font-semibold text-[#a76348] sm:col-span-2">Datos fiscales opcionales</p>
-        {FISCAL_FIELDS.map((field) => (
-          <Field key={field.name}>
-            <FieldLabel>{field.label}</FieldLabel>
-            <Input defaultValue={String(value(field.name))} name={field.name} placeholder={field.placeholder} />
-          </Field>
-        ))}
       </div>
+
+      {/* Datos fiscales plegados: solo se piden cuando el cliente requiere
+          factura; abierto al editar un cliente que ya los tiene. */}
+      <details className="mt-5 rounded-xl border border-[#eee8e3] bg-[#faf9f7] px-4 py-3" open={tieneFiscales}>
+        <summary className="cursor-pointer list-none text-sm font-medium text-[#625b55] hover:text-[#8a5140]">
+          Datos de facturación (solo si el cliente pide factura)
+        </summary>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          {FISCAL_FIELDS.map((field) => (
+            <Field key={field.name}>
+              <FieldLabel>{field.label}</FieldLabel>
+              <Input defaultValue={String(value(field.name))} name={field.name} placeholder={field.placeholder} />
+            </Field>
+          ))}
+        </div>
+      </details>
 
       {state.warning ? (
         <label className="mt-5 flex items-start gap-3 rounded-xl border border-[#ecd9a9] bg-[#fff9e9] p-4 text-sm text-[#80621d]">
