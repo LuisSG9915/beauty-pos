@@ -1,9 +1,9 @@
-import type { Metadata, Viewport } from "next";
+import type { Metadata } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import { PwaRegister } from "@/components/pwa-register";
 import { ThemeRuntime } from "@/components/theme-runtime";
 import { BRAND } from "@/lib/brand";
-import { BOOTSTRAP_SCRIPT, THEME_COLOR } from "@/lib/theme-preference";
+import { BOOTSTRAP_SCRIPT } from "@/lib/theme-preference";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -55,15 +55,6 @@ export const metadata: Metadata = {
     ],
     apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
   },
-};
-
-export const viewport: Viewport = {
-  // El bootstrap inline y ThemeRuntime reescriben el content según la
-  // preferencia guardada; los media queries cubren el arranque sin JS.
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: THEME_COLOR.light },
-    { media: "(prefers-color-scheme: dark)", color: THEME_COLOR.dark },
-  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

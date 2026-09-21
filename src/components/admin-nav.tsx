@@ -241,9 +241,22 @@ function LinkPendingIndicator({
   compact?: boolean;
   label: string;
 }) {
-  void compact;
-  void label;
-  return null;
+  const { pending } = useLinkStatus();
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        className={cn(
+          "pointer-events-none absolute rounded-full bg-primary opacity-0 transition-opacity data-[pending=true]:opacity-100",
+          compact ? "right-1.5 top-1.5 size-1.5" : "right-2 top-2 size-2",
+        )}
+        data-pending={pending}
+      />
+      <span className="sr-only" role="status">
+        {pending ? `Abriendo ${label}…` : ""}
+      </span>
+    </>
+  );
 }
 
 function NavLink({

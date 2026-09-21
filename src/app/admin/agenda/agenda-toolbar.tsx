@@ -34,8 +34,19 @@ function guardRepeatedTap(event: MouseEvent<HTMLAnchorElement>) {
 }
 
 function ViewPendingIndicator({ label }: { label: string }) {
-  void label;
-  return null;
+  const { pending } = useLinkStatus();
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        className="absolute right-1 top-1 size-1.5 rounded-full bg-primary opacity-0 transition-opacity data-[pending=true]:opacity-100"
+        data-pending={pending}
+      />
+      <span className="sr-only" role="status">
+        {pending ? `Abriendo vista ${label}…` : ""}
+      </span>
+    </>
+  );
 }
 
 type PendingControl = "fecha" | "sucursal" | "buscar";

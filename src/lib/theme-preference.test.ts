@@ -91,6 +91,7 @@ describe("theme preference", () => {
     expect(BOOTSTRAP_SCRIPT).toContain('data-theme-preference');
     expect(BOOTSTRAP_SCRIPT).toContain('data-theme-resolved');
     expect(BOOTSTRAP_SCRIPT).toContain('meta[name="theme-color"]');
+    expect(BOOTSTRAP_SCRIPT).toContain('data-theme-runtime="true"');
     expect(BOOTSTRAP_SCRIPT).toContain('querySelectorAll');
     expect(BOOTSTRAP_SCRIPT).toContain('els[j].remove()');
     expect(BOOTSTRAP_SCRIPT).toContain(THEME_COLOR.light);

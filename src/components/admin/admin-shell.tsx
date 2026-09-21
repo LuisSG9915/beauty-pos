@@ -219,6 +219,8 @@ function NavigationActivity() {
   const [pendingLabel, setPendingLabel] = useState<string | null>(null);
   const startedAt = useRef<number | null>(null);
   const targetPath = useRef<string | null>(null);
+  const targetKey = useRef<string | null>(null);
+  const tapTimes = useRef(new WeakMap<HTMLAnchorElement, number>());
   const timeoutRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
   const feedbackSent = useRef(false);
@@ -233,6 +235,7 @@ function NavigationActivity() {
     );
     startedAt.current = null;
     targetPath.current = null;
+    targetKey.current = null;
     setPendingLabel(null);
     if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
     if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
@@ -274,11 +277,26 @@ function NavigationActivity() {
         return;
       }
 
+      const key = `${url.pathname}${url.search}`;
+      const now = Date.now();
+      const lastGlobalTap = tapTimes.current.get(anchor) ?? 0;
+      if (
+        now - lastGlobalTap < 800 ||
+        (startedAt.current !== null && targetKey.current === key)
+      ) {
+        // En capture todavía no corre el onClick de Next Link; prevenir aquí
+        // evita que un segundo toque encole la misma navegación.
+        event.preventDefault();
+        return;
+      }
+      tapTimes.current.set(anchor, now);
+
       if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
       if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
       feedbackSent.current = false;
       startedAt.current = performance.now();
       targetPath.current = url.pathname;
+      targetKey.current = key;
       const label = anchor.textContent?.replace(/\s+/g, " ").trim().slice(0, 40) || "sección";
       setPendingLabel(label);
 
@@ -294,9 +312,9 @@ function NavigationActivity() {
       timeoutRef.current = window.setTimeout(() => finish(false), NAVIGATION_TIMEOUT_MS);
     };
 
-    document.addEventListener("click", onClick);
+    document.addEventListener("click", onClick, true);
     return () => {
-      document.removeEventListener("click", onClick);
+      document.removeEventListener("click", onClick, true);
       if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
       if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
     };
@@ -312,7 +330,7 @@ function NavigationActivity() {
           <span className="admin-nav-progress block h-full w-1/3 bg-primary" />
         </div>
       ) : null}
-      <span className="sr-only" role="status">
+      <span className="sr-only" data-navigation-activity="ready" role="status">
         {pendingLabel ? `Abriendo ${pendingLabel}…` : ""}
       </span>
     </>
@@ -355,7 +373,9 @@ export function AdminShell({
   return (
     <ToastProvider>
       <div className="flex min-h-dvh bg-background text-foreground">
-        {null}
+        <Suspense fallback={null}>
+          <NavigationActivity />
+        </Suspense>
         <a
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-foreground focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-background"
           href="#contenido-admin"

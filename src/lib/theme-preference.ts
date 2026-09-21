@@ -107,10 +107,10 @@ export function currentThemePreference(): ThemePreference {
 
 /**
  * Aplica la preferencia al documento: clase `.dark`, atributos
- * `data-theme-preference`/`data-theme-resolved`, `color-scheme` inline y el
- * meta `theme-color` (se elimina su `media` para que el modo explícito gane
- * sobre el del sistema; si no existe aún, se crea al inicio de <head> para
- * que prevalezca en orden de árbol).
+ * `data-theme-preference`/`data-theme-resolved`, `color-scheme` inline y un
+ * meta `theme-color` propio (`data-theme-runtime`). No toca metadatos de
+ * Next: mutar nodos administrados por React antes de hidratar rompe la
+ * navegación cliente al desmontar la ruta anterior.
  */
 export function applyThemePreference(preference: ThemePreference): ResolvedTheme {
   const resolved = resolveTheme(preference, systemPrefersDark());
@@ -120,15 +120,13 @@ export function applyThemePreference(preference: ThemePreference): ResolvedTheme
   root.setAttribute("data-theme-resolved", resolved);
   root.style.colorScheme = resolved;
   const color = themeColorFor(resolved);
-  const metas = document.querySelectorAll('meta[name="theme-color"]');
+  const metas = document.querySelectorAll('meta[name="theme-color"][data-theme-runtime="true"]');
   let meta = metas[0];
-  if (meta) {
-    meta.removeAttribute("media");
-  } else {
+  if (!meta) {
     meta = document.createElement("meta");
     meta.setAttribute("name", "theme-color");
-    const head = document.head ?? root;
-    head.insertBefore(meta, head.firstChild);
+    meta.setAttribute("data-theme-runtime", "true");
+    (document.head ?? root).appendChild(meta);
   }
   meta.setAttribute("content", color);
   for (let index = 1; index < metas.length; index += 1) {
@@ -174,8 +172,8 @@ export function subscribeThemePreference(callback: () => void): () => void {
 /**
  * Script inline mínimo que corre en <head> antes del primer paint. Replica
  * `applyThemePreference` sin dependencias: lee la cookie, resuelve "system"
- * con matchMedia, fija `.dark` + data-* + color-scheme y sincroniza el meta
- * theme-color (quitando `media` para que una elección explícita gane al OS).
+ * con matchMedia, fija `.dark` + data-* + color-scheme y sincroniza un meta
+ * theme-color propio marcado con `data-theme-runtime`.
  * Va envuelto en try/catch: si falla, la página queda en claro, sin error.
  */
-export const BOOTSTRAP_SCRIPT = `(function(){try{var d=document.documentElement;var p="system";var cs=document.cookie.split(";");for(var i=0;i<cs.length;i++){var at=cs[i].indexOf("=");if(at<0)continue;if(cs[i].slice(0,at).trim()==="${THEME_COOKIE_NAME}"){var v=cs[i].slice(at+1).trim();try{v=decodeURIComponent(v)}catch(x){}if(v==="light"||v==="dark")p=v;break;}}var r=p;if(p==="system"){r=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}d.classList.toggle("dark",r==="dark");d.setAttribute("data-theme-preference",p);d.setAttribute("data-theme-resolved",r);d.style.colorScheme=r;var c=r==="dark"?"${THEME_COLOR.dark}":"${THEME_COLOR.light}";var els=document.querySelectorAll('meta[name="theme-color"]');var el=els[0];if(el){el.removeAttribute("media");}else{el=document.createElement("meta");el.setAttribute("name","theme-color");var h=document.head||d;h.insertBefore(el,h.firstChild);}el.setAttribute("content",c);for(var j=1;j<els.length;j++){els[j].remove();}}catch(e){}})();`;
+export const BOOTSTRAP_SCRIPT = `(function(){try{var d=document.documentElement;var p="system";var cs=document.cookie.split(";");for(var i=0;i<cs.length;i++){var at=cs[i].indexOf("=");if(at<0)continue;if(cs[i].slice(0,at).trim()==="${THEME_COOKIE_NAME}"){var v=cs[i].slice(at+1).trim();try{v=decodeURIComponent(v)}catch(x){}if(v==="light"||v==="dark")p=v;break;}}var r=p;if(p==="system"){r=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}d.classList.toggle("dark",r==="dark");d.setAttribute("data-theme-preference",p);d.setAttribute("data-theme-resolved",r);d.style.colorScheme=r;var c=r==="dark"?"${THEME_COLOR.dark}":"${THEME_COLOR.light}";var els=document.querySelectorAll('meta[name="theme-color"][data-theme-runtime="true"]');var el=els[0];if(!el){el=document.createElement("meta");el.setAttribute("name","theme-color");el.setAttribute("data-theme-runtime","true");(document.head||d).appendChild(el);}el.setAttribute("content",c);for(var j=1;j<els.length;j++){els[j].remove();}}catch(e){}})();`;

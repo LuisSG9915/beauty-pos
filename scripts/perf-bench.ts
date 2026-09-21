@@ -177,16 +177,26 @@ async function main() {
     for (let i = 0; i < RUNS; i++) {
       for (const route of NAV_ROUTES) {
         await page.goto(`${BASE_URL}/admin`, { waitUntil: "load", timeout: 60000 });
+        // La medición empieza cuando la página ya es interactiva; en dev los
+        // chunks de hidratación pueden seguir llegando después de `load`.
+        await page.waitForNetworkIdle({ idleTime: 300, timeout: 10000 }).catch(() => {});
         Object.assign(navNet, freshNet(), { paths: {}, prefetchPaths: {} });
 
         const t0 = Date.now();
-        let clicked = await page.evaluate((h) => {
-          const link = [...document.querySelectorAll("a")].find(
-            (a) => new URL(a.href).pathname === h && a.getBoundingClientRect().width > 0,
-          );
-          link?.click();
-          return Boolean(link);
-        }, route);
+        const navSelector = viewport.isMobile
+          ? 'nav[aria-label="Accesos rápidos"] a[href]'
+          : 'nav[aria-label="Navegación del panel"] a[href]';
+        let clicked = await page.evaluate(
+          (h, selector) => {
+            const link = [...document.querySelectorAll<HTMLAnchorElement>(selector)].find(
+              (a) => new URL(a.href).pathname === h && a.getBoundingClientRect().width > 0,
+            );
+            link?.click();
+            return Boolean(link);
+          },
+          route,
+          navSelector,
+        );
         if (!clicked) {
           // Rutas secundarias viven tras "Más" en el tab bar móvil.
           await page.click('[data-action-id="nav.mas_abrir"]').catch(() => {});
