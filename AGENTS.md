@@ -2,7 +2,9 @@
 
 ## Base de datos y despliegue
 
-- `src/db/client.ts` usa el binding `HYPERDRIVE` cuando existe y cae a `DATABASE_URL`. **`wrangler.jsonc` aún no declara el binding**: en Cloudflare hay que crear la instancia (`wrangler hyperdrive create beauty-pos --connection-string=…`) y agregar `"hyperdrive": { "binding": "HYPERDRIVE", "id": "<id>" }` al config antes de medir latencia real en Workers.
+- `src/db/client.ts` usa el binding `HYPERDRIVE` (instancia `beauty-pos-db`, id `1e6092cc079c4f5c86a5d4bca6ddc7e4`, declarado en `wrangler.jsonc`) y cae a `DATABASE_URL` fuera de Cloudflare. Desplegado en `https://beauty-pos.luis-sg9915.workers.dev`.
+- **Regla crítica de Workers**: los sockets de `pg` no sobreviven entre invocaciones — nada que capture una conexión puede vivir en un global. `getDatabase()` crea un pool por request (WeakMap sobre el ExecutionContext, cerrado con `after()`); `createAuth` se cachea por request vía `getRequestScope()`. Cualquier caché nueva que toque la BD debe usar `getRequestScope()` igual.
+- Secretos del worker configurados con `wrangler secret put`: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `BREVO_API_KEY`, `BREVO_FROM_EMAIL`, `BREVO_FROM_NAME`, `CRON_SECRET`.
 - Migraciones: `pnpm db:generate` → `pnpm db:migrate`. Consistencia: `pnpm db:check`.
 - Catálogo de planes: `pnpm plans:seed` (idempotente, sincroniza `src/modules/billing/capacidades.ts`). Permisos/roles en organizaciones existentes: `pnpm tsx scripts/seed-access.ts`.
 - Diagnóstico de consultas: reiniciar el server con `DB_LOG_QUERIES=1`.

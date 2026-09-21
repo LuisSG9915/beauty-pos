@@ -11,8 +11,14 @@
   "observability": {
     "enabled": true
   },
-  // Pendiente: crear la instancia Hyperdrive y declarar el binding para que
-  // `src/db/client.ts` la use en producción (sin esto cae a DATABASE_URL):
-  // "hyperdrive": { "binding": "HYPERDRIVE", "id": "<hyperdrive-config-id>" },
+  // Pooling de conexiones a PostgreSQL (CockroachDB us-east-2): reduce la
+  // latencia por consulta del Worker. `src/db/client.ts` prefiere este binding
+  // y cae a DATABASE_URL solo en desarrollo local.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "1e6092cc079c4f5c86a5d4bca6ddc7e4"
+    }
+  ],
   "upload_source_maps": true
 }

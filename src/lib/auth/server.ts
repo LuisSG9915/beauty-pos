@@ -3,7 +3,7 @@ import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 import { twoFactor as twoFactorPlugin } from "better-auth/plugins";
 
-import { getDatabase } from "@/db/client";
+import { getDatabase, getRequestScope } from "@/db/client";
 import {
   account,
   session,
@@ -22,8 +22,11 @@ type AuthOptions = {
 type AuthInstance = ReturnType<typeof betterAuth>;
 
 // La configuración es estática por proceso; reutilizar la instancia evita
-// reconstruir el adaptador y los plugins en cada request.
+// reconstruir el adaptador y los plugins en cada request. En Workers el
+// adaptador captura la conexión del request que la creó, así que la caché
+// debe ser por request: una instancia global usaría un pool ya cerrado.
 const authInstances = new Map<string, AuthInstance>();
+const requestAuthInstances = new WeakMap<object, Map<string, AuthInstance>>();
 
 export function createAuth({ allowSignUp = false, sendEmails = true }: AuthOptions = {}) {
   const env = getRuntimeEnv();
@@ -34,7 +37,11 @@ export function createAuth({ allowSignUp = false, sendEmails = true }: AuthOptio
   }
 
   const key = `${allowSignUp}:${sendEmails}`;
-  const cached = authInstances.get(key);
+  const scope = getRequestScope();
+  const store = scope
+    ? (requestAuthInstances.get(scope) ?? new Map<string, AuthInstance>())
+    : authInstances;
+  const cached = store.get(key);
   if (cached) return cached;
 
   const instance = betterAuth({
@@ -93,6 +100,7 @@ export function createAuth({ allowSignUp = false, sendEmails = true }: AuthOptio
     },
   } as BetterAuthOptions);
 
-  authInstances.set(key, instance);
+  store.set(key, instance);
+  if (scope) requestAuthInstances.set(scope, store);
   return instance;
 }
