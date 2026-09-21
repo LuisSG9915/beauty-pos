@@ -144,10 +144,12 @@ function ShellTabBar({
   organizations,
   platformAdmin,
   permissionsByOrg,
+  capacidadesFaltantesByOrg,
 }: {
   organizations: AdminShellOrganization[];
   platformAdmin: boolean;
   permissionsByOrg?: Record<string, string[]> | null;
+  capacidadesFaltantesByOrg?: Record<string, string[]> | null;
 }) {
   const searchParams = useSearchParams();
   const organizationId =
@@ -156,7 +158,17 @@ function ShellTabBar({
     platformAdmin || permissionsByOrg == null
       ? null
       : (organizationId ? (permissionsByOrg[organizationId] ?? []) : []);
-  return <AdminTabBar permissions={permissions} />;
+  const capacidadesFaltantes =
+    platformAdmin || capacidadesFaltantesByOrg == null
+      ? null
+      : (organizationId ? (capacidadesFaltantesByOrg[organizationId] ?? []) : []);
+  return (
+    <AdminTabBar
+      capacidadesFaltantes={capacidadesFaltantes}
+      permissions={permissions}
+      platformAdmin={platformAdmin}
+    />
+  );
 }
 
 /**
@@ -250,6 +262,7 @@ export function AdminShell({
 
         <Suspense fallback={null}>
           <ShellTabBar
+            capacidadesFaltantesByOrg={capacidadesFaltantesByOrg}
             organizations={organizations}
             permissionsByOrg={permissionsByOrg}
             platformAdmin={isPlatformAdmin}

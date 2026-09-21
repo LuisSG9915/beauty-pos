@@ -9,7 +9,10 @@
     "binding": "ASSETS"
   },
   "observability": {
-    "enabled": true
+    "enabled": true,
+    "traces": {
+      "enabled": true
+    }
   },
   // Pooling de conexiones a PostgreSQL (CockroachDB us-east-2): reduce la
   // latencia por consulta del Worker. `src/db/client.ts` prefiere este binding

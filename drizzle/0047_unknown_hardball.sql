@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "telemetria_sesiones_sid_uq" ON "telemetria_sesiones" USING btree ("sid");

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
+import { reportarErrorCliente } from "@/lib/observability/reportar-error";
 
 /**
  * Error boundary del panel. Muestra un mensaje genérico sin exponer
@@ -19,6 +20,7 @@ export default function AdminError({
   useEffect(() => {
     // Registrar para diagnóstico; el mensaje visible sigue siendo genérico.
     console.error(error);
+    reportarErrorCliente({ error, digest: error.digest });
   }, [error]);
 
   return (

@@ -2,6 +2,8 @@
 
 import { useEffect } from "react";
 
+import { reportarErrorCliente } from "@/lib/observability/reportar-error";
+
 /**
  * Error boundary raíz: reemplaza el layout entero, así que define su propio
  * documento. Los estilos globales no aplican aquí — estilos inline.
@@ -9,6 +11,7 @@ import { useEffect } from "react";
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error(error);
+    reportarErrorCliente({ error, digest: error.digest });
   }, [error]);
 
   return (

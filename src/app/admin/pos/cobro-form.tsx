@@ -362,6 +362,8 @@ export function CobroForm({
 
       <Button
         className="mt-4 w-full rounded-xl"
+        data-action-clave="1"
+        data-action-id="pos.cobro.confirmar"
         disabled={!puedeCobrar}
         size="lg"
         type="submit"

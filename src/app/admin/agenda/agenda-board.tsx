@@ -743,7 +743,7 @@ export function AgendaBoard({
           </span>
           {pending ? <span role="status">Aplicando cambio…</span> : null}
         </div>
-        <Button className="rounded-xl" onClick={() => { setEditing(null); setCreateInitial(null); setCreateOpen(true); }} type="button">
+        <Button className="rounded-xl" data-action-id="agenda.cita.abrir_formulario" onClick={() => { setEditing(null); setCreateInitial(null); setCreateOpen(true); }} type="button">
           <CalendarPlus aria-hidden="true" /> Nueva cita
         </Button>
       </div>

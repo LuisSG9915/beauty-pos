@@ -73,7 +73,7 @@ export function CierreCajaForm({
       </Field>
 
       <ActionFeedback state={state} />
-      <Button className="rounded-xl" disabled={pending} size="touch" type="submit">
+      <Button className="rounded-xl" data-action-clave="1" data-action-id="caja.cierre.confirmar" disabled={pending} size="touch" type="submit">
         {pending ? "Cerrando…" : "Confirmar cierre de caja"}
       </Button>
     </form>

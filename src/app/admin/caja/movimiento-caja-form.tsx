@@ -112,7 +112,7 @@ export function MovimientoCajaForm({
       </Field>
 
       <ActionFeedback state={state} />
-      <Button className="rounded-xl" disabled={pending} type="submit" variant="outline">
+      <Button className="rounded-xl" data-action-clave="1" data-action-id="caja.movimiento.registrar" disabled={pending} type="submit" variant="outline">
         {pending ? "Registrando…" : "Registrar movimiento"}
       </Button>
     </form>

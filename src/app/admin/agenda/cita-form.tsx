@@ -318,7 +318,7 @@ export function CitaForm({
         </div>
       ) : null}
       <div className="flex justify-end">
-        <Button className="rounded-xl" disabled={pending} type="submit">
+        <Button className="rounded-xl" data-action-clave="1" data-action-id="agenda.cita.guardar" disabled={pending} type="submit">
           {pending ? "Guardando..." : initial?.id ? "Guardar cambios" : "Crear cita"}
         </Button>
       </div>

@@ -81,7 +81,7 @@ export function ClientForm({ organizationId, initial }: { organizationId: string
       <div className="mt-4">
         <ActionFeedback state={state} successMessage="Cliente guardado correctamente." />
       </div>
-      <Button className="mt-6 rounded-xl" disabled={isPending} type="submit">
+      <Button className="mt-6 rounded-xl" data-action-clave="1" data-action-id="clientes.cliente.guardar" disabled={isPending} type="submit">
         {isPending ? "Guardando…" : "Guardar cliente"}
       </Button>
     </form>

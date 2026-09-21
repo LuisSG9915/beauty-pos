@@ -33,7 +33,7 @@ export function AperturaCajaForm({
       </Field>
 
       <ActionFeedback state={state} />
-      <Button className="rounded-xl" disabled={pending} size="touch" type="submit">
+      <Button className="rounded-xl" data-action-clave="1" data-action-id="caja.apertura.confirmar" disabled={pending} size="touch" type="submit">
         {pending ? "Abriendo…" : "Abrir caja"}
       </Button>
     </form>
