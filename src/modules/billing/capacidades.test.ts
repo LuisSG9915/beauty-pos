@@ -34,6 +34,27 @@ describe("catálogo de planes", () => {
     expect(esencial.capacidades).not.toContain("reservas_auto_confirmar");
   });
 
+  it("Esencial cubre el ciclo operativo: gastos, comisiones y recordatorios", () => {
+    const esencial = planCatalogoPorClave("esencial")!;
+    for (const cap of ["gastos", "comisiones", "recordatorios_email"] as const) {
+      expect(esencial.capacidades).toContain(cap);
+    }
+  });
+
+  it("el precio fundador vigente es menor que el precio de lista", () => {
+    for (const plan of PLANES_CATALOGO) {
+      expect(Number(plan.precioMensual)).toBeLessThan(Number(plan.precioListaMensual));
+      if (plan.precioAnual && plan.precioListaAnual) {
+        expect(Number(plan.precioAnual)).toBeLessThan(Number(plan.precioListaAnual));
+      }
+      if (plan.precioListaSucursalExtra != null && plan.precioSucursalExtra != null) {
+        expect(Number(plan.precioSucursalExtra)).toBeLessThanOrEqual(
+          Number(plan.precioListaSucursalExtra),
+        );
+      }
+    }
+  });
+
   it("el plan del trial (crecimiento) tiene 14 días y cubre 2 sucursales", () => {
     const crecimiento = planCatalogoPorClave("crecimiento")!;
     expect(crecimiento.trialDias).toBe(14);

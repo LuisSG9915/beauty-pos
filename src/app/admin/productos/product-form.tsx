@@ -94,10 +94,10 @@ export function ProductForm({
         <FieldLabel required>Precio de venta (MXN)</FieldLabel>
         <Input defaultValue={String(value("precioVenta") || "0")} min="0" name="precioVenta" placeholder="0.00" required step="0.01" type="number" />
       </Field>
-      <label className="flex min-h-11 items-center gap-3 rounded-xl border border-[#eee8e3] p-3 text-sm sm:col-span-2">
+      <label className="flex min-h-11 items-center gap-3 rounded-xl border border-border p-3 text-sm sm:col-span-2">
         <input defaultChecked={initial ? initial.visiblePos : true} name="visiblePos" type="checkbox" value="true" /> Visible en POS
       </label>
-      <p className="rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55] sm:col-span-2">
+      <p className="rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground sm:col-span-2">
         El margen se calcula automáticamente como precio de venta menos costo.
       </p>
     </div>
@@ -109,24 +109,24 @@ export function ProductForm({
         <FieldLabel required>Stock mínimo</FieldLabel>
         <Input defaultValue={String(value("stockMinimo") || "0")} min="0" name="stockMinimo" placeholder="0" required step="0.001" type="number" />
       </Field>
-      <p className="rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55] sm:col-span-2">
+      <p className="rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground sm:col-span-2">
         El stock por sucursal y los movimientos de inventario se gestionan desde el módulo de inventario.
       </p>
     </div>
   );
 
   const futuro = (
-    <p className="rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55]">
+    <p className="rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">
       Proveedores, sucursales e historial se habilitarán al conectar inventario y compras.
     </p>
   );
 
   return (
-    <form action={formAction} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
+    <form action={formAction} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
       <h2 className="text-xl font-semibold">{initial ? "Editar producto" : "Nuevo producto o insumo"}</h2>
-      <p className="mt-1 text-sm text-[#625b55]">Un producto puede venderse, consumirse como insumo o ambas cosas.</p>
+      <p className="mt-1 text-sm text-muted-foreground">Un producto puede venderse, consumirse como insumo o ambas cosas.</p>
       <div className="mt-5">
         <FormTabs
           tabs={[

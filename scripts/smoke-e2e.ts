@@ -2,17 +2,9 @@ import "dotenv/config";
 
 import puppeteer from "puppeteer";
 
-const BASE_URL = process.env.SMOKE_BASE_URL ?? "http://localhost:3000";
-const EMAIL = process.env.BOOTSTRAP_ADMIN_EMAIL;
-const PASSWORD = process.env.BOOTSTRAP_ADMIN_PASSWORD;
-const OUT_DIR = ".smoke-shots";
+import { BASE_URL, E2E_EMAIL, login } from "./lib/e2e";
 
-if (!EMAIL || !PASSWORD) {
-  console.error("Faltan BOOTSTRAP_ADMIN_EMAIL/BOOTSTRAP_ADMIN_PASSWORD en .env");
-  process.exit(1);
-}
-const email = EMAIL as string;
-const password = PASSWORD as string;
+const OUT_DIR = ".smoke-shots";
 
 const pages = [
   { name: "admin", path: "/admin" },
@@ -41,14 +33,8 @@ async function main() {
     consoleErrors.push(`pageerror: ${err instanceof Error ? err.message : String(err)}`),
   );
 
-  // Login
-  await page.goto(`${BASE_URL}/login`, { waitUntil: "networkidle0" });
-  await page.type('input[name="email"]', email);
-  await page.type('input[name="password"]', password);
-  await Promise.all([
-    page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
-    page.click('button[type="submit"]'),
-  ]);
+  // Login con la cuenta E2E (organización dedicada de pruebas).
+  await login(page, E2E_EMAIL);
   console.log(`Tras login: ${page.url()}`);
   await page.screenshot({ path: `${OUT_DIR}/00-after-login.png`, fullPage: true });
 

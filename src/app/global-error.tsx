@@ -19,8 +19,8 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
       <body
         style={{
           alignItems: "center",
-          backgroundColor: "#faf9f7",
-          color: "#2d2926",
+          backgroundColor: "#f9f8f9",
+          color: "#2b272c",
           display: "flex",
           fontFamily: "system-ui, sans-serif",
           justifyContent: "center",
@@ -32,14 +32,14 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
       >
         <main>
           <h1 style={{ fontSize: 20, fontWeight: 600, margin: 0 }}>Algo salió mal</h1>
-          <p style={{ color: "#625b55", fontSize: 14, lineHeight: 1.6, marginTop: 12, maxWidth: 360 }}>
+          <p style={{ color: "#5f5562", fontSize: 14, lineHeight: 1.6, marginTop: 12, maxWidth: 360 }}>
             Ocurrió un error inesperado. Intenta de nuevo; si el problema persiste, contacta a soporte.
           </p>
-          {error.digest ? <p style={{ color: "#a89a91", fontSize: 12, marginTop: 8 }}>Referencia: {error.digest}</p> : null}
+          {error.digest ? <p style={{ color: "#a096a3", fontSize: 12, marginTop: 8 }}>Referencia: {error.digest}</p> : null}
           <button
             onClick={() => reset()}
             style={{
-              backgroundColor: "#8a5140",
+              backgroundColor: "#724b7f",
               border: 0,
               borderRadius: 12,
               color: "#fff",

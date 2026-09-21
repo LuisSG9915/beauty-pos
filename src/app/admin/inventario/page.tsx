@@ -138,7 +138,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
   const stockTable = (rows: typeof catalogoProductos) => (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[720px] text-left text-sm">
-        <thead className="bg-[#f8f7f5] text-xs uppercase tracking-wide text-[#6e6159]">
+        <thead className="bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
             <th className="px-4 py-3 font-medium">SKU</th>
             <th className="px-4 py-3 font-medium">Producto</th>
@@ -148,26 +148,26 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
             <th className="px-4 py-3 font-medium">Estado</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#eee8e3]">
+        <tbody className="divide-y divide-border">
           {rows.map((producto) => {
             const stock = stockPorProducto.get(producto.id) ?? 0;
             const minimo = Number(producto.stockMinimo);
             const estado = stockTone(stock, minimo);
             return (
-              <tr className="hover:bg-[#faf9f7]" key={producto.id}>
-                <td className="px-4 py-3 text-xs text-[#625b55]">{producto.sku}</td>
+              <tr className="hover:bg-muted/60" key={producto.id}>
+                <td className="px-4 py-3 text-xs text-muted-foreground">{producto.sku}</td>
                 <td className="px-4 py-3 font-medium">{producto.nombre}</td>
-                <td className="px-4 py-3 text-xs capitalize text-[#625b55]">{producto.tipo}</td>
+                <td className="px-4 py-3 text-xs capitalize text-muted-foreground">{producto.tipo}</td>
                 <td className="px-4 py-3 text-right font-semibold tabular-nums">
                   {stock.toFixed(3)}{producto.unidad ? ` ${producto.unidad}` : ""}
                 </td>
-                <td className="px-4 py-3 text-right text-xs tabular-nums text-[#625b55]">{minimo.toFixed(3)}</td>
+                <td className="px-4 py-3 text-right text-xs tabular-nums text-muted-foreground">{minimo.toFixed(3)}</td>
                 <td className="px-4 py-3"><StatusBadge tone={estado.tone}>{estado.label}</StatusBadge></td>
               </tr>
             );
           })}
           {rows.length === 0 ? (
-            <tr><td className="px-4 py-10 text-center text-sm text-[#625b55]" colSpan={6}>Sin registros en esta categoría.</td></tr>
+            <tr><td className="px-4 py-10 text-center text-sm text-muted-foreground" colSpan={6}>Sin registros en esta categoría.</td></tr>
           ) : null}
         </tbody>
       </table>
@@ -188,8 +188,8 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
             className={cn(
               "inline-flex min-h-10 items-center rounded-full border px-3.5 text-xs font-medium transition-colors",
               item.id === branch.id
-                ? "border-[#8a5140] bg-[#f2e3dc] text-[#60392e]"
-                : "border-[#ded8d2] bg-white text-[#625b55] hover:border-[#c9a899] hover:bg-[#faf6f3]",
+                ? "border-primary bg-accent/70 text-primary"
+                : "border-border bg-card text-muted-foreground hover:border-accent-foreground/30 hover:bg-muted/60",
             )}
             href={buildAdminHref("/inventario", { organizationId, sucursalId: item.id })}
             key={item.id}
@@ -217,22 +217,22 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
                       content: (
                         <div className="space-y-4">
                           {stockTable(backbar)}
-                          <div className="border-t border-[#eee8e3] px-4 pb-4 pt-3">
-                            <h4 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+                          <div className="border-t border-border px-4 pb-4 pt-3">
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-primary">
                               Consumo por servicio · 30 días
                             </h4>
                             {consumoPorServicio.length === 0 ? (
-                              <p className="mt-2 text-sm text-[#625b55]">
+                              <p className="mt-2 text-sm text-muted-foreground">
                                 Sin consumo registrado. Vincula insumos a servicios para ver la demanda de cabina.
                               </p>
                             ) : (
                               <ul className="mt-2 space-y-1.5">
                                 {consumoPorServicio.map((row, i) => (
                                   <li className="flex items-baseline justify-between gap-3 text-sm" key={i}>
-                                    <span className="text-[#625b55]">
-                                      {row.servicio} <span className="text-xs text-[#6e6159]">· {row.insumo}</span>
+                                    <span className="text-muted-foreground">
+                                      {row.servicio} <span className="text-xs text-muted-foreground">· {row.insumo}</span>
                                     </span>
-                                    <span className="font-semibold tabular-nums text-[#2d2926]">
+                                    <span className="font-semibold tabular-nums text-foreground">
                                       {Number(row.consumo).toFixed(3)}{row.unidad ? ` ${row.unidad}` : ""}
                                     </span>
                                   </li>
@@ -253,7 +253,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
             <AdminCard className="overflow-hidden p-0 sm:p-0">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead className="bg-[#f8f7f5] text-xs uppercase tracking-wide text-[#6e6159]">
+                  <thead className="bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
                       <th className="px-4 py-3 font-medium">Fecha</th>
                       <th className="px-4 py-3 font-medium">Producto</th>
@@ -263,22 +263,22 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
                       <th className="px-4 py-3 font-medium">Notas</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#eee8e3]">
+                  <tbody className="divide-y divide-border">
                     {movimientos.map((movimiento) => {
                       const cantidad = Number(movimiento.cantidad);
                       return (
-                        <tr className="hover:bg-[#faf9f7]" key={movimiento.id}>
-                          <td className="px-4 py-3 text-xs whitespace-nowrap text-[#625b55]">{formatDateTime(movimiento.createdAt, { timeZone })}</td>
+                        <tr className="hover:bg-muted/60" key={movimiento.id}>
+                          <td className="px-4 py-3 text-xs whitespace-nowrap text-muted-foreground">{formatDateTime(movimiento.createdAt, { timeZone })}</td>
                           <td className="px-4 py-3 text-xs">{movimiento.sku} · {movimiento.productoNombre}</td>
                           <td className="px-4 py-3"><StatusBadge tone={cantidad >= 0 ? "success" : "destructive"}>{TIPO_LABEL[movimiento.tipo] ?? movimiento.tipo}</StatusBadge></td>
                           <td className="px-4 py-3 text-right text-xs tabular-nums">{cantidad > 0 ? "+" : ""}{cantidad.toFixed(3)}</td>
-                          <td className="px-4 py-3 text-right text-xs tabular-nums text-[#625b55]">{Number(movimiento.stockResultante).toFixed(3)}</td>
-                          <td className="max-w-44 truncate px-4 py-3 text-xs text-[#625b55]" title={movimiento.notas ?? ""}>{movimiento.notas ?? "—"}</td>
+                          <td className="px-4 py-3 text-right text-xs tabular-nums text-muted-foreground">{Number(movimiento.stockResultante).toFixed(3)}</td>
+                          <td className="max-w-44 truncate px-4 py-3 text-xs text-muted-foreground" title={movimiento.notas ?? ""}>{movimiento.notas ?? "—"}</td>
                         </tr>
                       );
                     })}
                     {movimientos.length === 0 ? (
-                      <tr><td className="px-4 py-10 text-center text-sm text-[#625b55]" colSpan={6}>Sin movimientos en esta sucursal.</td></tr>
+                      <tr><td className="px-4 py-10 text-center text-sm text-muted-foreground" colSpan={6}>Sin movimientos en esta sucursal.</td></tr>
                     ) : null}
                   </tbody>
                 </table>

@@ -35,11 +35,11 @@ export function GastoForm({
   const [state, action, pending] = useActionState(registrarGastoAction, initialActionState);
 
   return (
-    <form action={action} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
+    <form action={action} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <input name="organizacionId" type="hidden" value={organizationId} />
       <input name="sucursalId" type="hidden" value={sucursalId} />
-      <h2 className="text-xl font-semibold text-[#2d2926]">Registrar gasto</h2>
-      <p className="mt-1 text-sm leading-6 text-[#625b55]">
+      <h2 className="text-xl font-semibold text-foreground">Registrar gasto</h2>
+      <p className="mt-1 text-sm leading-6 text-muted-foreground">
         En efectivo descuenta del corte abierto; tarjeta, transferencia u otros medios no tocan el cajón.
       </p>
 

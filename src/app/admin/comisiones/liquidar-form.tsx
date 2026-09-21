@@ -42,10 +42,10 @@ export function LiquidarForm({
 
   return (
     <details className="group">
-      <summary className="cursor-pointer list-none text-sm font-medium text-[#8a5140] hover:underline">
+      <summary className="cursor-pointer list-none text-sm font-medium text-primary hover:underline">
         Liquidar periodo
       </summary>
-      <form action={action} className="mt-3 space-y-3 rounded-xl border border-[#eadfd8] bg-[#faf9f7] p-4">
+      <form action={action} className="mt-3 space-y-3 rounded-xl border border-border bg-muted/60 p-4">
         <input name="organizacionId" type="hidden" value={organizationId} />
         <input name="sucursalId" type="hidden" value={sucursalId} />
         <input name="usuarioId" type="hidden" value={usuarioId} />

@@ -30,11 +30,11 @@ export function MembresiaForm({
   const value = (key: keyof MembresiaData) => initial?.[key] ?? "";
 
   return (
-    <form action={formAction} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
+    <form action={formAction} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
       <h2 className="text-xl font-semibold">{initial ? "Editar membresía" : "Nueva membresía"}</h2>
-      <p className="mt-1 text-sm text-[#625b55]">
+      <p className="mt-1 text-sm text-muted-foreground">
         Beneficio por tiempo: el cliente paga por adelantado y obtiene un descuento mientras la membresía esté vigente.
       </p>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">

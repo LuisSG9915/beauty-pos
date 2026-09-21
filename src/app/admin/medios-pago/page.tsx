@@ -21,11 +21,11 @@ type SearchParams = Promise<AdminSearchParams>;
 
 const CATEGORIA_LABEL: Record<string, string> = { efectivo: "Efectivo", tarjeta: "Tarjeta", transferencia: "Transferencia", wallet: "Wallet", otro: "Otro" };
 const CATEGORIA_COLOR: Record<string, string> = {
-  efectivo: "bg-[#eaf5ed] text-[#347052]",
-  tarjeta: "bg-[#f2e3dc] text-[#8a5140]",
-  transferencia: "bg-[#eef0f5] text-[#4a5a7a]",
-  wallet: "bg-[#f5eee8] text-[#986b16]",
-  otro: "bg-[#f1eeea] text-[#625b55]",
+  efectivo: "bg-[#d4efe9] text-success",
+  tarjeta: "bg-accent/70 text-primary",
+  transferencia: "bg-[#e3f1fa] text-info",
+  wallet: "bg-muted/60 text-warning",
+  otro: "bg-muted/60 text-muted-foreground",
 };
 
 export default async function PaymentMethodsPage({ searchParams }: { searchParams: SearchParams }) {
@@ -56,7 +56,7 @@ export default async function PaymentMethodsPage({ searchParams }: { searchParam
     <div className="space-y-6">
       <AdminPageHeader description="Medios disponibles al cobrar en el POS." title="Medios de pago" />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#eadfd8] bg-white p-4" method="get">
+      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <Field className="w-56">
           <FieldLabel>Categoría</FieldLabel>
@@ -94,7 +94,7 @@ export default async function PaymentMethodsPage({ searchParams }: { searchParam
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[520px] text-left text-sm">
-                <thead className="border-b border-[#eee8e3] text-xs uppercase tracking-wide text-[#625b55]">
+                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-4 font-medium">Clave</th>
                     <th className="py-2 pr-4 font-medium">Nombre</th>
@@ -105,7 +105,7 @@ export default async function PaymentMethodsPage({ searchParams }: { searchParam
                 </thead>
                 <tbody>
                   {methods.map((method) => (
-                    <tr className="border-b border-[#f1eeea]" key={method.id}>
+                    <tr className="border-b border-border" key={method.id}>
                       <td className="py-3 pr-4 font-mono text-xs">{method.clave}</td>
                       <td className="py-3 pr-4 font-medium">{method.nombre}</td>
                       <td className="py-3 pr-4">
@@ -116,12 +116,12 @@ export default async function PaymentMethodsPage({ searchParams }: { searchParam
                       <td className="py-3 pr-4"><StatusBadge active={method.activo} /></td>
                       <td className="py-3">
                         <div className="flex flex-wrap gap-2">
-                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-[#ded8d2] px-2.5 text-xs text-[#625b55] hover:bg-[#f8f7f5]" href={buildAdminHref("/medios-pago", { organizationId, extra: { edit: method.id } })}>Editar</Link>
+                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/medios-pago", { organizationId, extra: { edit: method.id } })}>Editar</Link>
                           <form action={togglePaymentMethod}>
                             <input name="organizacionId" type="hidden" value={organizationId} />
                             <input name="id" type="hidden" value={method.id} />
                             <input name="activo" type="hidden" value={String(method.activo)} />
-                            <button className="inline-flex min-h-9 items-center rounded-lg border border-[#ded8d2] px-2.5 text-xs text-[#625b55] hover:bg-[#f8f7f5]" type="submit">{method.activo ? "Ocultar" : "Activar"}</button>
+                            <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">{method.activo ? "Ocultar" : "Activar"}</button>
                           </form>
                         </div>
                       </td>

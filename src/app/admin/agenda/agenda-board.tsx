@@ -1,9 +1,10 @@
 "use client";
 
-import { CalendarPlus, Clock3 } from "lucide-react";
+import { CalendarPlus, Clock3, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
+  useEffect,
   useMemo,
   useState,
   useSyncExternalStore,
@@ -40,6 +41,7 @@ import {
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
+import { categoryTone } from "@/lib/category-color";
 import { formatCurrency, formatDate, formatTime } from "@/lib/format";
 import { buildAdminHref } from "@/lib/url-context";
 import { cn } from "@/lib/utils";
@@ -66,7 +68,7 @@ export type AgendaCita = {
   /** Concurrencia optimista: se envía en cada mutación. */
   version: number;
   ventaId: string | null;
-  servicios: Array<{ id: string; nombre: string; precio: string }>;
+  servicios: Array<{ id: string; nombre: string; categoriaId: string | null; precio: string }>;
   recursos: Array<{ id: string; nombre: string }>;
 };
 
@@ -97,27 +99,21 @@ type MoveMode = "mover" | "reagendar";
 
 const FALLBACK_START = 8 * 60;
 const FALLBACK_END = 21 * 60;
-const HOUR_PX = 80;
+const HOUR_PX = 76;
 const PX_PER_MIN = HOUR_PX / 60;
+const COLUMN_HEADER_PX = 46;
 
-// Fondo/texto de la tarjeta; el estado además pinta la franja border-l-4.
-const ESTADO_STYLE: Record<string, string> = {
-  pendiente: "bg-[#f1eeea] text-[#625b55]",
-  confirmada: "bg-[#eef4fa] text-[#3a5a7a]",
-  en_proceso: "bg-[#fdf3e8] text-[#986b16]",
-  completada: "bg-[#eaf5ed] text-[#347052]",
-  cancelada: "bg-[#fdf1ee] text-[#a8443a]",
-  no_asistio: "bg-[#f3efe8] text-[#6e6159]",
+// Estado como badge compacto (datos funcionales, no paleta estructural).
+const ESTADO_CHIP: Record<string, string> = {
+  pendiente: "bg-[#f0ebe6]/90 text-muted-foreground",
+  confirmada: "bg-[#d7ebf7]/95 text-info",
+  en_proceso: "bg-[#ffe3ad]/95 text-warning",
+  completada: "bg-[#d4efe9]/95 text-success",
+  cancelada: "bg-[#f6d9d2]/95 text-destructive",
+  no_asistio: "bg-[#efe9e4]/95 text-muted-foreground",
 };
 
-const ESTADO_STRIPE: Record<string, string> = {
-  pendiente: "border-l-[#b4aaa0]",
-  confirmada: "border-l-[#7fa8cc]",
-  en_proceso: "border-l-[#dfa94e]",
-  completada: "border-l-[#58a374]",
-  cancelada: "border-l-[#c96a58]",
-  no_asistio: "border-l-[#9a8d82]",
-};
+const ESTADO_ATENUADO = new Set(["cancelada", "no_asistio"]);
 
 const BLOQUEO_LABEL: Record<string, string> = {
   descanso: "Descanso",
@@ -154,6 +150,81 @@ function citaInterval(cita: AgendaCita) {
   return { iniciaAtMs, terminaAtMs: iniciaAtMs + cita.duracionMinutos * 60_000 };
 }
 
+function iniciales(nombre: string) {
+  return (
+    nombre
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((word) => word[0]?.toUpperCase())
+      .join("") || "·"
+  );
+}
+
+/** Citas que se traslapan en una columna reciben carriles horizontales. */
+function layoutCitas(citas: AgendaCita[], timeZone: string) {
+  const items = citas
+    .map((cita) => {
+      const inicioMin = getZonedParts(new Date(cita.fechaHora), timeZone).minutosDelDia;
+      return { cita, inicioMin, finMin: inicioMin + cita.duracionMinutos };
+    })
+    .sort((a, b) => a.inicioMin - b.inicioMin || a.finMin - b.finMin);
+  const layout = new Map<string, { lane: number; lanes: number }>();
+  let cluster: typeof items = [];
+  let clusterFin = -Infinity;
+
+  const flush = () => {
+    if (cluster.length === 0) return;
+    const ocupados: number[] = [];
+    for (const item of cluster) {
+      let lane = 0;
+      for (;;) {
+        const libre = !cluster.some(
+          (otro) =>
+            otro !== item &&
+            layout.get(otro.cita.id)?.lane === lane &&
+            otro.inicioMin < item.finMin &&
+            otro.finMin > item.inicioMin,
+        );
+        if (libre) break;
+        lane += 1;
+      }
+      ocupados.push(lane);
+      layout.set(item.cita.id, { lane, lanes: 0 });
+    }
+    const lanes = Math.max(...ocupados, 0) + 1;
+    for (const item of cluster) {
+      const pos = layout.get(item.cita.id);
+      if (pos) layout.set(item.cita.id, { ...pos, lanes });
+    }
+    cluster = [];
+    clusterFin = -Infinity;
+  };
+
+  for (const item of items) {
+    if (cluster.length > 0 && item.inicioMin >= clusterFin) flush();
+    cluster.push(item);
+    clusterFin = Math.max(clusterFin, item.finMin);
+  }
+  flush();
+  return layout;
+}
+
+/** Minuto actual del día en la zona de la sucursal; null si no es hoy. */
+function useMinutoActual(fecha: string, timeZone: string) {
+  const [minuto, setMinuto] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => {
+      const parts = getZonedParts(new Date(), timeZone);
+      setMinuto(parts.dayKey === fecha ? parts.minutosDelDia : null);
+    };
+    tick();
+    const timer = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(timer);
+  }, [fecha, timeZone]);
+  return minuto;
+}
+
 function CitaCard({
   cita,
   currency,
@@ -175,15 +246,19 @@ function CitaCard({
   className?: string;
   style?: CSSProperties;
 }) {
+  const principal = cita.servicios[0];
+  const tone = categoryTone(principal?.categoriaId ?? principal?.id ?? null);
+  const compact = cita.duracionMinutos <= 35;
+  const fin = formatTime(new Date(citaInterval(cita).terminaAtMs).toISOString(), { timeZone });
   const servicios = cita.servicios.map((servicio) => servicio.nombre).join(", ");
   return (
     <button
       aria-label={`${ESTADO_LABEL[cita.estado] ?? cita.estado}, ${formatTime(cita.fechaHora, { timeZone })}, ${cita.clienteNombre}`}
       className={cn(
-        "w-full overflow-hidden rounded-xl border border-[#eadfd8] border-l-4 p-2 text-left shadow-sm transition-transform hover:-translate-y-0.5 focus-visible:z-10",
+        "w-full overflow-hidden rounded-lg border px-2 py-1.5 text-left shadow-[0_1px_2px_rgba(33,27,25,0.08)] transition-[box-shadow,transform] hover:z-10 hover:shadow-md focus-visible:z-20",
         draggable && "cursor-grab active:cursor-grabbing",
-        ESTADO_STYLE[cita.estado] ?? ESTADO_STYLE.pendiente,
-        ESTADO_STRIPE[cita.estado] ?? ESTADO_STRIPE.pendiente,
+        tone.card,
+        ESTADO_ATENUADO.has(cita.estado) && "opacity-70 saturate-[0.55]",
         className,
       )}
       draggable={draggable}
@@ -193,17 +268,28 @@ function CitaCard({
       style={style}
       type="button"
     >
-      <span className="flex items-center justify-between gap-2 text-[13px] font-semibold">
-        <span className="truncate">
-          {formatTime(cita.fechaHora, { timeZone })} · {cita.clienteNombre}
+      <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+        <span className="min-w-0 text-[11px] font-semibold leading-4 tabular-nums">
+          {formatTime(cita.fechaHora, { timeZone })}–{fin}
+        </span>
+        <span
+          className={cn(
+            "ml-auto shrink-0 rounded-full px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide",
+            ESTADO_CHIP[cita.estado] ?? ESTADO_CHIP.pendiente,
+          )}
+        >
+          {ESTADO_LABEL[cita.estado] ?? cita.estado}
         </span>
       </span>
-      <span className="mt-0.5 block truncate text-xs opacity-80">
-        {servicios || "Sin servicios"}
-      </span>
-      <span className="mt-0.5 block text-xs tabular-nums opacity-70">
-        {formatCurrency(cita.totalEstimado, { currency })}
-      </span>
+      <span className="block truncate text-[13px] font-semibold leading-4">{cita.clienteNombre}</span>
+      {!compact && servicios ? (
+        <span className="block truncate text-[11px] leading-4 opacity-85">{servicios}</span>
+      ) : null}
+      {!compact ? (
+        <span className="block text-[11px] leading-4 tabular-nums opacity-85">
+          {formatCurrency(cita.totalEstimado, { currency })}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -285,14 +371,14 @@ function MoveCitaDialog({
             </Select>
           </Field>
           {sugerencias.length > 0 ? (
-            <div className="rounded-xl border border-[#e3d9d1] bg-[#faf6f3] p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+            <div className="rounded-xl border border-border bg-muted/60 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">
                 Horarios libres sugeridos
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {sugerencias.map((iso) => (
                   <button
-                    className="rounded-lg border border-[#e3d9d1] bg-white px-3 py-1.5 text-xs font-medium text-[#403a35] transition-colors hover:border-[#8a5140] hover:bg-[#f2e3dc]"
+                    className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary hover:bg-accent/70"
                     key={iso}
                     onClick={() => aplicarSugerencia(iso)}
                     type="button"
@@ -301,7 +387,7 @@ function MoveCitaDialog({
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-[11px] text-[#6e6159]">
+              <p className="mt-2 text-[11px] text-muted-foreground">
                 Elige una sugerencia para rellenar fecha y hora, luego confirma.
               </p>
             </div>
@@ -341,7 +427,7 @@ export function AgendaBoard({
   vista: AgendaVista;
   weekDays: string[];
   staff: Array<{ id: string; nombre: string }>;
-  servicios: Array<{ id: string; nombre: string; precioBase: string; duracionMinutos: number }>;
+  servicios: Array<{ id: string; nombre: string; categoriaId: string | null; precioBase: string; duracionMinutos: number }>;
   recursos: AgendaRecurso[];
   citas: AgendaCita[];
   horarios: AgendaHorario[];
@@ -366,6 +452,9 @@ export function AgendaBoard({
   const [checkoutVentaId, setCheckoutVentaId] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const isXl = useMediaQuery("(min-width: 80rem)");
+  const isMd = useMediaQuery("(min-width: 48rem)");
+  const minutoActual = useMinutoActual(fecha, timeZone);
+  const [columnaMovilId, setColumnaMovilId] = useState<string | null>(null);
 
   // La cita seleccionada se deriva por id desde `citas`: al refrescarse el
   // board (router.refresh / revalidatePath tras una action) el panel siempre
@@ -394,6 +483,13 @@ export function AgendaBoard({
     for (const list of map.values()) list.sort((a, b) => a.fechaHora.localeCompare(b.fechaHora));
     return map;
   }, [citas, columns]);
+
+  // En pantallas < md se muestra un solo carril elegido con pestañas.
+  const columnaMovil =
+    columnaMovilId && columns.some((column) => column.id === columnaMovilId)
+      ? columnaMovilId
+      : (columns[0]?.id ?? "");
+  const columnsVisibles = isMd ? columns : columns.filter((column) => column.id === columnaMovil);
 
   const runMutation = (
     action: Promise<CitaMutationResult>,
@@ -502,120 +598,177 @@ export function AgendaBoard({
     setCreateOpen(true);
   };
 
+  const fondoLineas = `repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR_PX - 1}px, var(--border) ${HOUR_PX - 1}px, var(--border) ${HOUR_PX}px), repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR_PX / 4 - 1}px, color-mix(in srgb, var(--border) 45%, transparent) ${HOUR_PX / 4 - 1}px, color-mix(in srgb, var(--border) 45%, transparent) ${HOUR_PX / 4}px)`;
+
   const dayGrid = (
     // Scroll interno en ambos ejes: permite que los encabezados de columna
     // queden sticky (top-0) al desplazarse verticalmente por el día.
     // tabIndex: la región scrollable debe ser alcanzable con teclado (WCAG).
-    <div
-      aria-label={`Citas del día por profesional en ${sucursal.nombre}`}
-      className="max-h-[calc(100dvh-10rem)] overflow-auto rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm"
-      role="region"
-      tabIndex={0}
-    >
-      <div className="flex min-w-[760px] gap-2">
-        <div className="w-16 shrink-0 pt-10">
-          {hours.map((hour) => (
-            <div className="relative" key={hour} style={{ height: HOUR_PX }}>
-              <span className="absolute -top-2 right-2 text-[10px] font-medium text-[#6f635a]">
-                {pad2(hour)}:00
-              </span>
-            </div>
-          ))}
-        </div>
-        {columns.map((column) => {
-          const columnCitas = citasPorColumna.get(column.id) ?? [];
-          const columnBloqueos = bloqueos.filter(
-            (bloqueo) => bloqueo.usuarioId === null || bloqueo.usuarioId === column.id,
-          );
-          return (
-            <section
-              aria-label={column.nombre || "Sin asignar"}
-              className={cn("min-w-[164px] flex-1 rounded-xl transition-colors", dropTarget === column.id && "bg-[#f2e3dc]")}
-              key={column.id || "sin-asignar"}
-            >
-              <h3 className="sticky top-0 z-10 mb-2 rounded-xl bg-[#f1eeea] px-3 py-2 text-center text-xs font-semibold text-[#625b55]">
-                {column.nombre}
-              </h3>
-              <div
-                className="relative cursor-cell rounded-xl border border-[#eee8e3] bg-[#faf9f7]"
-                onClick={(event) => clickEnHueco(event, column.id)}
-                onDragLeave={() => setDropTarget((target) => (target === column.id ? null : target))}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  setDropTarget(column.id);
-                }}
-                onDrop={(event) => dropEnColumna(event, column.id)}
-                style={{ height: (endMin - startMin) * PX_PER_MIN }}
-                title="Clic para nueva cita"
-              >
-                {hours.map((hour) => (
-                  <div className="pointer-events-none absolute w-full border-t border-[#eee8e3]" key={hour} style={{ top: (hour * 60 - startMin) * PX_PER_MIN }} />
-                ))}
-                {hours.map((hour) =>
-                  // Guías tenues cada 15 min para facilitar el clic en huecos.
-                  [15, 30, 45].map((offset) => (
-                    <div
-                      className="pointer-events-none absolute w-full border-t border-dashed border-[#f4eeea]"
-                      key={`${hour}-${offset}`}
-                      style={{ top: (hour * 60 + offset - startMin) * PX_PER_MIN }}
-                    />
-                  )),
+    <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+      {columns.length > 1 ? (
+        <div
+          aria-label="Profesional visible"
+          className="flex gap-2 overflow-x-auto border-b border-border bg-muted/50 p-2 md:hidden"
+          role="tablist"
+        >
+          {columns.map((column) => {
+            const activo = columnaMovil === column.id;
+            const tone = categoryTone(column.id || "sin-asignar");
+            const total = citasPorColumna.get(column.id)?.length ?? 0;
+            return (
+              <button
+                aria-selected={activo}
+                className={cn(
+                  "flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-2.5 text-xs font-medium transition-colors",
+                  activo ? "border-primary/40 bg-accent text-accent-foreground" : "border-border bg-card text-muted-foreground",
                 )}
-                {turnosDia.length === 0 ? (
-                  <div className="absolute inset-0 z-0 rounded-xl bg-[#f1eeea]/70 p-3 text-center text-xs font-medium text-[#6e6159]">
-                    Sin horario configurado
-                  </div>
-                ) : null}
-                {columnBloqueos.map((bloqueo) => {
-                  if (!dayBounds) return null;
-                  const inicia = new Date(bloqueo.iniciaAt).getTime();
-                  const termina = new Date(bloqueo.terminaAt).getTime();
-                  const dayStart = dayBounds.iniciaAt.getTime() + startMin * 60_000;
-                  const dayEnd = dayBounds.iniciaAt.getTime() + endMin * 60_000;
-                  if (termina <= dayStart || inicia >= dayEnd) return null;
-                  const top = (Math.max(inicia, dayStart) - dayStart) / 60_000 * PX_PER_MIN;
-                  const height = Math.max((Math.min(termina, dayEnd) - Math.max(inicia, dayStart)) / 60_000 * PX_PER_MIN, 24);
-                  return (
-                    <div
-                      className="absolute inset-x-1 z-[1] rounded-lg border border-dashed border-[#c9a899] bg-[#f2e3dc]/80 px-2 py-1 text-[10px] font-medium text-[#7b4c3d]"
-                      key={bloqueo.id}
-                      style={{ top, height }}
-                      title={bloqueo.motivo ?? BLOQUEO_LABEL[bloqueo.tipo] ?? "Bloqueo"}
-                    >
-                      {BLOQUEO_LABEL[bloqueo.tipo] ?? "Bloqueo"}
-                    </div>
-                  );
-                })}
-                {columnCitas.map((cita) => {
-                  const interval = citaInterval(cita);
-                  const top = (getZonedParts(new Date(cita.fechaHora), timeZone).minutosDelDia - startMin) * PX_PER_MIN;
-                  const height = Math.max((interval.terminaAtMs - interval.iniciaAtMs) / 60_000 * PX_PER_MIN, 34);
-                  return (
-                    <CitaCard
-                      cita={cita}
-                      className="absolute inset-x-1 z-[2]"
-                      currency={currency}
-                      draggable
-                      key={cita.id}
-                      onClick={() => setSelectedId(cita.id)}
-                      onDragEnd={() => {
-                        setDragId(null);
-                        setDropTarget(null);
-                      }}
-                      onDragStart={(event) => {
-                        event.dataTransfer.setData("text/plain", cita.id);
-                        event.dataTransfer.effectAllowed = "move";
-                        setDragId(cita.id);
-                      }}
-                      style={{ top, height }}
-                      timeZone={timeZone}
-                    />
-                  );
-                })}
+                key={column.id || "sin-asignar"}
+                onClick={() => setColumnaMovilId(column.id)}
+                role="tab"
+                type="button"
+              >
+                <span className={cn("flex size-6 items-center justify-center rounded-full border text-[10px] font-semibold", tone.chip)}>
+                  {column.id ? iniciales(column.nombre) : <UserRound aria-hidden="true" className="size-3.5" />}
+                </span>
+                <span className="max-w-24 truncate">{column.nombre}</span>
+                <span className="rounded-full bg-background px-1.5 py-0.5 text-[10px] tabular-nums">{total}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+      <div
+        aria-label={`Citas del día por profesional en ${sucursal.nombre}`}
+        className="max-h-[calc(100dvh-10rem)] overflow-auto"
+        role="region"
+        tabIndex={0}
+      >
+        <div className={cn("flex", isMd && "min-w-[760px]")}>
+          <div
+            className="sticky left-0 z-20 w-14 shrink-0 border-r border-border bg-card"
+            style={{ paddingTop: COLUMN_HEADER_PX }}
+          >
+            {hours.map((hour) => (
+              <div className="relative" key={hour} style={{ height: HOUR_PX }}>
+                <span className="absolute -top-2 right-2 text-[10px] font-medium text-muted-foreground">
+                  {pad2(hour)}:00
+                </span>
               </div>
-            </section>
-          );
-        })}
+            ))}
+          </div>
+          {columnsVisibles.map((column, index) => {
+            const columnCitas = citasPorColumna.get(column.id) ?? [];
+            const columnBloqueos = bloqueos.filter(
+              (bloqueo) => bloqueo.usuarioId === null || bloqueo.usuarioId === column.id,
+            );
+            const layout = layoutCitas(columnCitas, timeZone);
+            const tone = categoryTone(column.id || "sin-asignar");
+            return (
+              <section
+                aria-label={column.nombre || "Sin asignar"}
+                className={cn(
+                  "min-w-0 flex-1 transition-colors md:min-w-[150px]",
+                  index > 0 && "border-l border-border",
+                  dropTarget === column.id && "bg-accent/50",
+                )}
+                key={column.id || "sin-asignar"}
+              >
+                <h3
+                  className="sticky top-0 z-10 flex items-center justify-center gap-2 border-b border-border bg-card/95 px-2 backdrop-blur-sm"
+                  style={{ height: COLUMN_HEADER_PX }}
+                >
+                  <span className={cn("flex size-7 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold", tone.chip)}>
+                    {column.id ? iniciales(column.nombre) : <UserRound aria-hidden="true" className="size-4" />}
+                  </span>
+                  <span className="truncate text-xs font-semibold text-foreground">{column.nombre}</span>
+                  <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums text-muted-foreground">
+                    {columnCitas.length}
+                  </span>
+                </h3>
+                <div
+                  className="relative cursor-cell bg-background"
+                  onClick={(event) => clickEnHueco(event, column.id)}
+                  onDragLeave={() => setDropTarget((target) => (target === column.id ? null : target))}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setDropTarget(column.id);
+                  }}
+                  onDrop={(event) => dropEnColumna(event, column.id)}
+                  style={{ height: (endMin - startMin) * PX_PER_MIN, backgroundImage: fondoLineas }}
+                  title="Clic para nueva cita"
+                >
+                  {turnosDia.length === 0 ? (
+                    <div className="absolute inset-0 z-0 bg-muted/60 p-3 text-center text-xs font-medium text-muted-foreground">
+                      Sin horario configurado
+                    </div>
+                  ) : null}
+                  {minutoActual !== null && minutoActual >= startMin && minutoActual <= endMin ? (
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-0 z-[3]"
+                      style={{ top: (minutoActual - startMin) * PX_PER_MIN }}
+                    >
+                      <div className="border-t-2 border-primary" />
+                      {index === 0 ? <span className="absolute -left-1 -top-[5px] size-2 rounded-full bg-primary" /> : null}
+                    </div>
+                  ) : null}
+                  {columnBloqueos.map((bloqueo) => {
+                    if (!dayBounds) return null;
+                    const inicia = new Date(bloqueo.iniciaAt).getTime();
+                    const termina = new Date(bloqueo.terminaAt).getTime();
+                    const dayStart = dayBounds.iniciaAt.getTime() + startMin * 60_000;
+                    const dayEnd = dayBounds.iniciaAt.getTime() + endMin * 60_000;
+                    if (termina <= dayStart || inicia >= dayEnd) return null;
+                    const top = (Math.max(inicia, dayStart) - dayStart) / 60_000 * PX_PER_MIN;
+                    const height = Math.max((Math.min(termina, dayEnd) - Math.max(inicia, dayStart)) / 60_000 * PX_PER_MIN, 24);
+                    return (
+                      <div
+                        className="absolute inset-x-1 z-[1] rounded-lg border border-dashed border-muted-foreground/40 bg-muted/80 px-2 py-1 text-[10px] font-medium text-muted-foreground"
+                        key={bloqueo.id}
+                        style={{ top, height }}
+                        title={bloqueo.motivo ?? BLOQUEO_LABEL[bloqueo.tipo] ?? "Bloqueo"}
+                      >
+                        {BLOQUEO_LABEL[bloqueo.tipo] ?? "Bloqueo"}
+                      </div>
+                    );
+                  })}
+                  {columnCitas.map((cita) => {
+                    const interval = citaInterval(cita);
+                    const top = (getZonedParts(new Date(cita.fechaHora), timeZone).minutosDelDia - startMin) * PX_PER_MIN;
+                    const height = Math.max((interval.terminaAtMs - interval.iniciaAtMs) / 60_000 * PX_PER_MIN, 34);
+                    const pos = layout.get(cita.id) ?? { lane: 0, lanes: 1 };
+                    return (
+                      <CitaCard
+                        cita={cita}
+                        className="absolute z-[2]"
+                        currency={currency}
+                        draggable
+                        key={cita.id}
+                        onClick={() => setSelectedId(cita.id)}
+                        onDragEnd={() => {
+                          setDragId(null);
+                          setDropTarget(null);
+                        }}
+                        onDragStart={(event) => {
+                          event.dataTransfer.setData("text/plain", cita.id);
+                          event.dataTransfer.effectAllowed = "move";
+                          setDragId(cita.id);
+                        }}
+                        style={{
+                          top,
+                          height,
+                          left: `calc(${(pos.lane * 100) / pos.lanes}% + 2px)`,
+                          width: `calc(${100 / pos.lanes}% - 4px)`,
+                        }}
+                        timeZone={timeZone}
+                      />
+                    );
+                  })}
+                </div>
+              </section>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
@@ -626,13 +779,13 @@ export function AgendaBoard({
         const dayCitas = citas.filter((cita) => getZonedParts(new Date(cita.fechaHora), timeZone).dayKey === day);
         const isSelected = day === fecha;
         return (
-          <section className={cn("min-h-48 rounded-2xl border bg-white p-3 shadow-sm", isSelected ? "border-[#8a5140]" : "border-[#eadfd8]")} key={day}>
+          <section className={cn("min-h-48 rounded-2xl border bg-card p-3 shadow-sm", isSelected ? "border-primary/60 ring-1 ring-primary/25" : "border-border")} key={day}>
             <Link
-              className="flex items-center justify-between rounded-lg px-1 pb-2 text-sm font-semibold text-[#403a35] hover:text-[#8a5140]"
+              className="flex items-center justify-between rounded-lg px-1 pb-2 text-sm font-semibold text-foreground hover:text-primary"
               href={buildAdminHref("/agenda", { params: searchParams, preserve: ["sucursalId", "q"], extra: { fecha: day, vista: "dia" } })}
             >
               {formatDate(`${day}T12:00:00Z`, { timeZone: "UTC" })}
-              <span className="rounded-full bg-[#f1eeea] px-2 py-0.5 text-[10px] tabular-nums text-[#625b55]">{dayCitas.length}</span>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] tabular-nums text-muted-foreground">{dayCitas.length}</span>
             </Link>
             <div className="space-y-2">
               {dayCitas.map((cita) => (
@@ -644,7 +797,7 @@ export function AgendaBoard({
                   timeZone={timeZone}
                 />
               ))}
-              {dayCitas.length === 0 ? <p className="rounded-lg bg-[#f8f7f5] px-3 py-4 text-center text-xs text-[#6e6159]">Sin citas</p> : null}
+              {dayCitas.length === 0 ? <p className="rounded-lg bg-muted/60 px-3 py-4 text-center text-xs text-muted-foreground">Sin citas</p> : null}
             </div>
           </section>
         );
@@ -656,7 +809,7 @@ export function AgendaBoard({
     <AdminCard className="overflow-hidden p-0 sm:p-0">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="bg-[#f8f7f5] text-xs uppercase tracking-wide text-[#6e6159]">
+          <thead className="bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-3 font-medium">Fecha y hora</th>
               <th className="px-4 py-3 font-medium">Cliente</th>
@@ -667,19 +820,19 @@ export function AgendaBoard({
               <th className="px-4 py-3 text-right font-medium">Acciones</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#eee8e3]">
+          <tbody className="divide-y divide-border">
             {citas.map((cita) => (
-              <tr className="hover:bg-[#faf9f7]" key={cita.id}>
+              <tr className="hover:bg-muted/50" key={cita.id}>
                 <td className="px-4 py-3 whitespace-nowrap">
                   {formatDate(cita.fechaHora, { timeZone })}
-                  <span className="ml-2 text-xs text-[#6e6159]">{formatTime(cita.fechaHora, { timeZone })}</span>
+                  <span className="ml-2 text-xs text-muted-foreground">{formatTime(cita.fechaHora, { timeZone })}</span>
                 </td>
                 <td className="px-4 py-3 font-medium">{cita.clienteNombre}</td>
-                <td className="px-4 py-3 text-xs text-[#625b55]">{cita.usuarioNombre ?? "Sin asignar"}</td>
-                <td className="max-w-56 truncate px-4 py-3 text-xs text-[#625b55]">
+                <td className="px-4 py-3 text-xs text-muted-foreground">{cita.usuarioNombre ?? "Sin asignar"}</td>
+                <td className="max-w-56 truncate px-4 py-3 text-xs text-muted-foreground">
                   {cita.servicios.map((servicio) => servicio.nombre).join(", ") || "Sin servicios"}
                   {cita.recursos.length > 0 ? (
-                    <span className="block text-[10px] text-[#6e6159]">{cita.recursos.map((r) => r.nombre).join(", ")}</span>
+                    <span className="block text-[10px] text-muted-foreground/80">{cita.recursos.map((r) => r.nombre).join(", ")}</span>
                   ) : null}
                 </td>
                 <td className="px-4 py-3"><CitaStatusBadge estado={cita.estado} /></td>
@@ -693,7 +846,7 @@ export function AgendaBoard({
             ))}
             {citas.length === 0 ? (
               <tr>
-                <td className="px-4 py-10 text-center text-sm text-[#625b55]" colSpan={7}>
+                <td className="px-4 py-10 text-center text-sm text-muted-foreground" colSpan={7}>
                   No hay citas que coincidan con el filtro.
                 </td>
               </tr>
@@ -741,7 +894,7 @@ export function AgendaBoard({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-[#625b55]">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <Clock3 aria-hidden="true" className="size-4" />
           <span>
             {turnosDia.length > 0
@@ -759,7 +912,7 @@ export function AgendaBoard({
         <div className={cn(selected ? "xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(340px,26rem)] xl:gap-4" : "")}>
           {dayGrid}
           {selected && panelInline ? (
-            <aside className="sticky top-24 max-h-[calc(100dvh-8rem)] self-start overflow-y-auto rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
+            <aside className="sticky top-24 max-h-[calc(100dvh-8rem)] self-start overflow-y-auto rounded-2xl border border-border bg-card p-5 shadow-sm">
               {sidePanel}
             </aside>
           ) : null}

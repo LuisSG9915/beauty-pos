@@ -1,4 +1,4 @@
-// Service worker de Beauty POS.
+// Service worker de Melena.
 // Estrategia:
 // - Assets inmutables de Next (`/_next/static`) → stale-while-revalidate.
 // - Navegaciones → red primero; sin red, la página offline cacheada.
@@ -6,9 +6,11 @@
 //   del turno: no se cachean — solo el shell offline.
 // - Todo lo demás (APIs, server actions, queries) → directo a red.
 
-const CACHE_VERSION = "beauty-pos-v2";
+const CACHE_VERSION = "melena-v1";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
+// Prefijos históricos: purga también las cachés de la etapa "beauty-pos".
+const CACHE_PREFIXES = ["melena", "beauty-pos"];
 const OFFLINE_URL = "/offline";
 const OFFLINE_VENTA_URL = "/offline/venta";
 const PRECACHE_URLS = [OFFLINE_URL, OFFLINE_VENTA_URL];
@@ -26,7 +28,7 @@ self.addEventListener("activate", (event) => {
       .then((keys) =>
         Promise.all(
           keys
-            .filter((key) => key.startsWith(CACHE_VERSION.split("-v")[0]) && key !== STATIC_CACHE && key !== SHELL_CACHE)
+            .filter((key) => CACHE_PREFIXES.some((prefix) => key.startsWith(prefix)) && key !== STATIC_CACHE && key !== SHELL_CACHE)
             .map((key) => caches.delete(key)),
         ),
       )

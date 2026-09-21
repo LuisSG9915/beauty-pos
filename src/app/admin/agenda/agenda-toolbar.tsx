@@ -66,36 +66,9 @@ export function AgendaToolbar({
     });
 
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm lg:flex-row lg:items-end lg:justify-between">
-      <div className="grid gap-3 sm:grid-cols-2 lg:flex lg:items-end">
-        <label className="min-w-44 space-y-1.5">
-          <span className="text-xs font-medium text-[#6e6159]">Sucursal</span>
-          <select
-            aria-label="Sucursal de la agenda"
-            className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
-            onChange={(event) => router.push(hrefFor({ sucursalId: event.target.value }))}
-            value={sucursalId}
-          >
-            {branches.map((branch) => (
-              <option key={branch.id} value={branch.id}>
-                {branch.nombre} · {branch.clave}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1.5">
-          <span className="text-xs font-medium text-[#6e6159]">Fecha</span>
-          <input
-            aria-label="Fecha de la agenda"
-            className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
-            onChange={(event) => {
-              if (event.target.value) router.push(hrefFor({ fecha: event.target.value }));
-            }}
-            type="date"
-            value={fecha}
-          />
-        </label>
-        <div className="flex items-center gap-1 lg:pb-0">
+    <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1">
           <Button
             aria-label="Periodo anterior"
             className="rounded-xl"
@@ -107,7 +80,7 @@ export function AgendaToolbar({
             <ChevronLeft aria-hidden="true" />
           </Button>
           <Button
-            className="rounded-xl"
+            className={cn("rounded-xl", fecha === hoy && "border-primary/40 bg-accent text-accent-foreground")}
             onClick={() => router.push(hrefFor({ fecha: hoy }))}
             type="button"
             variant="outline"
@@ -125,9 +98,36 @@ export function AgendaToolbar({
             <ChevronRight aria-hidden="true" />
           </Button>
         </div>
+        <label className="min-w-0">
+          <span className="sr-only">Fecha de la agenda</span>
+          <input
+            aria-label="Fecha de la agenda"
+            className="h-10 w-full min-w-40 rounded-xl border border-input bg-background px-3 text-sm font-medium outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+            onChange={(event) => {
+              if (event.target.value) router.push(hrefFor({ fecha: event.target.value }));
+            }}
+            type="date"
+            value={fecha}
+          />
+        </label>
+        <label className="min-w-44 flex-1 sm:flex-none">
+          <span className="sr-only">Sucursal de la agenda</span>
+          <select
+            aria-label="Sucursal de la agenda"
+            className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+            onChange={(event) => router.push(hrefFor({ sucursalId: event.target.value }))}
+            value={sucursalId}
+          >
+            {branches.map((branch) => (
+              <option key={branch.id} value={branch.id}>
+                {branch.nombre} · {branch.clave}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+      <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
         <div className="relative min-w-0 flex-1 sm:w-64">
           <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <label className="sr-only" htmlFor="agenda-buscar">
@@ -143,15 +143,15 @@ export function AgendaToolbar({
             type="search"
           />
         </div>
-        <div aria-label="Vista de agenda" className="flex rounded-xl border border-[#ded8d2] bg-[#f1eeea] p-1" role="group">
+        <div aria-label="Vista de agenda" className="flex rounded-xl border border-border bg-muted p-1" role="group">
           {VIEWS.map((view) => (
             <Link
               aria-current={vista === view.value ? "page" : undefined}
               className={cn(
                 "inline-flex min-h-8 flex-1 items-center justify-center rounded-lg px-3 text-xs font-medium whitespace-nowrap transition-colors",
                 vista === view.value
-                  ? "bg-white text-[#60392e] shadow-sm"
-                  : "text-[#625b55] hover:text-[#8a5140]",
+                  ? "bg-card font-semibold text-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-primary",
               )}
               href={hrefFor({ vista: view.value })}
               key={view.value}

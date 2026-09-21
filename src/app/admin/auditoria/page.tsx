@@ -97,7 +97,7 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
         title="Auditoría"
       />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm" method="get">
+      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <Field className="w-40">
           <FieldLabel>Desde</FieldLabel>
@@ -110,7 +110,7 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
         <Field className="w-52">
           <FieldLabel>Acción</FieldLabel>
           <select
-            className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm text-[#403a35]"
+            className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground"
             defaultValue={accion}
             name="accion"
           >
@@ -123,7 +123,7 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
         <Field className="w-52">
           <FieldLabel>Usuario</FieldLabel>
           <select
-            className="h-10 w-full rounded-xl border border-[#ded8d2] bg-white px-3 text-sm text-[#403a35]"
+            className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground"
             defaultValue={usuarioId}
             name="usuarioId"
           >
@@ -139,10 +139,10 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
       {pageRows.length === 0 ? (
         <EmptyState description="No hay eventos registrados con esos filtros." title="Sin eventos" />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-[#eadfd8] bg-white shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#eee6e0] bg-[#faf6f3] text-left text-xs uppercase tracking-wide text-[#6e6159]">
+              <tr className="border-b border-border bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3 font-medium">Fecha</th>
                 <th className="px-4 py-3 font-medium">Usuario</th>
                 <th className="px-4 py-3 font-medium">Acción</th>
@@ -152,19 +152,19 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
             </thead>
             <tbody>
               {pageRows.map((evento) => (
-                <tr className="border-b border-[#f4eeea] last:border-0" key={evento.id}>
-                  <td className="whitespace-nowrap px-4 py-3 text-[#625b55]">
-                    {formatDate(evento.createdAt)} <span className="text-[#a99d94]">{formatTime(evento.createdAt)}</span>
+                <tr className="border-b border-border last:border-0" key={evento.id}>
+                  <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
+                    {formatDate(evento.createdAt)} <span className="text-muted-foreground">{formatTime(evento.createdAt)}</span>
                   </td>
-                  <td className="px-4 py-3 font-medium text-[#2d2926]">{evento.usuario ?? "Sistema"}</td>
+                  <td className="px-4 py-3 font-medium text-foreground">{evento.usuario ?? "Sistema"}</td>
                   <td className="px-4 py-3">
-                    <span className="rounded-full bg-[#f1eeea] px-2.5 py-1 text-xs font-medium text-[#60392e]">
+                    <span className="rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-primary">
                       {evento.accion}
                     </span>
                   </td>
-                  <td className="hidden px-4 py-3 text-[#625b55] md:table-cell">{evento.sucursal ?? "—"}</td>
+                  <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{evento.sucursal ?? "—"}</td>
                   <td className="hidden max-w-72 px-4 py-3 lg:table-cell">
-                    <span className="block truncate text-xs text-[#6e6159]" title={evento.detalle ? JSON.stringify(evento.detalle) : undefined}>
+                    <span className="block truncate text-xs text-muted-foreground" title={evento.detalle ? JSON.stringify(evento.detalle) : undefined}>
                       {evento.detalle ? JSON.stringify(evento.detalle) : evento.entidad ? `${evento.entidad} ${evento.entidadId ?? ""}` : "—"}
                     </span>
                   </td>
@@ -176,7 +176,7 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
       )}
 
       <div className="flex items-center justify-between text-sm">
-        <span className="text-[#6e6159]">Página {page}</span>
+        <span className="text-muted-foreground">Página {page}</span>
         <div className="flex gap-2">
           {page > 1 ? (
             <Button nativeButton={false} render={<Link href={buildAdminHref("/auditoria", { ...baseParams, extra: { ...baseParams.extra, page: String(page - 1) } })} />} variant="outline">

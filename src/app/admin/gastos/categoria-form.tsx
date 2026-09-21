@@ -12,10 +12,10 @@ export function CategoriaGastoForm({ organizationId }: { organizationId: string 
   const [state, action, pending] = useActionState(crearCategoriaGastoAction, initialActionState);
 
   return (
-    <form action={action} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
+    <form action={action} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <input name="organizacionId" type="hidden" value={organizationId} />
-      <h2 className="font-semibold text-[#2d2926]">Nueva categoría</h2>
-      <p className="mt-1 text-sm text-[#625b55]">Renta, insumos, sueldos, mantenimiento…</p>
+      <h2 className="font-semibold text-foreground">Nueva categoría</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Renta, insumos, sueldos, mantenimiento…</p>
       <Field className="mt-4">
         <FieldLabel required>Nombre</FieldLabel>
         <Input name="nombre" placeholder="Nombre de la categoría" required />

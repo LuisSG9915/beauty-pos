@@ -32,7 +32,7 @@ export function SubscriptionBanner({
 
   if (badge.estado === "vencida") {
     return (
-      <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[#e5b4a2] bg-[#fdf0ea] px-4 py-3 text-sm text-[#7c3a21]">
+      <div className="mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
         <LockKeyhole aria-hidden="true" className="size-4 shrink-0" />
         <p>
           Tu suscripción está en pausa: puedes consultar tu información, pero no
@@ -47,7 +47,7 @@ export function SubscriptionBanner({
   }
 
   return (
-    <div className="mb-4 flex items-center gap-3 rounded-2xl border border-[#ecd9c4] bg-[#fdf7ef] px-4 py-3 text-sm text-[#7a4f22]">
+    <div className="mb-4 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
       <Clock3 aria-hidden="true" className="size-4 shrink-0" />
       <p>
         Estás en tu periodo de prueba

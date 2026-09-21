@@ -37,7 +37,7 @@ function AccessError({ error }: { error?: string }) {
   const message = error ? ERROR_MESSAGES[error] : undefined;
   if (!message) return null;
   return (
-    <p className="rounded-xl border border-[#f0c8be] bg-[#fdf1ee] px-4 py-3 text-sm text-[#a8443a]" role="alert">
+    <p className="rounded-xl border border-[#efc0b4] bg-[#f6d9d2] px-4 py-3 text-sm text-destructive" role="alert">
       {message}
     </p>
   );
@@ -97,18 +97,18 @@ function MemberDashboard({
                 {alertas.map((alerta) => (
                   <li key={alerta.clave}>
                     <Link
-                      className="flex items-center justify-between gap-3 rounded-xl border border-[#eadfd8] bg-white px-4 py-3 transition-colors hover:border-[#c9a899]"
+                      className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:border-accent-foreground/30"
                       href={buildAdminHref(alerta.href, {
                         organizationId: item.organizationId,
                         sucursalId: item.branchId,
                       })}
                     >
-                      <span className="text-sm font-medium text-[#403a35]">{alerta.titulo}</span>
+                      <span className="text-sm font-medium text-foreground">{alerta.titulo}</span>
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                           alerta.tono === "critico"
-                            ? "bg-[#fdf1ee] text-[#a8443a]"
-                            : "bg-[#fdf6f1] text-[#a76348]"
+                            ? "bg-[#f6d9d2] text-destructive"
+                            : "bg-accent/70 text-primary"
                         }`}
                       >
                         {alerta.cantidad}
@@ -126,13 +126,13 @@ function MemberDashboard({
         <div className="grid gap-4 md:grid-cols-2">
           {access.map((item) => (
             <Link
-              className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm transition-colors hover:border-[#c9a899] focus-visible:outline-2 focus-visible:outline-[#8a5140]"
+              className="rounded-2xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-accent-foreground/30 focus-visible:outline-2 focus-visible:outline-ring"
               href={buildAdminHref("/agenda", { organizationId: item.organizationId, sucursalId: item.branchId })}
               key={`${item.organizationId}-${item.branchId}`}
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a5140]">Organización</p>
-              <h2 className="mt-2 text-xl font-semibold text-[#2d2926]">{item.organization}</h2>
-              <p className="mt-3 text-sm text-[#6e6159]">Sucursal: {item.branch} ({item.branchKey})</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Organización</p>
+              <h2 className="mt-2 text-xl font-semibold text-foreground">{item.organization}</h2>
+              <p className="mt-3 text-sm text-muted-foreground">Sucursal: {item.branch} ({item.branchKey})</p>
             </Link>
           ))}
         </div>
@@ -147,7 +147,7 @@ function MemberDashboard({
                 tienePermisoNav(accion.permiso, permissionsByOrg[first.organizationId]),
             ).map((accion) => (
               <Link
-                className="flex min-h-20 flex-col items-start justify-between gap-2 rounded-2xl border border-[#eadfd8] bg-white p-4 transition-colors hover:border-[#c9a899] hover:bg-[#faf6f3] focus-visible:outline-2 focus-visible:outline-[#8a5140]"
+                className="flex min-h-20 flex-col items-start justify-between gap-2 rounded-2xl border border-border bg-card p-4 transition-colors hover:border-accent-foreground/30 hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-ring"
                 data-action-id={`inicio.accion.${accion.id}`}
                 href={buildAdminHref(accion.href, {
                   organizationId: first.organizationId,
@@ -156,9 +156,9 @@ function MemberDashboard({
                 })}
                 key={accion.id}
               >
-                <accion.icon aria-hidden="true" className="size-5 text-[#8a5140]" strokeWidth={1.9} />
-                <span className="text-sm font-semibold text-[#2d2926]">{accion.label}</span>
-                <span className="text-xs leading-4 text-[#6e6159]">{accion.ayuda}</span>
+                <accion.icon aria-hidden="true" className="size-5 text-primary" strokeWidth={1.9} />
+                <span className="text-sm font-semibold text-foreground">{accion.label}</span>
+                <span className="text-xs leading-4 text-muted-foreground">{accion.ayuda}</span>
               </Link>
             ))}
           </div>
@@ -391,11 +391,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       >
         <dl className="grid gap-3 sm:grid-cols-5">
           {embudo.map((etapa) => (
-            <div className="rounded-xl bg-[#faf6f3] px-3 py-2" key={etapa.etiqueta}>
-              <dt className="text-[11px] uppercase tracking-wide text-[#6e6159]">{etapa.etiqueta}</dt>
-              <dd className="mt-0.5 text-lg font-semibold text-[#2d2926]">
+            <div className="rounded-xl bg-muted/60 px-3 py-2" key={etapa.etiqueta}>
+              <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{etapa.etiqueta}</dt>
+              <dd className="mt-0.5 text-lg font-semibold text-foreground">
                 {etapa.valor}
-                {etapa.pct != null ? <span className="ml-1 text-xs font-normal text-[#95877e]">{etapa.pct}%</span> : null}
+                {etapa.pct != null ? <span className="ml-1 text-xs font-normal text-muted-foreground">{etapa.pct}%</span> : null}
               </dd>
             </div>
           ))}
@@ -417,14 +417,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   { etiqueta: "Atribuidos a visita", valor: tot.atribuidos },
                   { etiqueta: "Conversión visita→registro", valor: `${conversion}%` },
                 ].map((etapa) => (
-                  <div className="rounded-xl bg-[#faf6f3] px-3 py-2" key={etapa.etiqueta}>
-                    <dt className="text-[11px] uppercase tracking-wide text-[#6e6159]">{etapa.etiqueta}</dt>
-                    <dd className="mt-0.5 text-lg font-semibold text-[#2d2926]">{etapa.valor}</dd>
+                  <div className="rounded-xl bg-muted/60 px-3 py-2" key={etapa.etiqueta}>
+                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{etapa.etiqueta}</dt>
+                    <dd className="mt-0.5 text-lg font-semibold text-foreground">{etapa.valor}</dd>
                   </div>
                 ))}
               </dl>
               {adquisicionPorOrigen.length > 0 ? (
-                <p className="mt-3 text-xs text-[#6e6159]">
+                <p className="mt-3 text-xs text-muted-foreground">
                   Por origen:{" "}
                   {adquisicionPorOrigen.map((o) => `${o.origen} ${o.unicas}`).join(" · ")}
                 </p>
@@ -456,11 +456,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                         }
                       : { tipo: "vencida" };
                 return (
-                  <div className="rounded-xl border border-[#eee6e0] px-4 py-3" key={organization.id}>
+                  <div className="rounded-xl border border-border px-4 py-3" key={organization.id}>
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">{organization.nombre}</p>
-                        <p className="mt-1 text-xs text-[#95877e]">{organization.slug}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{organization.slug}</p>
                       </div>
                       <StatusBadge tone={organization.activo ? "success" : "neutral"}>
                         {organization.activo ? "Activa" : "Inactiva"}
@@ -483,20 +483,20 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       </div>
       {solicitudes.length > 0 ? (
         <AdminCard description="Últimas solicitudes de las organizaciones" title="Solicitudes de suscripción">
-          <ul className="divide-y divide-[#f2ece7] text-sm">
+          <ul className="divide-y divide-border text-sm">
             {solicitudes.map((solicitud) => {
               const payload = (solicitud.payload ?? {}) as Record<string, unknown>;
               return (
                 <li className="flex flex-wrap items-center justify-between gap-2 py-2.5" key={solicitud.id}>
                   <div>
-                    <p className="font-medium text-[#2d2926]">{solicitud.organizacion}</p>
-                    <p className="text-xs text-[#6e6159]">
+                    <p className="font-medium text-foreground">{solicitud.organizacion}</p>
+                    <p className="text-xs text-muted-foreground">
                       {solicitud.tipo === "plan.cambio_solicitado"
                         ? `Cambio a ${String(payload.planNombre ?? payload.planClave ?? "?")} (${String(payload.periodicidad ?? "mensual")}${typeof payload.sucursales === "number" ? ` · ${payload.sucursales} sucursal(es)` : ""})`
                         : `Cancelación${payload.motivo ? ` — ${String(payload.motivo)}` : ""}`}
                     </p>
                   </div>
-                  <span className="text-xs text-[#95877e]">{solicitud.createdAt.toISOString().slice(0, 10)}</span>
+                  <span className="text-xs text-muted-foreground">{solicitud.createdAt.toISOString().slice(0, 10)}</span>
                 </li>
               );
             })}

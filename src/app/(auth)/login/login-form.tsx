@@ -45,15 +45,15 @@ export function LoginForm() {
   return (
     <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
       <Field className="space-y-2" name="email">
-        <FieldLabel className="text-[#4b403a]" required>
+        <FieldLabel className="text-[#453d48]" required>
           Correo de acceso
         </FieldLabel>
-        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#8a5140] focus-within:ring-3 focus-within:ring-[#8a5140]/10">
-          <Mail className="size-4 text-[#a18d81]" />
+        <div className="flex items-center gap-3 rounded-xl border border-[#dcd6de] bg-white px-3.5 focus-within:border-[#724b7f] focus-within:ring-3 focus-within:ring-[#724b7f]/10">
+          <Mail className="size-4 text-[#97869c]" />
           <Input
             required
             autoComplete="email"
-            className="h-11 min-w-0 flex-1 border-0 bg-transparent px-0 placeholder:text-[#b6a9a1] focus:border-transparent focus:ring-0"
+            className="h-11 min-w-0 flex-1 border-0 bg-transparent px-0 placeholder:text-[#afa4b3] focus:border-transparent focus:ring-0"
             placeholder="tu@salon.com"
             type="email"
           />
@@ -61,15 +61,15 @@ export function LoginForm() {
       </Field>
 
       <Field className="space-y-2" name="password">
-        <FieldLabel className="text-[#4b403a]" required>
+        <FieldLabel className="text-[#453d48]" required>
           Contraseña
         </FieldLabel>
-        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#8a5140] focus-within:ring-3 focus-within:ring-[#8a5140]/10">
-          <LockKeyhole className="size-4 text-[#a18d81]" />
+        <div className="flex items-center gap-3 rounded-xl border border-[#dcd6de] bg-white px-3.5 focus-within:border-[#724b7f] focus-within:ring-3 focus-within:ring-[#724b7f]/10">
+          <LockKeyhole className="size-4 text-[#97869c]" />
           <Input
             required
             autoComplete="current-password"
-            className="h-11 min-w-0 flex-1 border-0 bg-transparent px-0 placeholder:text-[#b6a9a1] focus:border-transparent focus:ring-0"
+            className="h-11 min-w-0 flex-1 border-0 bg-transparent px-0 placeholder:text-[#afa4b3] focus:border-transparent focus:ring-0"
             placeholder="Tu contraseña"
             type="password"
           />
@@ -82,12 +82,12 @@ export function LoginForm() {
         </p>
       ) : null}
 
-      <Button className="h-11 w-full rounded-xl bg-[#2c2522] text-[#fffaf5] hover:bg-[#463a34]" disabled={isPending} type="submit">
+      <Button className="h-11 w-full rounded-xl bg-[#29242a] text-[#faf6fd] hover:bg-[#403743]" disabled={isPending} type="submit">
         {isPending ? "Validando acceso..." : "Iniciar sesión"}
         {!isPending ? <ArrowRight className="size-4" /> : null}
       </Button>
 
-      <p className="text-center text-xs leading-5 text-[#9a8c83]">
+      <p className="text-center text-xs leading-5 text-[#928796]">
         El acceso se habilita mediante una invitación administrativa.
       </p>
     </form>

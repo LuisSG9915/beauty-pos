@@ -65,7 +65,7 @@ export default async function ServiceCategoriesPage({ searchParams }: { searchPa
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[520px] text-left text-sm">
-                <thead className="border-b border-[#eee8e3] text-xs uppercase tracking-wide text-[#625b55]">
+                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-4 font-medium">Clave</th>
                     <th className="py-2 pr-4 font-medium">Nombre</th>
@@ -76,10 +76,10 @@ export default async function ServiceCategoriesPage({ searchParams }: { searchPa
                 </thead>
                 <tbody>
                   {categories.map((category) => (
-                    <tr className="border-b border-[#f1eeea]" key={category.id}>
+                    <tr className="border-b border-border" key={category.id}>
                       <td className="py-3 pr-4 font-mono text-xs">{category.clave}</td>
                       <td className="py-3 pr-4 font-medium">{category.nombre}</td>
-                      <td className="py-3 pr-4 text-xs text-[#625b55]">{category.descripcion ?? "—"}</td>
+                      <td className="py-3 pr-4 text-xs text-muted-foreground">{category.descripcion ?? "—"}</td>
                       <td className="py-3 pr-4"><StatusBadge active={category.activo} /></td>
                       <td className="py-3">
                         <CrudRowActions

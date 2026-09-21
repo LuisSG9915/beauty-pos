@@ -98,7 +98,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
         title="Gastos"
       />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm" method="get">
+      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <input name="sucursalId" type="hidden" value={sucursalId} />
         <Field className="w-40">
@@ -130,13 +130,13 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
       </form>
 
       <section className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#6e6159]">Gastos confirmados</p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums text-[#2d2926]">{fmt(resumen.totalConfirmado)}</p>
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gastos confirmados</p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{fmt(resumen.totalConfirmado)}</p>
         </div>
-        <div className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#6e6159]">Revertidos en el periodo</p>
-          <p className="mt-2 text-2xl font-semibold tabular-nums text-[#a8443a]">{fmt(resumen.totalRevertido)}</p>
+        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Revertidos en el periodo</p>
+          <p className="mt-2 text-2xl font-semibold tabular-nums text-destructive">{fmt(resumen.totalRevertido)}</p>
         </div>
       </section>
 
@@ -160,7 +160,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] text-left text-sm">
-                <thead className="border-b border-[#eee8e3] text-xs uppercase tracking-wide text-[#625b55]">
+                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-4 font-medium">Fecha</th>
                     <th className="py-2 pr-4 font-medium">Concepto</th>
@@ -173,22 +173,22 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
                 </thead>
                 <tbody>
                   {listado.rows.map((gasto) => (
-                    <tr className="border-b border-[#f1eeea] align-top" key={gasto.id}>
-                      <td className="whitespace-nowrap py-3 pr-4 text-[#625b55]">{gasto.fechaGasto}</td>
+                    <tr className="border-b border-border align-top" key={gasto.id}>
+                      <td className="whitespace-nowrap py-3 pr-4 text-muted-foreground">{gasto.fechaGasto}</td>
                       <td className="py-3 pr-4">
-                        <p className="font-medium text-[#2d2926]">{gasto.concepto}</p>
-                        <p className="mt-0.5 text-xs text-[#6f635a]">
+                        <p className="font-medium text-foreground">{gasto.concepto}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
                           {[gasto.proveedor, gasto.referencia, gasto.registradoPor].filter(Boolean).join(" · ")}
                         </p>
                         {gasto.motivoReversion ? (
-                          <p className="mt-0.5 text-xs text-[#a8443a]">Reversión: {gasto.motivoReversion}</p>
+                          <p className="mt-0.5 text-xs text-destructive">Reversión: {gasto.motivoReversion}</p>
                         ) : null}
                       </td>
-                      <td className="py-3 pr-4 text-[#625b55]">{gasto.categoria ?? "Sin categoría"}</td>
+                      <td className="py-3 pr-4 text-muted-foreground">{gasto.categoria ?? "Sin categoría"}</td>
                       <td className="py-3 pr-4">
-                        <span className="text-[#625b55]">{gasto.medio}</span>
+                        <span className="text-muted-foreground">{gasto.medio}</span>
                         {gasto.cajaVinculada ? (
-                          <span className="ml-1 text-xs text-[#6f635a]" title="Salió del corte de caja">· caja</span>
+                          <span className="ml-1 text-xs text-muted-foreground" title="Salió del corte de caja">· caja</span>
                         ) : null}
                       </td>
                       <td className="py-3 pr-4 text-right font-semibold tabular-nums">{fmt(gasto.importe)}</td>
@@ -217,10 +217,10 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
           {page > 1 || listado.hasMore ? (
             <div className="mt-4 flex items-center justify-between text-sm">
               {page > 1 ? (
-                <a className="font-medium text-[#8a5140] hover:underline" href={pageHref(page - 1)}>← Anterior</a>
+                <a className="font-medium text-primary hover:underline" href={pageHref(page - 1)}>← Anterior</a>
               ) : <span />}
               {listado.hasMore ? (
-                <a className="font-medium text-[#8a5140] hover:underline" href={pageHref(page + 1)}>Siguiente →</a>
+                <a className="font-medium text-primary hover:underline" href={pageHref(page + 1)}>Siguiente →</a>
               ) : <span />}
             </div>
           ) : null}

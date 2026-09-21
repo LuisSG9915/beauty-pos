@@ -2,7 +2,8 @@
 
 ## Base de datos y despliegue
 
-- `src/db/client.ts` usa el binding `HYPERDRIVE` (instancia `beauty-pos-db`, id `1e6092cc079c4f5c86a5d4bca6ddc7e4`, declarado en `wrangler.jsonc`) y cae a `DATABASE_URL` fuera de Cloudflare. Desplegado en `https://beauty-pos.luis-sg9915.workers.dev`.
+- `src/db/client.ts` usa el binding `HYPERDRIVE` (instancia `beauty-pos-db`, id `1e6092cc079c4f5c86a5d4bca6ddc7e4`, declarado en `wrangler.jsonc`) y cae a `DATABASE_URL` fuera de Cloudflare. Desplegado como Worker `beauty-pos` con dominio canónico `https://melena.app` (el hostname `*.workers.dev` queda como ruta de rollback).
+- `pnpm deploy` (opennextjs-cloudflare) evalúa bindings en local: requiere `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` apuntando al `DATABASE_URL` de `.env`, p. ej. `export CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="$(python3 -c "import re;print(re.search(r'^DATABASE_URL=(.*)$',open('.env').read(),re.M).group(1))")"` antes de `npx opennextjs-cloudflare deploy`.
 - **Regla crítica de Workers**: los sockets de `pg` no sobreviven entre invocaciones — nada que capture una conexión puede vivir en un global. `getDatabase()` crea un pool por request (WeakMap sobre el ExecutionContext, cerrado con `after()`); `createAuth` se cachea por request vía `getRequestScope()`. Cualquier caché nueva que toque la BD debe usar `getRequestScope()` igual.
 - Secretos del worker configurados con `wrangler secret put`: `DATABASE_URL`, `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `BREVO_API_KEY`, `BREVO_FROM_EMAIL`, `BREVO_FROM_NAME`, `CRON_SECRET`.
 - Migraciones: `pnpm db:generate` → `pnpm db:migrate`. Consistencia: `pnpm db:check`.

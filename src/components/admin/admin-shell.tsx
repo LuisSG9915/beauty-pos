@@ -1,15 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useId, type ReactNode } from "react";
 
-import { AdminNavCompact, AdminTabBar } from "@/components/admin-nav";
+import { AdminSidebarNav, AdminTabBar, SignOutButton } from "@/components/admin-nav";
 import {
   SubscriptionBanner,
   type BillingBadge,
 } from "@/components/admin/subscription-banner";
+import { BrandWordmark } from "@/components/brand-mark";
 import { ToastProvider } from "@/components/ui/toast";
-import { buildHref, firstParam } from "@/lib/url-context";
+import { buildAdminHref, buildHref, firstParam } from "@/lib/url-context";
 
 /** Organización accesible por el usuario, para el selector del shell. */
 export type AdminShellOrganization = {
@@ -37,11 +39,14 @@ export type AdminShellProps = {
  * Selector de organización del shell. Lee `organizationId` de la URL (o la
  * primera organización disponible) y navega conservando los demás
  * parámetros; `sucursalId` se descarta porque depende de la organización.
+ * `variant="sidebar"` lo rinde como bloque de ancho completo.
  */
 function OrganizationSelector({
   organizations,
+  variant = "compact",
 }: {
   organizations: AdminShellOrganization[];
+  variant?: "compact" | "sidebar";
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -56,7 +61,7 @@ function OrganizationSelector({
 
   if (organizations.length === 0) {
     return (
-      <span className="rounded-full border border-dashed border-[#ded8d2] px-3 py-1.5 text-xs text-[#6e6159]">
+      <span className="rounded-full border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground">
         Sin organización asignada
       </span>
     );
@@ -65,20 +70,43 @@ function OrganizationSelector({
   if (organizations.length === 1) {
     const [organization] = organizations;
     return (
-      <span className="inline-flex max-w-48 items-center truncate rounded-full border border-[#eadfd8] bg-[#faf6f3] px-3 py-1.5 text-xs font-medium text-[#60392e]">
+      <span
+        className={
+          variant === "sidebar"
+            ? "block truncate rounded-xl border border-border bg-muted px-3 py-2 text-xs font-medium text-accent-foreground"
+            : "inline-flex max-w-48 items-center truncate rounded-full border border-border bg-muted px-3 py-1.5 text-xs font-medium text-accent-foreground"
+        }
+      >
         {organization.nombre}
       </span>
     );
   }
 
   return (
-    <label className="flex min-w-0 items-center gap-2" htmlFor={selectId}>
-      <span className="hidden text-xs font-medium text-[#6e6159] sm:inline">
+    <label
+      className={
+        variant === "sidebar"
+          ? "block min-w-0"
+          : "flex min-w-0 items-center gap-2"
+      }
+      htmlFor={selectId}
+    >
+      <span
+        className={
+          variant === "sidebar"
+            ? "mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+            : "hidden text-xs font-medium text-muted-foreground sm:inline"
+        }
+      >
         Organización
       </span>
       <select
         aria-label="Organización activa"
-        className="h-10 min-w-0 max-w-44 rounded-xl border border-[#ded8d2] bg-white px-2.5 text-xs font-medium text-[#403a35] sm:max-w-56"
+        className={
+          variant === "sidebar"
+            ? "h-10 w-full min-w-0 rounded-xl border border-input bg-card px-2.5 text-xs font-medium text-foreground"
+            : "h-10 min-w-0 max-w-44 rounded-xl border border-input bg-card px-2.5 text-xs font-medium text-foreground sm:max-w-56"
+        }
         id={selectId}
         onChange={(event) => {
           router.push(
@@ -102,22 +130,23 @@ function OrganizationSelector({
   );
 }
 
-/**
- * Navegación del shell: usa el `organizationId` de la URL y, si falta,
- * la primera organización accesible, de modo que los enlaces siempre
- * conserven el contexto de organización.
- */
-function ShellNav({
-  organizations,
-  platformAdmin,
-  permissionsByOrg,
-  capacidadesFaltantesByOrg,
-}: {
+type NavWiring = {
   organizations: AdminShellOrganization[];
   platformAdmin: boolean;
   permissionsByOrg?: Record<string, string[]> | null;
   capacidadesFaltantesByOrg?: Record<string, string[]> | null;
-}) {
+};
+
+/**
+ * Resuelve la organización activa (URL o primera accesible) y los filtros
+ * de permisos/capacidades que alimentan sidebar y tab bar.
+ */
+function useNavWiring({
+  organizations,
+  platformAdmin,
+  permissionsByOrg,
+  capacidadesFaltantesByOrg,
+}: NavWiring) {
   const searchParams = useSearchParams();
   const organizationId =
     firstParam(searchParams.get("organizationId")) ?? organizations[0]?.id;
@@ -129,55 +158,59 @@ function ShellNav({
     platformAdmin || capacidadesFaltantesByOrg == null
       ? null
       : (organizationId ? (capacidadesFaltantesByOrg[organizationId] ?? []) : []);
+  return { organizationId, permissions, capacidadesFaltantes };
+}
+
+function SidebarNav({ wiring }: { wiring: NavWiring }) {
+  const { organizationId, permissions, capacidadesFaltantes } = useNavWiring(wiring);
   return (
-    <AdminNavCompact
+    <AdminSidebarNav
       capacidadesFaltantes={capacidadesFaltantes}
       organizationId={organizationId}
       permissions={permissions}
-      platformAdmin={platformAdmin}
+      platformAdmin={wiring.platformAdmin}
     />
   );
 }
 
 /** Tab bar móvil con los accesos filtrados por los permisos de la org activa. */
-function ShellTabBar({
-  organizations,
-  platformAdmin,
-  permissionsByOrg,
-  capacidadesFaltantesByOrg,
-}: {
-  organizations: AdminShellOrganization[];
-  platformAdmin: boolean;
-  permissionsByOrg?: Record<string, string[]> | null;
-  capacidadesFaltantesByOrg?: Record<string, string[]> | null;
-}) {
-  const searchParams = useSearchParams();
-  const organizationId =
-    firstParam(searchParams.get("organizationId")) ?? organizations[0]?.id;
-  const permissions =
-    platformAdmin || permissionsByOrg == null
-      ? null
-      : (organizationId ? (permissionsByOrg[organizationId] ?? []) : []);
-  const capacidadesFaltantes =
-    platformAdmin || capacidadesFaltantesByOrg == null
-      ? null
-      : (organizationId ? (capacidadesFaltantesByOrg[organizationId] ?? []) : []);
+function ShellTabBar({ wiring }: { wiring: NavWiring }) {
+  const { organizationId, permissions, capacidadesFaltantes } = useNavWiring(wiring);
   return (
     <AdminTabBar
       capacidadesFaltantes={capacidadesFaltantes}
+      organizationId={organizationId}
       permissions={permissions}
-      platformAdmin={platformAdmin}
+      platformAdmin={wiring.platformAdmin}
     />
   );
 }
 
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase())
+    .join("") || "·";
+}
+
+function HomeLink({ organizationId }: { organizationId?: string }) {
+  return (
+    <Link
+      className="inline-flex rounded-lg outline-offset-4"
+      href={buildAdminHref("", { organizationId })}
+      prefetch={false}
+    >
+      <BrandWordmark markSize={34} />
+    </Link>
+  );
+}
+
 /**
- * Shell visual del panel de administración (client component). Conserva
- * estado entre navegaciones y deriva la organización activa de la URL.
- *
- * Nota de migración: las páginas actuales renderizan su propio <main> y
- * encabezado; al migrar deben usar <AdminPageHeader> y retirar el landmark
- * duplicado para que solo quede el <main> del shell.
+ * Shell visual del panel: sidebar persistente en escritorio (marca,
+ * organización, navegación por secciones y cuenta) y en móvil un header
+ * compacto con tab bar inferior + panel "Más".
  */
 export function AdminShell({
   userName,
@@ -189,86 +222,108 @@ export function AdminShell({
   capacidadesFaltantesByOrg,
   children,
 }: AdminShellProps) {
+  const wiring: NavWiring = {
+    organizations,
+    platformAdmin: isPlatformAdmin,
+    permissionsByOrg,
+    capacidadesFaltantesByOrg,
+  };
   return (
     <ToastProvider>
-      <div className="flex min-h-screen flex-col bg-[#faf9f7] text-[#292522]">
+      <div className="admin-theme flex min-h-dvh bg-background text-foreground">
         <a
-          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-[#2c2522] focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-[#fffaf5]"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-foreground focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-background"
           href="#contenido-admin"
         >
           Saltar al contenido
         </a>
-        <header className="sticky top-0 z-40 border-b border-[#eee6e0] bg-white/95 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-6 lg:px-10">
-            <div className="flex items-center gap-3">
-              <div
-                aria-hidden="true"
-                className="flex size-9 items-center justify-center rounded-xl bg-[#2c2522] text-xs font-semibold text-[#f6eadf]"
-              >
-                BP
-              </div>
-              <div className="leading-tight">
-                <p className="text-sm font-semibold tracking-tight">Beauty POS</p>
-                <p className="text-[11px] text-[#6e6159]">
-                  {isPlatformAdmin ? "Plataforma" : "Panel de operación"}
-                </p>
-              </div>
-            </div>
 
-            <div className="ml-auto flex min-w-0 items-center gap-3">
-              <Suspense
-                fallback={
-                  <span className="h-10 w-36 animate-pulse rounded-xl bg-[#f1eeea]" />
-                }
+        {/* Sidebar de escritorio */}
+        <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
+          <div className="px-5 pb-4 pt-5">
+            <Suspense fallback={<BrandWordmark markSize={34} />}>
+              <SidebarHome organizations={organizations} />
+            </Suspense>
+          </div>
+          <div className="px-4 pb-4">
+            <Suspense
+              fallback={
+                <span className="block h-10 animate-pulse rounded-xl bg-muted" />
+              }
+            >
+              <OrganizationSelector organizations={organizations} variant="sidebar" />
+            </Suspense>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
+            <Suspense fallback={null}>
+              <SidebarNav wiring={wiring} />
+            </Suspense>
+          </div>
+          <div className="border-t border-sidebar-border px-3 py-3">
+            <div className="flex items-center gap-2.5 px-1 pb-2">
+              <span
+                aria-hidden="true"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground"
               >
-                <OrganizationSelector organizations={organizations} />
-              </Suspense>
-              <div className="hidden text-right leading-tight sm:block">
-                <p className="max-w-40 truncate text-sm font-medium">{userName}</p>
-                <p className="max-w-40 truncate text-[11px] text-[#6e6159]">
-                  {userEmail}
-                </p>
+                {initials(userName)}
+              </span>
+              <div className="min-w-0 leading-tight">
+                <p className="truncate text-sm font-medium">{userName}</p>
+                <p className="truncate text-[11px] text-muted-foreground">{userEmail}</p>
               </div>
             </div>
+            <SignOutButton />
           </div>
-          <div className="border-t border-[#f4eeea]">
-            <div className="mx-auto w-full max-w-[1400px] px-4 py-2 sm:px-6 lg:px-10">
+        </aside>
+
+        {/* Columna de contenido */}
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* Header móvil: marca + organización */}
+          <header className="sticky top-0 z-40 border-b border-sidebar-border bg-card/95 backdrop-blur lg:hidden">
+            <div className="flex items-center gap-3 px-4 py-3">
+              <Suspense fallback={<BrandWordmark markSize={32} />}>
+                <SidebarHome organizations={organizations} />
+              </Suspense>
+              <div className="ml-auto flex min-w-0 items-center gap-3">
+                <Suspense
+                  fallback={
+                    <span className="h-10 w-36 animate-pulse rounded-xl bg-muted" />
+                  }
+                >
+                  <OrganizationSelector organizations={organizations} />
+                </Suspense>
+              </div>
+            </div>
+          </header>
+
+          <main
+            className="mx-auto w-full max-w-[1400px] flex-1 px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-8"
+            id="contenido-admin"
+          >
+            {billingByOrg ? (
               <Suspense fallback={null}>
-                <ShellNav
-                  capacidadesFaltantesByOrg={capacidadesFaltantesByOrg}
+                <SubscriptionBanner
+                  billingByOrg={billingByOrg}
                   organizations={organizations}
-                  permissionsByOrg={permissionsByOrg}
-                  platformAdmin={isPlatformAdmin}
                 />
               </Suspense>
-            </div>
-          </div>
-        </header>
-
-        <main
-          className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-6 pb-24 sm:px-6 md:pb-6 lg:px-10"
-          id="contenido-admin"
-        >
-          {billingByOrg ? (
-            <Suspense fallback={null}>
-              <SubscriptionBanner
-                billingByOrg={billingByOrg}
-                organizations={organizations}
-              />
-            </Suspense>
-          ) : null}
-          {children}
-        </main>
+            ) : null}
+            {children}
+          </main>
+        </div>
 
         <Suspense fallback={null}>
-          <ShellTabBar
-            capacidadesFaltantesByOrg={capacidadesFaltantesByOrg}
-            organizations={organizations}
-            permissionsByOrg={permissionsByOrg}
-            platformAdmin={isPlatformAdmin}
-          />
+          <ShellTabBar wiring={wiring} />
         </Suspense>
       </div>
     </ToastProvider>
   );
+}
+
+/** Logo → /admin conservando la organización activa. */
+function SidebarHome({ organizations }: { organizations: AdminShellOrganization[] }) {
+  const searchParams = useSearchParams();
+  const organizationId =
+    firstParam(searchParams.get("organizationId")) ?? organizations[0]?.id;
+  return <HomeLink organizationId={organizationId} />;
 }

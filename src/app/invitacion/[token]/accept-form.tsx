@@ -12,7 +12,7 @@ export function AcceptInvitationForm({ token, email, name }: { token: string; em
   return (
     <form action={formAction} className="mt-8 space-y-5">
       <input name="token" type="hidden" value={token} />
-      <div className="rounded-xl bg-[#f8f5f2] px-4 py-3 text-sm text-[#74675f]">Invitación para <strong>{email}</strong></div>
+      <div className="rounded-xl bg-[#f6f4f6] px-4 py-3 text-sm text-[#6d6271]">Invitación para <strong>{email}</strong></div>
       <Field>
         <FieldLabel required>Nombre</FieldLabel>
         <Input defaultValue={name} name="nombre" required />

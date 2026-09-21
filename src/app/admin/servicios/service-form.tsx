@@ -50,21 +50,21 @@ export function ServiceForm({ organizationId, categories, initial }: { organizat
         <FieldLabel required>Precio base (MXN)</FieldLabel>
         <Input defaultValue={String(value("precioBase"))} min="0" name="precioBase" placeholder="350.00" required step="0.01" type="number" />
       </Field>
-      <label className="flex min-h-11 items-center gap-3 rounded-xl border border-[#eee8e3] p-3 text-sm">
+      <label className="flex min-h-11 items-center gap-3 rounded-xl border border-border p-3 text-sm">
         <input defaultChecked={initial ? initial.visibleAgenda : true} name="visibleAgenda" type="checkbox" value="true" /> Visible en agenda
       </label>
-      <label className="flex min-h-11 items-center gap-3 rounded-xl border border-[#eee8e3] p-3 text-sm">
+      <label className="flex min-h-11 items-center gap-3 rounded-xl border border-border p-3 text-sm">
         <input defaultChecked={initial?.requiereCabina} name="requiereCabina" type="checkbox" value="true" /> Requiere cabina
       </label>
     </div>
   );
 
   return (
-    <form action={formAction} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
+    <form action={formAction} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
       <h2 className="text-xl font-semibold">{initial ? "Editar servicio" : "Nuevo servicio"}</h2>
-      <p className="mt-1 text-sm text-[#625b55]">Organiza la información en secciones para mantener el formulario simple.</p>
+      <p className="mt-1 text-sm text-muted-foreground">Organiza la información en secciones para mantener el formulario simple.</p>
       <div className="mt-5">
         <FormTabs
           tabs={[
@@ -74,7 +74,7 @@ export function ServiceForm({ organizationId, categories, initial }: { organizat
               id: "futuro",
               label: "Insumos y comisiones",
               content: (
-                <p className="rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55]">
+                <p className="rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">
                   {initial ? "Los insumos y comisiones se gestionan en las secciones debajo de este formulario." : "Guarda el servicio primero para poder asignarle insumos y comisiones."}
                 </p>
               ),

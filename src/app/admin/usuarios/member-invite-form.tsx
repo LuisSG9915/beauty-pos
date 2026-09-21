@@ -59,12 +59,12 @@ export function MemberInviteForm({
       </div>
       <ActionFeedback state={state} />
       {invitationUrl ? (
-        <div className="rounded-xl border border-[#eadfd8] bg-[#fffaf5] p-4 text-sm">
-          <p className="font-medium text-[#4b403a]">Enlace local de invitación</p>
-          <a className="mt-2 block break-all text-[#a76348] underline" href={invitationUrl}>
+        <div className="rounded-xl border border-border bg-muted/60 p-4 text-sm">
+          <p className="font-medium text-foreground">Enlace local de invitación</p>
+          <a className="mt-2 block break-all text-primary underline" href={invitationUrl}>
             {invitationUrl}
           </a>
-          <p className="mt-2 text-xs leading-5 text-[#6e6159]">
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
             Este enlace solo se muestra en desarrollo porque no hay envío de correo habilitado.
           </p>
         </div>

@@ -67,15 +67,15 @@ function CheckoutContent({
   if (status === "loading") {
     return (
       <div className="flex items-center justify-center py-16" role="status">
-        <Loader2 aria-hidden="true" className="size-6 animate-spin text-[#8a5140]" />
+        <Loader2 aria-hidden="true" className="size-6 animate-spin text-primary" />
         <span className="sr-only">Cargando ticket…</span>
       </div>
     );
   }
   if (status === "error" || !ticket) {
     return (
-      <div className="rounded-xl border border-[#e3b8b0] bg-[#fdf1ee] px-4 py-6 text-center">
-        <p className="text-sm text-[#a8443a]">{error ?? "No se pudo cargar el ticket."}</p>
+      <div className="rounded-xl border border-accent-foreground/30 bg-[#f6d9d2] px-4 py-6 text-center">
+        <p className="text-sm text-destructive">{error ?? "No se pudo cargar el ticket."}</p>
         <Button className="mt-3 rounded-xl" onClick={refetch} type="button" variant="outline">
           Reintentar
         </Button>
@@ -120,7 +120,7 @@ export function CheckoutSheet({
       <SheetContent className="w-[min(100vw,54rem)]">
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
-            <ReceiptText aria-hidden="true" className="size-5 text-[#8a5140]" />
+            <ReceiptText aria-hidden="true" className="size-5 text-primary" />
             Cobro de la cita
           </SheetTitle>
           <SheetDescription>

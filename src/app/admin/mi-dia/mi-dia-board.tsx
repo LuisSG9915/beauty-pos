@@ -118,49 +118,49 @@ export function MiDiaBoard({
         aria-label="Resumen del día"
         className="grid grid-cols-2 gap-3 sm:grid-cols-4"
       >
-        <div className="rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-[#6e6159]">
-            <Scissors aria-hidden="true" className="size-3.5 text-[#8a5140]" /> Completadas
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Scissors aria-hidden="true" className="size-3.5 text-primary" /> Completadas
           </p>
-          <p className="mt-1.5 text-2xl font-bold tabular-nums text-[#2d2926]">
+          <p className="mt-1.5 text-2xl font-bold tabular-nums text-foreground">
             {resumen.completadas}
           </p>
         </div>
-        <div className="rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-[#6e6159]">
-            <ClipboardList aria-hidden="true" className="size-3.5 text-[#8a5140]" /> Por atender
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <ClipboardList aria-hidden="true" className="size-3.5 text-primary" /> Por atender
           </p>
-          <p className="mt-1.5 text-2xl font-bold tabular-nums text-[#2d2926]">
+          <p className="mt-1.5 text-2xl font-bold tabular-nums text-foreground">
             {resumen.pendientes}
           </p>
         </div>
-        <div className="rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-[#6e6159]">
-            <Coins aria-hidden="true" className="size-3.5 text-[#8a5140]" /> Propinas
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Coins aria-hidden="true" className="size-3.5 text-primary" /> Propinas
           </p>
-          <p className="mt-1.5 text-2xl font-bold tabular-nums text-[#347052]">
+          <p className="mt-1.5 text-2xl font-bold tabular-nums text-success">
             {formatCurrency(resumen.propinas, { currency })}
           </p>
         </div>
-        <div className="rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-[#6e6159]">
-            <Wallet aria-hidden="true" className="size-3.5 text-[#8a5140]" /> Comisiones
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Wallet aria-hidden="true" className="size-3.5 text-primary" /> Comisiones
           </p>
-          <p className="mt-1.5 text-2xl font-bold tabular-nums text-[#347052]">
+          <p className="mt-1.5 text-2xl font-bold tabular-nums text-success">
             {formatCurrency(resumen.comisiones, { currency })}
           </p>
         </div>
       </section>
 
-      <p className="text-sm text-[#6e6159]">
+      <p className="text-sm text-muted-foreground">
         {formatDate(`${fecha}T12:00:00Z`, { timeZone: "UTC" })} · {citas.length}{" "}
         {citas.length === 1 ? "cita" : "citas"}
       </p>
 
       {citas.length === 0 ? (
-        <section className="rounded-2xl border border-dashed border-[#ded8d2] bg-white px-6 py-14 text-center shadow-sm">
-          <p className="text-base font-medium text-[#403a35]">Sin citas asignadas hoy</p>
-          <p className="mt-1.5 text-sm text-[#6e6159]">
+        <section className="rounded-2xl border border-dashed border-border bg-card px-6 py-14 text-center shadow-sm">
+          <p className="text-base font-medium text-foreground">Sin citas asignadas hoy</p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
             Cuando la recepción te asigne una cita aparecerá aquí.
           </p>
         </section>
@@ -174,23 +174,23 @@ export function MiDiaBoard({
             return (
               <li
                 className={cn(
-                  "rounded-2xl border bg-white p-4 shadow-sm sm:p-5",
-                  enCurso ? "border-[#dfa94e]" : "border-[#eadfd8]",
+                  "rounded-2xl border bg-card p-4 shadow-sm sm:p-5",
+                  enCurso ? "border-[#e7bd66]" : "border-border",
                 )}
                 key={cita.id}
               >
                 <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
                   <div className="min-w-0">
-                    <p className="flex flex-wrap items-baseline gap-x-2 text-lg font-bold tabular-nums text-[#2d2926]">
+                    <p className="flex flex-wrap items-baseline gap-x-2 text-lg font-bold tabular-nums text-foreground">
                       {formatTime(cita.fechaHora, { timeZone })}
-                      <span className="text-sm font-normal text-[#6e6159]">
+                      <span className="text-sm font-normal text-muted-foreground">
                         {cita.duracionMinutos} min
                       </span>
                     </p>
-                    <p className="mt-0.5 text-base font-medium text-[#403a35]">
+                    <p className="mt-0.5 text-base font-medium text-foreground">
                       {cita.clienteId ? (
                         <a
-                          className="hover:text-[#8a5140] hover:underline"
+                          className="hover:text-primary hover:underline"
                           href={buildAdminHref(`/clientes/${cita.clienteId}`, { organizationId })}
                         >
                           {cita.clienteNombre}
@@ -199,21 +199,21 @@ export function MiDiaBoard({
                         cita.clienteNombre
                       )}
                     </p>
-                    <p className="mt-0.5 text-sm text-[#625b55]">
+                    <p className="mt-0.5 text-sm text-muted-foreground">
                       {cita.servicios.join(" · ") || "Sin servicios"}
                     </p>
                     {cita.notas ? (
-                      <p className="mt-1 text-xs text-[#6e6159]">Nota: {cita.notas}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">Nota: {cita.notas}</p>
                     ) : null}
                     {cita.clienteNotas ? (
-                      <p className="mt-1.5 rounded-lg bg-[#fdf3e8] px-2.5 py-1.5 text-xs font-medium text-[#986b16]">
+                      <p className="mt-1.5 rounded-lg bg-[#ffe3ad] px-2.5 py-1.5 text-xs font-medium text-warning">
                         {cita.clienteNotas}
                       </p>
                     ) : null}
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
                     <CitaStatusBadge estado={cita.estado} />
-                    <span className="text-sm font-semibold tabular-nums text-[#625b55]">
+                    <span className="text-sm font-semibold tabular-nums text-muted-foreground">
                       {formatCurrency(cita.totalEstimado, { currency })}
                     </span>
                   </div>

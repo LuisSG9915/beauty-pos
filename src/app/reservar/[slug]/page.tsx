@@ -55,14 +55,14 @@ export default async function ReservarPage({
   }
 
   return (
-    <main className="min-h-screen bg-[#faf9f7] text-[#292522]">
+    <main className="min-h-screen bg-[#f9f8f9] text-[#272328]">
       <header className="mx-auto flex w-full max-w-3xl items-center gap-3 px-6 py-6">
-        <div className="flex size-10 items-center justify-center rounded-2xl bg-[#2c2522] text-sm font-semibold text-[#f6eadf]">
+        <div className="flex size-10 items-center justify-center rounded-2xl bg-[#29242a] text-sm font-semibold text-[#f3ecf8]">
           {portal.organizacion.nombre.slice(0, 2).toUpperCase()}
         </div>
         <div>
           <p className="font-semibold tracking-tight">{portal.organizacion.nombre}</p>
-          <p className="text-xs text-[#6e6159]">Reserva tu cita en línea</p>
+          <p className="text-xs text-[#675d6a]">Reserva tu cita en línea</p>
         </div>
       </header>
       <ReservaFlow

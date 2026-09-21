@@ -1,6 +1,8 @@
 import { eq } from "drizzle-orm";
 
 import { AcceptInvitationForm } from "@/app/invitacion/[token]/accept-form";
+import { BrandMark } from "@/components/brand-mark";
+import { BRAND } from "@/lib/brand";
 import { getDatabase } from "@/db/client";
 import { invitacionesUsuarios } from "@/db/schema/access";
 
@@ -20,11 +22,11 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
   const valid = invitation && invitation.estado === "pendiente" && invitation.expiraAt > new Date();
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#faf9f7] px-6 py-12 text-[#292522]">
-      <section className="w-full max-w-md rounded-3xl border border-[#eadfd8] bg-white p-8 shadow-[0_24px_80px_-32px_rgba(70,45,33,0.35)]">
-        <div className="flex size-10 items-center justify-center rounded-2xl bg-[#2c2522] text-sm font-semibold text-[#f6eadf]">BP</div>
-        <p className="mt-8 text-sm font-semibold uppercase tracking-[0.2em] text-[#8a5140]">Beauty POS</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">Acepta tu invitación</h1>
+    <main className="flex min-h-screen items-center justify-center bg-[#f9f8f9] px-6 py-12 text-[#272328]">
+      <section className="w-full max-w-md rounded-3xl border border-[#e3dce6] bg-white p-8 shadow-[0_24px_80px_-32px_rgba(70,45,33,0.35)]">
+        <BrandMark size={40} />
+        <p className="mt-8 text-sm font-semibold uppercase tracking-[0.2em] text-[#724b7f]">{BRAND.name}</p>
+        <h1 className="mt-3 font-serif text-3xl font-semibold tracking-[-0.03em]">Acepta tu invitación</h1>
         {valid ? (
           <AcceptInvitationForm token={token} email={invitation.correo} name={invitation.nombre} />
         ) : (

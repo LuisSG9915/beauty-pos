@@ -155,23 +155,23 @@ export function ReservaFlow({
   if (resultado?.tipo === "confirmada" || resultado?.tipo === "pendiente") {
     return (
       <section className="mx-auto w-full max-w-3xl px-6 pb-16">
-        <div className="rounded-3xl border border-[#e4d9cf] bg-white p-8 text-center shadow-sm">
+        <div className="rounded-3xl border border-[#dcd5de] bg-white p-8 text-center shadow-sm">
           <CheckCircle2 className="mx-auto size-12 text-[#5d9a76]" />
           <h1 className="mt-4 text-2xl font-semibold tracking-tight">
             {resultado.tipo === "confirmada" ? "¡Cita confirmada!" : "Reserva recibida"}
           </h1>
-          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#74675f]">
+          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#6d6271]">
             {resultado.tipo === "confirmada"
               ? `Te esperamos en ${sucursal.nombre}. Llega unos minutos antes de tu horario.`
               : `${organizacion.nombre} revisará tu solicitud y te confirmará por teléfono.`}
           </p>
-          <dl className="mx-auto mt-6 max-w-sm space-y-2 rounded-2xl bg-[#faf6f3] p-5 text-left text-sm">
+          <dl className="mx-auto mt-6 max-w-sm space-y-2 rounded-2xl bg-[#f7f5f8] p-5 text-left text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-[#6e6159]">Servicio</dt>
+              <dt className="text-[#675d6a]">Servicio</dt>
               <dd className="font-medium">{servicio?.nombre}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-[#6e6159]">Horario</dt>
+              <dt className="text-[#675d6a]">Horario</dt>
               <dd className="font-medium">
                 {dias.find((d) => d.diaKey === diaKey)?.etiqueta ?? diaKey} ·{" "}
                 {formatoHora(slotIso, sucursal.zonaHoraria)}
@@ -179,24 +179,24 @@ export function ReservaFlow({
             </div>
             {profesional ? (
               <div className="flex justify-between gap-4">
-                <dt className="text-[#6e6159]">Profesional</dt>
+                <dt className="text-[#675d6a]">Profesional</dt>
                 <dd className="font-medium">{profesional.nombre}</dd>
               </div>
             ) : null}
             <div className="flex justify-between gap-4">
-              <dt className="text-[#6e6159]">Sucursal</dt>
+              <dt className="text-[#675d6a]">Sucursal</dt>
               <dd className="font-medium">{sucursal.nombre}</dd>
             </div>
           </dl>
           {resultado.gestionUrl ? (
             <>
               <a
-                className="mt-6 inline-block rounded-xl bg-[#2c2522] px-5 py-2.5 text-sm font-medium text-[#f6eadf] transition-colors hover:bg-[#453c37]"
+                className="mt-6 inline-block rounded-xl bg-[#29242a] px-5 py-2.5 text-sm font-medium text-[#f3ecf8] transition-colors hover:bg-[#403a42]"
                 href={resultado.gestionUrl}
               >
                 Consultar o modificar mi cita
               </a>
-              <p className="mx-auto mt-3 max-w-sm text-xs leading-5 text-[#a8958a]">
+              <p className="mx-auto mt-3 max-w-sm text-xs leading-5 text-[#675d6a]">
                 Guarda este enlace: con él puedes ver el estado de tu cita, reagendarla o cancelarla
                 según la política del negocio. También llega en tu correo de confirmación.
               </p>
@@ -212,14 +212,14 @@ export function ReservaFlow({
       {/* Paso 1: sucursal (solo si hay más de una reservable) */}
       {sucursales.length > 1 ? (
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#a76348]">Sucursal</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#885699]">Sucursal</h2>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {sucursales.map((s) => (
               <button
                 className={`rounded-2xl border p-4 text-left transition-colors ${
                   s.id === sucursal.id
-                    ? "border-[#8a5140] bg-[#fdf6f1]"
-                    : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
+                    ? "border-[#724b7f] bg-[#fdf6f1]"
+                    : "border-[#e8e4ea] bg-white hover:border-[#d0c3d4]"
                 }`}
                 key={s.id}
                 onClick={() => {
@@ -234,7 +234,7 @@ export function ReservaFlow({
               >
                 <p className="font-medium">{s.nombre}</p>
                 {s.direccion ? (
-                  <p className="mt-1 flex items-center gap-1 text-xs text-[#6e6159]">
+                  <p className="mt-1 flex items-center gap-1 text-xs text-[#675d6a]">
                     <MapPin className="size-3" /> {s.direccion}
                   </p>
                 ) : null}
@@ -246,21 +246,21 @@ export function ReservaFlow({
 
       {/* Paso 2: servicio */}
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#a76348]">Servicio</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#885699]">Servicio</h2>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {servicios.map((s) => (
             <button
               className={`rounded-2xl border p-4 text-left transition-colors ${
                 s.id === servicioId
-                  ? "border-[#8a5140] bg-[#fdf6f1]"
-                  : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
+                  ? "border-[#724b7f] bg-[#fdf6f1]"
+                  : "border-[#e8e4ea] bg-white hover:border-[#d0c3d4]"
               }`}
               key={s.id}
               onClick={() => elegir(setServicioId)(s.id)}
               type="button"
             >
               <p className="font-medium">{s.nombre}</p>
-              <p className="mt-1 flex items-center gap-2 text-xs text-[#6e6159]">
+              <p className="mt-1 flex items-center gap-2 text-xs text-[#675d6a]">
                 <Clock3 className="size-3" />
                 {s.duracionMinutos} min · {formatoPrecio(s.precio)}
               </p>
@@ -272,26 +272,26 @@ export function ReservaFlow({
       {/* Paso 3: profesional (opcional — por defecto cualquiera disponible) */}
       {servicioId && profesionalesSucursal.length > 0 ? (
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#a76348]">Profesional</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#885699]">Profesional</h2>
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
             <button
               className={`rounded-2xl border p-4 text-left transition-colors ${
                 usuarioId === ""
-                  ? "border-[#8a5140] bg-[#fdf6f1]"
-                  : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
+                  ? "border-[#724b7f] bg-[#fdf6f1]"
+                  : "border-[#e8e4ea] bg-white hover:border-[#d0c3d4]"
               }`}
               onClick={() => elegir(setUsuarioId)("")}
               type="button"
             >
               <p className="font-medium">Cualquiera disponible</p>
-              <p className="mt-1 text-xs text-[#6e6159]">Te asignamos quien esté libre</p>
+              <p className="mt-1 text-xs text-[#675d6a]">Te asignamos quien esté libre</p>
             </button>
             {profesionalesSucursal.map((p) => (
               <button
                 className={`rounded-2xl border p-4 text-left transition-colors ${
                   p.usuarioId === usuarioId
-                    ? "border-[#8a5140] bg-[#fdf6f1]"
-                    : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
+                    ? "border-[#724b7f] bg-[#fdf6f1]"
+                    : "border-[#e8e4ea] bg-white hover:border-[#d0c3d4]"
                 }`}
                 key={p.usuarioId}
                 onClick={() => elegir(setUsuarioId)(p.usuarioId)}
@@ -307,14 +307,14 @@ export function ReservaFlow({
       {/* Paso 4: día */}
       {servicioId ? (
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#a76348]">Día</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#885699]">Día</h2>
           <div className="mt-3 flex flex-wrap gap-2">
             {dias.map((dia) => (
               <button
                 className={`rounded-xl border px-4 py-2 text-sm transition-colors ${
                   dia.diaKey === diaKey
-                    ? "border-[#8a5140] bg-[#fdf6f1] font-semibold"
-                    : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
+                    ? "border-[#724b7f] bg-[#fdf6f1] font-semibold"
+                    : "border-[#e8e4ea] bg-white hover:border-[#d0c3d4]"
                 }`}
                 key={dia.diaKey}
                 onClick={() => elegir(setDiaKey)(dia.diaKey)}
@@ -330,15 +330,15 @@ export function ReservaFlow({
       {/* Paso 4: horario */}
       {diaKey ? (
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#a76348]">Horario</h2>
+          <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#885699]">Horario</h2>
           {pending && slots === null ? (
-            <p className="mt-3 text-sm text-[#6e6159]">Buscando horarios disponibles…</p>
+            <p className="mt-3 text-sm text-[#675d6a]">Buscando horarios disponibles…</p>
           ) : null}
           {slotsError ? (
             <p className="mt-3 text-sm text-[#a8443a]">{slotsError}</p>
           ) : null}
           {slots !== null && slots.length === 0 && !slotsError ? (
-            <p className="mt-3 text-sm text-[#6e6159]">
+            <p className="mt-3 text-sm text-[#675d6a]">
               No quedan horarios libres ese día. Prueba con otra fecha.
             </p>
           ) : null}
@@ -348,8 +348,8 @@ export function ReservaFlow({
                 <button
                   className={`rounded-xl border px-3 py-2 text-sm tabular-nums transition-colors ${
                     iso === slotIso
-                      ? "border-[#8a5140] bg-[#2c2522] font-semibold text-[#fffaf5]"
-                      : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
+                      ? "border-[#724b7f] bg-[#29242a] font-semibold text-[#faf6fd]"
+                      : "border-[#e8e4ea] bg-white hover:border-[#d0c3d4]"
                   }`}
                   key={iso}
                   onClick={() => setSlotIso(iso)}
@@ -365,8 +365,8 @@ export function ReservaFlow({
 
       {/* Paso 5: datos */}
       {slotIso ? (
-        <form className="rounded-3xl border border-[#e4d9cf] bg-white p-6 shadow-sm" onSubmit={enviar}>
-          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-[#a76348]">
+        <form className="rounded-3xl border border-[#dcd5de] bg-white p-6 shadow-sm" onSubmit={enviar}>
+          <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-[#885699]">
             <CalendarCheck2 className="size-4" /> Tus datos
           </h2>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -394,7 +394,7 @@ export function ReservaFlow({
           ) : null}
           <div className="mt-5 flex items-center gap-3">
             <Button
-              className="rounded-xl border-[#ded5ce] bg-white"
+              className="rounded-xl border-[#d8d3d9] bg-white"
               onClick={() => setSlotIso("")}
               type="button"
               variant="outline"
@@ -402,14 +402,14 @@ export function ReservaFlow({
               <ChevronLeft className="size-4" /> Cambiar horario
             </Button>
             <Button
-              className="flex-1 rounded-xl bg-[#2c2522] py-3 text-sm font-semibold text-[#fffaf5] hover:bg-[#463a34]"
+              className="flex-1 rounded-xl bg-[#29242a] py-3 text-sm font-semibold text-[#faf6fd] hover:bg-[#403743]"
               disabled={pending}
               type="submit"
             >
               {pending ? "Reservando…" : "Confirmar reserva"}
             </Button>
           </div>
-          <p className="mt-3 text-xs leading-5 text-[#6e6159]">
+          <p className="mt-3 text-xs leading-5 text-[#675d6a]">
             {sucursal.autoConfirmar
               ? "Tu cita queda confirmada al instante."
               : "El equipo revisará tu solicitud y te confirmará por teléfono."}

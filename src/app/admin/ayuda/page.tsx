@@ -16,9 +16,9 @@ export const dynamic = "force-dynamic";
 type SearchParams = Promise<AdminSearchParams>;
 
 const cardClass =
-  "rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm sm:p-6";
+  "rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6";
 const iconClass =
-  "flex size-10 items-center justify-center rounded-xl bg-[#f1eeea] text-[#8a5140]";
+  "flex size-10 items-center justify-center rounded-xl bg-muted/60 text-primary";
 
 /** Centro de ayuda: guía de configuración, práctica segura y soporte. */
 export default async function AyudaPage({ searchParams }: { searchParams: SearchParams }) {
@@ -58,12 +58,12 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
           <section className={cardClass}>
             <div className={iconClass}><Compass aria-hidden="true" className="size-5" /></div>
             <div className="mt-4 flex items-center gap-2">
-              <h2 className="font-semibold text-[#2d2926]">Guía de configuración</h2>
+              <h2 className="font-semibold text-foreground">Guía de configuración</h2>
               <StatusBadge tone={guiaAccion.badge === "Completada" ? "success" : "neutral"}>
                 {guiaAccion.badge}
               </StatusBadge>
             </div>
-            <p className="mt-2 text-sm leading-6 text-[#625b55]">
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
               Paso a paso sobre tu negocio real: servicios, horario, primera cita y primer cobro.
               Los pasos se marcan solos cuando existen en el sistema.
             </p>
@@ -75,8 +75,8 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
 
         <section className={cardClass}>
           <div className={iconClass}><FlaskConical aria-hidden="true" className="size-5" /></div>
-          <h2 className="mt-4 font-semibold text-[#2d2926]">Práctica</h2>
-          <p className="mt-2 text-sm leading-6 text-[#625b55]">
+          <h2 className="mt-4 font-semibold text-foreground">Práctica</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             Recorrido con datos de ejemplo: agenda una cita, cóbrala y ve el ticket.
             No toca tus ventas, tu caja ni tu inventario, y puedes repetirlo las veces que quieras.
           </p>
@@ -87,8 +87,8 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
 
         <section className={cardClass}>
           <div className={iconClass}><LifeBuoy aria-hidden="true" className="size-5" /></div>
-          <h2 className="mt-4 font-semibold text-[#2d2926]">Soporte</h2>
-          <p className="mt-2 text-sm leading-6 text-[#625b55]">
+          <h2 className="mt-4 font-semibold text-foreground">Soporte</h2>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">
             ¿Algo no cuadra o necesitas cambiar permisos? Contacta a quien administra tu
             organización; puede ajustar tu rol desde <strong>Equipo</strong>.
           </p>

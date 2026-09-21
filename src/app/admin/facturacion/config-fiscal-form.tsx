@@ -29,10 +29,10 @@ export function ConfigFiscalForm({
   const [state, formAction, pending] = useActionState<ActionState, FormData>(saveConfigFiscal, {});
 
   return (
-    <form action={formAction} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
+    <form action={formAction} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <input name="organizacionId" type="hidden" value={organizationId} />
       <h2 className="text-xl font-semibold">Datos del emisor</h2>
-      <p className="mt-1 text-sm text-[#625b55]">
+      <p className="mt-1 text-sm text-muted-foreground">
         Identidad fiscal con la que se emiten los CFDI de esta organización. Es requisito para facturar.
       </p>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -70,8 +70,8 @@ export function ConfigFiscalForm({
             <option value="0">0%</option>
           </Select>
         </Field>
-        <label className="flex items-center gap-2 text-sm text-[#2d2926] sm:col-span-2">
-          <input className="h-4 w-4 accent-[#8a5140]" defaultChecked={initial?.preciosIncluyenIva ?? true} name="preciosIncluyenIva" type="checkbox" value="true" />
+        <label className="flex items-center gap-2 text-sm text-foreground sm:col-span-2">
+          <input className="h-4 w-4 accent-primary" defaultChecked={initial?.preciosIncluyenIva ?? true} name="preciosIncluyenIva" type="checkbox" value="true" />
           Los precios del catálogo ya incluyen IVA
         </label>
       </div>

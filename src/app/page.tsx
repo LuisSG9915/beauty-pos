@@ -1,55 +1,84 @@
 import Link from "next/link";
-import { CalendarDays, ChartNoAxesCombined, ShieldCheck, Store } from "lucide-react";
+import {
+  CalendarDays,
+  ChartNoAxesCombined,
+  Scissors,
+  ShieldCheck,
+  Store,
+  Wallet,
+} from "lucide-react";
 
+import { BrandWordmark } from "@/components/brand-mark";
 import { Button } from "@/components/ui/button";
 import { TelemetriaPing } from "@/components/telemetria-ping";
+import { BRAND } from "@/lib/brand";
 
-const modules = [
+const benefits = [
   {
     icon: CalendarDays,
-    title: "Agenda y citas",
-    description: "Organiza la jornada y convierte cada cita en una venta en proceso.",
+    title: "Agenda sin empalmes",
+    description: "Tus clientes reservan en línea y cada cita queda lista para cobrarse al terminar.",
+  },
+  {
+    icon: Wallet,
+    title: "Caja que sí cuadra",
+    description: "Ventas, gastos y comisiones conectados: cierras el día sabiendo cómo quedó el negocio.",
+  },
+  {
+    icon: Scissors,
+    title: "Clientes que regresan",
+    description: "Historial, paquetes, membresías y promociones para que vuelvan sin perseguirlas por WhatsApp.",
   },
   {
     icon: Store,
-    title: "Multi-sucursal",
-    description: "Administra equipos, cajas y operación desde un solo lugar.",
+    title: "Sucursales bajo control",
+    description: "Equipos, cajas e inventario de cada sucursal, supervisados desde un solo lugar.",
   },
   {
     icon: ChartNoAxesCombined,
-    title: "Reportes claros",
-    description: "Toma decisiones con ventas, ocupación e inventario en contexto.",
+    title: "Decisiones con números",
+    description: "Qué se vende, quién lo hace y cómo se paga — reportes claros por rango y sucursal.",
   },
   {
     icon: ShieldCheck,
-    title: "Seguridad integrada",
-    description: "Permisos por rol y organización desde el inicio del sistema.",
+    title: "Cada quien lo suyo",
+    description: "Permisos por rol: recepción ve la agenda, estilistas su día y tú todo el negocio.",
+  },
+];
+
+const steps = [
+  {
+    step: "1",
+    title: "Crea tu salón",
+    description: "Servicios, equipo y agenda listos en minutos, con guía inicial incluida.",
+  },
+  {
+    step: "2",
+    title: "Agenda y cobra",
+    description: "Tus clientes reservan solas y cada cita se convierte en venta con un toque.",
+  },
+  {
+    step: "3",
+    title: "Cierra con claridad",
+    description: "Corte de caja, gastos y comisiones al día — sin libreta ni Excel.",
   },
 ];
 
 export default function Home() {
   return (
-    <main className="flex min-h-screen flex-col bg-[#faf9f7] text-[#292522]">
+    <main className="flex min-h-screen flex-col bg-[#fbf9fc] text-[#26202c]">
       <TelemetriaPing origen="landing" />
       <header className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-6 lg:px-10">
-        <div className="flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-2xl bg-[#2c2522] text-sm font-semibold text-[#f6eadf]">
-            BP
-          </div>
-          <div>
-            <p className="font-semibold tracking-tight">Beauty POS</p>
-            <p className="text-xs text-[#6e6159]">Gestión para tu belleza</p>
-          </div>
-        </div>
+        <BrandWordmark markSize={40} withDescriptor />
         <nav className="flex items-center gap-2">
           <Link
-            className="hidden h-8 items-center rounded-lg px-3 text-sm font-medium text-[#6b5d54] transition-colors hover:bg-[#f4f1ee] sm:inline-flex"
+            className="hidden h-8 items-center rounded-lg px-3 text-sm font-medium text-[#5f5562] transition-colors hover:bg-[#f2eef4] sm:inline-flex"
             href="/precios"
           >
             Precios
           </Link>
           <Link
-            className="inline-flex h-8 items-center rounded-lg border border-[#ded5ce] bg-white px-4 text-sm font-medium transition-colors hover:bg-[#f4f1ee]"
+            className="inline-flex h-8 items-center rounded-lg border border-[#ddd4e3] bg-white px-4 text-sm font-medium transition-colors hover:bg-[#f6f2f9]"
             href="/login"
           >
             Iniciar sesión
@@ -59,23 +88,23 @@ export default function Home() {
 
       <section className="mx-auto grid w-full max-w-7xl flex-1 items-center gap-16 px-6 py-16 lg:grid-cols-[1.1fr_0.9fr] lg:px-10 lg:py-24">
         <div>
-          <p className="mb-5 text-sm font-semibold uppercase tracking-[0.22em] text-[#ae6f54]">
-            Próxima generación para salones
+          <p className="mb-5 text-sm font-semibold uppercase tracking-[0.22em] text-[#7a5c88]">
+            Para salones, spas y estudios de belleza
           </p>
-          <h1 className="max-w-3xl text-5xl font-semibold leading-[1.03] tracking-[-0.05em] text-[#292522] sm:text-6xl lg:text-7xl">
-            Menos administración.
-            <span className="block text-[#8a5140]">Más tiempo para consentir.</span>
+          <h1 className="max-w-3xl font-serif text-5xl font-semibold leading-[1.05] tracking-[-0.03em] text-[#26202c] sm:text-6xl lg:text-7xl">
+            Todo tu salón,
+            <span className="block italic text-[#6f4b7d]">bajo control.</span>
           </h1>
-          <p className="mt-7 max-w-xl text-lg leading-8 text-[#74675f]">
-            Una operación sencilla para conectar citas, clientes, servicios,
-            inventario y ventas en cada sucursal de tu salón.
+          <p className="mt-7 max-w-xl text-lg leading-8 text-[#6b5e73]">
+            De la cita al corte de caja: agenda, clientes, cobros, inventario y
+            comisiones conectados en un solo lugar. Menos libreta, más salón.
           </p>
           <div className="mt-9 flex flex-wrap gap-3">
             <Button
               nativeButton={false}
               render={<Link href="/registro" />}
               size="lg"
-              className="h-11 rounded-xl bg-[#2c2522] px-6 text-[#fffaf5] hover:bg-[#463a34]"
+              className="h-11 rounded-xl px-6"
             >
               Prueba gratis 14 días
             </Button>
@@ -84,47 +113,47 @@ export default function Home() {
               render={<Link href="/precios" />}
               size="lg"
               variant="outline"
-              className="h-11 rounded-xl border-[#ded5ce] bg-white px-6"
+              className="h-11 rounded-xl bg-white px-6"
             >
               Ver planes y precios
             </Button>
           </div>
-          <p className="mt-5 text-sm text-[#988b82]">
-            Diseñado para México · Sin tarjeta · Tus datos se conservan al contratar
+          <p className="mt-5 text-sm text-[#75677e]">
+            Diseñado para México · Precio fijo por negocio, no por persona · Sin tarjeta
           </p>
         </div>
 
         <div className="relative">
-          <div className="absolute -inset-5 rounded-[2.5rem] bg-[#f1dfd3] blur-3xl" />
-          <div className="relative overflow-hidden rounded-[2rem] border border-[#eadfd8] bg-white p-5 shadow-[0_24px_80px_-32px_rgba(70,45,33,0.35)]">
-            <div className="flex items-center justify-between border-b border-[#f0e9e4] pb-4">
+          <div className="absolute -inset-5 rounded-[2.5rem] bg-[#e9ddf0] blur-3xl" />
+          <div className="relative overflow-hidden rounded-[2rem] border border-[#e3dce6] bg-white p-5 shadow-[0_24px_80px_-32px_rgba(60,38,74,0.35)]">
+            <div className="flex items-center justify-between border-b border-[#ece6ee] pb-4">
               <div>
-                <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#a7978e]">Resumen del día</p>
-                <p className="mt-1 text-xl font-semibold">Casa Magnolia</p>
+                <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#9c8fa3]">Resumen del día</p>
+                <p className="mt-1 font-serif text-xl font-semibold">Casa Magnolia</p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="rounded-full border border-[#e5ddd6] px-2.5 py-1 text-[10px] font-medium text-[#a7978e]">
+                <span className="rounded-full border border-[#e0d9e4] px-2.5 py-1 text-[10px] font-medium text-[#9c8fa3]">
                   Ejemplo ilustrativo
                 </span>
-                <div className="rounded-full bg-[#f8eee8] px-3 py-1.5 text-xs font-medium text-[#a76348]">Hoy, 8 sep</div>
+                <div className="rounded-full bg-[#efe6f4] px-3 py-1.5 text-xs font-medium text-[#6f4b7d]">Hoy, 8 sep</div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 py-5">
-              <div className="rounded-2xl bg-[#f8f5f2] p-4">
-                <p className="text-xs text-[#95877e]">Ventas</p>
+              <div className="rounded-2xl bg-[#f6f4f8] p-4">
+                <p className="text-xs text-[#75677e]">Ventas</p>
                 <p className="mt-2 text-2xl font-semibold">$18,450</p>
-                <p className="mt-1 text-xs text-[#5d9a76]">+12.8% vs. ayer</p>
+                <p className="mt-1 text-xs text-[#3f7a55]">+12.8% vs. ayer</p>
               </div>
-              <div className="rounded-2xl bg-[#f8f5f2] p-4">
-                <p className="text-xs text-[#95877e]">Citas de hoy</p>
+              <div className="rounded-2xl bg-[#f6f4f8] p-4">
+                <p className="text-xs text-[#75677e]">Citas de hoy</p>
                 <p className="mt-2 text-2xl font-semibold">24</p>
-                <p className="mt-1 text-xs text-[#95877e]">18 confirmadas</p>
+                <p className="mt-1 text-xs text-[#75677e]">18 confirmadas</p>
               </div>
             </div>
-            <div className="rounded-2xl border border-[#eee6e0] p-4">
+            <div className="rounded-2xl border border-[#eae4ec] p-4">
               <div className="mb-4 flex items-center justify-between">
                 <p className="text-sm font-semibold">Próximas citas</p>
-                <span className="text-xs text-[#a76348]">Ver agenda</span>
+                <span className="text-xs text-[#6f4b7d]">Ver agenda</span>
               </div>
               <div className="space-y-3">
                 {[
@@ -133,13 +162,13 @@ export default function Home() {
                   ["11:00", "Camila Torres", "Facial hidratante", "Confirmada"],
                 ].map(([time, name, service, status]) => (
                   <div className="flex items-center gap-3" key={`${time}-${name}`}>
-                    <span className="w-12 text-xs font-semibold text-[#a76348]">{time}</span>
-                    <div className="size-8 rounded-full bg-[#e7d5cb]" />
+                    <span className="w-12 text-xs font-semibold text-[#6f4b7d]">{time}</span>
+                    <div className="size-8 rounded-full bg-[#ded3e4]" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{name}</p>
-                      <p className="truncate text-xs text-[#95877e]">{service}</p>
+                      <p className="truncate text-xs text-[#75677e]">{service}</p>
                     </div>
-                    <span className="rounded-full bg-[#f4f1ee] px-2 py-1 text-[10px] text-[#786b63]">{status}</span>
+                    <span className="rounded-full bg-[#f2eef4] px-2 py-1 text-[10px] text-[#6b6270]">{status}</span>
                   </div>
                 ))}
               </div>
@@ -148,26 +177,69 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="border-t border-[#eee6e0] bg-white/70">
-        <div className="mx-auto grid w-full max-w-7xl gap-4 px-6 py-10 sm:grid-cols-2 lg:grid-cols-4 lg:px-10">
-          {modules.map(({ icon: Icon, title, description }) => (
+      <section className="border-t border-[#eae4ec] bg-white/70">
+        <div className="mx-auto grid w-full max-w-7xl gap-4 px-6 py-12 sm:grid-cols-2 lg:grid-cols-3 lg:px-10">
+          {benefits.map(({ icon: Icon, title, description }) => (
             <div className="rounded-2xl p-4" key={title}>
-              <Icon className="size-5 text-[#8a5140]" strokeWidth={1.8} />
+              <Icon className="size-5 text-[#6f4b7d]" strokeWidth={1.8} />
               <h2 className="mt-4 font-semibold">{title}</h2>
-              <p className="mt-2 text-sm leading-6 text-[#6e6159]">{description}</p>
+              <p className="mt-2 text-sm leading-6 text-[#675d6a]">{description}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <footer className="border-t border-[#eee6e0]">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-8 text-sm text-[#6e6159] lg:px-10">
-          <p>© Beauty POS · Hecho para estéticas y salones en México</p>
+      <section className="border-t border-[#eae4ec]">
+        <div className="mx-auto w-full max-w-7xl px-6 py-16 lg:px-10">
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#7a5c88]">
+            Cómo funciona
+          </p>
+          <h2 className="mt-4 max-w-xl font-serif text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
+            Ordena tu salón en tres pasos
+          </h2>
+          <div className="mt-10 grid gap-8 sm:grid-cols-3">
+            {steps.map(({ step, title, description }) => (
+              <div key={step}>
+                <span className="inline-flex size-10 items-center justify-center rounded-full bg-[#efe6f4] font-serif text-lg font-semibold text-[#6f4b7d]">
+                  {step}
+                </span>
+                <h3 className="mt-4 font-semibold">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-[#675d6a]">{description}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-t border-[#eae4ec] bg-[#2a2130]">
+        <div className="mx-auto flex w-full max-w-7xl flex-col items-center px-6 py-16 text-center lg:px-10">
+          <h2 className="max-w-2xl font-serif text-3xl font-semibold tracking-[-0.02em] text-[#f4edf8] sm:text-4xl">
+            Menos caos. <span className="italic">Más salón.</span>
+          </h2>
+          <p className="mt-4 max-w-xl text-sm leading-6 text-[#c9b8d4]">
+            Prueba {BRAND.name} gratis 14 días y deja tu agenda, tu caja y tus
+            comisiones trabajando juntas. Los primeros 100 negocios contratan con
+            precio fundador.
+          </p>
+          <Button
+            nativeButton={false}
+            render={<Link href="/registro" />}
+            size="lg"
+            className="mt-8 h-11 rounded-xl bg-[#f4edf8] px-6 text-[#33243d] hover:bg-white"
+          >
+            Crear mi cuenta gratis
+          </Button>
+        </div>
+      </section>
+
+      <footer className="border-t border-[#eae4ec]">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-8 text-sm text-[#675d6a] lg:px-10">
+          <p>© {BRAND.name} · {BRAND.descriptor} en México</p>
           <nav className="flex flex-wrap gap-x-6 gap-y-2">
-            <Link className="hover:text-[#5d524b]" href="/precios">Precios</Link>
-            <Link className="hover:text-[#5d524b]" href="/soporte">Soporte</Link>
-            <Link className="hover:text-[#5d524b]" href="/terminos">Términos</Link>
-            <Link className="hover:text-[#5d524b]" href="/privacidad">Privacidad</Link>
+            <Link className="hover:text-[#4d4453]" href="/precios">Precios</Link>
+            <Link className="hover:text-[#4d4453]" href="/soporte">Soporte</Link>
+            <Link className="hover:text-[#4d4453]" href="/terminos">Términos</Link>
+            <Link className="hover:text-[#4d4453]" href="/privacidad">Privacidad</Link>
           </nav>
         </div>
       </footer>

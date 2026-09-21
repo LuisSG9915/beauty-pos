@@ -60,59 +60,59 @@ export default async function IncidenteDetallePage({
           <AdminCard title="Detalle del error">
             <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <div>
-                <dt className="text-xs text-[#6e6159]">Estado</dt>
+                <dt className="text-xs text-muted-foreground">Estado</dt>
                 <dd className="mt-1"><StatusBadge tone={estado.tone}>{estado.label}</StatusBadge></dd>
               </div>
               <div>
-                <dt className="text-xs text-[#6e6159]">Prioridad</dt>
+                <dt className="text-xs text-muted-foreground">Prioridad</dt>
                 <dd className="mt-1"><StatusBadge tone={prioridad.tone}>{prioridad.label}</StatusBadge></dd>
               </div>
               <div>
-                <dt className="text-xs text-[#6e6159]">Fuente</dt>
+                <dt className="text-xs text-muted-foreground">Fuente</dt>
                 <dd className="mt-1">{incidente.fuente}</dd>
               </div>
               <div>
-                <dt className="text-xs text-[#6e6159]">Módulo / ruta</dt>
+                <dt className="text-xs text-muted-foreground">Módulo / ruta</dt>
                 <dd className="mt-1">
                   {incidente.modulo ?? "—"} {incidente.ruta ? `· ${incidente.ruta}` : ""}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-[#6e6159]">Ocurrencias</dt>
+                <dt className="text-xs text-muted-foreground">Ocurrencias</dt>
                 <dd className="mt-1 tabular-nums">{incidente.ocurrencias}</dd>
               </div>
               <div>
-                <dt className="text-xs text-[#6e6159]">Negocios afectados</dt>
+                <dt className="text-xs text-muted-foreground">Negocios afectados</dt>
                 <dd className="mt-1 tabular-nums">{incidente.organizacionesAfectadas}</dd>
               </div>
               <div>
-                <dt className="text-xs text-[#6e6159]">Primera vez</dt>
+                <dt className="text-xs text-muted-foreground">Primera vez</dt>
                 <dd className="mt-1">{formatDateTime(incidente.primeraVezAt)}</dd>
               </div>
               <div>
-                <dt className="text-xs text-[#6e6159]">Última vez</dt>
+                <dt className="text-xs text-muted-foreground">Última vez</dt>
                 <dd className="mt-1">{formatDateTime(incidente.ultimaVezAt)}</dd>
               </div>
               {incidente.releaseAparece ? (
                 <div>
-                  <dt className="text-xs text-[#6e6159]">Apareció en</dt>
+                  <dt className="text-xs text-muted-foreground">Apareció en</dt>
                   <dd className="mt-1">{incidente.releaseAparece}</dd>
                 </div>
               ) : null}
               {incidente.releaseCorregido ? (
                 <div>
-                  <dt className="text-xs text-[#6e6159]">Corregido en</dt>
+                  <dt className="text-xs text-muted-foreground">Corregido en</dt>
                   <dd className="mt-1">{incidente.releaseCorregido}</dd>
                 </div>
               ) : null}
             </dl>
             {incidente.mensaje ? (
-              <pre className="mt-4 max-h-48 overflow-auto rounded-xl bg-[#faf6f3] p-4 text-xs leading-5 whitespace-pre-wrap text-[#403a35]">
+              <pre className="mt-4 max-h-48 overflow-auto rounded-xl bg-muted/60 p-4 text-xs leading-5 whitespace-pre-wrap text-foreground">
                 {incidente.mensaje}
               </pre>
             ) : null}
             {incidente.resueltoAt ? (
-              <p className="mt-4 rounded-xl border border-[#cfe3d0] bg-[#eef6ee] px-4 py-3 text-sm text-[#3f6b45]">
+              <p className="mt-4 rounded-xl border border-[#9fcfc4] bg-[#e2f5f1] px-4 py-3 text-sm text-success">
                 Resuelto por {incidente.resueltoNombre ?? "—"} el{" "}
                 {formatDateTime(incidente.resueltoAt)}.
                 {incidente.notaResolucion ? ` ${incidente.notaResolucion}` : ""}
@@ -122,12 +122,12 @@ export default async function IncidenteDetallePage({
 
           <AdminCard title="Ocurrencias recientes">
             {ocurrencias.length === 0 ? (
-              <p className="text-sm text-[#6e6159]">Sin ocurrencias registradas.</p>
+              <p className="text-sm text-muted-foreground">Sin ocurrencias registradas.</p>
             ) : (
-              <ul className="divide-y divide-[#f4eeea]">
+              <ul className="divide-y divide-border">
                 {ocurrencias.map((oc) => (
                   <li className="py-3" key={oc.id}>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#6e6159]">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                       <span className="font-mono">{oc.correlationId}</span>
                       <span>{formatDateTime(oc.createdAt)}</span>
                       {oc.ruta ? <span>{oc.ruta}</span> : null}
@@ -136,12 +136,12 @@ export default async function IncidenteDetallePage({
                       {oc.organizacion ? <span>{oc.organizacion}</span> : null}
                     </div>
                     {typeof oc.contexto?.stack === "string" && oc.contexto.stack ? (
-                      <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-[#faf6f3] p-3 text-[11px] leading-4 whitespace-pre-wrap text-[#625b55]">
+                      <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-muted/60 p-3 text-[11px] leading-4 whitespace-pre-wrap text-muted-foreground">
                         {oc.contexto.stack}
                       </pre>
                     ) : null}
                     {Array.isArray(oc.contexto?.rastro) && oc.contexto.rastro.length > 0 ? (
-                      <p className="mt-2 text-[11px] text-[#6e6159]">
+                      <p className="mt-2 text-[11px] text-muted-foreground">
                         Acciones previas: {oc.contexto.rastro.join(" → ")}
                       </p>
                     ) : null}
@@ -169,7 +169,7 @@ export default async function IncidenteDetallePage({
 
           <AdminCard title="Distribución por navegador">
             {porNavegador.length === 0 ? (
-              <p className="text-sm text-[#6e6159]">Sin datos.</p>
+              <p className="text-sm text-muted-foreground">Sin datos.</p>
             ) : (
               <ul className="space-y-1 text-sm">
                 {porNavegador.map((fila) => (
@@ -186,8 +186,8 @@ export default async function IncidenteDetallePage({
             <IncidenteNota incidenteId={incidente.id} />
             <ul className="mt-4 space-y-3">
               {historial.map((item) => (
-                <li className="border-l-2 border-[#eadfd8] pl-3 text-sm" key={item.id}>
-                  <p className="text-xs text-[#6e6159]">
+                <li className="border-l-2 border-border pl-3 text-sm" key={item.id}>
+                  <p className="text-xs text-muted-foreground">
                     {formatDateTime(item.createdAt)} · {item.usuario ?? "Sistema"} ·{" "}
                     {TIPO_HISTORIAL[item.tipo] ?? item.tipo}
                     {item.valorAnterior || item.valorNuevo
@@ -195,7 +195,7 @@ export default async function IncidenteDetallePage({
                       : ""}
                   </p>
                   {item.comentario ? (
-                    <p className="mt-1 text-[#403a35]">{item.comentario}</p>
+                    <p className="mt-1 text-foreground">{item.comentario}</p>
                   ) : null}
                 </li>
               ))}

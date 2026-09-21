@@ -95,7 +95,7 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
     <div className="space-y-6">
       <AdminPageHeader description="Membresías: descuento porcentual por tiempo limitado que el cliente compra por adelantado." title="Membresías" />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#eadfd8] bg-white p-4" method="get">
+      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <Field className="min-w-52 flex-1">
           <FieldLabel>Buscar</FieldLabel>
@@ -138,7 +138,7 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[720px] text-left text-sm">
-                <thead className="border-b border-[#eee8e3] text-xs uppercase tracking-wide text-[#625b55]">
+                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-4 font-medium">Clave</th>
                     <th className="py-2 pr-4 font-medium">Nombre</th>
@@ -151,10 +151,10 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
                 </thead>
                 <tbody>
                   {membresiaRows.map((membresia) => (
-                    <tr className="border-b border-[#f1eeea]" key={membresia.id}>
+                    <tr className="border-b border-border" key={membresia.id}>
                       <td className="py-3 pr-4 font-mono text-xs">{membresia.clave}</td>
                       <td className="py-3 pr-4 font-medium">{membresia.nombre}</td>
-                      <td className="py-3 pr-4 text-xs tabular-nums text-[#625b55]">
+                      <td className="py-3 pr-4 text-xs tabular-nums text-muted-foreground">
                         {Number(membresia.descuentoPorcentaje)}% · {APLICA_LABEL[membresia.aplica] ?? membresia.aplica}
                       </td>
                       <td className="py-3 pr-4 tabular-nums">{membresia.duracionDias} días</td>
@@ -162,12 +162,12 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
                       <td className="py-3 pr-4"><StatusBadge active={membresia.activo} /></td>
                       <td className="py-3">
                         <div className="flex flex-wrap gap-2">
-                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-[#ded8d2] px-2.5 text-xs text-[#625b55] hover:bg-[#f8f7f5]" href={buildAdminHref("/membresias", { organizationId, extra: { ...preserved, edit: membresia.id } })}>Editar</Link>
+                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/membresias", { organizationId, extra: { ...preserved, edit: membresia.id } })}>Editar</Link>
                           <form action={toggleMembresia}>
                             <input name="organizacionId" type="hidden" value={organizationId} />
                             <input name="id" type="hidden" value={membresia.id} />
                             <input name="activo" type="hidden" value={String(membresia.activo)} />
-                            <button className="inline-flex min-h-9 items-center rounded-lg border border-[#ded8d2] px-2.5 text-xs text-[#625b55] hover:bg-[#f8f7f5]" type="submit">{membresia.activo ? "Ocultar" : "Activar"}</button>
+                            <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">{membresia.activo ? "Ocultar" : "Activar"}</button>
                           </form>
                         </div>
                       </td>

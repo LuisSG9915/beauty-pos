@@ -7,7 +7,7 @@ export default function AdminNotFound() {
     <EmptyState
       action={
         <Link
-          className="inline-flex min-h-10 items-center rounded-xl bg-[#8a5140] px-4 text-sm font-medium text-white transition-colors hover:bg-[#744233]"
+          className="inline-flex min-h-10 items-center rounded-xl bg-primary px-4 text-sm font-medium text-white transition-colors hover:bg-[#a63c28]"
           href="/admin"
         >
           Volver al panel

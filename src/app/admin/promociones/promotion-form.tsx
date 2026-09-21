@@ -75,24 +75,24 @@ export function PromotionForm({ organizationId, initial }: { organizationId: str
         <FieldLabel>Vigencia hasta</FieldLabel>
         <Input defaultValue={String(value("vigenciaHasta"))} name="vigenciaHasta" type="date" />
       </Field>
-      <p className="rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55] sm:col-span-2">
+      <p className="rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground sm:col-span-2">
         Si no indicas fecha de fin, la promoción queda vigente hasta que la ocultes manualmente.
       </p>
     </div>
   );
 
   const futuro = (
-    <p className="rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55]">
+    <p className="rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">
       La selección de productos, servicios, sucursales y restricciones específicas se habilitará al conectar el cobro y la agenda.
     </p>
   );
 
   return (
-    <form action={formAction} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
+    <form action={formAction} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
       <h2 className="text-xl font-semibold">{initial ? "Editar promoción" : "Nueva promoción"}</h2>
-      <p className="mt-1 text-sm text-[#625b55]">Configura descuentos, 2x1 o paquetes para productos y servicios.</p>
+      <p className="mt-1 text-sm text-muted-foreground">Configura descuentos, 2x1 o paquetes para productos y servicios.</p>
       <div className="mt-5">
         <FormTabs
           tabs={[

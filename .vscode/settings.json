@@ -1,0 +1,5 @@
+{
+  // Tailwind v4 usa at-rules propios (@custom-variant, @theme, @apply) que el
+  // linter CSS del IDE no conoce; se desactiva solo esa validación.
+  "css.lint.unknownAtRules": "ignore"
+}

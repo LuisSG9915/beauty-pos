@@ -175,12 +175,12 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                 <ul className="mt-4 space-y-2">
                   {movimientosTurno.map((mov) => (
                     <li
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#eee8e3] px-4 py-2.5 text-sm"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border px-4 py-2.5 text-sm"
                       key={mov.id}
                     >
                       <div className="min-w-0">
-                        <p className="font-medium capitalize text-[#2d2926]">{mov.tipo}</p>
-                        <p className="text-xs text-[#6e6159]">
+                        <p className="font-medium capitalize text-foreground">{mov.tipo}</p>
+                        <p className="text-xs text-muted-foreground">
                           {formatTime(mov.createdAt, { timeZone })} · {mov.medioNombre} · {mov.usuarioNombre}
                           {mov.notas ? ` · ${mov.notas}` : ""}
                         </p>
@@ -188,8 +188,8 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                       <span
                         className={`tabular-nums font-semibold ${
                           mov.tipo === "entrada" || (mov.tipo === "ajuste" && num(mov.monto) > 0)
-                            ? "text-[#347052]"
-                            : "text-[#a8443a]"
+                            ? "text-success"
+                            : "text-destructive"
                         }`}
                       >
                         {mov.tipo === "entrada" || mov.tipo === "ajuste"
@@ -217,26 +217,26 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                 const tot = ventasPorCorte.get(corte.id);
                 const diferenciaTotal = (detallesPorCorte.get(corte.id) ?? []).reduce((s, d) => s + num(d.diferencia), 0);
                 return (
-                  <li className="rounded-xl border border-[#eee8e3] p-4" key={corte.id}>
+                  <li className="rounded-xl border border-border p-4" key={corte.id}>
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-[#2d2926]">
+                      <p className="text-sm font-semibold text-foreground">
                         {formatDate(corte.createdAt, { timeZone })} · {formatTime(corte.createdAt, { timeZone })} →{" "}
                         {corte.cerradoAt ? formatTime(corte.cerradoAt, { timeZone }) : "—"}
                       </p>
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                          Math.abs(diferenciaTotal) < 0.005 ? "bg-[#eaf5ed] text-[#347052]" : "bg-[#fdf1ee] text-[#a8443a]"
+                          Math.abs(diferenciaTotal) < 0.005 ? "bg-[#d4efe9] text-success" : "bg-[#f6d9d2] text-destructive"
                         }`}
                       >
                         {Math.abs(diferenciaTotal) < 0.005 ? "Cuadrado" : `Diferencia ${fmt(diferenciaTotal)}`}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-[#6e6159]">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       {corte.abiertoPor ?? "—"} · {tot?.ventasCount ?? 0} venta(s) · {fmt(tot?.total)} ventas ·{" "}
                       {fmt(tot?.propinas)} propinas · {fmt(comisionesPorCorte.get(corte.id))} comisiones
                     </p>
                     <table className="mt-3 w-full text-left text-sm">
-                      <thead className="text-xs uppercase tracking-wide text-[#6e6159]">
+                      <thead className="text-xs uppercase tracking-wide text-muted-foreground">
                         <tr>
                           <th className="py-1 pr-3 font-medium">Medio</th>
                           <th className="py-1 pr-3 text-right font-medium">Esperado</th>
@@ -246,13 +246,13 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                       </thead>
                       <tbody>
                         {(detallesPorCorte.get(corte.id) ?? []).map((d, i) => (
-                          <tr className="border-t border-[#f1eeea]" key={i}>
+                          <tr className="border-t border-border" key={i}>
                             <td className="py-1.5 pr-3">{d.medioNombre}</td>
                             <td className="py-1.5 pr-3 text-right tabular-nums">{fmt(d.esperado)}</td>
                             <td className="py-1.5 pr-3 text-right tabular-nums">{fmt(d.contado)}</td>
                             <td
                               className={`py-1.5 text-right font-medium tabular-nums ${
-                                Math.abs(num(d.diferencia)) < 0.005 ? "text-[#347052]" : "text-[#a8443a]"
+                                Math.abs(num(d.diferencia)) < 0.005 ? "text-success" : "text-destructive"
                               }`}
                             >
                               {fmt(d.diferencia)}
@@ -261,7 +261,7 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                         ))}
                       </tbody>
                     </table>
-                    {corte.notas ? <p className="mt-2 text-xs text-[#6e6159]">Notas: {corte.notas}</p> : null}
+                    {corte.notas ? <p className="mt-2 text-xs text-muted-foreground">Notas: {corte.notas}</p> : null}
                   </li>
                 );
               })}

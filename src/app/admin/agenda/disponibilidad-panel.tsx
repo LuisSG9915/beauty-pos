@@ -19,6 +19,15 @@ import {
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
+import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
+
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
 import { formatDate, formatTime } from "@/lib/format";
 import { RECURSO_TIPOS } from "@/db/schema/operations";
@@ -308,32 +317,36 @@ export function DisponibilidadPanel({
   );
 
   return (
-    <details className="group rounded-2xl border border-[#eadfd8] bg-white shadow-sm">
-      <summary className="flex cursor-pointer items-center gap-3 rounded-2xl px-5 py-4 text-sm font-semibold text-[#403a35] select-none hover:bg-[#faf9f7]">
-        <Settings2 aria-hidden="true" className="size-4 text-[#8a5140]" />
-        Disponibilidad de la sucursal
-        <span className="text-xs font-normal text-[#6e6159]">
-          horarios, bloqueos y citas sin asignar
-        </span>
-        <span className="ml-auto text-xs text-[#8a5140] group-open:hidden">Configurar</span>
-        <span className="ml-auto hidden text-xs text-[#8a5140] group-open:inline">Cerrar</span>
-      </summary>
-
-      <div className="grid gap-6 border-t border-[#eee8e3] px-5 py-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+    <Sheet>
+      <DialogPrimitive.Trigger
+        render={
+          <Button className="w-full shrink-0 rounded-xl lg:w-auto" type="button" variant="outline" />
+        }
+      >
+        <Settings2 aria-hidden="true" /> Configurar agenda
+      </DialogPrimitive.Trigger>
+      <SheetContent className="w-[min(100vw,46rem)]">
+        <SheetHeader>
+          <SheetTitle>Disponibilidad de la sucursal</SheetTitle>
+          <SheetDescription>
+            Horarios, bloqueos, reservas, recordatorios, recursos y citas sin asignar.
+          </SheetDescription>
+        </SheetHeader>
+      <div className="grid gap-6 border-t border-border pt-5">
         {/* ------------------------- Horario semanal ------------------------- */}
         <section className="space-y-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
             Horario de atención
           </h3>
           <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {DIAS.map(({ dia, nombre }) => {
               const turnos = horarios.filter((horario) => horario.diaSemana === dia);
               return (
-                <div className="rounded-xl border border-[#eee8e3] bg-[#faf9f7] p-3" key={dia}>
-                  <p className="text-xs font-semibold text-[#625b55]">{nombre}</p>
+                <div className="rounded-xl border border-border bg-muted/60 p-3" key={dia}>
+                  <p className="text-xs font-semibold text-muted-foreground">{nombre}</p>
                   <div className="mt-2 space-y-1.5">
                     {turnos.length === 0 ? (
-                      <p className="text-[11px] text-[#6f635a]">Cerrado</p>
+                      <p className="text-[11px] text-muted-foreground">Cerrado</p>
                     ) : (
                       turnos.map((turno) => (
                         <button
@@ -345,8 +358,8 @@ export function DisponibilidadPanel({
                           className={cn(
                             "flex w-full items-center justify-between rounded-lg px-2 py-1 text-xs tabular-nums transition-colors",
                             turno.activo
-                              ? "bg-white text-[#403a35] hover:bg-[#fdf1ee]"
-                              : "bg-[#f1eeea] text-[#6f635a] line-through hover:bg-[#eaf5ed]",
+                              ? "bg-card text-foreground hover:bg-[#f6d9d2]"
+                              : "bg-muted/60 text-muted-foreground line-through hover:bg-[#d4efe9]",
                           )}
                           disabled={pending}
                           key={turno.id}
@@ -365,7 +378,7 @@ export function DisponibilidadPanel({
               );
             })}
           </div>
-          <p className="text-xs text-[#6e6159]">
+          <p className="text-xs text-muted-foreground">
             Para huecos intermedios (comida, limpieza) registra dos turnos por día, p. ej. 09:00–14:00 y 16:00–20:00.
           </p>
         </section>
@@ -373,7 +386,7 @@ export function DisponibilidadPanel({
         <div className="space-y-6">
           {/* --------------------- Capacidad sin asignar --------------------- */}
           <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
               Citas sin profesional asignado
             </h3>
             <div className="flex items-end gap-2">
@@ -397,7 +410,7 @@ export function DisponibilidadPanel({
                 Guardar
               </Button>
             </div>
-            <p className="text-xs leading-5 text-[#6e6159]">
+            <p className="text-xs leading-5 text-muted-foreground">
               Cuántas citas sin asignar pueden coexistir en el mismo horario. 1 = solo una a la vez;
               súbelo si recepción agenda varias y asigna profesional al llegar.
             </p>
@@ -405,24 +418,24 @@ export function DisponibilidadPanel({
 
           {/* ---------------------- Reservas en línea ---------------------- */}
           <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
               Reservas en línea
             </h3>
-            <label className="flex items-start gap-2 text-sm text-[#403a35]">
+            <label className="flex items-start gap-2 text-sm text-foreground">
               <input
                 checked={reservas}
-                className="mt-0.5 size-4 accent-[#8a5140] disabled:opacity-50"
+                className="mt-0.5 size-4 accent-primary disabled:opacity-50"
                 disabled={!permiteReservasOnline}
                 onChange={(event) => setReservas(event.target.checked)}
                 type="checkbox"
               />
               <span>
                 Permitir que clientes reserven desde el portal público.
-                <span className="block text-xs text-[#6e6159]">
+                <span className="block text-xs text-muted-foreground">
                   Las reservas web usan el carril «sin asignar» y aparecen en la agenda.
                 </span>
                 {!permiteReservasOnline ? (
-                  <span className="block text-xs font-medium text-[#a76348]">
+                  <span className="block text-xs font-medium text-primary">
                     No está incluido en tu plan actual.
                   </span>
                 ) : null}
@@ -430,78 +443,78 @@ export function DisponibilidadPanel({
             </label>
             {reservas ? (
               <>
-                <label className="flex items-start gap-2 pl-6 text-sm text-[#403a35]">
+                <label className="flex items-start gap-2 pl-6 text-sm text-foreground">
                   <input
                     checked={autoConfirmar}
-                    className="mt-0.5 size-4 accent-[#8a5140] disabled:opacity-50"
+                    className="mt-0.5 size-4 accent-primary disabled:opacity-50"
                     disabled={!permiteAutoConfirmar}
                     onChange={(event) => setAutoConfirmar(event.target.checked)}
                     type="checkbox"
                   />
                   <span>
                     Confirmar automáticamente.
-                    <span className="block text-xs text-[#6e6159]">
+                    <span className="block text-xs text-muted-foreground">
                       Si lo desactivas, cada reserva queda pendiente hasta que el equipo la confirme.
                     </span>
                     {!permiteAutoConfirmar ? (
-                      <span className="block text-xs font-medium text-[#a76348]">
+                      <span className="block text-xs font-medium text-primary">
                         Disponible en el plan Crecimiento.
                       </span>
                     ) : null}
                   </span>
                 </label>
                 <div className="grid gap-3 pl-6 sm:grid-cols-3">
-                  <label className="text-xs font-medium text-[#625b55]">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Anticipación mínima (min)
                     <input
-                      className="mt-1 w-full rounded-lg border border-[#e5d9d0] px-3 py-2 text-sm disabled:opacity-50"
+                      className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-50"
                       min={0}
                       onChange={(event) => setAnticipacionMinutos(event.target.value)}
                       type="number"
                       value={anticipacionMinutos}
                     />
-                    <span className="mt-0.5 block font-normal text-[#6e6159]">
+                    <span className="mt-0.5 block font-normal text-muted-foreground">
                       Reservas con al menos esta anticipación.
                     </span>
                   </label>
-                  <label className="text-xs font-medium text-[#625b55]">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Horizonte (días)
                     <input
-                      className="mt-1 w-full rounded-lg border border-[#e5d9d0] px-3 py-2 text-sm disabled:opacity-50"
+                      className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-50"
                       min={1}
                       onChange={(event) => setHorizonteDias(event.target.value)}
                       type="number"
                       value={horizonteDias}
                     />
-                    <span className="mt-0.5 block font-normal text-[#6e6159]">
+                    <span className="mt-0.5 block font-normal text-muted-foreground">
                       Qué tan adelante pueden reservar.
                     </span>
                   </label>
-                  <label className="text-xs font-medium text-[#625b55]">
+                  <label className="text-xs font-medium text-muted-foreground">
                     Corte de cambios (h)
                     <input
-                      className="mt-1 w-full rounded-lg border border-[#e5d9d0] px-3 py-2 text-sm disabled:opacity-50"
+                      className="mt-1 w-full rounded-lg border border-border px-3 py-2 text-sm disabled:opacity-50"
                       min={0}
                       onChange={(event) => setCancelacionHoras(event.target.value)}
                       type="number"
                       value={cancelacionHoras}
                     />
-                    <span className="mt-0.5 block font-normal text-[#6e6159]">
+                    <span className="mt-0.5 block font-normal text-muted-foreground">
                       Cancelar/reagendar en línea hasta antes de la cita.
                     </span>
                   </label>
                 </div>
-                <div className="rounded-lg bg-[#f4f1ee] px-3 py-2 text-xs text-[#625b55]">
+                <div className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
                   <p className="break-all">
                     Enlace para tus clientes:{" "}
-                    <span className="font-medium text-[#8a5140]">/reservar/{organizacionSlug}</span>
+                    <span className="font-medium text-primary">/reservar/{organizacionSlug}</span>
                   </p>
                   {staff.length > 0 ? (
-                    <ul className="mt-2 space-y-1 border-t border-[#e5d9d0] pt-2">
+                    <ul className="mt-2 space-y-1 border-t border-border pt-2">
                       {staff.map((item) => (
                         <li className="break-all" key={item.id}>
                           <span className="font-medium">{item.nombre}:</span>{" "}
-                          <span className="text-[#8a5140]">
+                          <span className="text-primary">
                             /reservar/{organizacionSlug}?p={item.id}
                           </span>
                         </li>
@@ -531,24 +544,24 @@ export function DisponibilidadPanel({
 
           {/* --------------------- Recordatorios por correo --------------------- */}
           <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
               Recordatorios por correo
             </h3>
-            <label className="flex items-start gap-2 text-sm text-[#403a35]">
+            <label className="flex items-start gap-2 text-sm text-foreground">
               <input
                 checked={recordatorios}
-                className="mt-0.5 size-4 accent-[#8a5140] disabled:opacity-50"
+                className="mt-0.5 size-4 accent-primary disabled:opacity-50"
                 disabled={!permiteRecordatorios}
                 onChange={(event) => setRecordatorios(event.target.checked)}
                 type="checkbox"
               />
               <span>
                 Enviar recordatorio automático a clientes con correo.
-                <span className="block text-xs text-[#6e6159]">
+                <span className="block text-xs text-muted-foreground">
                   Aplica a toda la organización; solo citas pendientes o confirmadas.
                 </span>
                 {!permiteRecordatorios ? (
-                  <span className="block text-xs font-medium text-[#a76348]">
+                  <span className="block text-xs font-medium text-primary">
                     Disponible en el plan Crecimiento.
                   </span>
                 ) : null}
@@ -566,7 +579,7 @@ export function DisponibilidadPanel({
                     value={horasAntes}
                   />
                 </Field>
-                <p className="pb-2 text-xs text-[#6e6159]">24 = un día antes de la cita.</p>
+                <p className="pb-2 text-xs text-muted-foreground">24 = un día antes de la cita.</p>
               </div>
             ) : null}
             <Button
@@ -586,22 +599,22 @@ export function DisponibilidadPanel({
 
           {/* --------------------- Últimos avisos de cita --------------------- */}
           <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
               Últimos avisos de cita
             </h3>
             {avisos.length === 0 ? (
-              <p className="text-xs text-[#6e6159]">
+              <p className="text-xs text-muted-foreground">
                 Aún no hay avisos. Las confirmaciones, cambios, cancelaciones y recordatorios por correo aparecen aquí.
               </p>
             ) : (
-              <ul className="divide-y divide-[#eee8e3] rounded-xl border border-[#eee8e3]">
+              <ul className="divide-y divide-border rounded-xl border border-border">
                 {avisos.map((aviso) => (
                   <li className="flex items-center justify-between gap-3 px-3 py-2" key={aviso.id}>
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-[#403a35]">
+                      <p className="truncate text-sm font-medium text-foreground">
                         {ETIQUETA_AVISO[aviso.tipo] ?? aviso.tipo} · {aviso.correoDestino}
                       </p>
-                      <p className="text-xs text-[#6e6159]">
+                      <p className="text-xs text-muted-foreground">
                         {aviso.citaFechaHora
                           ? `Cita: ${formatDate(aviso.citaFechaHora, { timeZone })} ${formatTime(aviso.citaFechaHora, { timeZone })}`
                           : `Programado: ${formatDate(aviso.programadoPara, { timeZone })} ${formatTime(aviso.programadoPara, { timeZone })}`}
@@ -615,17 +628,17 @@ export function DisponibilidadPanel({
                 ))}
               </ul>
             )}
-            <p className="text-xs text-[#6e6159]">
+            <p className="text-xs text-muted-foreground">
               «Aceptado» significa que el proveedor de correo recibió el envío; no garantiza que el cliente lo haya leído.
             </p>
           </section>
 
           {/* ---------------------------- Bloqueos ---------------------------- */}
           <section className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
               Bloqueos de agenda
             </h3>
-            <form className="grid gap-2 rounded-xl border border-[#eee8e3] bg-[#faf9f7] p-3" onSubmit={guardarBloqueo}>
+            <form className="grid gap-2 rounded-xl border border-border bg-muted/60 p-3" onSubmit={guardarBloqueo}>
               <div className="grid gap-2 sm:grid-cols-2">
                 <Field>
                   <FieldLabel required>Tipo</FieldLabel>
@@ -670,30 +683,30 @@ export function DisponibilidadPanel({
                   <Plus aria-hidden="true" /> Agregar bloqueo
                 </Button>
               </div>
-              <p className="text-[11px] text-[#6f635a]">
+              <p className="text-[11px] text-muted-foreground">
                 Las horas se interpretan en {timeZone}. Un bloqueo de toda la sucursal impide cualquier cita en ese rango.
               </p>
             </form>
 
             {bloqueosOrdenados.length === 0 ? (
-              <p className="rounded-xl bg-[#f8f7f5] px-4 py-3 text-xs text-[#6e6159]">Sin bloqueos registrados.</p>
+              <p className="rounded-xl bg-muted/60 px-4 py-3 text-xs text-muted-foreground">Sin bloqueos registrados.</p>
             ) : (
               <ul className="space-y-1.5">
                 {bloqueosOrdenados.slice(0, 12).map((bloqueo) => (
                   <li
                     className={cn(
-                      "flex items-center gap-3 rounded-xl border border-[#eee8e3] px-3 py-2 text-xs",
+                      "flex items-center gap-3 rounded-xl border border-border px-3 py-2 text-xs",
                       !bloqueo.activo && "opacity-55",
                     )}
                     key={bloqueo.id}
                   >
-                    <CalendarClock aria-hidden="true" className="size-4 shrink-0 text-[#8a5140]" />
+                    <CalendarClock aria-hidden="true" className="size-4 shrink-0 text-primary" />
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-[#403a35]">
+                      <p className="font-medium text-foreground">
                         {formatDate(bloqueo.iniciaAt, { timeZone })} ·{" "}
                         {formatTime(bloqueo.iniciaAt, { timeZone })}–{formatTime(bloqueo.terminaAt, { timeZone })}
                       </p>
-                      <p className="truncate text-[#6e6159]">
+                      <p className="truncate text-muted-foreground">
                         {BLOQUEO_LABEL[bloqueo.tipo] ?? bloqueo.tipo} ·{" "}
                         {bloqueo.usuarioId ? (bloqueo.usuarioNombre ?? "Profesional") : "Toda la sucursal"}
                         {bloqueo.motivo ? ` · ${bloqueo.motivo}` : ""}
@@ -717,10 +730,10 @@ export function DisponibilidadPanel({
 
           {/* ---------------------------- Recursos ---------------------------- */}
           <section className="space-y-3">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
               Recursos (cabinas, sillas, equipo)
             </h3>
-            <form className="grid gap-2 rounded-xl border border-[#eee8e3] bg-[#faf9f7] p-3" onSubmit={guardarRecurso}>
+            <form className="grid gap-2 rounded-xl border border-border bg-muted/60 p-3" onSubmit={guardarRecurso}>
               <div className="grid gap-2 sm:grid-cols-3">
                 <Field className="sm:col-span-2">
                   <FieldLabel required>Nombre</FieldLabel>
@@ -752,27 +765,27 @@ export function DisponibilidadPanel({
                   <Plus aria-hidden="true" /> Agregar recurso
                 </Button>
               </div>
-              <p className="text-[11px] text-[#6f635a]">
+              <p className="text-[11px] text-muted-foreground">
                 Capacidad mayor a 1 registra recursos compartibles (p. ej. 2 sillas iguales). Las citas
                 que reserven el recurso no podrán traslaparse más allá de su capacidad.
               </p>
             </form>
 
             {recursos.length === 0 ? (
-              <p className="rounded-xl bg-[#f8f7f5] px-4 py-3 text-xs text-[#6e6159]">Sin recursos registrados.</p>
+              <p className="rounded-xl bg-muted/60 px-4 py-3 text-xs text-muted-foreground">Sin recursos registrados.</p>
             ) : (
               <ul className="space-y-1.5">
                 {recursos.map((recurso) => (
                   <li
                     className={cn(
-                      "flex items-center gap-3 rounded-xl border border-[#eee8e3] px-3 py-2 text-xs",
+                      "flex items-center gap-3 rounded-xl border border-border px-3 py-2 text-xs",
                       !recurso.activo && "opacity-55",
                     )}
                     key={recurso.id}
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="font-medium text-[#403a35]">{recurso.nombre}</p>
-                      <p className="truncate text-[#6e6159]">
+                      <p className="font-medium text-foreground">{recurso.nombre}</p>
+                      <p className="truncate text-muted-foreground">
                         {RECURSO_TIPO_LABEL[recurso.tipo as (typeof RECURSO_TIPOS)[number]] ?? recurso.tipo}
                         {recurso.capacidad > 1 ? ` · capacidad ${recurso.capacidad}` : ""}
                       </p>
@@ -794,7 +807,8 @@ export function DisponibilidadPanel({
           </section>
         </div>
       </div>
-    </details>
+      </SheetContent>
+    </Sheet>
   );
 }
 

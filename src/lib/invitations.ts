@@ -91,8 +91,8 @@ export async function issueInvitation(
     try {
       await sendAuthEmail({
         to: input.correo,
-        subject: "Invitación a Beauty POS",
-        title: `Hola ${input.nombre}, tienes una invitación a Beauty POS`,
+        subject: "Invitación a Melena",
+        title: `Hola ${input.nombre}, tienes una invitación a Melena`,
         url: invitationUrl,
       });
     } catch (error) {

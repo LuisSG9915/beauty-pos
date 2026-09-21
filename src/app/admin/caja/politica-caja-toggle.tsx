@@ -46,17 +46,17 @@ export function PoliticaCajaToggle({
   };
 
   return (
-    <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-[#eee8e3] px-4 py-2.5 text-sm transition-colors hover:border-[#c9a899]">
+    <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-border px-4 py-2.5 text-sm transition-colors hover:border-accent-foreground/30">
       <input
         checked={exigir}
-        className="size-4 accent-[#8a5140]"
+        className="size-4 accent-primary"
         disabled={pending}
         onChange={(event) => cambiar(event.target.checked)}
         type="checkbox"
       />
       <span className="min-w-0 flex-1">
-        <span className="font-medium text-[#2d2926]">Exigir corte abierto para cobrar</span>
-        <span className="block text-xs text-[#6e6159]">
+        <span className="font-medium text-foreground">Exigir corte abierto para cobrar</span>
+        <span className="block text-xs text-muted-foreground">
           {exigir
             ? "El cobro se rechaza mientras no haya corte abierto."
             : "Se puede cobrar sin corte; la venta se asocia al corte si existe."}

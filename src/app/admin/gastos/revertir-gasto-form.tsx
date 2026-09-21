@@ -25,10 +25,10 @@ export function RevertirGastoForm({
 
   return (
     <details className="group">
-      <summary className="cursor-pointer list-none text-xs font-medium text-[#a8443a] hover:underline">
+      <summary className="cursor-pointer list-none text-xs font-medium text-destructive hover:underline">
         Revertir
       </summary>
-      <form action={action} className="mt-2 w-56 space-y-2 rounded-xl border border-[#eadfd8] bg-[#faf9f7] p-3">
+      <form action={action} className="mt-2 w-56 space-y-2 rounded-xl border border-border bg-muted/60 p-3">
         <input name="organizacionId" type="hidden" value={organizationId} />
         <input name="gastoId" type="hidden" value={gastoId} />
         <Field>

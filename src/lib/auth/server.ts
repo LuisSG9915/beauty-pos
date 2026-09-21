@@ -59,7 +59,7 @@ export function createAuth({ allowSignUp = false, sendEmails = true }: AuthOptio
       sendResetPassword: async ({ user, url }) => {
         await sendAuthEmail({
           to: user.email,
-          subject: "Restablece tu contraseña de Beauty POS",
+          subject: "Restablece tu contraseña de Melena",
           title: "Restablece tu contraseña",
           url,
         });
@@ -71,7 +71,7 @@ export function createAuth({ allowSignUp = false, sendEmails = true }: AuthOptio
       sendVerificationEmail: async ({ user, url }) => {
         await sendAuthEmail({
           to: user.email,
-          subject: "Verifica tu correo de Beauty POS",
+          subject: "Verifica tu correo de Melena",
           title: "Verifica tu correo",
           url,
         });
@@ -79,7 +79,7 @@ export function createAuth({ allowSignUp = false, sendEmails = true }: AuthOptio
     },
     plugins: [
       twoFactorPlugin({
-        issuer: "Beauty POS",
+        issuer: "Melena",
       }),
       nextCookies(),
     ],

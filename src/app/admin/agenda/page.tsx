@@ -116,7 +116,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
       )
       .orderBy(asc(usuarios.nombre)),
     getDatabase()
-      .select({ id: servicios.id, nombre: servicios.nombre, precioBase: servicios.precioBase, duracionMinutos: servicios.duracionMinutos })
+      .select({ id: servicios.id, nombre: servicios.nombre, categoriaId: servicios.categoriaId, precioBase: servicios.precioBase, duracionMinutos: servicios.duracionMinutos })
       .from(servicios)
       .where(and(eq(servicios.organizacionId, organization.id), eq(servicios.activo, true)))
       .orderBy(asc(servicios.nombre)),
@@ -185,11 +185,11 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   const [detalles, detallesRecursos, alergias] = await Promise.all([
     citaIds.length > 0
       ? getDatabase()
-          .select({ citaId: detalleCitasServicios.citaId, servicioId: detalleCitasServicios.servicioId, nombre: servicios.nombre, precio: detalleCitasServicios.precio })
+          .select({ citaId: detalleCitasServicios.citaId, servicioId: detalleCitasServicios.servicioId, nombre: servicios.nombre, categoriaId: servicios.categoriaId, precio: detalleCitasServicios.precio })
           .from(detalleCitasServicios)
           .innerJoin(servicios, eq(detalleCitasServicios.servicioId, servicios.id))
           .where(and(inArray(detalleCitasServicios.citaId, citaIds), eq(detalleCitasServicios.activo, true)))
-      : Promise.resolve([] as Array<{ citaId: string; servicioId: string; nombre: string; precio: string }>),
+      : Promise.resolve([] as Array<{ citaId: string; servicioId: string; nombre: string; categoriaId: string | null; precio: string }>),
     citaIds.length > 0
       ? getDatabase()
           .select({ citaId: citaRecursos.citaId, recursoId: citaRecursos.recursoId, nombre: recursos.nombre })
@@ -200,10 +200,10 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
     alergiasPorCliente(getDatabase(), organization.id, clienteIdsVisibles, context.access),
   ]);
 
-  const serviciosPorCita = new Map<string, Array<{ id: string; nombre: string; precio: string }>>();
+  const serviciosPorCita = new Map<string, Array<{ id: string; nombre: string; categoriaId: string | null; precio: string }>>();
   for (const detalle of detalles) {
     const list = serviciosPorCita.get(detalle.citaId) ?? [];
-    list.push({ id: detalle.servicioId, nombre: detalle.nombre, precio: detalle.precio });
+    list.push({ id: detalle.servicioId, nombre: detalle.nombre, categoriaId: detalle.categoriaId, precio: detalle.precio });
     serviciosPorCita.set(detalle.citaId, list);
   }
   const recursosPorCita = new Map<string, Array<{ id: string; nombre: string }>>();
@@ -284,43 +284,54 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
     : [fecha];
 
   return (
-    <div className="space-y-6">
-      <AdminPageHeader
-        description={`${branch.nombre} · ${timeZone}`}
-        title="Agenda de citas"
-      />
-      <AgendaToolbar
-        branches={branches.map((item) => ({ id: item.id, nombre: item.nombre, clave: item.clave }))}
-        fecha={fecha}
-        hoy={todayDateInput(timeZone)}
-        q={q}
-        sucursalId={sucursalId ?? branch.id}
-        vista={vista}
-      />
-      {puedeEditar ? (
-        <DisponibilidadPanel
-          bloqueos={bloqueosConfig}
-          capacidadSinAsignar={branch.capacidadSinAsignar}
-          horarios={horariosConfig}
-          organizacionSlug={organization.slug}
-          organizationId={organizationId ?? organization.id}
-          permiteAutoConfirmar={suscripcion.capacidades.has("reservas_auto_confirmar")}
-          permiteRecordatorios={suscripcion.capacidades.has("recordatorios_email")}
-          permiteReservasOnline={suscripcion.capacidades.has("reservas_online")}
-          avisos={avisos}
-          recordatoriosActivos={organization.recordatoriosActivos}
-          recordatoriosHorasAntes={organization.recordatoriosHorasAntes}
-          reservasAutoConfirmar={branch.reservasAutoConfirmar}
-          reservasAnticipacionMinutos={branch.reservasAnticipacionMinutos}
-          reservasCancelacionHoras={branch.reservasCancelacionHoras}
-          reservasHorizonteDias={branch.reservasHorizonteDias}
-          reservasOnline={branch.reservasOnline}
-          recursos={recursosConfig}
-          staff={staffRows}
-          sucursalId={branch.id}
-          timeZone={timeZone}
-        />
-      ) : null}
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+        <div className="min-w-0 flex-1">
+          <AdminPageHeader
+            description={`${branch.nombre} · ${timeZone}`}
+            title="Agenda de citas"
+          />
+        </div>
+        <p className="max-w-xl text-xs leading-5 text-muted-foreground xl:text-right">
+          Un espacio vivo para operar el día: colores por servicio, estados legibles y cobro sin salir de la agenda.
+        </p>
+      </div>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+        <div className="min-w-0 flex-1">
+          <AgendaToolbar
+            branches={branches.map((item) => ({ id: item.id, nombre: item.nombre, clave: item.clave }))}
+            fecha={fecha}
+            hoy={todayDateInput(timeZone)}
+            q={q}
+            sucursalId={sucursalId ?? branch.id}
+            vista={vista}
+          />
+        </div>
+        {puedeEditar ? (
+          <DisponibilidadPanel
+            avisos={avisos}
+            bloqueos={bloqueosConfig}
+            capacidadSinAsignar={branch.capacidadSinAsignar}
+            horarios={horariosConfig}
+            organizacionSlug={organization.slug}
+            organizationId={organizationId ?? organization.id}
+            permiteAutoConfirmar={suscripcion.capacidades.has("reservas_auto_confirmar")}
+            permiteRecordatorios={suscripcion.capacidades.has("recordatorios_email")}
+            permiteReservasOnline={suscripcion.capacidades.has("reservas_online")}
+            recordatoriosActivos={organization.recordatoriosActivos}
+            recordatoriosHorasAntes={organization.recordatoriosHorasAntes}
+            recursos={recursosConfig}
+            reservasAnticipacionMinutos={branch.reservasAnticipacionMinutos}
+            reservasAutoConfirmar={branch.reservasAutoConfirmar}
+            reservasCancelacionHoras={branch.reservasCancelacionHoras}
+            reservasHorizonteDias={branch.reservasHorizonteDias}
+            reservasOnline={branch.reservasOnline}
+            staff={staffRows}
+            sucursalId={branch.id}
+            timeZone={timeZone}
+          />
+        ) : null}
+      </div>
       <AgendaBoard
         bloqueos={bloqueos}
         citas={citasSerializadas}

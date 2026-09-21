@@ -126,27 +126,27 @@ function CitaHistorial({
 
   return (
     <details
-      className="rounded-xl border border-[#eee8e3] bg-[#faf9f7] px-4 py-3"
+      className="rounded-xl border border-border bg-muted/60 px-4 py-3"
       onToggle={(event) => {
         if (event.currentTarget.open) cargar();
       }}
     >
-      <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-[#8a5140] select-none">
+      <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-primary select-none">
         Historial de la cita
       </summary>
       <ul className="mt-3 space-y-2">
         {eventos === null ? (
-          <li className="text-xs text-[#6e6159]">{cargando ? "Cargando…" : ""}</li>
+          <li className="text-xs text-muted-foreground">{cargando ? "Cargando…" : ""}</li>
         ) : eventos.length === 0 ? (
-          <li className="text-xs text-[#6e6159]">Sin movimientos registrados.</li>
+          <li className="text-xs text-muted-foreground">Sin movimientos registrados.</li>
         ) : (
           eventos.map((evento) => (
             <li className="flex items-baseline gap-2 text-xs" key={evento.id}>
-              <span className="shrink-0 tabular-nums text-[#6f635a]">
+              <span className="shrink-0 tabular-nums text-muted-foreground">
                 {formatDate(evento.createdAt, { timeZone })} {formatTime(evento.createdAt, { timeZone })}
               </span>
-              <span className="min-w-0 flex-1 text-[#625b55]">
-                <span className="font-medium text-[#403a35]">
+              <span className="min-w-0 flex-1 text-muted-foreground">
+                <span className="font-medium text-foreground">
                   {HISTORIAL_LABEL[evento.accion] ?? evento.accion}
                 </span>
                 {["estado", "movida", "reagendada", "recurso_agregado", "recurso_quitado"].includes(evento.accion)
@@ -281,11 +281,11 @@ function CitaAnticipos({
   return (
     <section className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
           Anticipos
         </h3>
         {vigenteTotal > 0 ? (
-          <span className="text-xs font-semibold tabular-nums text-[#347052]">
+          <span className="text-xs font-semibold tabular-nums text-success">
             {formatCurrency(vigenteTotal, { currency })} vigente
           </span>
         ) : null}
@@ -295,7 +295,7 @@ function CitaAnticipos({
         <ul className="space-y-2">
           {data.anticipos.map((ant) => (
             <li
-              className="rounded-xl border border-[#eee8e3] px-4 py-2.5 text-sm"
+              className="rounded-xl border border-border px-4 py-2.5 text-sm"
               key={ant.id}
             >
               <div className="flex min-h-8 items-center gap-3">
@@ -303,7 +303,7 @@ function CitaAnticipos({
                   <span className="font-medium tabular-nums">
                     {formatCurrency(ant.monto, { currency })}
                   </span>
-                  <span className="ml-2 text-xs text-[#6e6159]">{ant.medioNombre ?? "Medio"}</span>
+                  <span className="ml-2 text-xs text-muted-foreground">{ant.medioNombre ?? "Medio"}</span>
                 </span>
                 <StatusBadge tone={ANTICIPO_ESTADO_TONE[ant.estado] ?? "neutral"}>
                   {ANTICIPO_ESTADO_LABEL[ant.estado] ?? ant.estado}
@@ -317,7 +317,7 @@ function CitaAnticipos({
                     type="button"
                     variant="ghost"
                   >
-                    <RefreshCcw aria-hidden="true" className="size-4 text-[#a8443a]" />
+                    <RefreshCcw aria-hidden="true" className="size-4 text-destructive" />
                   </Button>
                 ) : null}
               </div>
@@ -350,7 +350,7 @@ function CitaAnticipos({
 
       {puedeCapturar ? (
         formAbierto ? (
-          <div className="space-y-2 rounded-xl border border-[#eee8e3] p-3">
+          <div className="space-y-2 rounded-xl border border-border p-3">
             <div className="flex flex-wrap items-center gap-2">
               <input
                 aria-label="Monto del anticipo"
@@ -370,8 +370,8 @@ function CitaAnticipos({
                     className={cn(
                       "min-h-9 rounded-lg border px-3 text-xs font-medium transition-colors",
                       medioPagoId === medio.id
-                        ? "border-[#8a5140] bg-[#f2e3dc] text-[#60392e]"
-                        : "border-[#e3d9d1] bg-white text-[#625b55] hover:border-[#c9a899]",
+                        ? "border-primary bg-accent/70 text-primary"
+                        : "border-border bg-card text-muted-foreground hover:border-accent-foreground/30",
                     )}
                     key={medio.id}
                     onClick={() => setMedioPagoId(medio.id)}
@@ -421,7 +421,7 @@ function CitaAnticipos({
           </div>
         ) : (
           <Button
-            className="rounded-xl text-[#8a5140]"
+            className="rounded-xl text-primary"
             onClick={() => {
               setFormAbierto(true);
               setMedioPagoId((prev) => prev || (data.mediosPago.find((m) => m.categoria === "efectivo") ?? data.mediosPago[0])?.id || "");
@@ -568,10 +568,10 @@ export function CitaSidePanel({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-lg font-semibold tracking-tight text-[#2d2926]">
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">
               {cita.clienteId ? (
                 <a
-                  className="hover:text-[#8a5140] hover:underline"
+                  className="hover:text-primary hover:underline"
                   href={buildAdminHref(`/clientes/${cita.clienteId}`, { organizationId })}
                 >
                   {cita.clienteNombre}
@@ -582,14 +582,14 @@ export function CitaSidePanel({
             </h2>
             <CitaStatusBadge estado={cita.estado} />
           </div>
-          <p className="mt-1 text-sm text-[#6e6159]">
+          <p className="mt-1 text-sm text-muted-foreground">
             {formatDate(cita.fechaHora, { timeZone })} · {formatTime(cita.fechaHora, { timeZone })} ·{" "}
             {cita.duracionMinutos} min
           </p>
-          <p className="mt-1.5 text-sm font-medium text-[#625b55]">{profesional}</p>
+          <p className="mt-1.5 text-sm font-medium text-muted-foreground">{profesional}</p>
           {cita.clienteTelefono ? (
             <a
-              className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-[#8a5140] hover:underline"
+              className="mt-1 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
               href={`tel:${cita.clienteTelefono}`}
             >
               <Phone aria-hidden="true" className="size-3.5" /> {cita.clienteTelefono}
@@ -623,7 +623,7 @@ export function CitaSidePanel({
           ) : null}
           {puedeCobrar ? (
             <Button
-              className="rounded-xl bg-[#347052] text-white hover:bg-[#2a5a42]"
+              className="rounded-xl bg-[#205a50] text-white hover:bg-[#205a50]"
               disabled={ocupado}
               onClick={() => onCobrar(cita)}
               size="touch"
@@ -637,26 +637,26 @@ export function CitaSidePanel({
 
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
             Servicios
           </h3>
-          <span className="text-xs font-semibold tabular-nums text-[#625b55]">
+          <span className="text-xs font-semibold tabular-nums text-muted-foreground">
             {formatCurrency(cita.totalEstimado, { currency })}
           </span>
         </div>
         {cita.servicios.length === 0 ? (
-          <p className="rounded-xl bg-[#f1eeea] px-4 py-3 text-sm text-[#625b55]">
+          <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
             Sin servicios en esta cita.
           </p>
         ) : (
           <ul className="space-y-2">
             {cita.servicios.map((servicio) => (
               <li
-                className="flex min-h-11 items-center gap-3 rounded-xl border border-[#eee8e3] px-4 py-2 text-sm"
+                className="flex min-h-11 items-center gap-3 rounded-xl border border-border px-4 py-2 text-sm"
                 key={servicio.id}
               >
                 <span className="min-w-0 flex-1 truncate font-medium">{servicio.nombre}</span>
-                <span className="text-xs tabular-nums text-[#625b55]">
+                <span className="text-xs tabular-nums text-muted-foreground">
                   {formatCurrency(servicio.precio, { currency })}
                 </span>
                 {editable ? (
@@ -696,18 +696,18 @@ export function CitaSidePanel({
 
       {cita.recursos.length > 0 || (editable && recursosDisponibles.length > 0) ? (
         <section className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
             Recursos
           </h3>
           {cita.recursos.length === 0 ? (
-            <p className="rounded-xl bg-[#f1eeea] px-4 py-3 text-sm text-[#625b55]">
+            <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
               Sin recursos asignados.
             </p>
           ) : (
             <ul className="space-y-2">
               {cita.recursos.map((recurso) => (
                 <li
-                  className="flex min-h-11 items-center gap-3 rounded-xl border border-[#eee8e3] px-4 py-2 text-sm"
+                  className="flex min-h-11 items-center gap-3 rounded-xl border border-border px-4 py-2 text-sm"
                   key={recurso.id}
                 >
                   <span className="min-w-0 flex-1 truncate font-medium">{recurso.nombre}</span>
@@ -757,10 +757,10 @@ export function CitaSidePanel({
 
       {cita.notas ? (
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
             Notas de la cita
           </h3>
-          <p className="mt-2 rounded-xl bg-[#faf9f7] px-4 py-3 text-sm leading-6 text-[#625b55]">
+          <p className="mt-2 rounded-xl bg-muted/60 px-4 py-3 text-sm leading-6 text-muted-foreground">
             {cita.notas}
           </p>
         </section>
@@ -768,10 +768,10 @@ export function CitaSidePanel({
 
       {cita.clienteNotas ? (
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-[#986b16]">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-warning">
             Notas del cliente / alergias
           </h3>
-          <p className="mt-2 rounded-xl border border-[#e3c8a0] bg-[#fdf3e8] px-4 py-3 text-sm leading-6 text-[#986b16]">
+          <p className="mt-2 rounded-xl border border-[#e7bd66] bg-[#ffe3ad] px-4 py-3 text-sm leading-6 text-warning">
             {cita.clienteNotas}
           </p>
         </section>
@@ -779,8 +779,8 @@ export function CitaSidePanel({
 
       {/* Ficha técnica: registro rápido mientras la cita está en proceso. */}
       {cita.estado === "en_proceso" && cita.clienteId ? (
-        <details className="rounded-xl border border-[#eadfd8] bg-[#faf9f7] px-4 py-3">
-          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-[#8a5140] select-none">
+        <details className="rounded-xl border border-border bg-muted/60 px-4 py-3">
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-primary select-none">
             Registrar en ficha técnica
           </summary>
           <div className="mt-3">
@@ -845,7 +845,7 @@ export function CitaSidePanel({
 
       <CitaHistorial citaId={cita.id} organizationId={organizationId} timeZone={timeZone} />
 
-      <div className="flex flex-wrap gap-2 border-t border-[#eee8e3] pt-4">
+      <div className="flex flex-wrap gap-2 border-t border-border pt-4">
         {puedeCancelar ? (
           <ConfirmDialog
             confirmLabel={TRANSITION_LABEL.cancelada}

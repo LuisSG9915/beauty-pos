@@ -21,7 +21,7 @@ export async function sendAuthEmail({ to, subject, title, url }: AuthEmailInput)
   const env = getRuntimeEnv();
   const apiKey = env.BREVO_API_KEY;
   const fromEmail = env.BREVO_FROM_EMAIL;
-  const fromName = env.BREVO_FROM_NAME ?? "Beauty POS";
+  const fromName = env.BREVO_FROM_NAME ?? "Melena";
 
   if (!apiKey || !fromEmail) {
     throw new Error("BREVO_API_KEY and BREVO_FROM_EMAIL are not configured.");
@@ -43,7 +43,7 @@ export async function sendAuthEmail({ to, subject, title, url }: AuthEmailInput)
       htmlContent: `
         <main style="font-family: Arial, sans-serif; line-height: 1.5">
           <h1>${safeTitle}</h1>
-          <p>Usa el siguiente enlace para continuar en Beauty POS:</p>
+          <p>Usa el siguiente enlace para continuar en Melena:</p>
           <p><a href="${safeUrl}">Continuar</a></p>
           <p>Si no solicitaste esta acción, puedes ignorar este correo.</p>
         </main>

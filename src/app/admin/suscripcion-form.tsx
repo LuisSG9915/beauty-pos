@@ -35,22 +35,22 @@ function estadoLabel(estado: EstadoSuscripcionAdmin): { texto: string; tono: str
     case "trialing":
       return {
         texto: `Prueba${estado.diasRestantes !== null ? ` · ${estado.diasRestantes} días` : ""}`,
-        tono: "bg-[#fdf7ef] text-[#7a4f22] border-[#ecd9c4]",
+        tono: "bg-accent/70 text-warning border-[#e7bd66]",
       };
     case "activa":
       return {
         texto: `Activa${estado.termina ? ` · hasta ${estado.termina}` : ""}`,
-        tono: "bg-[#edf5f0] text-[#2f6a4b] border-[#cfe4d8]",
+        tono: "bg-[#e2f5f1] text-success border-[#9fcfc4]",
       };
     case "vencida":
-      return { texto: "Vencida (solo lectura)", tono: "bg-[#fdf0ea] text-[#8a3c1d] border-[#efc9b8]" };
+      return { texto: "Vencida (solo lectura)", tono: "bg-accent/70 text-destructive border-[#efc0b4]" };
     default:
-      return { texto: "Sin suscripción", tono: "bg-[#f4f1ee] text-[#786b63] border-[#e5ddd6]" };
+      return { texto: "Sin suscripción", tono: "bg-muted/60 text-muted-foreground border-border" };
   }
 }
 
 const selectClass =
-  "w-full rounded-xl border border-[#e5ddd6] bg-white px-3 py-2 text-sm text-[#2d2926] focus:border-[#c98a6b] focus:outline-none";
+  "w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground focus:border-primary focus:outline-none";
 
 /**
  * Fila de organización para el admin de plataforma: estado de suscripción y
@@ -89,14 +89,14 @@ export function SuscripcionAdminRow({
     new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 }).format(v);
 
   return (
-    <div className="rounded-xl border border-[#eee6e0] px-4 py-3">
+    <div className="rounded-xl border border-border px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${badge.tono}`}>
           {badge.texto}
         </span>
       </div>
       <details className="mt-3">
-        <summary className="cursor-pointer text-xs font-medium text-[#a76348]">
+        <summary className="cursor-pointer text-xs font-medium text-primary">
           Registrar pago / activar plan
         </summary>
         <form action={formAction} className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:items-end">
@@ -160,12 +160,12 @@ export function SuscripcionAdminRow({
           </Field>
           <Field>
             <FieldLabel>Total a cobrar</FieldLabel>
-            <p className="rounded-xl border border-[#e5ddd6] bg-[#faf6f3] px-3 py-2 text-sm font-semibold text-[#2d2926]">
+            <p className="rounded-xl border border-border bg-muted/60 px-3 py-2 text-sm font-semibold text-foreground">
               {cotizacion?.ok
                 ? `${fmtMonto(cotizacion.monto)} MXN${cotizacion.extras > 0 ? ` (${cotizacion.extras} extra × ${fmtMonto(cotizacion.precioExtraUnitario)})` : ""}`
                 : "—"}
             </p>
-            <p className="mt-1 text-[11px] text-[#95877e]">Se calcula del catálogo al confirmar.</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">Se calcula del catálogo al confirmar.</p>
           </Field>
           <Field>
             <FieldLabel>Referencia</FieldLabel>

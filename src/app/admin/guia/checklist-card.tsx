@@ -30,15 +30,15 @@ export function GuiaChecklistCard({
   const href = (path: `/${string}`) => buildAdminHref(path, { organizationId, sucursalId });
 
   return (
-    <section className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm sm:p-6">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <span className="flex size-10 items-center justify-center rounded-xl bg-[#f1eeea] text-[#8a5140]">
+          <span className="flex size-10 items-center justify-center rounded-xl bg-muted/60 text-primary">
             <Compass aria-hidden="true" className="size-5" />
           </span>
           <div>
-            <h2 className="font-semibold text-[#2d2926]">Prepara tu negocio</h2>
-            <p className="text-sm text-[#6e6159]">
+            <h2 className="font-semibold text-foreground">Prepara tu negocio</h2>
+            <p className="text-sm text-muted-foreground">
               {resumen.completados} de {resumen.total} pasos listos
             </p>
           </div>
@@ -50,32 +50,32 @@ export function GuiaChecklistCard({
 
       <div
         aria-hidden="true"
-        className="mt-4 h-2 overflow-hidden rounded-full bg-[#f1eeea]"
+        className="mt-4 h-2 overflow-hidden rounded-full bg-muted/60"
       >
         <div
-          className="h-full rounded-full bg-[#8a5140]"
+          className="h-full rounded-full bg-primary"
           style={{ width: `${Math.round((resumen.completados / resumen.total) * 100)}%` }}
         />
       </div>
 
-      <ol className="mt-4 divide-y divide-[#f4eeea]">
+      <ol className="mt-4 divide-y divide-border">
         {resumen.pasos.map((paso) => (
           <li className="flex items-center gap-3 py-3" key={paso.clave}>
             {paso.hecho ? (
-              <CheckCircle2 aria-hidden="true" className="size-5 shrink-0 text-[#347052]" />
+              <CheckCircle2 aria-hidden="true" className="size-5 shrink-0 text-success" />
             ) : (
-              <Circle aria-hidden="true" className="size-5 shrink-0 text-[#c4b7ae]" />
+              <Circle aria-hidden="true" className="size-5 shrink-0 text-muted-foreground" />
             )}
             <Link
-              className="inline-flex min-h-6 min-w-0 flex-1 items-center truncate text-sm font-medium text-[#2d2926] hover:text-[#8a5140]"
+              className="inline-flex min-h-6 min-w-0 flex-1 items-center truncate text-sm font-medium text-foreground hover:text-primary"
               href={href(paso.href)}
               prefetch={false}
             >
               {paso.titulo}
-              {paso.opcional ? <span className="ml-2 text-xs font-normal text-[#6f635a]">Opcional</span> : null}
+              {paso.opcional ? <span className="ml-2 text-xs font-normal text-muted-foreground">Opcional</span> : null}
             </Link>
             {!paso.hecho ? (
-              <Link className="inline-flex min-h-6 shrink-0 items-center text-xs font-medium text-[#8a5140] hover:underline" href={href(paso.href)} prefetch={false}>
+              <Link className="inline-flex min-h-6 shrink-0 items-center text-xs font-medium text-primary hover:underline" href={href(paso.href)} prefetch={false}>
                 Ir
               </Link>
             ) : null}
@@ -83,8 +83,8 @@ export function GuiaChecklistCard({
         ))}
       </ol>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#f4eeea] pt-4">
-        <Link className="inline-flex min-h-6 items-center text-sm font-medium text-[#8a5140] hover:underline" href={href("/practica")} prefetch={false}>
+      <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border pt-4">
+        <Link className="inline-flex min-h-6 items-center text-sm font-medium text-primary hover:underline" href={href("/practica")} prefetch={false}>
           Practicar con datos de ejemplo
         </Link>
         <form action={omitirGuia} className="ml-auto">

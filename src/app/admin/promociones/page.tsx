@@ -86,7 +86,7 @@ export default async function PromotionsPage({ searchParams }: { searchParams: S
     <div className="space-y-6">
       <AdminPageHeader description="Descuentos y promociones aplicables en el punto de venta." title="Promociones" />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#eadfd8] bg-white p-4" method="get">
+      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <Field className="min-w-52 flex-1">
           <FieldLabel>Buscar</FieldLabel>
@@ -135,7 +135,7 @@ export default async function PromotionsPage({ searchParams }: { searchParams: S
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[680px] text-left text-sm">
-                <thead className="border-b border-[#eee8e3] text-xs uppercase tracking-wide text-[#625b55]">
+                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-4 font-medium">Clave</th>
                     <th className="py-2 pr-4 font-medium">Nombre</th>
@@ -149,24 +149,24 @@ export default async function PromotionsPage({ searchParams }: { searchParams: S
                 </thead>
                 <tbody>
                   {promotionRows.map((promo) => (
-                    <tr className="border-b border-[#f1eeea]" key={promo.id}>
+                    <tr className="border-b border-border" key={promo.id}>
                       <td className="py-3 pr-4 font-mono text-xs">{promo.clave}</td>
                       <td className="py-3 pr-4 font-medium">{promo.nombre}</td>
-                      <td className="py-3 pr-4"><span className="rounded-full bg-[#f1eeea] px-2.5 py-1 text-xs text-[#625b55]">{TIPO_LABEL[promo.tipo] ?? promo.tipo}</span></td>
+                      <td className="py-3 pr-4"><span className="rounded-full bg-muted/60 px-2.5 py-1 text-xs text-muted-foreground">{TIPO_LABEL[promo.tipo] ?? promo.tipo}</span></td>
                       <td className="py-3 pr-4 tabular-nums">
                         {promo.tipo === "porcentaje" ? `${promo.valor}%` : promo.tipo === "2x1" ? "—" : formatCurrency(promo.valor, { currency: context.currency })}
                       </td>
-                      <td className="py-3 pr-4 text-xs text-[#625b55]">{APLICA_LABEL[promo.aplica] ?? promo.aplica}</td>
-                      <td className="py-3 pr-4 text-xs text-[#625b55]">{promo.vigenciaDesde}{promo.vigenciaHasta ? ` → ${promo.vigenciaHasta}` : " → ∞"}</td>
+                      <td className="py-3 pr-4 text-xs text-muted-foreground">{APLICA_LABEL[promo.aplica] ?? promo.aplica}</td>
+                      <td className="py-3 pr-4 text-xs text-muted-foreground">{promo.vigenciaDesde}{promo.vigenciaHasta ? ` → ${promo.vigenciaHasta}` : " → ∞"}</td>
                       <td className="py-3 pr-4"><StatusBadge active={promo.activo} /></td>
                       <td className="py-3">
                         <div className="flex flex-wrap gap-2">
-                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-[#ded8d2] px-2.5 text-xs text-[#625b55] hover:bg-[#f8f7f5]" href={buildAdminHref("/promociones", { organizationId, extra: { ...preserved, edit: promo.id } })}>Editar</Link>
+                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/promociones", { organizationId, extra: { ...preserved, edit: promo.id } })}>Editar</Link>
                           <form action={togglePromotion}>
                             <input name="organizacionId" type="hidden" value={organizationId} />
                             <input name="id" type="hidden" value={promo.id} />
                             <input name="activo" type="hidden" value={String(promo.activo)} />
-                            <button className="inline-flex min-h-9 items-center rounded-lg border border-[#ded8d2] px-2.5 text-xs text-[#625b55] hover:bg-[#f8f7f5]" type="submit">{promo.activo ? "Ocultar" : "Activar"}</button>
+                            <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">{promo.activo ? "Ocultar" : "Activar"}</button>
                           </form>
                         </div>
                       </td>

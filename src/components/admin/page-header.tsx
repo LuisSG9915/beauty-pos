@@ -20,16 +20,16 @@ export function AdminBreadcrumbs({
   if (items.length === 0) return null;
   return (
     <nav aria-label="Ruta de navegación" className={className}>
-      <ol className="flex flex-wrap items-center gap-1 text-xs text-[#6e6159]">
+      <ol className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
           return (
             <li className="flex items-center gap-1" key={`${item.label}-${index}`}>
               {index > 0 ? (
-                <ChevronRight aria-hidden="true" className="size-3 text-[#c4b7ae]" />
+                <ChevronRight aria-hidden="true" className="size-3 text-border" />
               ) : null}
               {item.href && !isLast ? (
-                <Link className="font-medium text-[#a76348] hover:underline" href={item.href}>
+                <Link className="font-medium text-primary hover:underline" href={item.href}>
                   {item.label}
                 </Link>
               ) : (
@@ -75,11 +75,11 @@ export function AdminPageHeader({
         {breadcrumbs && breadcrumbs.length > 0 ? (
           <AdminBreadcrumbs className="mb-2" items={breadcrumbs} />
         ) : null}
-        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-[#2d2926]">
+        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-foreground">
           {title}
         </h1>
         {description ? (
-          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-[#6e6159]">
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">
             {description}
           </p>
         ) : null}
@@ -116,12 +116,12 @@ export function AdminSection({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div className="min-w-0">
             {title ? (
-              <h2 className="text-lg font-semibold tracking-tight text-[#2d2926]">
+              <h2 className="text-lg font-semibold tracking-tight text-foreground">
                 {title}
               </h2>
             ) : null}
             {description ? (
-              <p className="mt-1 text-sm text-[#6e6159]">{description}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{description}</p>
             ) : null}
           </div>
           {actions ? (
@@ -154,7 +154,7 @@ export function AdminCard({
   return (
     <section
       className={cn(
-        "rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm sm:p-6",
+        "rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6",
         className,
       )}
       {...props}
@@ -163,10 +163,10 @@ export function AdminCard({
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             {title ? (
-              <h2 className="font-semibold text-[#2d2926]">{title}</h2>
+              <h2 className="font-semibold text-foreground">{title}</h2>
             ) : null}
             {description ? (
-              <p className="mt-1 text-sm text-[#6e6159]">{description}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{description}</p>
             ) : null}
           </div>
           {actions ? (

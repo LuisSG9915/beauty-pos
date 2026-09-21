@@ -10,11 +10,11 @@ import { ActionFeedback } from "@/components/ui/toast";
 export function ProductCategoryForm({ organizationId, initial }: { organizationId: string; initial?: { id: string; clave: string; nombre: string } }) {
   const [state, action, pending] = useActionState<ProductCategoryActionState, FormData>(saveProductCategory, {});
   return (
-    <form action={action} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
+    <form action={action} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
       <h2 className="text-xl font-semibold">{initial ? "Editar categoría" : "Nueva categoría de producto"}</h2>
-      <p className="mt-1 text-sm text-[#625b55]">Agrupa productos e insumos para facilitar su búsqueda y reportes.</p>
+      <p className="mt-1 text-sm text-muted-foreground">Agrupa productos e insumos para facilitar su búsqueda y reportes.</p>
       <div className="mt-5 space-y-4">
         <Field>
           <FieldLabel required>Clave</FieldLabel>

@@ -27,14 +27,14 @@ export function FormTabs({
     >
       <Tabs.List
         aria-label="Secciones del formulario"
-        className="flex gap-1 overflow-x-auto border-b border-[#eee8e3]"
+        className="flex gap-1 overflow-x-auto border-b border-border"
       >
         {tabs.map((tab) => (
           <Tabs.Tab
             className={cn(
-              "-mb-px min-h-10 shrink-0 border-b-2 border-transparent px-3 text-sm font-medium text-[#625b55] outline-none transition-colors select-none",
-              "hover:text-[#8a5140] focus-visible:text-[#8a5140]",
-              "data-[active]:border-[#8a5140] data-[active]:font-semibold data-[active]:text-[#8a5140]",
+              "-mb-px min-h-10 shrink-0 border-b-2 border-transparent px-3 text-sm font-medium text-muted-foreground outline-none transition-colors select-none",
+              "hover:text-primary focus-visible:text-primary",
+              "data-[active]:border-primary data-[active]:font-semibold data-[active]:text-primary",
             )}
             key={tab.id}
             value={tab.id}

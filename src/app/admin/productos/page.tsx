@@ -103,7 +103,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         title="Productos e insumos"
       />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#eadfd8] bg-white p-4" method="get">
+      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <Field className="min-w-56 flex-1">
           <FieldLabel>Buscar</FieldLabel>
@@ -146,16 +146,16 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       </form>
 
       {hasFilters ? (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-[#625b55]">
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <span>Filtros activos:</span>
-          {query ? <span className="rounded-full bg-[#f1eeea] px-2.5 py-1">Búsqueda: {query}</span> : null}
-          {tipo ? <span className="rounded-full bg-[#f1eeea] px-2.5 py-1">Tipo: {TIPO_LABEL[tipo] ?? tipo}</span> : null}
+          {query ? <span className="rounded-full bg-muted/60 px-2.5 py-1">Búsqueda: {query}</span> : null}
+          {tipo ? <span className="rounded-full bg-muted/60 px-2.5 py-1">Tipo: {TIPO_LABEL[tipo] ?? tipo}</span> : null}
           {categoriaId ? (
-            <span className="rounded-full bg-[#f1eeea] px-2.5 py-1">
+            <span className="rounded-full bg-muted/60 px-2.5 py-1">
               Categoría: {categories.find((category) => category.id === categoriaId)?.nombre ?? categoriaId}
             </span>
           ) : null}
-          {estado ? <span className="rounded-full bg-[#f1eeea] px-2.5 py-1">Estado: {estado}</span> : null}
+          {estado ? <span className="rounded-full bg-muted/60 px-2.5 py-1">Estado: {estado}</span> : null}
         </div>
       ) : null}
 
@@ -176,7 +176,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] text-left text-sm">
-                <thead className="border-b border-[#eee8e3] text-xs uppercase tracking-wide text-[#625b55]">
+                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-4 font-medium">SKU</th>
                     <th className="py-2 pr-4 font-medium">Nombre</th>
@@ -189,11 +189,11 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
                 </thead>
                 <tbody>
                   {productRows.map((product) => (
-                    <tr className="border-b border-[#f1eeea]" key={product.id}>
+                    <tr className="border-b border-border" key={product.id}>
                       <td className="py-3 pr-4 font-mono text-xs">{product.sku}</td>
                       <td className="py-3 pr-4 font-medium">{product.nombre}</td>
                       <td className="py-3 pr-4">
-                        <span className="rounded-full bg-[#f1eeea] px-2.5 py-1 text-xs text-[#625b55]">{TIPO_LABEL[product.tipo] ?? product.tipo}</span>
+                        <span className="rounded-full bg-muted/60 px-2.5 py-1 text-xs text-muted-foreground">{TIPO_LABEL[product.tipo] ?? product.tipo}</span>
                       </td>
                       <td className="py-3 pr-4 tabular-nums">{formatCurrency(product.costo, { currency: context.currency })}</td>
                       <td className="py-3 pr-4 tabular-nums">{formatCurrency(product.precioVenta, { currency: context.currency })}</td>
@@ -201,7 +201,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
                       <td className="py-3">
                         <div className="flex flex-wrap gap-2">
                           <Link
-                            className="inline-flex min-h-9 items-center rounded-lg border border-[#ded8d2] px-2.5 text-xs text-[#625b55] hover:bg-[#f8f7f5]"
+                            className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60"
                             href={buildAdminHref("/productos", { organizationId, extra: { ...preserved, edit: product.id } })}
                           >
                             Editar
@@ -210,7 +210,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
                             <input name="organizacionId" type="hidden" value={organizationId} />
                             <input name="id" type="hidden" value={product.id} />
                             <input name="activo" type="hidden" value={String(product.activo)} />
-                            <button className="inline-flex min-h-9 items-center rounded-lg border border-[#ded8d2] px-2.5 text-xs text-[#625b55] hover:bg-[#f8f7f5]" type="submit">
+                            <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">
                               {product.activo ? "Ocultar" : "Activar"}
                             </button>
                           </form>

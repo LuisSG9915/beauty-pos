@@ -38,18 +38,18 @@ export function RoleCard({
   const modulos = [...new Set(permisos.map((p) => p.modulo))];
 
   return (
-    <section className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#f1eeea] text-[#8a5140]">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted/60 text-primary">
             <ShieldCheck aria-hidden="true" className="size-5" />
           </span>
           <div className="min-w-0">
-            <p className="truncate font-medium text-[#2d2926]">
+            <p className="truncate font-medium text-foreground">
               {role.nombre}
-              {role.esSistema ? <span className="ml-2 text-xs font-normal text-[#6e6159]">sistema</span> : null}
+              {role.esSistema ? <span className="ml-2 text-xs font-normal text-muted-foreground">sistema</span> : null}
             </p>
-            <p className="truncate text-xs text-[#6e6159]">
+            <p className="truncate text-xs text-muted-foreground">
               {role.clave} · {permisoIds.length} permisos · {memberCount} miembro(s)
             </p>
           </div>
@@ -82,12 +82,12 @@ export function RoleCard({
       </div>
 
       {open ? (
-        <form action={formAction} className="mt-4 space-y-4 border-t border-[#f1ece8] pt-4">
+        <form action={formAction} className="mt-4 space-y-4 border-t border-border pt-4">
           <input name="organizacionId" type="hidden" value={organizationId} />
           <input name="rolId" type="hidden" value={role.id} />
           {modulos.map((modulo) => (
             <div key={modulo}>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8a5140]">{modulo}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">{modulo}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {permisos
                   .filter((permiso) => permiso.modulo === modulo)
@@ -98,8 +98,8 @@ export function RoleCard({
                       <label
                         className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors ${
                           !editable || !asignable
-                            ? "cursor-not-allowed border-[#eee8e3] bg-[#f7f4f1] text-[#a99d94]"
-                            : "cursor-pointer border-[#ded8d2] bg-white text-[#625b55] hover:border-[#c9a899] has-checked:border-[#8a5140] has-checked:bg-[#f2e3dc] has-checked:text-[#60392e]"
+                            ? "cursor-not-allowed border-border bg-muted/60 text-muted-foreground"
+                            : "cursor-pointer border-border bg-card text-muted-foreground hover:border-accent-foreground/30 has-checked:border-primary has-checked:bg-accent/70 has-checked:text-primary"
                         }`}
                         key={permiso.id}
                         title={asignable ? permiso.clave : `${permiso.clave} — no tienes este permiso`}
@@ -126,7 +126,7 @@ export function RoleCard({
               </Button>
             </div>
           ) : (
-            <p className="text-xs text-[#6e6159]">
+            <p className="text-xs text-muted-foreground">
               {protegido ? "El rol Propietario tiene todos los permisos y no se puede modificar." : "Solo lectura."}
             </p>
           )}

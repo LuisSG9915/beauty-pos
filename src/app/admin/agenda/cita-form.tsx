@@ -155,26 +155,26 @@ export function CitaForm({
       <div className="space-y-2">
         <p className="text-sm font-medium text-foreground">Servicios de la cita</p>
         {servicios.length === 0 ? (
-          <p className="rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55]">
+          <p className="rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">
             No hay servicios activos. Crea servicios primero.
           </p>
         ) : (
           <div className="grid gap-2 sm:grid-cols-2">
             {servicios.map((servicio) => (
               <label
-                className="flex min-h-11 items-center gap-3 rounded-xl border border-[#eee8e3] p-3 text-sm transition-colors hover:border-[#c9a899]"
+                className="flex min-h-11 items-center gap-3 rounded-xl border border-border p-3 text-sm transition-colors hover:border-accent-foreground/30"
                 key={servicio.id}
               >
                 <input
                   checked={seleccionados.has(servicio.id)}
-                  className="size-4 accent-[#8a5140]"
+                  className="size-4 accent-primary"
                   name="servicioIds"
                   onChange={() => toggleServicio(servicio.id)}
                   type="checkbox"
                   value={servicio.id}
                 />
                 <span className="flex-1 font-medium">{servicio.nombre}</span>
-                <span className="text-xs tabular-nums text-[#625b55]">
+                <span className="text-xs tabular-nums text-muted-foreground">
                   {formatCurrency(servicio.precioBase, { currency })} · {servicio.duracionMinutos} min
                 </span>
               </label>
@@ -182,26 +182,26 @@ export function CitaForm({
           </div>
         )}
         {recursos.length > 0 ? (
-          <details className="rounded-xl border border-[#eee8e3] bg-[#faf9f7] px-4 py-3" open={Boolean(initial?.recursoIds?.length)}>
-            <summary className="cursor-pointer list-none text-sm font-medium text-[#625b55] hover:text-[#8a5140]">
+          <details className="rounded-xl border border-border bg-muted/60 px-4 py-3" open={Boolean(initial?.recursoIds?.length)}>
+            <summary className="cursor-pointer list-none text-sm font-medium text-muted-foreground hover:text-primary">
               Apartar cabina, silla o equipo (opcional)
             </summary>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {recursos.map((recurso) => (
                 <label
-                  className="flex min-h-11 items-center gap-3 rounded-xl border border-[#eee8e3] bg-white p-3 text-sm transition-colors hover:border-[#c9a899]"
+                  className="flex min-h-11 items-center gap-3 rounded-xl border border-border bg-card p-3 text-sm transition-colors hover:border-accent-foreground/30"
                   key={recurso.id}
                 >
                   <input
                     checked={recursosSel.has(recurso.id)}
-                    className="size-4 accent-[#8a5140]"
+                    className="size-4 accent-primary"
                     name="recursoIds"
                     onChange={() => toggleRecurso(recurso.id)}
                     type="checkbox"
                     value={recurso.id}
                   />
                   <span className="flex-1 font-medium">{recurso.nombre}</span>
-                  <span className="text-[10px] uppercase tracking-wide text-[#6e6159]">{recurso.tipo}</span>
+                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{recurso.tipo}</span>
                 </label>
               ))}
             </div>
@@ -251,8 +251,8 @@ export function CitaForm({
         </Field>
       </div>
 
-      <details className="rounded-xl border border-[#eee8e3] bg-[#faf9f7] px-4 py-3" open={Boolean(initial?.notas)}>
-        <summary className="cursor-pointer list-none text-sm font-medium text-[#625b55] hover:text-[#8a5140]">
+      <details className="rounded-xl border border-border bg-muted/60 px-4 py-3" open={Boolean(initial?.notas)}>
+        <summary className="cursor-pointer list-none text-sm font-medium text-muted-foreground hover:text-primary">
           Agregar nota (opcional)
         </summary>
         <Textarea
@@ -263,19 +263,19 @@ export function CitaForm({
         />
       </details>
 
-      <div className="rounded-xl border border-[#e3d9d1] bg-[#faf6f3] p-4">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">Resumen</h4>
+      <div className="rounded-xl border border-border bg-muted/60 p-4">
+        <h4 className="text-xs font-semibold uppercase tracking-wide text-primary">Resumen</h4>
         <div className="mt-2 grid grid-cols-3 gap-3 text-sm">
           <div>
-            <p className="text-xs text-[#625b55]">Inicio</p>
+            <p className="text-xs text-muted-foreground">Inicio</p>
             <p className="font-semibold tabular-nums">{inicio ? `${inicio.slice(11)} h` : "—"}</p>
           </div>
           <div>
-            <p className="text-xs text-[#625b55]">Fin estimado</p>
+            <p className="text-xs text-muted-foreground">Fin estimado</p>
             <p className="font-semibold tabular-nums">{resumen.fin ? `${resumen.fin} h` : "—"}</p>
           </div>
           <div>
-            <p className="text-xs text-[#625b55]">Total</p>
+            <p className="text-xs text-muted-foreground">Total</p>
             <p className="font-semibold tabular-nums">{formatCurrency(resumen.totalPrecio, { currency })}</p>
           </div>
         </div>
@@ -283,14 +283,14 @@ export function CitaForm({
 
       <ActionFeedback state={state} successMessage="Cita guardada correctamente." />
       {state.sugerencias && state.sugerencias.length > 0 ? (
-        <div className="rounded-xl border border-[#e3d9d1] bg-[#faf6f3] p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#8a5140]">
+        <div className="rounded-xl border border-border bg-muted/60 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
             Horarios libres sugeridos
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {state.sugerencias.map((iso) => (
               <button
-                className="rounded-lg border border-[#e3d9d1] bg-white px-3 py-1.5 text-xs font-medium text-[#403a35] transition-colors hover:border-[#8a5140] hover:bg-[#f2e3dc]"
+                className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary hover:bg-accent/70"
                 key={iso}
                 onClick={() => setInicio(toBranchDateTimeInput(iso, timeZone))}
                 type="button"
@@ -299,7 +299,7 @@ export function CitaForm({
               </button>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-[#6e6159]">
+          <p className="mt-2 text-[11px] text-muted-foreground">
             Elige una sugerencia para rellenar fecha y hora, luego guarda de nuevo.
           </p>
         </div>

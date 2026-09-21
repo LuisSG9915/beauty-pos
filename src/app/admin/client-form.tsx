@@ -47,13 +47,11 @@ export function ClientForm({ organizationId, initial }: { organizationId: string
   const tieneFiscales = FISCAL_FIELDS.some((field) => Boolean(initial?.[field.name]));
 
   return (
-    <form action={formAction} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
+    <form action={formAction}>
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
-      <h2 className="text-xl font-semibold">{initial ? "Editar cliente" : "Nuevo cliente"}</h2>
-      <p className="mt-1 text-sm text-[#6e6159]">Solo el nombre es obligatorio; el teléfono ayuda a confirmar citas.</p>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2">
         {PERSONAL_FIELDS.map((field) => (
           <Field key={field.name}>
             <FieldLabel required={field.required}>{field.label}</FieldLabel>
@@ -68,8 +66,8 @@ export function ClientForm({ organizationId, initial }: { organizationId: string
 
       {/* Datos fiscales plegados: solo se piden cuando el cliente requiere
           factura; abierto al editar un cliente que ya los tiene. */}
-      <details className="mt-5 rounded-xl border border-[#eee8e3] bg-[#faf9f7] px-4 py-3" open={tieneFiscales}>
-        <summary className="cursor-pointer list-none text-sm font-medium text-[#625b55] hover:text-[#8a5140]">
+      <details className="mt-5 rounded-xl border border-border bg-muted/60 px-4 py-3" open={tieneFiscales}>
+        <summary className="cursor-pointer list-none text-sm font-medium text-muted-foreground hover:text-primary">
           Datos de facturación (solo si el cliente pide factura)
         </summary>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -83,7 +81,7 @@ export function ClientForm({ organizationId, initial }: { organizationId: string
       </details>
 
       {state.warning ? (
-        <label className="mt-5 flex items-start gap-3 rounded-xl border border-[#ecd9a9] bg-[#fff9e9] p-4 text-sm text-[#80621d]">
+        <label className="mt-5 flex items-start gap-3 rounded-xl border border-[#e7bd66] bg-accent/70 p-4 text-sm text-warning">
           <input className="mt-1" name="confirmarDuplicado" type="checkbox" value="true" />
           <span>{state.warning} Deseo guardar el cliente de todas formas.</span>
         </label>

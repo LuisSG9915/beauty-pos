@@ -95,7 +95,7 @@ export default async function PaquetesPage({ searchParams }: { searchParams: Sea
     <div className="space-y-6">
       <AdminPageHeader description="Paquetes prepagados: sesiones de un servicio que el cliente paga por adelantado." title="Paquetes" />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#eadfd8] bg-white p-4" method="get">
+      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <Field className="min-w-52 flex-1">
           <FieldLabel>Buscar</FieldLabel>
@@ -139,7 +139,7 @@ export default async function PaquetesPage({ searchParams }: { searchParams: Sea
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[640px] text-left text-sm">
-                <thead className="border-b border-[#eee8e3] text-xs uppercase tracking-wide text-[#625b55]">
+                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-4 font-medium">Clave</th>
                     <th className="py-2 pr-4 font-medium">Nombre</th>
@@ -152,21 +152,21 @@ export default async function PaquetesPage({ searchParams }: { searchParams: Sea
                 </thead>
                 <tbody>
                   {paqueteRows.map((paquete) => (
-                    <tr className="border-b border-[#f1eeea]" key={paquete.id}>
+                    <tr className="border-b border-border" key={paquete.id}>
                       <td className="py-3 pr-4 font-mono text-xs">{paquete.clave}</td>
                       <td className="py-3 pr-4 font-medium">{paquete.nombre}</td>
-                      <td className="py-3 pr-4 text-xs text-[#625b55]">{paquete.servicioNombre}</td>
+                      <td className="py-3 pr-4 text-xs text-muted-foreground">{paquete.servicioNombre}</td>
                       <td className="py-3 pr-4 tabular-nums">{paquete.sesiones}</td>
                       <td className="py-3 pr-4 tabular-nums">{formatCurrency(paquete.precio, { currency: context.currency })}</td>
                       <td className="py-3 pr-4"><StatusBadge active={paquete.activo} /></td>
                       <td className="py-3">
                         <div className="flex flex-wrap gap-2">
-                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-[#ded8d2] px-2.5 text-xs text-[#625b55] hover:bg-[#f8f7f5]" href={buildAdminHref("/paquetes", { organizationId, extra: { ...preserved, edit: paquete.id } })}>Editar</Link>
+                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/paquetes", { organizationId, extra: { ...preserved, edit: paquete.id } })}>Editar</Link>
                           <form action={togglePaquete}>
                             <input name="organizacionId" type="hidden" value={organizationId} />
                             <input name="id" type="hidden" value={paquete.id} />
                             <input name="activo" type="hidden" value={String(paquete.activo)} />
-                            <button className="inline-flex min-h-9 items-center rounded-lg border border-[#ded8d2] px-2.5 text-xs text-[#625b55] hover:bg-[#f8f7f5]" type="submit">{paquete.activo ? "Ocultar" : "Activar"}</button>
+                            <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">{paquete.activo ? "Ocultar" : "Activar"}</button>
                           </form>
                         </div>
                       </td>

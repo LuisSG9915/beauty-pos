@@ -46,7 +46,7 @@ export function CierreCajaForm({
       <input name="corteId" type="hidden" value={corteId} />
       <input name="conteos" ref={conteosRef} type="hidden" value="{}" />
 
-      <p className="rounded-xl bg-[#fdf3e8] px-4 py-3 text-sm font-medium text-[#986b16]">
+      <p className="rounded-xl bg-[#ffe3ad] px-4 py-3 text-sm font-medium text-warning">
         Cuenta el efectivo y los vouchers de cada medio sin consultar el sistema. Las diferencias se calculan al confirmar.
       </p>
 

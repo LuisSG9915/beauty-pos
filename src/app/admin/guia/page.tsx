@@ -82,8 +82,8 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
       />
 
       {omitida && !resumen.terminada ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#eadfd8] bg-[#faf6f3] px-5 py-4">
-          <p className="text-sm text-[#625b55]">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/60 px-5 py-4">
+          <p className="text-sm text-muted-foreground">
             Omitiste la guía. Puedes retomarla cuando quieras; tu avance se conserva.
           </p>
           <form action={enviarAccionGuia}>
@@ -96,7 +96,7 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
       <AdminCard>
         <div className="mb-5">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-[#2d2926]">
+            <p className="text-sm font-medium text-foreground">
               {resumen.completados} de {resumen.total} pasos listos
             </p>
             {resumen.terminada ? <StatusBadge tone="success">Configuración completa</StatusBadge> : null}
@@ -106,33 +106,33 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
             aria-valuemax={resumen.total}
             aria-valuemin={0}
             aria-valuenow={resumen.completados}
-            className="mt-3 h-2 overflow-hidden rounded-full bg-[#f1eeea]"
+            className="mt-3 h-2 overflow-hidden rounded-full bg-muted/60"
             role="progressbar"
           >
             <div
-              className="h-full rounded-full bg-[#8a5140] transition-[width]"
+              className="h-full rounded-full bg-primary transition-[width]"
               style={{ width: `${Math.round((resumen.completados / resumen.total) * 100)}%` }}
             />
           </div>
         </div>
 
-        <ol className="divide-y divide-[#f4eeea]">
+        <ol className="divide-y divide-border">
           {resumen.pasos.map((paso, index) => (
             <li className="flex items-center gap-4 py-4 first:pt-0 last:pb-0" key={paso.clave}>
               <span
                 aria-hidden="true"
                 className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
-                  paso.hecho ? "bg-[#e8f0ea] text-[#347052]" : "bg-[#f1eeea] text-[#6f635a]"
+                  paso.hecho ? "bg-[#d4efe9] text-success" : "bg-muted/60 text-muted-foreground"
                 }`}
               >
                 {paso.hecho ? <CheckCircle2 className="size-5" /> : <Circle className="size-5" />}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-2 font-medium text-[#2d2926]">
+                <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
                   {index + 1}. {paso.titulo}
                   {paso.opcional ? <StatusBadge tone="neutral">Opcional</StatusBadge> : null}
                 </p>
-                <p className="mt-0.5 text-sm leading-6 text-[#6e6159]">{paso.descripcion}</p>
+                <p className="mt-0.5 text-sm leading-6 text-muted-foreground">{paso.descripcion}</p>
               </div>
               <Button
                 nativeButton={false}
@@ -160,7 +160,7 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
           </form>
         )}
         <Link
-          className="text-sm font-medium text-[#8a5140] hover:underline"
+          className="text-sm font-medium text-primary hover:underline"
           href={buildAdminHref("/ayuda", { organizationId, sucursalId })}
         >
           Ir a Ayuda

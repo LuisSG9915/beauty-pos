@@ -39,7 +39,7 @@ export function SucursalAsignacionForm({
       <input name="sucursalId" type="hidden" value={sucursalId} />
       <div className="grid gap-2 sm:grid-cols-2">
         {miembros.map((miembro) => (
-          <label className="flex items-start gap-2 rounded-xl border border-[#eee8e3] px-3 py-2.5 text-sm" key={miembro.usuarioId}>
+          <label className="flex items-start gap-2 rounded-xl border border-border px-3 py-2.5 text-sm" key={miembro.usuarioId}>
             <input
               className="mt-0.5"
               defaultChecked={miembro.asignado}
@@ -49,15 +49,15 @@ export function SucursalAsignacionForm({
               value={miembro.usuarioId}
             />
             <span>
-              <span className="block font-medium text-[#2d2926]">{miembro.nombre}</span>
-              <span className="block text-xs text-[#6e6159]">
+              <span className="block font-medium text-foreground">{miembro.nombre}</span>
+              <span className="block text-xs text-muted-foreground">
                 {miembro.sinRestriccion ? "Sin restricción: ve todas las sucursales" : (miembro.correo ?? "")}
               </span>
             </span>
           </label>
         ))}
       </div>
-      <p className="text-xs leading-5 text-[#6e6159]">
+      <p className="text-xs leading-5 text-muted-foreground">
         Marca quién puede operar esta sucursal. Un miembro sin ninguna asignación en el negocio ve todas las
         sucursales; quitarle la última ampliaría su acceso.
       </p>

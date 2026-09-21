@@ -13,14 +13,14 @@ export function InsumosManager({ organizationId, servicioId, insumos, disponible
   const [cantidad, setCantidad] = useState("1");
 
   return (
-    <div className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <h3 className="font-semibold">Insumos que consume este servicio</h3>
-      <p className="mt-1 text-sm text-[#625b55]">Cada vez que se cobre el servicio, se descontará esta cantidad del inventario.</p>
+      <p className="mt-1 text-sm text-muted-foreground">Cada vez que se cobre el servicio, se descontará esta cantidad del inventario.</p>
 
       {insumos.length > 0 ? (
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-[#eee8e3] text-xs uppercase tracking-wide text-[#625b55]">
+            <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="py-2 pr-4 font-medium">SKU</th>
                 <th className="py-2 pr-4 font-medium">Producto</th>
@@ -31,16 +31,16 @@ export function InsumosManager({ organizationId, servicioId, insumos, disponible
             </thead>
             <tbody>
               {insumos.map((insumo) => (
-                <tr className="border-b border-[#f1eeea]" key={insumo.id}>
+                <tr className="border-b border-border" key={insumo.id}>
                   <td className="py-3 pr-4 font-mono text-xs">{insumo.productoSku}</td>
                   <td className="py-3 pr-4 font-medium">{insumo.productoNombre}</td>
                   <td className="py-3 pr-4 tabular-nums">{insumo.cantidad}</td>
-                  <td className="py-3 pr-4 text-xs text-[#625b55]">{insumo.unidadNombre ?? "—"}</td>
+                  <td className="py-3 pr-4 text-xs text-muted-foreground">{insumo.unidadNombre ?? "—"}</td>
                   <td className="py-3">
                     <form action={removeServicioInsumo}>
                       <input name="organizacionId" type="hidden" value={organizationId} />
                       <input name="insumoRelId" type="hidden" value={insumo.id} />
-                      <button className="inline-flex min-h-9 items-center rounded-lg border border-[#ded8d2] px-2.5 text-xs text-[#a8443a] hover:bg-[#fdf1ee]" type="submit">Quitar</button>
+                      <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-destructive hover:bg-[#f6d9d2]" type="submit">Quitar</button>
                     </form>
                   </td>
                 </tr>
@@ -49,11 +49,11 @@ export function InsumosManager({ organizationId, servicioId, insumos, disponible
           </table>
         </div>
       ) : (
-        <p className="mt-4 rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55]">Este servicio todavía no tiene insumos asignados.</p>
+        <p className="mt-4 rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">Este servicio todavía no tiene insumos asignados.</p>
       )}
 
       {disponibles.length > 0 ? (
-        <form action={addServicioInsumo} className="mt-5 flex flex-wrap items-end gap-3 rounded-xl border border-[#eee8e3] p-4">
+        <form action={addServicioInsumo} className="mt-5 flex flex-wrap items-end gap-3 rounded-xl border border-border p-4">
           <input name="organizacionId" type="hidden" value={organizationId} />
           <input name="servicioId" type="hidden" value={servicioId} />
           <Field className="flex-1">
@@ -74,7 +74,7 @@ export function InsumosManager({ organizationId, servicioId, insumos, disponible
           <Button className="rounded-xl" disabled={!selectedProducto} type="submit">Agregar</Button>
         </form>
       ) : (
-        <p className="mt-4 text-xs font-medium text-[#986b16]">No hay productos marcados como insumo. Crea productos con tipo &quot;Insumo&quot; o &quot;Ambos&quot; en el catálogo de productos.</p>
+        <p className="mt-4 text-xs font-medium text-warning">No hay productos marcados como insumo. Crea productos con tipo &quot;Insumo&quot; o &quot;Ambos&quot; en el catálogo de productos.</p>
       )}
     </div>
   );

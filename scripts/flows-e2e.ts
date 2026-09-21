@@ -2,18 +2,18 @@ import "dotenv/config";
 
 import puppeteer, { type Page } from "puppeteer";
 
+import { login } from "./lib/e2e";
+
 const BASE_URL = process.env.SMOKE_BASE_URL ?? "http://localhost:3000";
-const EMAIL = process.env.BOOTSTRAP_ADMIN_EMAIL;
-const PASSWORD = process.env.BOOTSTRAP_ADMIN_PASSWORD;
 const OUT_DIR = ".smoke-shots/flows";
 const TIME_ZONE = "America/Mexico_City";
 
-if (!EMAIL || !PASSWORD) {
-  console.error("Faltan BOOTSTRAP_ADMIN_EMAIL/BOOTSTRAP_ADMIN_PASSWORD en .env");
-  process.exit(1);
-}
-const email = EMAIL as string;
-const password = PASSWORD as string;
+// Organización dedicada de pruebas: el flujo solo puede escribir aquí. La
+// guarda de `resolveContext` aborta antes de tocar datos si el usuario o el
+// ID no corresponden a "Estética Prueba E2E".
+const E2E_ORG_ID = "652c172c-bf32-4b9c-90d1-006eded7ff56";
+const E2E_ORG_NOMBRE = "Estética Prueba E2E";
+const email = process.env.PERF_EMAIL ?? "e2e-salon@test.dev";
 
 const E2E_MARK = "E2E-SMOKE";
 const E2E_NOTAS = `%${E2E_MARK}%`;
@@ -41,6 +41,13 @@ function hora12(slot: string) {
   return `${String(((h + 11) % 12) + 1).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
+/** Needle único para abrirDetalle: "09:00 a.m." — distingue la tarjeta de cita
+ * de los botones de turno ("Desactivar turno 09:00–19:00"). */
+function citaNeedle(slot: string) {
+  const h = Number(slot.split(":")[0]);
+  return `${hora12(slot)} ${h < 12 ? "a.m." : "p.m."}`;
+}
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type PgClient = import("pg").Client;
@@ -59,26 +66,25 @@ async function withDb<T>(fn: (client: PgClient) => Promise<T>): Promise<T> {
 type E2EContext = { orgId: string; branchId: string; adminId: string; timeZone: string };
 
 /**
- * Resuelve la misma organización y sucursal por defecto que `getAdminContext`:
- * primera org accesible por nombre → primera sucursal activa por nombre.
+ * Resuelve EXCLUSIVAMENTE la organización E2E autorizada. Aborta si el usuario
+ * no es miembro activo o si el ID/nombre no coinciden: el flujo escribe datos
+ * y nunca debe resolver otra organización por orden alfabético.
  */
 async function resolveContext(): Promise<E2EContext> {
   return withDb(async (client) => {
     const { rows } = await client.query(
       `with u as (
-         select id, es_administrador_plataforma as plataforma
-         from usuarios where correo = $1
+         select id from usuarios where correo = $1
        ),
        o as (
-         select org.id, org.zona_horaria
+         select org.id, org.nombre, org.zona_horaria
          from organizaciones org
-         where (select plataforma from u)
-            or exists (
-              select 1 from miembros_organizaciones mo, u
-              where mo.organizacion_id = org.id
-                and mo.usuario_id = u.id and mo.estado = 'activo'
-            )
-         order by org.nombre limit 1
+         where org.id = $2
+           and exists (
+             select 1 from miembros_organizaciones mo, u
+             where mo.organizacion_id = org.id
+               and mo.usuario_id = u.id and mo.estado = 'activo'
+           )
        ),
        b as (
          select s.id, coalesce(s.zona_horaria, o.zona_horaria) as tz
@@ -88,15 +94,56 @@ async function resolveContext(): Promise<E2EContext> {
        )
        select (select id from u) as admin_id,
               (select id from o) as org_id,
+              (select nombre from o) as org_nombre,
               (select id from b) as branch_id,
-              coalesce((select tz from b), $2) as tz`,
-      [email, TIME_ZONE],
+              coalesce((select tz from b), $3) as tz`,
+      [email, E2E_ORG_ID, TIME_ZONE],
     );
     const row = rows[0] ?? {};
-    if (!row.org_id || !row.branch_id) {
-      throw new Error("No se pudo resolver organización/sucursal por defecto para E2E");
+    if (row.org_id !== E2E_ORG_ID || row.org_nombre !== E2E_ORG_NOMBRE || !row.branch_id || !row.admin_id) {
+      throw new Error(
+        `Guarda E2E: se esperaba ${E2E_ORG_NOMBRE} (${E2E_ORG_ID}) con ${email} como miembro activo; se obtuvo ${JSON.stringify(row)}`,
+      );
     }
     return { orgId: row.org_id, branchId: row.branch_id, adminId: row.admin_id, timeZone: row.tz };
+  });
+}
+
+/**
+ * Fixtures mínimos que el flujo usa con nombre fijo. Inserts idempotentes
+ * marcados con claves E2E-* y acotados a la organización autorizada.
+ */
+async function ensureFixtures(ctx: E2EContext) {
+  await withDb(async (client) => {
+    await client.query(
+      `insert into servicios (organizacion_id, clave, nombre, duracion_minutos, precio_base, visible_agenda, created_by)
+       select $1, 'E2ESRV-CORTE', 'CORTE DE DAMA', 60, 300, true, $2
+       where not exists (
+         select 1 from servicios where organizacion_id = $1 and nombre = 'CORTE DE DAMA' and activo
+       )`,
+      [ctx.orgId, ctx.adminId],
+    );
+    await client.query(
+      `insert into productos (organizacion_id, sku, nombre, tipo, costo, precio_venta, stock_minimo, visible_pos, created_by)
+       select $1, 'E2EPRD-SHAM', 'SHAMPOO REPARADOR', 'producto', 60, 150, 1, true, $2
+       where not exists (
+         select 1 from productos where organizacion_id = $1 and nombre = 'SHAMPOO REPARADOR' and activo
+       )`,
+      [ctx.orgId, ctx.adminId],
+    );
+    // Stock inicial en la sucursal del flujo: sin fila en inventario_stock el
+    // POS no puede vender el producto.
+    await client.query(
+      `insert into inventario_stock (organizacion_id, sucursal_id, producto_id, stock_actual, created_by)
+       select $1, $2, p.id, 20, $3
+       from productos p
+       where p.organizacion_id = $1 and p.nombre = 'SHAMPOO REPARADOR' and p.activo
+         and not exists (
+           select 1 from inventario_stock s
+           where s.sucursal_id = $2 and s.producto_id = p.id
+         )`,
+      [ctx.orgId, ctx.branchId, ctx.adminId],
+    );
   });
 }
 
@@ -317,6 +364,50 @@ async function waitForText(page: Page, text: string, timeout = 15000) {
   );
 }
 
+/**
+ * Espera texto recargando la página cada ~6 s. La caché de Hyperdrive puede
+ * servir el SELECT del board con datos anteriores a la escritura (read-after-
+ * write staleness), así que un solo reload no basta: hay que insistir hasta
+ * que la caché expire o el dato aparezca.
+ */
+async function waitForTextReload(page: Page, text: string, timeout = 90_000) {
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    const found = await page.evaluate(
+      (t) => document.body.innerText.toLowerCase().includes(t.toLowerCase()),
+      text,
+    );
+    if (found) return;
+    if (Date.now() > deadline) throw new Error(`Texto no encontrado tras recargas: ${text}`);
+    await sleep(6000);
+    await page.reload({ waitUntil: "networkidle0" }).catch(() => {});
+  }
+}
+
+/**
+ * Repite `check` recargando cada ~6 s hasta que sea cierto o venza el plazo.
+ * Las escrituras por server actions tardan varios segundos en producción y un
+ * reload inmediato puede abortar el POST o leer antes de que termine.
+ */
+async function pollReload(page: Page, check: () => Promise<boolean>, timeout = 90_000) {
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    if (await check().catch(() => false)) return true;
+    if (Date.now() > deadline) return false;
+    await sleep(6000);
+    await page.reload({ waitUntil: "networkidle0" }).catch(() => {});
+  }
+}
+
+/** Espera a que cualquier dialog/alertdialog se cierre (acción completada). */
+async function closeDialogs(page: Page, timeout = 30_000) {
+  await page
+    .waitForFunction(() => !document.querySelector('[role="dialog"], [role="alertdialog"]'), {
+      timeout,
+    })
+    .catch(() => {});
+}
+
 async function clickText(page: Page, selector: string, text: string, scopeSelector?: string) {
   const clicked = await page.evaluate(
     (sel, t, scope) => {
@@ -410,6 +501,12 @@ async function main() {
   const page = await browser.newPage();
   // Dev mode recompila rutas tras cambios; 60s absorbe compiles pesadas.
   page.setDefaultNavigationTimeout(60_000);
+  // En headless el rAF puede pausarse y el polling por default de
+  // waitForFunction deja de re-evaluar aunque la condición ya se cumplió
+  // (mismo motivo que en login() de lib/e2e). Forzamos polling por intervalo.
+  const waitForFunctionOriginal = page.waitForFunction.bind(page);
+  page.waitForFunction = ((fn: unknown, opts: object = {}, ...args: unknown[]) =>
+    waitForFunctionOriginal(fn as never, { polling: 100, ...opts } as never, ...(args as never[]))) as typeof page.waitForFunction;
   await page.setViewport({ width: 1440, height: 900 });
   page.on("console", (msg) => {
     if (msg.type() === "error") consoleErrors.push(`[${page.url()}] ${msg.text()}`);
@@ -423,21 +520,17 @@ async function main() {
 
   try {
     await cleanup(ctx);
+    await ensureFixtures(ctx);
     // Horarios libres reales: la cita inicial, el destino de "Mover", la
     // segunda cita y el destino de "Reagendar" nunca chocan con datos
     // preexistentes ni entre sí.
     const slots = await findFreeSlots(ctx, fecha, 4);
     console.log(`Horarios E2E (${ctx.timeZone}): ${slots.join(", ")}`);
 
-    // ── Login ────────────────────────────────────────────────────────────
-    await page.goto(`${BASE_URL}/login`, { waitUntil: "networkidle0" });
-    await page.type('input[name="email"]', email);
-    await page.type('input[name="password"]', password);
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
-      page.click('button[type="submit"]'),
-    ]);
-    record("Login redirige a /admin", page.url().includes("/admin"));
+    // ── Sesión (cookie directa: el sign-in remoto puede leer el hash viejo
+    // desde la caché de Hyperdrive tras un reset de contraseña) ────────────
+    await login(page, email);
+    record("Sesión E2E en /admin", page.url().includes("/admin"));
 
     // ── Agenda: crear cita ────────────────────────────────────────────────
     const crearCita = async (hhmm: string, notas: string) => {
@@ -452,13 +545,16 @@ async function main() {
       await clickText(page, '[role="dialog"] button[type="submit"]', "Crear cita");
       await page.waitForFunction(
         () => !document.querySelector('[role="dialog"]'),
-        { timeout: 15000 },
+        { timeout: 30000 },
       );
+      // El board no siempre refleja la revalidación del server action en
+      // headless; recargar garantiza la tarjeta nueva en el DOM.
+      await page.reload({ waitUntil: "networkidle0" });
     };
 
     await page.goto(`${BASE_URL}/admin/agenda`, { waitUntil: "networkidle0" });
     await crearCita(slots[0], E2E_MARK);
-    await waitForText(page, "Walk-in");
+    await waitForTextReload(page, "Walk-in");
     await shot(page, "02-cita-creada");
     record(`Crear cita walk-in a las ${slots[0]}`, true);
 
@@ -477,6 +573,18 @@ async function main() {
       await page.waitForSelector('button[aria-label="Cerrar panel"]', { visible: true, timeout: 15000 });
     };
     const clickPanel = (texto: string) => clickText(page, "button", texto);
+    /** Click en acción del panel que debe abrir un diálogo; reintenta si no abre. */
+    const clickPanelDialog = async (texto: string, waitSel: string) => {
+      for (let i = 0; i < 3; i++) {
+        await clickPanel(texto);
+        const ok = await page
+          .waitForSelector(waitSel, { visible: true, timeout: 12000 })
+          .then(() => true)
+          .catch(() => false);
+        if (ok) return;
+      }
+      throw new Error(`Panel: "${texto}" no abrió ${waitSel}`);
+    };
     const cardAria = (estado: string, extra?: string) =>
       page.evaluate(
         ([e, x]) =>
@@ -486,26 +594,6 @@ async function main() {
           }),
         [estado, extra ?? ""],
       );
-
-    await abrirDetalle("Walk-in");
-    await clickPanel("Mover");
-    await page.waitForSelector('[role="dialog"] input[type="time"]', { visible: true });
-    await setNativeInput(page, '[role="dialog"] input[type="time"]', slots[1]);
-    await shot(page, "03-mover-cita");
-    await clickText(page, '[role="dialog"] button[type="submit"]', "Mover cita");
-    await sleep(1500);
-    await page.reload({ waitUntil: "networkidle0" });
-    await waitForText(page, "Walk-in");
-    record(`Mover cita a las ${slots[1]} (sin drag)`, await cardAria("pendiente", hora12(slots[1])));
-
-    // ── Agenda: transición de estado ──────────────────────────────────────
-    await abrirDetalle("Walk-in");
-    await clickPanel("Confirmar");
-    await sleep(1500);
-    await page.reload({ waitUntil: "networkidle0" });
-    record("Transición pendiente → confirmada", await cardAria("confirmada"));
-
-    // ── Agenda → cobro inline: el panel abre el CheckoutSheet ─────────────
     const waitPendingClear = () =>
       page.waitForFunction(
         () => {
@@ -514,8 +602,26 @@ async function main() {
             busy.some((t) => b.textContent?.toLowerCase().includes(t)),
           );
         },
-        { timeout: 20000 },
+        { timeout: 30000 },
       );
+
+    await abrirDetalle(citaNeedle(slots[0]));
+    await clickPanelDialog("Mover", '[role="dialog"] input[type="time"]');
+    await setNativeInput(page, '[role="dialog"] input[type="time"]', slots[1]);
+    await shot(page, "03-mover-cita");
+    await clickText(page, '[role="dialog"] button[type="submit"]', "Mover cita");
+    await closeDialogs(page);
+    await waitPendingClear().catch(() => {});
+    record(
+      `Mover cita a las ${slots[1]} (sin drag)`,
+      await pollReload(page, () => cardAria("pendiente", hora12(slots[1]))),
+    );
+
+    // ── Agenda: transición de estado ──────────────────────────────────────
+    await abrirDetalle(citaNeedle(slots[1]));
+    await clickPanel("Confirmar");
+    await waitPendingClear().catch(() => {});
+    record("Transición pendiente → confirmada", await pollReload(page, () => cardAria("confirmada")));
     /** page.select con reintento: el select controlado se resetea si React aún no hidrata. */
     const selectOption = async (selector: string, value: string) => {
       for (let i = 0; i < 30; i++) {
@@ -555,14 +661,16 @@ async function main() {
         await clickText(page, '[role="group"][aria-label="Tipo de catálogo"] button', tab);
         await sleep(300);
         const ok = await page.evaluate((n) => {
-          const btn = document.querySelector<HTMLElement>(`button[aria-label="Agregar ${n} al ticket"]`);
-          if (!btn) return false;
+          const btn = document.querySelector<HTMLButtonElement>(`button[aria-label="Agregar ${n} al ticket"]`);
+          if (!btn) return "missing";
+          // Mientras la acción corre el botón queda disabled: no re-clicar.
+          if (btn.disabled) return "pending";
           btn.click();
-          return true;
+          return "clicked";
         }, nombre);
-        if (!ok) throw new Error(`Tarjeta de catálogo no encontrada: ${nombre}`);
+        if (ok === "missing") throw new Error(`Tarjeta de catálogo no encontrada: ${nombre}`);
         const aparecio = await page
-          .waitForSelector(selector, { visible: true, timeout: 10000 })
+          .waitForSelector(selector, { visible: true, timeout: 30000 })
           .then(() => true)
           .catch(() => false);
         if (aparecio) return;
@@ -592,7 +700,7 @@ async function main() {
     };
     const clickCobrar = () => clickText(page, '[role="dialog"] button[type="submit"]', "Cobrar");
 
-    await abrirDetalle("confirmada");
+    await abrirDetalle(citaNeedle(slots[1]));
     await shot(page, "04-detalle-cita");
     await abrirCobro();
     await shot(page, "05-checkout-sheet");
@@ -623,7 +731,7 @@ async function main() {
     // Cobro que debe fallar: stock de SHAMPOO está en 0
     // (al abrir la venta la cita pasó a "en proceso")
     await page.goto(`${BASE_URL}/admin/agenda`, { waitUntil: "networkidle0" });
-    await abrirDetalle("en proceso");
+    await abrirDetalle(citaNeedle(slots[1]));
     await abrirCobro();
     await clickCobrar();
     await esperarResultadoCobro(true);
@@ -684,7 +792,7 @@ async function main() {
 
     // ── Cobro inline con stock: cierra el sheet y completa la cita ────────
     await page.goto(`${BASE_URL}/admin/agenda`, { waitUntil: "networkidle0" });
-    await abrirDetalle("en proceso");
+    await abrirDetalle(citaNeedle(slots[1]));
     await abrirCobro();
     await clickCobrar();
     await esperarResultadoCobro(true);
@@ -705,7 +813,7 @@ async function main() {
     ]);
     record("Abrir venta walk-in crea ticket", page.url().includes("ventaId"));
     const ventaWalkinUrl = page.url();
-    await waitForText(page, "Agregar al ticket");
+    await waitForTextReload(page, "Agregar al ticket");
     await agregarAlTicket("Servicios", "CORTE DE DAMA");
     // Propina por atajo: 10% de $300 = $30 → cobro total $330
     await clickText(page, '[role="group"][aria-label="Propina"] button', "10%");
@@ -760,7 +868,7 @@ async function main() {
       page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
       clickText(page, 'button[type="submit"]', "Abrir venta"),
     ]);
-    await waitForText(page, "Agregar al ticket");
+    await waitForTextReload(page, "Agregar al ticket");
     await agregarAlTicket("Servicios", "CORTE DE DAMA");
     await setNativeInput(page, 'input[name="descuento"]', "50");
     await clickText(page, 'button[type="submit"]', "Aplicar");
@@ -772,42 +880,47 @@ async function main() {
     // ── Agenda: editar cita ───────────────────────────────────────────────
     await page.goto(`${BASE_URL}/admin/agenda`, { waitUntil: "networkidle0" });
     await crearCita(slots[2], `${E2E_MARK} segunda`);
-    await waitForText(page, "Walk-in");
-    await abrirDetalle("pendiente");
-    await clickPanel("Editar");
-    await page.waitForSelector('[role="dialog"] textarea[name="notas"]', { visible: true });
+    await waitForTextReload(page, "Walk-in");
+    await abrirDetalle(citaNeedle(slots[2]));
+    await clickPanelDialog("Editar", '[role="dialog"] textarea[name="notas"]');
     await setNativeInput(page, '[role="dialog"] textarea[name="notas"]', "E2E-SMOKE editada");
     await clickText(page, '[role="dialog"] button[type="submit"]', "Guardar cambios");
-    await page.waitForFunction(() => !document.querySelector('[role="dialog"]'), { timeout: 15000 });
-    await page.reload({ waitUntil: "networkidle0" });
-    await abrirDetalle("pendiente");
-    const notaEditada = await page.evaluate(() => document.body.innerText.includes("E2E-SMOKE editada"));
+    await closeDialogs(page);
+    const notaEditada = await pollReload(page, async () => {
+      await abrirDetalle(citaNeedle(slots[2])).catch(() => {});
+      return page.evaluate(() => document.body.innerText.includes("E2E-SMOKE editada"));
+    });
     record("Editar cita actualiza las notas", notaEditada);
 
     // ── Agenda: cancelar y reagendar ──────────────────────────────────────
     await clickPanel("Cancelar cita");
     await page.waitForSelector('[role="alertdialog"]', { visible: true });
     await clickText(page, '[role="alertdialog"] button', "Cancelar cita");
-    await sleep(1500);
-    await page.reload({ waitUntil: "networkidle0" });
-    record("Cancelar cita cambia el estado", await cardAria("cancelada"));
+    await closeDialogs(page);
+    await waitPendingClear().catch(() => {});
+    record("Cancelar cita cambia el estado", await pollReload(page, () => cardAria("cancelada")));
 
-    await abrirDetalle("cancelada");
-    await clickPanel("Reagendar");
-    await page.waitForSelector('[role="dialog"] input[type="time"]', { visible: true });
+    await pollReload(page, async () => {
+      await abrirDetalle(citaNeedle(slots[2])).catch(() => {});
+      return page.evaluate(() => Boolean(document.querySelector('button[aria-label="Cerrar panel"]')));
+    });
+    await clickPanelDialog("Reagendar", '[role="dialog"] input[type="time"]');
     await setNativeInput(page, '[role="dialog"] input[type="time"]', slots[3]);
     await clickText(page, '[role="dialog"] button[type="submit"]', "Reagendar");
-    await sleep(1500);
-    await page.reload({ waitUntil: "networkidle0" });
+    await closeDialogs(page);
+    await waitPendingClear().catch(() => {});
     record(
       `Reagendar rescata cita cancelada → pendiente ${slots[3]}`,
-      await cardAria("pendiente", hora12(slots[3])),
+      await pollReload(page, () => cardAria("pendiente", hora12(slots[3]))),
     );
     await shot(page, "12-cita-reagendada");
 
     // ── Agenda: vistas semana y lista interactivas ────────────────────────
     await page.goto(`${BASE_URL}/admin/agenda?vista=semana`, { waitUntil: "networkidle0" });
-    await abrirDetalle("pendiente");
+    await pollReload(page, async () => {
+      await abrirDetalle(citaNeedle(slots[3])).catch(() => {});
+      return page.evaluate(() => Boolean(document.querySelector('button[aria-label="Cerrar panel"]')));
+    });
     const detalleSemana = await page.evaluate(() =>
       Boolean(document.querySelector('button[aria-label="Cerrar panel"]')),
     );
@@ -840,7 +953,9 @@ async function main() {
       );
     });
     record("Mi día: resumen de propinas y comisiones", miDiaOk);
-    const miDiaCita = await page.evaluate(() => document.body.innerText.includes("Walk-in"));
+    const miDiaCita = await pollReload(page, () =>
+      page.evaluate(() => document.body.innerText.includes("Walk-in")),
+    );
     record("Mi día lista la cita asignada al usuario", miDiaCita);
     const tabBarOk = await page.evaluate(
       () => Boolean(document.querySelector('nav[aria-label="Accesos rápidos"]')),
@@ -849,8 +964,10 @@ async function main() {
     await shot(page, "15-mi-dia");
 
     await clickText(page, "button", "Cliente en silla");
-    await page.reload({ waitUntil: "networkidle0" });
-    const checkInOk = await page.evaluate(() => document.body.innerText.includes("En proceso"));
+    await waitPendingClear().catch(() => {});
+    const checkInOk = await pollReload(page, () =>
+      page.evaluate(() => document.body.innerText.includes("En proceso")),
+    );
     record("Mi día: check-in pasa la cita a en proceso", checkInOk);
 
     await clickText(page, "button", "Cobrar");
@@ -858,7 +975,7 @@ async function main() {
       () => location.pathname === "/admin/pos" && location.search.includes("ventaId"),
       { timeout: 20000 },
     );
-    await waitForText(page, "Agregar al ticket");
+    await waitForTextReload(page, "Agregar al ticket");
     const vuelveMiDia = await page.evaluate(() =>
       Array.from(document.querySelectorAll<HTMLAnchorElement>("a")).some((a) =>
         (a.getAttribute("href") ?? "").includes("/admin/mi-dia"),
@@ -996,6 +1113,12 @@ async function main() {
     // Teléfono único por corrida: evita el warning de duplicado del backend.
     const clienteTelefono = `55${String(Date.now()).slice(-8)}`;
     await page.goto(`${BASE_URL}/admin/clientes`, { waitUntil: "networkidle0" });
+    // El alta vive en un panel lateral: hay que abrirlo antes de llenar.
+    await clickText(page, "a", "Nuevo cliente");
+    await page.waitForFunction(
+      () => document.body.innerText.includes("Solo el nombre es obligatorio"),
+      { timeout: 10000 },
+    );
     await fill("nombre", clienteNombre);
     await fill("telefono", clienteTelefono);
     await clickText(page, 'button[type="submit"]', "Guardar cliente");
@@ -1151,7 +1274,7 @@ async function main() {
     // corte como entrada; al cobrar, el ticket cobra solo el resto ($200).
     await page.goto(`${BASE_URL}/admin/agenda`, { waitUntil: "networkidle0" });
     await crearCita(slots[2], `${E2E_MARK} anticipo`);
-    await abrirDetalle("pendiente");
+    await abrirDetalle(citaNeedle(slots[2]));
     // El encabezado de sección usa text-transform:uppercase → innerText
     // devuelve "ANTICIPOS"; se compara en minúsculas.
     await page.waitForFunction(
@@ -1191,7 +1314,7 @@ async function main() {
       page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
       clickText(page, 'button[type="submit"]', "Abrir venta"),
     ]);
-    await waitForText(page, "Agregar al ticket");
+    await waitForTextReload(page, "Agregar al ticket");
     await agregarAlTicket("Servicios", "CORTE DE DAMA");
 
     // Promoción vigente del catálogo (10% sobre todo): $300 → $270.
@@ -1221,7 +1344,7 @@ async function main() {
       page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
       clickText(page, 'button[type="submit"]', "Abrir venta"),
     ]);
-    await waitForText(page, "Agregar al ticket");
+    await waitForTextReload(page, "Agregar al ticket");
     await pickCombobox(page, "Cliente de la venta", clienteNombre);
     const clienteAsignado = await page
       .waitForFunction((n) => document.body.innerText.includes(`Cliente: ${n}`), { timeout: 15000 }, clienteNombre)
@@ -1249,18 +1372,24 @@ async function main() {
       page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
       clickText(page, 'button[type="submit"]', "Abrir venta"),
     ]);
-    await waitForText(page, "Agregar al ticket");
+    await waitForTextReload(page, "Agregar al ticket");
     await pickCombobox(page, "Cliente de la venta", clienteNombre);
     await page.waitForFunction((n) => document.body.innerText.includes(`Cliente: ${n}`), { timeout: 15000 }, clienteNombre);
     await agregarAlTicket("Servicios", "CORTE DE DAMA");
-    const usoClick = await page.evaluate(() => {
-      const btn = Array.from(document.querySelectorAll<HTMLElement>("button")).find((b) =>
-        b.textContent?.includes("Usar paquete"),
-      );
-      if (!btn) return false;
-      btn.click();
-      return true;
-    });
+    const usoClick = await page
+      .waitForFunction(
+        () => {
+          const btn = Array.from(document.querySelectorAll<HTMLElement>("button")).find((b) =>
+            b.textContent?.includes("Usar paquete"),
+          );
+          if (!btn) return false;
+          btn.click();
+          return true;
+        },
+        { timeout: 15000, polling: 250 },
+      )
+      .then(() => true)
+      .catch(() => false);
     const cubiertoPorPaquete = await page
       .waitForFunction(
         () => document.body.innerText.toLowerCase().includes("cubierto por paquete"),
@@ -1278,7 +1407,7 @@ async function main() {
       page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
       clickText(page, 'button[type="submit"]', "Abrir venta"),
     ]);
-    await waitForText(page, "Agregar al ticket");
+    await waitForTextReload(page, "Agregar al ticket");
     await pickCombobox(page, "Cliente de la venta", clienteNombre);
     await page.waitForFunction((n) => document.body.innerText.includes(`Cliente: ${n}`), { timeout: 15000 }, clienteNombre);
     await agregarAlTicket("Membresías", membresiaNombre);
@@ -1318,7 +1447,7 @@ async function main() {
       page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
       clickText(page, 'button[type="submit"]', "Abrir venta"),
     ]);
-    await waitForText(page, "Agregar al ticket");
+    await waitForTextReload(page, "Agregar al ticket");
     await pickCombobox(page, "Cliente de la venta", clienteNombre);
     await page.waitForFunction((n) => document.body.innerText.includes(`Cliente: ${n}`), { timeout: 15000 }, clienteNombre);
     await agregarAlTicket("Servicios", "CORTE DE DAMA");
@@ -1440,8 +1569,8 @@ async function main() {
 
     const assetsOk = await page.evaluate(async () => {
       const [icon, apple, sw] = await Promise.all([
-        fetch("/icon"),
-        fetch("/apple-icon"),
+        fetch("/icon.png"),
+        fetch("/apple-icon.png"),
         fetch("/sw.js"),
       ]);
       return (

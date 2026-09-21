@@ -90,7 +90,7 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
         title="Comisiones"
       />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm" method="get">
+      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <input name="sucursalId" type="hidden" value={sucursalId} />
         <Field className="w-40">
@@ -110,10 +110,10 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {resumen.map((item) => (
-              <div className="rounded-2xl border border-[#eadfd8] bg-[#faf9f7] p-4" key={item.usuarioId}>
-                <p className="font-medium text-[#2d2926]">{item.nombre}</p>
-                <p className="mt-1 text-xs text-[#6e6159]">{item.cantidad} línea(s) de servicio</p>
-                <p className="mt-2 text-xl font-semibold tabular-nums text-[#2d2926]">{fmt(item.total)}</p>
+              <div className="rounded-2xl border border-border bg-muted/60 p-4" key={item.usuarioId}>
+                <p className="font-medium text-foreground">{item.nombre}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{item.cantidad} línea(s) de servicio</p>
+                <p className="mt-2 text-xl font-semibold tabular-nums text-foreground">{fmt(item.total)}</p>
                 {puedeEditar ? (
                   <div className="mt-3">
                     <LiquidarForm
@@ -138,7 +138,7 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="border-b border-[#eee8e3] text-xs uppercase tracking-wide text-[#625b55]">
+              <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="py-2 pr-4 font-medium">Cobro</th>
                   <th className="py-2 pr-4 font-medium">Profesional</th>
@@ -149,16 +149,16 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
               </thead>
               <tbody>
                 {pendientes.map((row) => (
-                  <tr className="border-b border-[#f1eeea] align-top" key={row.id}>
-                    <td className="whitespace-nowrap py-3 pr-4 text-[#625b55]">{formatDateTime(row.fecha, { timeZone })}</td>
-                    <td className="py-3 pr-4 font-medium text-[#2d2926]">{row.profesional}</td>
-                    <td className="py-3 pr-4 text-[#625b55]">
+                  <tr className="border-b border-border align-top" key={row.id}>
+                    <td className="whitespace-nowrap py-3 pr-4 text-muted-foreground">{formatDateTime(row.fecha, { timeZone })}</td>
+                    <td className="py-3 pr-4 font-medium text-foreground">{row.profesional}</td>
+                    <td className="py-3 pr-4 text-muted-foreground">
                       {row.servicio ?? "Servicio"}
-                      <a className="ml-2 text-xs text-[#8a5140] hover:underline" href={buildAdminHref("/pos", { organizationId, sucursalId, extra: { ventaId: row.ventaId } })}>
+                      <a className="ml-2 text-xs text-primary hover:underline" href={buildAdminHref("/pos", { organizationId, sucursalId, extra: { ventaId: row.ventaId } })}>
                         ticket
                       </a>
                     </td>
-                    <td className="py-3 pr-4 text-right tabular-nums text-[#625b55]">{fmt(row.base)}</td>
+                    <td className="py-3 pr-4 text-right tabular-nums text-muted-foreground">{fmt(row.base)}</td>
                     <td className="py-3 text-right font-semibold tabular-nums">{fmt(row.monto)}</td>
                   </tr>
                 ))}
@@ -174,7 +174,7 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="border-b border-[#eee8e3] text-xs uppercase tracking-wide text-[#625b55]">
+              <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="py-2 pr-4 font-medium">Registro</th>
                   <th className="py-2 pr-4 font-medium">Profesional</th>
@@ -187,18 +187,18 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
               </thead>
               <tbody>
                 {liquidaciones.map((liq) => (
-                  <tr className="border-b border-[#f1eeea] align-top" key={liq.id}>
-                    <td className="whitespace-nowrap py-3 pr-4 text-[#625b55]">{formatDateTime(liq.createdAt, { timeZone })}</td>
-                    <td className="py-3 pr-4 font-medium text-[#2d2926]">{liq.profesional}</td>
-                    <td className="whitespace-nowrap py-3 pr-4 text-[#625b55]">{liq.periodoDesde} → {liq.periodoHasta}</td>
-                    <td className="py-3 pr-4 text-[#625b55]">{liq.medio}</td>
+                  <tr className="border-b border-border align-top" key={liq.id}>
+                    <td className="whitespace-nowrap py-3 pr-4 text-muted-foreground">{formatDateTime(liq.createdAt, { timeZone })}</td>
+                    <td className="py-3 pr-4 font-medium text-foreground">{liq.profesional}</td>
+                    <td className="whitespace-nowrap py-3 pr-4 text-muted-foreground">{liq.periodoDesde} → {liq.periodoHasta}</td>
+                    <td className="py-3 pr-4 text-muted-foreground">{liq.medio}</td>
                     <td className="py-3 pr-4 text-right font-semibold tabular-nums">{fmt(liq.total)}</td>
                     <td className="py-3 pr-4">
                       <StatusBadge tone={liq.estado === "confirmada" ? "success" : "neutral"}>
                         {ESTADO_LABEL[liq.estado] ?? liq.estado}
                       </StatusBadge>
                       {liq.motivoReversion ? (
-                        <p className="mt-1 text-xs text-[#a8443a]">{liq.motivoReversion}</p>
+                        <p className="mt-1 text-xs text-destructive">{liq.motivoReversion}</p>
                       ) : null}
                     </td>
                     {puedeEditar ? (

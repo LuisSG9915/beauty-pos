@@ -34,10 +34,10 @@ type ClienteFiscal = {
 } | null;
 
 const ESTADO_BADGE: Record<string, { label: string; className: string }> = {
-  borrador: { label: "Borrador", className: "bg-[#f4ede6] text-[#7a5a2e]" },
-  timbrada: { label: "Emitida", className: "bg-[#e3f2e8] text-[#347052]" },
-  cancelada: { label: "Cancelada", className: "bg-[#f1eeea] text-[#6e6159]" },
-  error: { label: "Error", className: "bg-[#fae8e6] text-[#a8443a]" },
+  borrador: { label: "Borrador", className: "bg-muted/60 text-warning" },
+  timbrada: { label: "Emitida", className: "bg-[#d4efe9] text-success" },
+  cancelada: { label: "Cancelada", className: "bg-muted/60 text-muted-foreground" },
+  error: { label: "Error", className: "bg-[#f6d9d2] text-destructive" },
 };
 
 /** Panel de comprobante del ticket: genera el comprobante interno de la venta cobrada o muestra su estado. */
@@ -61,9 +61,9 @@ export function FacturarPanel({
   const bloqueado = comprobante?.estado === "timbrada" || comprobante?.estado === "borrador";
 
   return (
-    <section className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-[#2d2926]">Comprobante interno</h3>
+        <h3 className="text-sm font-semibold text-foreground">Comprobante interno</h3>
         {comprobante ? (
           <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${(ESTADO_BADGE[comprobante.estado] ?? ESTADO_BADGE.borrador).className}`}>
             {(ESTADO_BADGE[comprobante.estado] ?? ESTADO_BADGE.borrador).label}
@@ -74,26 +74,26 @@ export function FacturarPanel({
       {comprobante ? (
         <div className="mt-3 space-y-2 text-sm">
           <div className="flex justify-between gap-3">
-            <span className="text-[#6e6159]">Folio</span>
+            <span className="text-muted-foreground">Folio</span>
             <span className="font-mono text-xs">{comprobante.serie}-{comprobante.folio}</span>
           </div>
           <div className="flex justify-between gap-3">
-            <span className="text-[#6e6159]">Receptor</span>
-            <span className="text-right">{comprobante.receptorNombre} <span className="font-mono text-xs text-[#6e6159]">{comprobante.receptorRfc}</span></span>
+            <span className="text-muted-foreground">Receptor</span>
+            <span className="text-right">{comprobante.receptorNombre} <span className="font-mono text-xs text-muted-foreground">{comprobante.receptorRfc}</span></span>
           </div>
           <div className="flex justify-between gap-3">
-            <span className="text-[#6e6159]">Total</span>
+            <span className="text-muted-foreground">Total</span>
             <span className="tabular-nums">{formatCurrency(comprobante.total, { currency })}</span>
           </div>
           {comprobante.uuid ? (
             <div className="flex justify-between gap-3">
-              <span className="text-[#6e6159]">UUID simulado</span>
+              <span className="text-muted-foreground">UUID simulado</span>
               <span className="max-w-56 truncate font-mono text-xs" title={comprobante.uuid}>{comprobante.uuid}</span>
             </div>
           ) : null}
-          {comprobante.error ? <p className="rounded-lg bg-[#fae8e6] px-3 py-2 text-xs text-[#a8443a]">{comprobante.error}</p> : null}
+          {comprobante.error ? <p className="rounded-lg bg-[#f6d9d2] px-3 py-2 text-xs text-destructive">{comprobante.error}</p> : null}
           {comprobante.estado === "timbrada" ? (
-            <p className="rounded-lg bg-[#fdf6e7] px-3 py-2 text-xs text-[#7a5a2e]">
+            <p className="rounded-lg bg-[#fff1d1] px-3 py-2 text-xs text-warning">
               Folio simulado (sin PAC contratado) — documento interno, no tiene validez fiscal ante el SAT.
             </p>
           ) : null}
@@ -101,7 +101,7 @@ export function FacturarPanel({
       ) : null}
 
       {comprobante?.estado === "timbrada" ? (
-        <div className="mt-4 border-t border-[#f1eeea] pt-4">
+        <div className="mt-4 border-t border-border pt-4">
           <CancelarFacturaForm comprobanteId={comprobante.id} organizationId={organizationId} />
         </div>
       ) : null}
@@ -116,9 +116,9 @@ export function FacturarPanel({
             ventaId={ventaId}
           />
         ) : (
-          <p className="mt-3 text-sm text-[#625b55]">
+          <p className="mt-3 text-sm text-muted-foreground">
             Configura primero los datos del emisor en{" "}
-            <Link className="font-medium text-[#8a5140] underline" href={`/admin/facturacion?organizationId=${organizationId}`}>
+            <Link className="font-medium text-primary underline" href={`/admin/facturacion?organizationId=${organizationId}`}>
               Comprobantes
             </Link>
             .
@@ -159,7 +159,7 @@ function EmitirForm({
         : null;
 
   return (
-    <form action={formAction} className="mt-3 space-y-3 border-t border-[#f1eeea] pt-4">
+    <form action={formAction} className="mt-3 space-y-3 border-t border-border pt-4">
       <input name="organizacionId" type="hidden" value={organizationId} />
       <input name="ventaId" type="hidden" value={ventaId} />
       <input name="metodoPago" type="hidden" value="PUE" />
@@ -167,16 +167,16 @@ function EmitirForm({
       <div className="flex flex-wrap gap-3 text-sm">
         {clienteFiscal ? (
           <label className="flex items-center gap-1.5">
-            <input checked={modo === "cliente"} className="accent-[#8a5140]" name="receptorModo" onChange={() => setModo("cliente")} type="radio" />
+            <input checked={modo === "cliente"} className="accent-primary" name="receptorModo" onChange={() => setModo("cliente")} type="radio" />
             Datos del cliente
           </label>
         ) : null}
         <label className="flex items-center gap-1.5">
-          <input checked={modo === "publico"} className="accent-[#8a5140]" name="receptorModo" onChange={() => setModo("publico")} type="radio" />
+          <input checked={modo === "publico"} className="accent-primary" name="receptorModo" onChange={() => setModo("publico")} type="radio" />
           Público en general
         </label>
         <label className="flex items-center gap-1.5">
-          <input checked={modo === "otro"} className="accent-[#8a5140]" name="receptorModo" onChange={() => setModo("otro")} type="radio" />
+          <input checked={modo === "otro"} className="accent-primary" name="receptorModo" onChange={() => setModo("otro")} type="radio" />
           Otro receptor
         </label>
       </div>
@@ -187,7 +187,7 @@ function EmitirForm({
           <input name="receptorNombre" type="hidden" value={receptor.nombre} />
           <input name="receptorRegimen" type="hidden" value={receptor.regimen} />
           <input name="receptorCp" type="hidden" value={receptor.cp} />
-          <p className="rounded-lg bg-[#f8f7f5] px-3 py-2 text-xs text-[#625b55]">
+          <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
             {receptor.nombre} · {receptor.rfc} · Régimen {receptor.regimen}
             {modo === "publico" ? " · CP del emisor" : ` · CP ${receptor.cp}`}
           </p>

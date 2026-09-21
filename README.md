@@ -1,6 +1,8 @@
-# Beauty POS
+# Melena
 
-POS SaaS multiempresa para salones de belleza en México. La aplicación usa Next.js, TypeScript, Drizzle ORM, CockroachDB y Better Auth, y se despliega como un único Cloudflare Worker mediante OpenNext.
+POS SaaS multiempresa para salones de belleza en México (<https://melena.app>, worker técnico `beauty-pos`). La aplicación usa Next.js, TypeScript, Drizzle ORM, CockroachDB y Better Auth, y se despliega como un único Cloudflare Worker mediante OpenNext.
+
+La identidad de marca (nombre, tagline, dominio, correo de soporte) vive en `src/lib/brand.ts`.
 
 ## Requisitos
 

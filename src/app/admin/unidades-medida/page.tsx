@@ -65,7 +65,7 @@ export default async function UnitsPage({ searchParams }: { searchParams: Search
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[440px] text-left text-sm">
-                <thead className="border-b border-[#eee8e3] text-xs uppercase tracking-wide text-[#625b55]">
+                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-4 font-medium">Clave</th>
                     <th className="py-2 pr-4 font-medium">Nombre</th>
@@ -75,7 +75,7 @@ export default async function UnitsPage({ searchParams }: { searchParams: Search
                 </thead>
                 <tbody>
                   {units.map((unit) => (
-                    <tr className="border-b border-[#f1eeea]" key={unit.id}>
+                    <tr className="border-b border-border" key={unit.id}>
                       <td className="py-3 pr-4 font-mono text-xs">{unit.clave}</td>
                       <td className="py-3 pr-4 font-medium">{unit.nombre}</td>
                       <td className="py-3 pr-4"><StatusBadge active={unit.activo} /></td>

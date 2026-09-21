@@ -8,6 +8,7 @@ import {
   Boxes,
   Calendar,
   CalendarCheck,
+  ChevronDown,
   Clipboard,
   CreditCard,
   Crown,
@@ -17,6 +18,7 @@ import {
   Building2,
   Landmark,
   LifeBuoy,
+  LogOut,
   Menu,
   Package,
   PackageCheck,
@@ -34,15 +36,17 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 
+import { BrandWordmark } from "@/components/brand-mark";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { authClient } from "@/lib/auth/client";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { cn } from "@/lib/utils";
 
@@ -60,6 +64,8 @@ export type AdminNavItem = {
 export type AdminNavSection = {
   title: string;
   items: AdminNavItem[];
+  /** Sección plegable: se muestra contraída salvo que contenga la ruta activa. */
+  collapsible?: boolean;
 };
 
 const OPERACION: AdminNavItem[] = [
@@ -68,6 +74,9 @@ const OPERACION: AdminNavItem[] = [
   { path: "/admin/pos", label: "Cobrar", description: "Ventas directas y cobro de citas", icon: ShoppingCart, permiso: "ventas.ver" },
   { path: "/admin/ventas", label: "Historial", description: "Busca tickets, devoluciones y cancelaciones", icon: ReceiptText, permiso: "ventas.ver" },
   { path: "/admin/caja", label: "Caja", description: "Apertura, cierre ciego y discrepancias", icon: Wallet, permiso: "caja.ver" },
+];
+
+const CLIENTES_CATALOGO: AdminNavItem[] = [
   { path: "/admin/clientes", label: "Clientes", description: "Expedientes, contacto y seguimiento", icon: Users, permiso: "clientes.ver" },
   { path: "/admin/servicios", label: "Servicios", description: "Catálogo de servicios del salón", icon: Scissors, permiso: "catalogos.ver" },
   { path: "/admin/productos", label: "Productos", description: "Venta, consumo e inventario", icon: ShoppingBag, permiso: "catalogos.ver" },
@@ -92,7 +101,7 @@ const DINERO: AdminNavItem[] = [
   { path: "/admin/reportes", label: "Reportes", description: "Operativos y financieros por rango", icon: BarChart3, permiso: ["reportes.operativos", "reportes.financieros"], capacidad: "reportes_avanzados" },
 ];
 
-const EQUIPO: AdminNavItem[] = [
+const NEGOCIO: AdminNavItem[] = [
   { path: "/admin/usuarios", label: "Equipo", description: "Miembros, roles y sucursales", icon: Users, permiso: "usuarios.ver" },
   { path: "/admin/sucursales", label: "Sucursales", description: "Alta, políticas y asignación de miembros", icon: Building2, permiso: "sucursales.ver" },
   { path: "/admin/roles", label: "Roles", description: "Permisos por rol", icon: ShieldCheck, permiso: "roles.ver" },
@@ -117,10 +126,6 @@ function toAdminPath(path: string): `/${string}` | "" {
   return path.replace("/admin", "") as `/${string}` | "";
 }
 
-/**
- * Secciones visibles según los permisos del usuario en la organización
- * activa. `permissions === null` desactiva el filtro (admin de plataforma).
- */
 /** `permiso` simple o lista (cualquiera) contra el set efectivo del usuario. */
 function tienePermiso(permiso: AdminNavItem["permiso"], permissions: ReadonlySet<string>): boolean {
   if (!permiso) return true;
@@ -129,6 +134,11 @@ function tienePermiso(permiso: AdminNavItem["permiso"], permissions: ReadonlySet
     : permissions.has(permiso as string);
 }
 
+/**
+ * Secciones visibles según los permisos del usuario en la organización
+ * activa. `permissions === null` desactiva el filtro (admin de plataforma).
+ * Las secciones secundarias se marcan plegables para no saturar el sidebar.
+ */
 export function getAdminNavSections(
   platformAdmin = false,
   permissions: ReadonlySet<string> | null = null,
@@ -142,9 +152,10 @@ export function getAdminNavSections(
     );
   const sections: AdminNavSection[] = [
     { title: "Operación", items: visible(OPERACION) },
-    { title: "Catálogos", items: visible(CATALOGOS) },
+    { title: "Clientes y catálogo", items: visible(CLIENTES_CATALOGO) },
+    { title: "Catálogos", items: visible(CATALOGOS), collapsible: true },
     { title: "Dinero", items: visible(DINERO) },
-    { title: "Equipo", items: visible(EQUIPO) },
+    { title: "Negocio", items: visible(NEGOCIO), collapsible: true },
     { title: "Ayuda", items: visible(AYUDA) },
   ].filter((section) => section.items.length > 0);
   if (platformAdmin) sections.push({ title: "Plataforma", items: PLATAFORMA });
@@ -182,19 +193,123 @@ function toPermissionSet(permissions: readonly string[] | null | undefined) {
   return permissions === null || permissions === undefined ? null : new Set(permissions);
 }
 
+function navItemClasses(isActive: boolean) {
+  return cn(
+    "relative flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm transition-colors",
+    isActive
+      ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-sidebar-primary"
+      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+  );
+}
+
+function navIconClasses(isActive: boolean) {
+  return cn("size-4.5 shrink-0", isActive ? "text-sidebar-primary" : "text-muted-foreground");
+}
+
+function NavLink({
+  item,
+  isActive,
+  organizationId,
+  sucursalId,
+  onNavigate,
+}: {
+  item: AdminNavItem;
+  isActive: boolean;
+  organizationId?: string;
+  sucursalId?: string;
+  onNavigate?: () => void;
+}) {
+  return (
+    <Link
+      aria-current={isActive ? "page" : undefined}
+      className={navItemClasses(isActive)}
+      href={buildAdminHref(toAdminPath(item.path), { organizationId, sucursalId })}
+      onClick={onNavigate}
+      prefetch={false}
+      title={item.description}
+    >
+      <item.icon aria-hidden="true" className={navIconClasses(isActive)} strokeWidth={isActive ? 2 : 1.8} />
+      {item.label}
+    </Link>
+  );
+}
+
+/** Sección del sidebar; las plegables se abren solas si contienen la ruta activa. */
+function SidebarSection({
+  section,
+  pathname,
+  organizationId,
+  sucursalId,
+  onNavigate,
+}: {
+  section: AdminNavSection;
+  pathname: string;
+  organizationId?: string;
+  sucursalId?: string;
+  onNavigate?: () => void;
+}) {
+  const [manual, setManual] = useState<boolean | null>(null);
+  const abierta = !section.collapsible || (manual ?? true);
+
+  const items = (
+    <ul className="mt-1 space-y-0.5">
+      {section.items.map((item) => (
+        <li key={item.path}>
+          <NavLink
+            isActive={isItemActive(pathname, item.path)}
+            item={item}
+            onNavigate={onNavigate}
+            organizationId={organizationId}
+            sucursalId={sucursalId}
+          />
+        </li>
+      ))}
+    </ul>
+  );
+
+  if (!section.collapsible) {
+    return (
+      <section aria-label={section.title}>
+        <h3 className="px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          {section.title}
+        </h3>
+        {items}
+      </section>
+    );
+  }
+
+  return (
+    <section aria-label={section.title}>
+      <button
+        aria-expanded={abierta}
+        className="flex min-h-8 w-full items-center justify-between rounded-lg px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary"
+        onClick={() => setManual(!abierta)}
+        type="button"
+      >
+        {section.title}
+        <ChevronDown
+          aria-hidden="true"
+          className={cn("size-3.5 transition-transform", abierta ? "rotate-0" : "-rotate-90")}
+        />
+      </button>
+      {abierta ? items : null}
+    </section>
+  );
+}
+
 /**
- * Navegación principal del panel en tarjetas, agrupada por sección.
- * Conserva `organizationId`/`sucursalId` de la URL (o de las props) en
- * cada enlace.
+ * Navegación lateral (sidebar de escritorio y panel "Más" del tab bar móvil).
+ * Conserva `organizationId`/`sucursalId` en cada enlace.
  */
-export function AdminNav({
+export function AdminSidebarNav({
   organizationId,
   sucursalId,
   platformAdmin = false,
   activePath,
   permissions,
   capacidadesFaltantes,
-}: NavContext) {
+  onNavigate,
+}: NavContext & { onNavigate?: () => void }) {
   const context = useNavContext({ organizationId, sucursalId, activePath });
   const sections = getAdminNavSections(
     platformAdmin,
@@ -203,54 +318,45 @@ export function AdminNav({
   );
 
   return (
-    <nav aria-label="Secciones del panel" className="space-y-8">
+    <nav aria-label="Navegación del panel" className="space-y-5">
       {sections.map((section) => (
-        <section aria-label={section.title} key={section.title}>
-          <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a5140]">
-            {section.title}
-          </h3>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {section.items.map((item) => {
-              const isActive = isItemActive(context.pathname, item.path);
-              return (
-                <Link
-                  aria-current={isActive ? "page" : undefined}
-                  className={cn(
-                    "group flex min-h-10 items-start gap-3 rounded-2xl border p-4 transition-colors",
-                    isActive
-                      ? "border-[#8a5140] bg-[#f2e3dc]"
-                      : "border-[#eadfd8] bg-white hover:border-[#c9a899] hover:bg-[#faf6f3]",
-                  )}
-                  href={buildAdminHref(toAdminPath(item.path), {
-                    organizationId: context.organizationId,
-                    sucursalId: context.sucursalId,
-                  })}
-                  key={item.path}
-                  prefetch={false}
-                >
-                  <div
-                    className={cn(
-                      "flex size-10 shrink-0 items-center justify-center rounded-xl",
-                      isActive
-                        ? "bg-[#8a5140] text-white"
-                        : "bg-[#f1eeea] text-[#8a5140] group-hover:bg-[#f2e3dc]",
-                    )}
-                  >
-                    <item.icon aria-hidden="true" className="size-5" strokeWidth={1.8} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-[#2d2926]">{item.label}</p>
-                    <p className="mt-0.5 text-xs leading-5 text-[#6e6159]">
-                      {item.description}
-                    </p>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </section>
+        <SidebarSection
+          key={section.title}
+          onNavigate={onNavigate}
+          organizationId={context.organizationId}
+          pathname={context.pathname}
+          section={section}
+          sucursalId={context.sucursalId}
+        />
       ))}
     </nav>
+  );
+}
+
+/** Botón de cierre de sesión compartido entre el sidebar y el panel móvil. */
+export function SignOutButton({ className, onNavigate }: { className?: string; onNavigate?: () => void }) {
+  const router = useRouter();
+  const [saliendo, setSaliendo] = useState(false);
+  return (
+    <button
+      className={cn(
+        "flex min-h-10 w-full items-center gap-3 rounded-xl px-3 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50",
+        className,
+      )}
+      data-action-id="nav.cerrar_sesion"
+      disabled={saliendo}
+      onClick={async () => {
+        setSaliendo(true);
+        onNavigate?.();
+        await authClient.signOut();
+        router.push("/login");
+        router.refresh();
+      }}
+      type="button"
+    >
+      <LogOut aria-hidden="true" className="size-4.5 shrink-0 text-muted-foreground" strokeWidth={1.8} />
+      {saliendo ? "Saliendo…" : "Cerrar sesión"}
+    </button>
   );
 }
 
@@ -258,7 +364,7 @@ export function AdminNav({
 const TAB_BAR: AdminNavItem[] = [OPERACION[0], OPERACION[1], OPERACION[2]];
 
 /**
- * Tab bar inferior para teléfono/tablet (<md): Agenda · Mi día · Cobrar + "Más"
+ * Tab bar inferior para teléfono/tablet (<lg): Agenda · Mi día · Cobrar + "Más"
  * que abre la navegación completa en un panel lateral. Targets de 56 px.
  */
 export function AdminTabBar({ organizationId, sucursalId, activePath, permissions, capacidadesFaltantes, platformAdmin }: NavContext) {
@@ -272,7 +378,7 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
     <>
       <nav
         aria-label="Accesos rápidos"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-[#eee6e0] bg-white/95 backdrop-blur md:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card/95 backdrop-blur lg:hidden"
       >
         <div
           className="grid"
@@ -285,7 +391,7 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors",
-                  isActive ? "text-[#8a5140]" : "text-[#6e6159] hover:text-[#8a5140]",
+                  isActive ? "text-primary" : "text-muted-foreground hover:text-primary",
                 )}
                 data-action-id="nav.tab"
                 href={buildAdminHref(toAdminPath(item.path), {
@@ -301,7 +407,7 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
           })}
           <button
             aria-expanded={masAbierto}
-            className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-[#6e6159] transition-colors hover:text-[#8a5140]"
+            className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:text-primary"
             data-action-id="nav.mas_abrir"
             onClick={() => setMasAbierto(true)}
             type="button"
@@ -315,10 +421,12 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
       <Sheet onOpenChange={setMasAbierto} open={masAbierto}>
         <SheetContent>
           <SheetHeader>
-            <SheetTitle>Todas las secciones</SheetTitle>
+            <SheetTitle>
+              <BrandWordmark markSize={32} />
+            </SheetTitle>
           </SheetHeader>
-          <nav aria-label="Navegación completa" className="space-y-6">
-            <AdminNavList
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <AdminSidebarNav
               activePath={context.pathname}
               capacidadesFaltantes={capacidadesFaltantes}
               onNavigate={() => setMasAbierto(false)}
@@ -327,209 +435,12 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
               platformAdmin={platformAdmin}
               sucursalId={context.sucursalId}
             />
-          </nav>
+          </div>
+          <div className="border-t border-border pt-3">
+            <SignOutButton onNavigate={() => setMasAbierto(false)} />
+          </div>
         </SheetContent>
       </Sheet>
     </>
-  );
-}
-
-/**
- * Lista vertical de todas las secciones para el panel "Más" del tab bar móvil.
- * Mismo filtrado de permisos/capacidades que la navegación principal.
- */
-function AdminNavList({
-  organizationId,
-  sucursalId,
-  activePath,
-  platformAdmin,
-  permissions,
-  capacidadesFaltantes,
-  onNavigate,
-}: NavContext & { onNavigate: () => void }) {
-  const sections = getAdminNavSections(
-    platformAdmin,
-    toPermissionSet(permissions),
-    capacidadesFaltantes ? new Set(capacidadesFaltantes) : null,
-  );
-  return (
-    <>
-      {sections.map((section) => (
-        <section aria-label={section.title} key={section.title}>
-          <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a5140]">
-            {section.title}
-          </h3>
-          <ul className="mt-2 space-y-1">
-            {section.items.map((item) => {
-              const isActive = isItemActive(activePath ?? "", item.path);
-              return (
-                <li key={item.path}>
-                  <Link
-                    aria-current={isActive ? "page" : undefined}
-                    className={cn(
-                      "flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors",
-                      isActive
-                        ? "bg-[#f2e3dc] text-[#60392e]"
-                        : "text-[#403a35] hover:bg-[#faf6f3]",
-                    )}
-                    href={buildAdminHref(toAdminPath(item.path), {
-                      organizationId,
-                      sucursalId,
-                    })}
-                    onClick={onNavigate}
-                    prefetch={false}
-                  >
-                    <item.icon aria-hidden="true" className="size-4 text-[#8a5140]" strokeWidth={1.9} />
-                    {item.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ))}
-    </>
-  );
-}
-
-/**
- * Rutas del trabajo diario — siempre visibles como píldoras principales en la
- * navegación compacta. El resto de secciones queda tras "Más opciones" para
- * reducir la carga cognitiva del equipo operativo.
- */
-const RUTAS_DIARIAS = new Set([
-  "/admin/agenda",
-  "/admin/mi-dia",
-  "/admin/pos",
-  "/admin/caja",
-  "/admin/clientes",
-]);
-
-function navPill(
-  item: AdminNavItem,
-  isActive: boolean,
-  context: { organizationId?: string; sucursalId?: string },
-  prefetch?: boolean,
-) {
-  return (
-    <Link
-      aria-current={isActive ? "page" : undefined}
-      className={cn(
-        "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium whitespace-nowrap transition-colors",
-        isActive
-          ? "border-[#8a5140] bg-[#f2e3dc] text-[#60392e]"
-          : "border-[#ded8d2] bg-white text-[#625b55] hover:border-[#c9a899] hover:bg-[#faf6f3] hover:text-[#8a5140]",
-      )}
-      href={buildAdminHref(toAdminPath(item.path), {
-        organizationId: context.organizationId,
-        sucursalId: context.sucursalId,
-      })}
-      key={item.path}
-      prefetch={prefetch}
-      title={item.description}
-    >
-      <item.icon aria-hidden="true" className="size-3.5" strokeWidth={2} />
-      {item.label}
-    </Link>
-  );
-}
-
-/**
- * Variante compacta: primero "Trabajo de hoy" (Agenda · Mi día · Cobrar ·
- * Caja · Clientes) y detrás un botón "Más opciones" que despliega el resto de
- * secciones agrupadas. Si la página activa vive en "Más", el bloque abre solo.
- */
-export function AdminNavCompact({
-  organizationId,
-  sucursalId,
-  platformAdmin = false,
-  activePath,
-  permissions,
-  capacidadesFaltantes,
-}: NavContext) {
-  const context = useNavContext({ organizationId, sucursalId, activePath });
-  const sections = useMemo(
-    () =>
-      getAdminNavSections(
-        platformAdmin,
-        toPermissionSet(permissions),
-        capacidadesFaltantes ? new Set(capacidadesFaltantes) : null,
-      ),
-    [platformAdmin, permissions, capacidadesFaltantes],
-  );
-
-  const { diario, resto } = useMemo(() => {
-    const vistos = new Set<string>();
-    const diario: AdminNavItem[] = [];
-    const resto: AdminNavSection[] = [];
-    for (const section of sections) {
-      const items: AdminNavItem[] = [];
-      for (const item of section.items) {
-        if (RUTAS_DIARIAS.has(item.path) && !vistos.has(item.path)) {
-          diario.push(item);
-          vistos.add(item.path);
-        } else {
-          items.push(item);
-        }
-      }
-      if (items.length > 0) resto.push({ title: section.title, items });
-    }
-    return { diario, resto };
-  }, [sections]);
-
-  const activoEnMas = resto.some((section) =>
-    section.items.some((item) => isItemActive(context.pathname, item.path)),
-  );
-  // Abierto si el usuario lo pidió o si la página activa vive dentro de "Más".
-  const [abiertoManual, setAbiertoManual] = useState<boolean | null>(null);
-  const masAbierto = abiertoManual ?? activoEnMas;
-
-  return (
-    <nav aria-label="Navegación del panel">
-      <div className="flex items-stretch gap-2 overflow-x-auto pb-1">
-        <div aria-label="Trabajo de hoy" className="flex items-center gap-2" role="group">
-          {diario.map((item) =>
-            navPill(item, isItemActive(context.pathname, item.path), context),
-          )}
-        </div>
-        {resto.length > 0 ? (
-          <button
-            aria-expanded={masAbierto}
-            className={cn(
-              "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium whitespace-nowrap transition-colors",
-              masAbierto || activoEnMas
-                ? "border-[#8a5140] bg-[#f2e3dc] text-[#60392e]"
-                : "border-dashed border-[#c9b8ae] bg-transparent text-[#6e6159] hover:border-[#c9a899] hover:text-[#8a5140]",
-            )}
-            data-action-id="nav.mas_opciones"
-            onClick={() => setAbiertoManual(masAbierto ? false : true)}
-            type="button"
-          >
-            <Menu aria-hidden="true" className="size-3.5" strokeWidth={2} />
-            Más opciones
-          </button>
-        ) : null}
-      </div>
-
-      {masAbierto && resto.length > 0 ? (
-        <div className="mt-2 space-y-2 rounded-2xl border border-[#eee6e0] bg-[#fcfaf8] p-3">
-          {resto.map((section) => (
-            <div className="flex flex-wrap items-center gap-2" key={section.title}>
-              <span className="w-28 shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#b08d7c]">
-                {section.title}
-              </span>
-              {section.items.map((item) =>
-                navPill(
-                  item,
-                  isItemActive(context.pathname, item.path),
-                  context,
-                  false,
-                ),
-              )}
-            </div>
-          ))}
-        </div>
-      ) : null}
-    </nav>
   );
 }

@@ -97,7 +97,7 @@ export default async function RolesPage({ searchParams }: { searchParams: Search
             </AdminCard>
           ) : null}
           <AdminCard title="Notas">
-            <ul className="list-disc space-y-1 pl-5 text-sm leading-6 text-[#625b55]">
+            <ul className="list-disc space-y-1 pl-5 text-sm leading-6 text-muted-foreground">
               <li>El rol <strong>Propietario</strong> no se puede modificar ni desactivar.</li>
               <li>Solo puedes otorgar permisos que tú mismo tienes.</li>
               <li>Un rol con miembros asignados no se puede desactivar.</li>

@@ -17,7 +17,7 @@ export function LoadingState({
       {Array.from({ length: rows }).map((_, index) => (
         <div
           aria-hidden="true"
-          className="h-16 animate-pulse rounded-xl border border-[#eee8e3] bg-white"
+          className="h-16 animate-pulse rounded-xl border border-border bg-card"
           key={index}
         />
       ))}

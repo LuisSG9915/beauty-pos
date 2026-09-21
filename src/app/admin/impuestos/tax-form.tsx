@@ -15,11 +15,11 @@ export function TaxForm({ organizationId, initial }: { organizationId: string; i
   const [state, action, pending] = useActionState<TaxActionState, FormData>(saveTax, {});
   const tipo = (initial?.tipo ?? "agregado") as "agregado" | "incluido" | "exento";
   return (
-    <form action={action} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
+    <form action={action} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
       <h2 className="text-xl font-semibold">{initial ? "Editar impuesto" : "Nuevo impuesto"}</h2>
-      <p className="mt-1 text-sm text-[#625b55]">Configura IVA, IEPS u otros impuestos aplicables en el POS.</p>
+      <p className="mt-1 text-sm text-muted-foreground">Configura IVA, IEPS u otros impuestos aplicables en el POS.</p>
       <div className="mt-5 space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field>
@@ -45,7 +45,7 @@ export function TaxForm({ organizationId, initial }: { organizationId: string; i
             </Select>
           </Field>
         </div>
-        <p className="rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55]">
+        <p className="rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">
           {TIPO_LABEL[tipo]}: {tipo === "agregado" ? "el impuesto se suma al precio base en el ticket." : tipo === "incluido" ? "el precio ya contiene el impuesto y se desglosa en el ticket." : "no se aplica impuesto."}
         </p>
       </div>

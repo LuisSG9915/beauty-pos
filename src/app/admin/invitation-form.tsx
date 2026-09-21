@@ -21,14 +21,14 @@ export function InvitationForm({ organizations, roles, branches }: InvitationFor
   const availableBranches = branches.filter((branch) => branch.organizacionId === organizationId);
 
   return (
-    <form action={formAction} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
+    <form action={formAction} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <div className="flex items-start gap-3">
-        <div className="flex size-10 items-center justify-center rounded-xl bg-[#f8eee8] text-[#a76348]">
+        <div className="flex size-10 items-center justify-center rounded-xl bg-muted/60 text-primary">
           <MailPlus aria-hidden="true" className="size-5" />
         </div>
         <div>
           <h2 className="font-semibold">Invitar miembro</h2>
-          <p className="mt-1 text-sm leading-6 text-[#6e6159]">Asigna organización, sucursal y rol.</p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">Asigna organización, sucursal y rol.</p>
         </div>
       </div>
 
@@ -84,12 +84,12 @@ export function InvitationForm({ organizations, roles, branches }: InvitationFor
         <ActionFeedback state={state} successMessage="Invitación creada correctamente." />
       </div>
       {state.invitationUrl ? (
-        <div className="mt-4 rounded-xl border border-[#eadfd8] bg-[#fffaf5] p-4 text-sm">
-          <p className="font-medium text-[#4b403a]">Enlace local de invitación</p>
-          <a className="mt-2 block break-all text-[#a76348] underline" href={state.invitationUrl}>
+        <div className="mt-4 rounded-xl border border-border bg-muted/60 p-4 text-sm">
+          <p className="font-medium text-foreground">Enlace local de invitación</p>
+          <a className="mt-2 block break-all text-primary underline" href={state.invitationUrl}>
             {state.invitationUrl}
           </a>
-          <p className="mt-2 text-xs leading-5 text-[#6e6159]">
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
             Este enlace solo se muestra en desarrollo porque no hay envío de correo habilitado.
           </p>
         </div>

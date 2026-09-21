@@ -102,25 +102,25 @@ export default async function SucursalesPage({ searchParams }: Props) {
       >
         <dl className="grid gap-3 sm:grid-cols-3">
           <div>
-            <dt className="text-xs uppercase tracking-wide text-[#6e6159]">Plan</dt>
-            <dd className="mt-0.5 font-semibold text-[#2d2926]">{ctx.plan?.nombre ?? "Sin suscripción"}</dd>
+            <dt className="text-xs uppercase tracking-wide text-muted-foreground">Plan</dt>
+            <dd className="mt-0.5 font-semibold text-foreground">{ctx.plan?.nombre ?? "Sin suscripción"}</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-[#6e6159]">Sucursales activas</dt>
-            <dd className="mt-0.5 font-semibold text-[#2d2926]">
+            <dt className="text-xs uppercase tracking-wide text-muted-foreground">Sucursales activas</dt>
+            <dd className="mt-0.5 font-semibold text-foreground">
               {activas}
               {maxSucursales != null ? ` de ${maxSucursales} permitidas` : ""}
             </dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-[#6e6159]">Cobertura facturada</dt>
-            <dd className="mt-0.5 font-semibold text-[#2d2926]">
+            <dt className="text-xs uppercase tracking-wide text-muted-foreground">Cobertura facturada</dt>
+            <dd className="mt-0.5 font-semibold text-foreground">
               {cubiertas != null ? `${cubiertas} sucursal(es)` : "—"}
             </dd>
           </div>
         </dl>
         {planRow ? (
-          <p className="mt-3 text-sm text-[#625b55]">
+          <p className="mt-3 text-sm text-muted-foreground">
             Tu plan: {formatCurrency(Number(planRow.precioMensual), { currency })} MXN/mes incluye{" "}
             {planRow.sucursalesIncluidas} sucursal(es)
             {planRow.precioSucursalExtra
@@ -130,19 +130,19 @@ export default async function SucursalesPage({ searchParams }: Props) {
           </p>
         ) : null}
         {maxSucursales != null && activas >= maxSucursales && ctx.efectivo === "vigente" ? (
-          <p className="mt-4 rounded-xl bg-[#f6efe9] px-4 py-3 text-sm text-[#5f5347]">
+          <p className="mt-4 rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
             Tu plan permite hasta {maxSucursales} sucursal(es).{" "}
-            <Link className="font-medium text-[#8f3f2c] underline" href={`/admin/suscripcion?organizationId=${organization.id}`}>
+            <Link className="font-medium text-primary underline" href={`/admin/suscripcion?organizationId=${organization.id}`}>
               Cambia a Profesional
             </Link>{" "}
             para más sucursales y reportes consolidados.
           </p>
         ) : null}
         {cubiertas != null && activas >= cubiertas ? (
-          <p className="mt-3 rounded-xl bg-[#fdf6e7] px-4 py-3 text-sm text-[#7a5b23]">
+          <p className="mt-3 rounded-xl bg-[#fff1d1] px-4 py-3 text-sm text-warning">
             Ya usas las {cubiertas} sucursal(es) cubiertas por tu suscripción. Para activar o crear otra,
             solicita ampliar la cobertura en{" "}
-            <Link className="font-medium text-[#8f3f2c] underline" href={`/admin/suscripcion?organizationId=${organization.id}`}>
+            <Link className="font-medium text-primary underline" href={`/admin/suscripcion?organizationId=${organization.id}`}>
               Suscripción
             </Link>
             .
@@ -161,7 +161,7 @@ export default async function SucursalesPage({ searchParams }: Props) {
             >
               {puedeEditar ? (
                 <details className="group">
-                  <summary className="cursor-pointer text-sm font-medium text-[#8f3f2c] select-none">
+                  <summary className="cursor-pointer text-sm font-medium text-primary select-none">
                     Editar datos y políticas
                   </summary>
                   <div className="mt-4">
@@ -171,7 +171,7 @@ export default async function SucursalesPage({ searchParams }: Props) {
               ) : null}
               {puedeEditar ? (
                 <details className="group mt-3">
-                  <summary className="cursor-pointer text-sm font-medium text-[#8f3f2c] select-none">
+                  <summary className="cursor-pointer text-sm font-medium text-primary select-none">
                     Miembros con acceso ({asignacionesPorSucursal.get(sucursal.id)?.size ?? 0})
                   </summary>
                   <div className="mt-4">
@@ -205,9 +205,9 @@ export default async function SucursalesPage({ searchParams }: Props) {
             {puedeCrearOtra ? (
               <SucursalNuevaForm organizationId={organization.id} />
             ) : (
-              <p className="rounded-xl bg-[#f6efe9] px-4 py-3 text-sm text-[#5f5347]">
+              <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
                 {motivoBloqueoSucursal(capacidad)}{" "}
-                <Link className="font-medium text-[#8f3f2c] underline" href={`/admin/suscripcion?organizationId=${organization.id}`}>
+                <Link className="font-medium text-primary underline" href={`/admin/suscripcion?organizationId=${organization.id}`}>
                   Revisar suscripción
                 </Link>
               </p>

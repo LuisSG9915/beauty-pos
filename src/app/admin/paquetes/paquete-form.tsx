@@ -32,11 +32,11 @@ export function PaqueteForm({
   const value = (key: keyof PaqueteData) => initial?.[key] ?? "";
 
   return (
-    <form action={formAction} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
+    <form action={formAction} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
       <h2 className="text-xl font-semibold">{initial ? "Editar paquete" : "Nuevo paquete"}</h2>
-      <p className="mt-1 text-sm text-[#625b55]">
+      <p className="mt-1 text-sm text-muted-foreground">
         Sesiones prepagadas de un servicio: el cliente paga por adelantado y consume una sesión por visita.
       </p>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">

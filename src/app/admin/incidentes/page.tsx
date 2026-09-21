@@ -139,7 +139,7 @@ export default async function IncidentesPage({
         <AdminCard className="overflow-x-auto p-0 sm:p-0">
           <table className="w-full min-w-[720px] text-sm">
             <thead>
-              <tr className="border-b border-[#eee6e0] text-left text-xs text-[#6e6159]">
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
                 <th className="px-5 py-3 font-medium">Prioridad</th>
                 <th className="px-5 py-3 font-medium">Error</th>
                 <th className="px-5 py-3 font-medium">Estado</th>
@@ -155,7 +155,7 @@ export default async function IncidentesPage({
                 const estado = ESTADO_LABELS[incidente.estado] ?? ESTADO_LABELS.nuevo;
                 return (
                   <tr
-                    className="border-b border-[#f4eeea] last:border-0 hover:bg-[#faf6f3]"
+                    className="border-b border-border last:border-0 hover:bg-muted/60"
                     key={incidente.id}
                   >
                     <td className="px-5 py-3">
@@ -163,12 +163,12 @@ export default async function IncidentesPage({
                     </td>
                     <td className="max-w-md px-5 py-3">
                       <Link
-                        className="font-medium text-[#60392e] hover:underline"
+                        className="font-medium text-primary hover:underline"
                         href={`/admin/incidentes/${incidente.id}`}
                       >
                         {incidente.titulo}
                       </Link>
-                      <p className="mt-0.5 truncate text-xs text-[#6e6159]">
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
                         {FUENTE_LABELS[incidente.fuente] ?? incidente.fuente}
                         {incidente.modulo ? ` · ${incidente.modulo}` : ""}
                         {incidente.ruta ? ` · ${incidente.ruta}` : ""}
@@ -181,10 +181,10 @@ export default async function IncidentesPage({
                     <td className="px-5 py-3 tabular-nums">
                       {incidente.organizacionesAfectadas}
                     </td>
-                    <td className="px-5 py-3 text-xs text-[#625b55]">
+                    <td className="px-5 py-3 text-xs text-muted-foreground">
                       {formatDateTime(incidente.ultimaVezAt)}
                     </td>
-                    <td className="px-5 py-3 text-xs text-[#625b55]">
+                    <td className="px-5 py-3 text-xs text-muted-foreground">
                       {incidente.asignadoNombre ?? "—"}
                     </td>
                   </tr>
@@ -198,7 +198,7 @@ export default async function IncidentesPage({
       <div className="flex items-center justify-between">
         {page > 1 ? (
           <Link
-            className="inline-flex min-h-10 items-center rounded-xl border border-[#ded8d2] bg-white px-4 text-sm font-medium text-[#625b55] transition-colors hover:bg-[#faf6f3]"
+            className="inline-flex min-h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/60"
             href={`/admin/incidentes?${queryBase}&page=${page - 1}`}
           >
             ← Anterior
@@ -208,7 +208,7 @@ export default async function IncidentesPage({
         )}
         {hasMore ? (
           <Link
-            className="inline-flex min-h-10 items-center rounded-xl border border-[#ded8d2] bg-white px-4 text-sm font-medium text-[#625b55] transition-colors hover:bg-[#faf6f3]"
+            className="inline-flex min-h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/60"
             href={`/admin/incidentes?${queryBase}&page=${page + 1}`}
           >
             Siguiente →

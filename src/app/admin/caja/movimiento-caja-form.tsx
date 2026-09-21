@@ -37,7 +37,7 @@ export function MovimientoCajaForm({
 
   if (mediosEfectivo.length === 0) {
     return (
-      <p className="rounded-xl bg-[#fbf4e2] px-4 py-3 text-sm text-[#986b16]">
+      <p className="rounded-xl bg-[#fff1d1] px-4 py-3 text-sm text-warning">
         Configura un medio de pago en efectivo para registrar movimientos.
       </p>
     );

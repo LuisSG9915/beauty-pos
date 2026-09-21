@@ -58,7 +58,7 @@ export default async function TaxesPage({ searchParams }: { searchParams: Search
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[560px] text-left text-sm">
-                <thead className="border-b border-[#eee8e3] text-xs uppercase tracking-wide text-[#625b55]">
+                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-4 font-medium">Clave</th>
                     <th className="py-2 pr-4 font-medium">Nombre</th>
@@ -70,20 +70,20 @@ export default async function TaxesPage({ searchParams }: { searchParams: Search
                 </thead>
                 <tbody>
                   {taxes.map((tax) => (
-                    <tr className="border-b border-[#f1eeea]" key={tax.id}>
+                    <tr className="border-b border-border" key={tax.id}>
                       <td className="py-3 pr-4 font-mono text-xs">{tax.clave}</td>
                       <td className="py-3 pr-4 font-medium">{tax.nombre}</td>
                       <td className="py-3 pr-4 tabular-nums">{tax.tasa}%</td>
-                      <td className="py-3 pr-4"><span className="rounded-full bg-[#f1eeea] px-2.5 py-1 text-xs text-[#625b55]">{TIPO_LABEL[tax.tipo] ?? tax.tipo}</span></td>
+                      <td className="py-3 pr-4"><span className="rounded-full bg-muted/60 px-2.5 py-1 text-xs text-muted-foreground">{TIPO_LABEL[tax.tipo] ?? tax.tipo}</span></td>
                       <td className="py-3 pr-4"><StatusBadge active={tax.activo} /></td>
                       <td className="py-3">
                         <div className="flex flex-wrap gap-2">
-                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-[#ded8d2] px-2.5 text-xs text-[#625b55] hover:bg-[#f8f7f5]" href={buildAdminHref("/impuestos", { organizationId, extra: { edit: tax.id } })}>Editar</Link>
+                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/impuestos", { organizationId, extra: { edit: tax.id } })}>Editar</Link>
                           <form action={toggleTax}>
                             <input name="organizacionId" type="hidden" value={organizationId} />
                             <input name="id" type="hidden" value={tax.id} />
                             <input name="activo" type="hidden" value={String(tax.activo)} />
-                            <button className="inline-flex min-h-9 items-center rounded-lg border border-[#ded8d2] px-2.5 text-xs text-[#625b55] hover:bg-[#f8f7f5]" type="submit">{tax.activo ? "Ocultar" : "Activar"}</button>
+                            <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">{tax.activo ? "Ocultar" : "Activar"}</button>
                           </form>
                         </div>
                       </td>

@@ -105,24 +105,24 @@ export async function sendAvisoCita(tipo: string, input: AvisoCitaInput): Promis
       to: [{ email: input.to, name: input.nombreCliente }],
       subject: plantilla.subject,
       htmlContent: `
-        <main style="font-family: Arial, sans-serif; line-height: 1.6; color: #292522">
+        <main style="font-family: Arial, sans-serif; line-height: 1.6; color: #272328">
           <h1 style="font-size: 20px">Hola, ${cliente}</h1>
           <h2 style="font-size: 16px; font-weight: 600">${plantilla.titulo}</h2>
           <p>${plantilla.mensaje}</p>
           <table style="border-collapse: collapse">
-            <tr><td style="padding: 4px 12px 4px 0; color: #6e6159">Sucursal</td><td><strong>${sucursal}</strong></td></tr>
-            ${antes ? `<tr><td style="padding: 4px 12px 4px 0; color: #6e6159">Horario anterior</td><td><s>${antes}</s></td></tr>` : ""}
-            <tr><td style="padding: 4px 12px 4px 0; color: #6e6159">Fecha y hora</td><td><strong>${cuando}</strong></td></tr>
-            ${servicio ? `<tr><td style="padding: 4px 12px 4px 0; color: #6e6159">Servicio</td><td><strong>${servicio}</strong></td></tr>` : ""}
+            <tr><td style="padding: 4px 12px 4px 0; color: #675d6a">Sucursal</td><td><strong>${sucursal}</strong></td></tr>
+            ${antes ? `<tr><td style="padding: 4px 12px 4px 0; color: #675d6a">Horario anterior</td><td><s>${antes}</s></td></tr>` : ""}
+            <tr><td style="padding: 4px 12px 4px 0; color: #675d6a">Fecha y hora</td><td><strong>${cuando}</strong></td></tr>
+            ${servicio ? `<tr><td style="padding: 4px 12px 4px 0; color: #675d6a">Servicio</td><td><strong>${servicio}</strong></td></tr>` : ""}
           </table>
-          ${nota ? `<p style="color: #57534e">${nota}</p>` : ""}
+          ${nota ? `<p style="color: #554d58">${nota}</p>` : ""}
           ${
             gestion
-              ? `<p style="margin: 20px 0"><a href="${gestion}" style="background: #292522; color: #ffffff; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block">Consultar o modificar mi cita</a></p>
-                 <p style="color: #a8958a; font-size: 12px">Guarda este enlace: con él puedes consultar el estado de tu cita, reagendarla o cancelarla según la política del negocio.</p>`
+              ? `<p style="margin: 20px 0"><a href="${gestion}" style="background: #272328; color: #ffffff; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block">Consultar o modificar mi cita</a></p>
+                 <p style="color: #675d6a; font-size: 12px">Guarda este enlace: con él puedes consultar el estado de tu cita, reagendarla o cancelarla según la política del negocio.</p>`
               : `<p>Si necesitas cambiar o cancelar tu cita, comunícate con el negocio.</p>`
           }
-          <p style="color: #a8958a; font-size: 12px">Enviado por Beauty POS a nombre de ${escapeHtml(input.nombreNegocio)}.</p>
+          <p style="color: #675d6a; font-size: 12px">Enviado por Melena a nombre de ${escapeHtml(input.nombreNegocio)}.</p>
         </main>
       `,
     }),

@@ -131,17 +131,17 @@ export function SucursalEditarForm({ organizationId, sucursal }: { organizationI
         </Field>
       </div>
 
-      <fieldset className="space-y-2 rounded-xl border border-[#eee8e3] p-4">
-        <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-[#6e6159]">Caja y reservas</legend>
-        <label className="flex items-center gap-2 text-sm text-[#403a35]">
+      <fieldset className="space-y-2 rounded-xl border border-border p-4">
+        <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Caja y reservas</legend>
+        <label className="flex items-center gap-2 text-sm text-foreground">
           <input defaultChecked={sucursal.exigirCorteParaCobrar} name="exigirCorteParaCobrar" type="checkbox" />
           Exigir corte de caja abierto para cobrar
         </label>
-        <label className="flex items-center gap-2 text-sm text-[#403a35]">
+        <label className="flex items-center gap-2 text-sm text-foreground">
           <input defaultChecked={sucursal.reservasOnline} name="reservasOnline" type="checkbox" />
           Aceptar reservas en línea
         </label>
-        <label className="flex items-center gap-2 text-sm text-[#403a35]">
+        <label className="flex items-center gap-2 text-sm text-foreground">
           <input defaultChecked={sucursal.reservasAutoConfirmar} name="reservasAutoConfirmar" type="checkbox" />
           Confirmar reservas web automáticamente
         </label>

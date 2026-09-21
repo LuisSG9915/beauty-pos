@@ -81,7 +81,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
 
   if (hecho === "cancelada") {
     return (
-      <div className="mt-6 rounded-2xl border border-[#efd0cc] bg-[#faecea] p-5 text-sm text-[#a0473f]">
+      <div className="mt-6 rounded-2xl border border-[#e2d5e6] bg-[#faecea] p-5 text-sm text-[#a0473f]">
         <p className="font-semibold">Tu cita quedó cancelada.</p>
         <p className="mt-1">Recibirás un correo de confirmación de la cancelación.</p>
       </div>
@@ -98,7 +98,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
 
   if (!reserva.gestionable) {
     return (
-      <div className="mt-6 rounded-2xl bg-[#faf6f3] p-5 text-sm text-[#74675f]">
+      <div className="mt-6 rounded-2xl bg-[#f7f5f8] p-5 text-sm text-[#6d6271]">
         <p>{reserva.motivoNoGestionable}</p>
       </div>
     );
@@ -128,12 +128,12 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
   };
 
   return (
-    <div className="mt-6 border-t border-[#efe7e0] pt-6">
+    <div className="mt-6 border-t border-[#e9e4eb] pt-6">
       {aviso ? (
         <div
           className={`mb-4 flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${
             aviso.tipo === "error"
-              ? "border-[#efd0cc] bg-[#faecea] text-[#a0473f]"
+              ? "border-[#e2d5e6] bg-[#faecea] text-[#a0473f]"
               : "border-[#c8e2d2] bg-[#eaf5ee] text-[#3f7a55]"
           }`}
         >
@@ -145,7 +145,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
       {modo === "menu" ? (
         <div className="flex flex-wrap gap-3">
           <button
-            className="inline-flex items-center gap-2 rounded-xl border border-[#d8c9bf] px-4 py-2.5 text-sm font-medium transition-colors hover:border-[#8a5140] hover:bg-[#fdf6f1]"
+            className="inline-flex items-center gap-2 rounded-xl border border-[#d0c3d4] px-4 py-2.5 text-sm font-medium transition-colors hover:border-[#724b7f] hover:bg-[#fdf6f1]"
             onClick={() => setModo("reagendar")}
             type="button"
           >
@@ -153,21 +153,21 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
             Reagendar
           </button>
           <button
-            className="inline-flex items-center gap-2 rounded-xl border border-[#efd0cc] px-4 py-2.5 text-sm font-medium text-[#a0473f] transition-colors hover:bg-[#faecea]"
+            className="inline-flex items-center gap-2 rounded-xl border border-[#e2d5e6] px-4 py-2.5 text-sm font-medium text-[#a0473f] transition-colors hover:bg-[#faecea]"
             onClick={() => setModo("cancelar")}
             type="button"
           >
             <XCircle className="size-4" />
             Cancelar cita
           </button>
-          <p className="w-full text-xs leading-5 text-[#a8958a]">
+          <p className="w-full text-xs leading-5 text-[#675d6a]">
             Puedes cambiar o cancelar en línea hasta {reserva.cancelacionHoras} h antes de la cita.
           </p>
         </div>
       ) : null}
 
       {modo === "cancelar" ? (
-        <div className="rounded-2xl border border-[#efd0cc] bg-[#faecea] p-5">
+        <div className="rounded-2xl border border-[#e2d5e6] bg-[#faecea] p-5">
           <p className="text-sm font-semibold text-[#a0473f]">¿Cancelar tu cita?</p>
           <p className="mt-1 text-sm text-[#a0473f]">
             Esta acción no se puede deshacer. Si cambias de opinión tendrás que reservar de nuevo.
@@ -177,7 +177,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
               Teléfono con el que reservaste
               <input
                 autoComplete="tel"
-                className="mt-1 w-full rounded-lg border border-[#efd0cc] bg-white px-3 py-2 text-sm text-[#292522]"
+                className="mt-1 w-full rounded-lg border border-[#e2d5e6] bg-white px-3 py-2 text-sm text-[#272328]"
                 inputMode="tel"
                 onChange={(event) => setTelefono(event.target.value)}
                 placeholder="55 1234 5678"
@@ -196,7 +196,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
               {pending ? "Cancelando…" : "Sí, cancelar mi cita"}
             </button>
             <button
-              className="rounded-xl border border-[#d8c9bf] bg-white px-4 py-2 text-sm font-medium transition-colors hover:bg-[#faf6f3]"
+              className="rounded-xl border border-[#d0c3d4] bg-white px-4 py-2 text-sm font-medium transition-colors hover:bg-[#f7f5f8]"
               onClick={() => setModo("menu")}
               type="button"
             >
@@ -207,14 +207,14 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
       ) : null}
 
       {modo === "reagendar" ? (
-        <div className="rounded-2xl border border-[#e4d9cf] bg-[#fdfaf8] p-5">
+        <div className="rounded-2xl border border-[#dcd5de] bg-[#faf7fc] p-5">
           <p className="text-sm font-semibold">Elige un nuevo horario</p>
           {reserva.verificacionContacto ? (
-            <label className="mt-3 block text-sm text-[#625b55]">
+            <label className="mt-3 block text-sm text-[#5f5562]">
               Teléfono con el que reservaste
               <input
                 autoComplete="tel"
-                className="mt-1 w-full max-w-xs rounded-lg border border-[#e5d9d0] bg-white px-3 py-2 text-sm"
+                className="mt-1 w-full max-w-xs rounded-lg border border-[#ddd6df] bg-white px-3 py-2 text-sm"
                 inputMode="tel"
                 onChange={(event) => setTelefono(event.target.value)}
                 placeholder="55 1234 5678"
@@ -224,14 +224,14 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
             </label>
           ) : null}
           <div className="mt-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#a76348]">Día</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#885699]">Día</p>
             <div className="mt-2 flex flex-wrap gap-2">
               {dias.map((dk) => (
                 <button
                   className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
                     dk === diaKeySel
-                      ? "border-[#8a5140] bg-[#fdf0e8] text-[#8a5038]"
-                      : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
+                      ? "border-[#724b7f] bg-[#fdf0e8] text-[#6f447e]"
+                      : "border-[#e8e4ea] bg-white hover:border-[#d0c3d4]"
                   }`}
                   key={dk}
                   onClick={() => {
@@ -250,21 +250,21 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
 
           {diaKeySel ? (
             <div className="mt-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#a76348]">Horario</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#885699]">Horario</p>
               {slots === null ? (
-                <p className="mt-2 text-sm text-[#6e6159]">Buscando horarios…</p>
+                <p className="mt-2 text-sm text-[#675d6a]">Buscando horarios…</p>
               ) : slotsError ? (
                 <p className="mt-2 text-sm text-[#a0473f]">{slotsError}</p>
               ) : slots.length === 0 ? (
-                <p className="mt-2 text-sm text-[#6e6159]">No hay horarios libres este día.</p>
+                <p className="mt-2 text-sm text-[#675d6a]">No hay horarios libres este día.</p>
               ) : (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {slots.map((iso) => (
                     <button
                       className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
                         iso === slotIso
-                          ? "border-[#8a5140] bg-[#fdf0e8] text-[#8a5038]"
-                          : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
+                          ? "border-[#724b7f] bg-[#fdf0e8] text-[#6f447e]"
+                          : "border-[#e8e4ea] bg-white hover:border-[#d0c3d4]"
                       }`}
                       key={iso}
                       onClick={() => setSlotIso(iso)}
@@ -280,7 +280,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
 
           <div className="mt-5 flex gap-3">
             <button
-              className="rounded-xl bg-[#2c2522] px-4 py-2 text-sm font-medium text-[#f6eadf] transition-colors hover:bg-[#453c37] disabled:opacity-50"
+              className="rounded-xl bg-[#29242a] px-4 py-2 text-sm font-medium text-[#f3ecf8] transition-colors hover:bg-[#403a42] disabled:opacity-50"
               disabled={pending || !slotIso || (reserva.verificacionContacto && !telefono.trim())}
               onClick={confirmarReagenda}
               type="button"
@@ -288,7 +288,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
               {pending ? "Reagendando…" : "Confirmar nuevo horario"}
             </button>
             <button
-              className="rounded-xl border border-[#d8c9bf] bg-white px-4 py-2 text-sm font-medium transition-colors hover:bg-[#faf6f3]"
+              className="rounded-xl border border-[#d0c3d4] bg-white px-4 py-2 text-sm font-medium transition-colors hover:bg-[#f7f5f8]"
               onClick={() => setModo("menu")}
               type="button"
             >

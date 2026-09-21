@@ -57,25 +57,25 @@ function Tabla({
   vacio: string;
 }) {
   if (filas.length === 0) {
-    return <p className="rounded-xl bg-[#f1eeea] px-4 py-3 text-sm text-[#625b55]">{vacio}</p>;
+    return <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">{vacio}</p>;
   }
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[28rem] text-sm">
         <thead>
-          <tr className="border-b border-[#eee8e3] text-left">
+          <tr className="border-b border-border text-left">
             {encabezados.map((h) => (
-              <th className="pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-[#6e6159] last:pr-0" key={h}>
+              <th className="pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground last:pr-0" key={h}>
                 {h}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#eee8e3]">
+        <tbody className="divide-y divide-border">
           {filas.map((celdas, i) => (
             <tr key={i}>
               {celdas.map((celda, j) => (
-                <td className="py-2.5 pr-4 align-top text-[#403a35] last:pr-0" key={j}>
+                <td className="py-2.5 pr-4 align-top text-foreground last:pr-0" key={j}>
                   {celda}
                 </td>
               ))}
@@ -89,10 +89,10 @@ function Tabla({
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-xl border border-[#eee8e3] bg-[#faf9f7] px-4 py-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-[#6e6159]">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-[#2d2926]">{value}</p>
-      {hint ? <p className="mt-0.5 text-xs text-[#6e6159]">{hint}</p> : null}
+    <div className="rounded-xl border border-border bg-muted/60 px-4 py-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">{value}</p>
+      {hint ? <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
@@ -244,7 +244,7 @@ export default async function ReportesPage({ searchParams }: Props) {
         title="Reportes"
       />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm" method="get">
+      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm" method="get">
         <input name="organizationId" type="hidden" value={organization.id} />
         {context.branches.length > 1 ? (
           <Field className="w-56">
@@ -272,14 +272,14 @@ export default async function ReportesPage({ searchParams }: Props) {
         <Button className="rounded-xl" type="submit">Aplicar</Button>
         {puedeExportar ? (
           <a
-            className="inline-flex h-10 items-center rounded-xl border border-[#d9cdc4] px-4 text-sm font-medium text-[#5f5347] transition hover:bg-[#f6efe9]"
+            className="inline-flex h-10 items-center rounded-xl border border-border px-4 text-sm font-medium text-muted-foreground transition hover:bg-muted/60"
             href={`/admin/reportes/export?${filtrosExport}`}
           >
             Exportar CSV
           </a>
         ) : null}
-        <div className="flex w-full flex-wrap items-center gap-2 pt-1 text-xs text-[#6e6159]">
-          <span className="font-medium text-[#6f665e]">Rangos rápidos:</span>
+        <div className="flex w-full flex-wrap items-center gap-2 pt-1 text-xs text-muted-foreground">
+          <span className="font-medium text-muted-foreground">Rangos rápidos:</span>
           {presets.map((preset) => {
             const href = `?${new URLSearchParams({
               organizationId: organization.id,
@@ -292,8 +292,8 @@ export default async function ReportesPage({ searchParams }: Props) {
               <Link
                 className={`rounded-full border px-3 py-1.5 font-medium transition ${
                   activo
-                    ? "border-[#b5563f] bg-[#f7e8e2] text-[#8f3f2c]"
-                    : "border-[#e4d8cf] text-[#6f665e] hover:bg-[#f6efe9]"
+                    ? "border-primary bg-accent text-accent-foreground"
+                    : "border-border text-muted-foreground hover:bg-muted/60"
                 }`}
                 href={href}
                 key={preset.clave}
@@ -303,7 +303,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             );
           })}
           {anterior ? (
-            <span className="ml-auto text-[#9c9188]">
+            <span className="ml-auto text-muted-foreground">
               Comparando contra {anterior.desde} → {anterior.hasta}
             </span>
           ) : null}
@@ -370,7 +370,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             <AdminCard
               actions={
                 consolidado ? null : (
-                  <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/ventas?${filtrosExport}`}>
+                  <Link className="text-sm font-medium text-primary hover:underline" href={`/admin/ventas?${filtrosExport}`}>
                     Ver ventas →
                   </Link>
                 )
@@ -389,7 +389,7 @@ export default async function ReportesPage({ searchParams }: Props) {
           <AdminCard
             actions={
               consolidado ? null : (
-                <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/agenda?${filtrosExport}`}>
+                <Link className="text-sm font-medium text-primary hover:underline" href={`/admin/agenda?${filtrosExport}`}>
                   Ver agenda →
                 </Link>
               )
@@ -435,7 +435,7 @@ export default async function ReportesPage({ searchParams }: Props) {
                 vacio="Sin avisos generados en el rango."
               />
               {avisosFallidos > 0 ? (
-                <p className="mt-3 rounded-xl bg-[#fbeaea] px-4 py-3 text-xs font-medium text-[#8f3f2c]">
+                <p className="mt-3 rounded-xl bg-accent/70 px-4 py-3 text-xs font-medium text-primary">
                   {avisosFallidos} aviso(s) agotaron sus reintentos. Revisa los correos de tus clientes o contacta soporte.
                 </p>
               ) : null}
@@ -486,7 +486,7 @@ export default async function ReportesPage({ searchParams }: Props) {
           </section>
 
           {num(productosSinCosto[0]?.unidades) > 0 ? (
-            <p className="rounded-xl border border-[#efd9a8] bg-[#fdf6e7] px-4 py-3 text-sm text-[#7a5b23]">
+            <p className="rounded-xl border border-[#e7bd66] bg-[#fff1d1] px-4 py-3 text-sm text-warning">
               {productosSinCosto[0]?.productos} producto(s) vendidos en el periodo no tienen costo capturado
               ({productosSinCosto[0]?.unidades} unidad(es)). El «resultado estimado» no descuenta costo de
               insumos — captura el costo en el catálogo para márgenes reales.
@@ -497,7 +497,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             <AdminCard
               actions={
                 consolidado ? null : (
-                  <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/ventas?${filtrosExport}`}>
+                  <Link className="text-sm font-medium text-primary hover:underline" href={`/admin/ventas?${filtrosExport}`}>
                     Ver historial →
                   </Link>
                 )
@@ -551,7 +551,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             <AdminCard
               actions={
                 consolidado ? null : (
-                  <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/comisiones?${filtrosExport}`}>
+                  <Link className="text-sm font-medium text-primary hover:underline" href={`/admin/comisiones?${filtrosExport}`}>
                     Ver detalle →
                   </Link>
                 )
@@ -573,7 +573,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             <AdminCard
               actions={
                 consolidado ? null : (
-                  <Link className="text-sm font-medium text-[#8f3f2c] hover:underline" href={`/admin/gastos?${filtrosExport}`}>
+                  <Link className="text-sm font-medium text-primary hover:underline" href={`/admin/gastos?${filtrosExport}`}>
                     Ver detalle →
                   </Link>
                 )
@@ -583,7 +583,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             >
               <div className="mb-4">
                 <HBarChart
-                  color="#a76348"
+                  color="#b7442e"
                   formato={(v) => fmt(v)}
                   puntos={gastosResumen.porCategoria.map((row) => ({
                     etiqueta: row.nombre,
@@ -606,7 +606,7 @@ export default async function ReportesPage({ searchParams }: Props) {
                   row.medio,
                   fmt(row.esperado),
                   fmt(row.contado),
-                  <span className="font-semibold text-[#a8443a]" key="d">{fmt(row.diferencia)}</span>,
+                  <span className="font-semibold text-destructive" key="d">{fmt(row.diferencia)}</span>,
                 ])}
                 vacio="Todos los cierres cuadraron en el rango."
               />
@@ -615,8 +615,8 @@ export default async function ReportesPage({ searchParams }: Props) {
         </>
       ) : null}
 
-      <details className="rounded-2xl border border-[#eadfd8] bg-white px-5 py-4 text-sm shadow-sm">
-        <summary className="cursor-pointer font-semibold text-[#403a35] select-none">
+      <details className="rounded-2xl border border-border bg-card px-5 py-4 text-sm shadow-sm">
+        <summary className="cursor-pointer font-semibold text-foreground select-none">
           ¿Cómo se calculan estas cifras?
         </summary>
         <dl className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -638,8 +638,8 @@ export default async function ReportesPage({ searchParams }: Props) {
             ["Todas las sucursales", "Vista consolidada: suma las operaciones de todas tus sucursales usando la zona horaria de la organización. El comparativo desglosa el aporte de cada sucursal con los mismos filtros."],
           ].map(([termino, definicion]) => (
             <div key={termino}>
-              <dt className="font-medium text-[#403a35]">{termino}</dt>
-              <dd className="mt-0.5 text-xs leading-5 text-[#6e6159]">{definicion}</dd>
+              <dt className="font-medium text-foreground">{termino}</dt>
+              <dd className="mt-0.5 text-xs leading-5 text-muted-foreground">{definicion}</dd>
             </div>
           ))}
         </dl>

@@ -12,14 +12,14 @@ export function OrganizationForm() {
   const [state, formAction, isPending] = useActionState(createOrganization, {});
 
   return (
-    <form action={formAction} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
+    <form action={formAction} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <div className="flex items-start gap-3">
-        <div className="flex size-10 items-center justify-center rounded-xl bg-[#f8eee8] text-[#a76348]">
+        <div className="flex size-10 items-center justify-center rounded-xl bg-muted/60 text-primary">
           <Building2 aria-hidden="true" className="size-5" />
         </div>
         <div>
           <h2 className="font-semibold">Crear organización</h2>
-          <p className="mt-1 text-sm leading-6 text-[#6e6159]">Registra el negocio y su primera sucursal.</p>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">Registra el negocio y su primera sucursal.</p>
         </div>
       </div>
 

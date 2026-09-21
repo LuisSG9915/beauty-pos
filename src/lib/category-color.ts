@@ -11,51 +11,51 @@ export type CategoryTone = {
 };
 
 const TONES: CategoryTone[] = [
-  // Terracota (primario del proyecto)
+  // Coral editorial (primario del producto)
   {
-    card: "border-[#e0c0b2] bg-[#f9ece6] hover:border-[#c9a08d]",
-    chip: "border-[#e0c0b2] bg-[#f2e3dc] text-[#8a5140]",
+    card: "border-[#efc0b4] bg-[#ffd9cf] hover:border-[#dd9a86]",
+    chip: "border-[#efc0b4] bg-[#fbe5dc] text-[#7a2e20]",
   },
-  // Verde
+  // Mango
   {
-    card: "border-[#c4dcc9] bg-[#eef6ef] hover:border-[#a3c4ab]",
-    chip: "border-[#c4dcc9] bg-[#e2efe5] text-[#347052]",
+    card: "border-[#e7bd66] bg-[#ffe3ad] hover:border-[#d3a040]",
+    chip: "border-[#e7bd66] bg-[#fff1d1] text-[#654300]",
   },
-  // Ámbar
+  // Menta
   {
-    card: "border-[#e6d3a6] bg-[#fbf3df] hover:border-[#d3b87e]",
-    chip: "border-[#e6d3a6] bg-[#f4ead0] text-[#986b16]",
+    card: "border-[#9fcfc4] bg-[#d4efe9] hover:border-[#78b5a9]",
+    chip: "border-[#9fcfc4] bg-[#e2f5f1] text-[#205a50]",
   },
-  // Azul
+  // Cielo
   {
-    card: "border-[#c3d3e4] bg-[#edf2f9] hover:border-[#9fb8d2]",
-    chip: "border-[#c3d3e4] bg-[#dfe9f4] text-[#3e6390]",
+    card: "border-[#a9cbe0] bg-[#d7ebf7] hover:border-[#82b2d0]",
+    chip: "border-[#a9cbe0] bg-[#e3f1fa] text-[#24536b]",
   },
   // Rosa
   {
-    card: "border-[#e4c3cb] bg-[#f9edf0] hover:border-[#cf9fab]",
-    chip: "border-[#e4c3cb] bg-[#f2dfe3] text-[#8f4a56]",
+    card: "border-[#e2aabb] bg-[#f8d8e3] hover:border-[#cd8aa0]",
+    chip: "border-[#e2aabb] bg-[#fbe5ed] text-[#762c49]",
   },
-  // Violeta
+  // Violeta controlado
   {
-    card: "border-[#d2c9e6] bg-[#f2effa] hover:border-[#b3a4d4]",
-    chip: "border-[#d2c9e6] bg-[#e6dff4] text-[#6a5490]",
+    card: "border-[#beb2de] bg-[#e6e0f7] hover:border-[#a191ca]",
+    chip: "border-[#beb2de] bg-[#eeeaf9] text-[#4a3d72]",
   },
-  // Teal
+  // Lima suave
   {
-    card: "border-[#badad5] bg-[#eaf5f3] hover:border-[#93c2bb]",
-    chip: "border-[#badad5] bg-[#d9ece9] text-[#2f6d66]",
+    card: "border-[#c1ca8b] bg-[#e5edcb] hover:border-[#a8b36b]",
+    chip: "border-[#c1ca8b] bg-[#eef2dc] text-[#42551e]",
   },
-  // Oliva
+  // Durazno
   {
-    card: "border-[#d8d5b8] bg-[#f5f4e4] hover:border-[#beb984]",
-    chip: "border-[#d8d5b8] bg-[#eae8d2] text-[#6d6a2e]",
+    card: "border-[#edb894] bg-[#fbdcc6] hover:border-[#dc9d72]",
+    chip: "border-[#edb894] bg-[#fce7d7] text-[#6e3819]",
   },
 ];
 
 const NEUTRAL: CategoryTone = {
-  card: "border-[#eee8e3] bg-white hover:border-[#d8cfc7]",
-  chip: "border-[#ded8d2] bg-[#f1eeea] text-[#625b55]",
+  card: "border-border bg-card hover:border-muted-foreground/40",
+  chip: "border-border bg-muted text-muted-foreground",
 };
 
 export function categoryTone(categoriaId: string | null): CategoryTone {

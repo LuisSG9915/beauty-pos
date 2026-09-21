@@ -188,7 +188,7 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
             </Button>
           </form>
           {branches.length === 0 ? (
-            <p className="mt-3 text-sm font-medium text-[#986b16]">Necesitas una sucursal activa para vender.</p>
+            <p className="mt-3 text-sm font-medium text-warning">Necesitas una sucursal activa para vender.</p>
           ) : null}
         </AdminCard>
 
@@ -216,11 +216,11 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
         >
           <div className="space-y-2">
             {ventasHoy.length === 0 ? (
-              <p className="rounded-xl bg-[#f1eeea] px-4 py-3 text-sm text-[#625b55]">Sin ventas hoy en esta sucursal.</p>
+              <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">Sin ventas hoy en esta sucursal.</p>
             ) : null}
             {ventasHoy.map((venta) => (
               <Link
-                className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-[#eee8e3] px-4 py-2.5 text-sm transition-colors hover:bg-[#faf9f7] focus-visible:outline-2 focus-visible:outline-[#8a5140]"
+                className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-border px-4 py-2.5 text-sm transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-ring"
                 href={buildAdminHref("/pos", {
                   organizationId,
                   sucursalId,

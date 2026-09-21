@@ -41,8 +41,8 @@ function CheckboxList({
         <label
           className={`inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors ${
             disabled
-              ? "cursor-not-allowed border-[#eee8e3] bg-[#f7f4f1] text-[#a99d94]"
-              : "border-[#ded8d2] bg-white text-[#625b55] hover:border-[#c9a899] has-checked:border-[#8a5140] has-checked:bg-[#f2e3dc] has-checked:text-[#60392e]"
+              ? "cursor-not-allowed border-border bg-muted/60 text-muted-foreground"
+              : "border-border bg-card text-muted-foreground hover:border-accent-foreground/30 has-checked:border-primary has-checked:bg-accent/70 has-checked:text-primary"
           }`}
           key={item.id}
         >
@@ -89,18 +89,18 @@ export function MemberCard({
   );
 
   return (
-    <section className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#f1eeea] text-[#8a5140]">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-muted/60 text-primary">
             <UserRound aria-hidden="true" className="size-5" />
           </span>
           <div className="min-w-0">
-            <p className="truncate font-medium text-[#2d2926]">
+            <p className="truncate font-medium text-foreground">
               {member.nombre}
-              {isSelf ? <span className="ml-2 text-xs font-normal text-[#6e6159]">(tú)</span> : null}
+              {isSelf ? <span className="ml-2 text-xs font-normal text-muted-foreground">(tú)</span> : null}
             </p>
-            <p className="truncate text-xs text-[#6e6159]">{member.correo}</p>
+            <p className="truncate text-xs text-muted-foreground">{member.correo}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -130,7 +130,7 @@ export function MemberCard({
         <form action={rolesAction} className="space-y-2">
           <input name="organizacionId" type="hidden" value={organizationId} />
           <input name="miembroId" type="hidden" value={member.miembroId} />
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#8a5140]">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-primary">
             <ShieldCheck aria-hidden="true" className="size-3.5" /> Roles
           </p>
           <CheckboxList
@@ -152,7 +152,7 @@ export function MemberCard({
         <form action={branchesAction} className="space-y-2">
           <input name="organizacionId" type="hidden" value={organizationId} />
           <input name="miembroId" type="hidden" value={member.miembroId} />
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#8a5140]">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-primary">
             <Store aria-hidden="true" className="size-3.5" /> Sucursales
           </p>
           <CheckboxList
@@ -165,7 +165,7 @@ export function MemberCard({
             name="sucursalIds"
           />
           {fueraDeAlcance.length > 0 ? (
-            <p className="text-xs text-[#6e6159]">
+            <p className="text-xs text-muted-foreground">
               Fuera de tu alcance: {fueraDeAlcance.map((id) => allBranchNames[id] ?? "—").join(", ")}
             </p>
           ) : null}
@@ -204,14 +204,14 @@ export function PendingInvitations({
   if (invitations.length === 0) return null;
 
   return (
-    <section className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
+    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
       <h3 className="font-semibold">Invitaciones pendientes</h3>
       <ul className="mt-3 space-y-3">
         {invitations.map((inv) => (
-          <li className="rounded-xl border border-[#eee8e3] p-3 text-sm" key={inv.id}>
-            <p className="font-medium text-[#2d2926]">{inv.nombre}</p>
-            <p className="mt-0.5 text-xs text-[#6e6159]">{inv.correo}</p>
-            <p className="mt-1 text-xs text-[#6e6159]">
+          <li className="rounded-xl border border-border p-3 text-sm" key={inv.id}>
+            <p className="font-medium text-foreground">{inv.nombre}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{inv.correo}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
               {inv.rolNombre} · {inv.sucursalNombre} · expira {formatDate(inv.expiraAt)}
             </p>
             {canCancel ? (
@@ -219,7 +219,7 @@ export function PendingInvitations({
                 <input name="organizacionId" type="hidden" value={organizationId} />
                 <input name="invitacionId" type="hidden" value={inv.id} />
                 <button
-                  className="min-h-8 rounded-lg border border-[#ded8d2] px-2.5 text-xs text-[#a8443a] hover:bg-[#fdf1ee] disabled:opacity-50"
+                  className="min-h-8 rounded-lg border border-border px-2.5 text-xs text-destructive hover:bg-[#f6d9d2] disabled:opacity-50"
                   disabled={isPending}
                   type="submit"
                 >

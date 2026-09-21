@@ -13,7 +13,7 @@ export function ClientImport({ organizationId }: { organizationId: string }) {
     <form action={formAction}>
       <input name="organizacionId" type="hidden" value={organizationId} />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-[#625b55]">Carga un CSV guardado desde Excel.</p>
+        <p className="text-sm text-muted-foreground">Carga un CSV guardado desde Excel.</p>
         <div className="w-full md:max-w-md">
           <FileDropzone accept=".csv,text/csv" name="archivo" required />
         </div>

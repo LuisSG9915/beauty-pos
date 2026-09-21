@@ -10,7 +10,7 @@ export type PuntoGrafica = { etiqueta: string; valor: number; detalle?: string }
 export function BarChart({
   puntos,
   alto = 160,
-  color = "#8a5140",
+  color = "#b7442e",
   formato = (v: number) => String(v),
 }: {
   puntos: PuntoGrafica[];
@@ -44,7 +44,7 @@ export function BarChart({
               <rect fill={color} height={h} rx={4} width={anchoBarra} x={x} y={y} />
               {i % mostrarEtiquetaCada === 0 ? (
                 <text
-                  className="fill-[#6e6159]"
+                  className="fill-muted-foreground"
                   fontSize={10}
                   textAnchor="middle"
                   x={x + anchoBarra / 2}
@@ -64,7 +64,7 @@ export function BarChart({
 /** Barras horizontales con etiqueta y valor (p.ej. cobros por medio de pago). */
 export function HBarChart({
   puntos,
-  color = "#8a5140",
+  color = "#b7442e",
   formato = (v: number) => String(v),
 }: {
   puntos: PuntoGrafica[];
@@ -80,10 +80,10 @@ export function HBarChart({
         return (
           <div key={punto.etiqueta}>
             <div className="mb-1 flex items-baseline justify-between gap-3 text-xs">
-              <span className="truncate font-medium text-[#4b403a]">{punto.etiqueta}</span>
-              <span className="shrink-0 tabular-nums text-[#6e6159]">{formato(punto.valor)}</span>
+              <span className="truncate font-medium text-foreground">{punto.etiqueta}</span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">{formato(punto.valor)}</span>
             </div>
-            <div className="h-2.5 overflow-hidden rounded-full bg-[#f1eeea]">
+            <div className="h-2.5 overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full"
                 style={{ width: `${ancho}%`, backgroundColor: color }}

@@ -21,11 +21,11 @@ export function PaymentMethodForm({ organizationId, initial }: { organizationId:
   const [state, action, pending] = useActionState<PaymentMethodActionState, FormData>(savePaymentMethod, {});
   const categoria = (initial?.categoria ?? "efectivo") as "efectivo" | "tarjeta" | "transferencia" | "wallet" | "otro";
   return (
-    <form action={action} className="rounded-2xl border border-[#eadfd8] bg-white p-6 shadow-sm">
+    <form action={action} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
       <h2 className="text-xl font-semibold">{initial ? "Editar medio de pago" : "Nuevo medio de pago"}</h2>
-      <p className="mt-1 text-sm text-[#625b55]">Define cómo se puede pagar en Cobrar: efectivo, tarjeta, transferencia, etc.</p>
+      <p className="mt-1 text-sm text-muted-foreground">Define cómo se puede pagar en Cobrar: efectivo, tarjeta, transferencia, etc.</p>
       <div className="mt-5 space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field>
@@ -47,7 +47,7 @@ export function PaymentMethodForm({ organizationId, initial }: { organizationId:
             <option value="otro">Otro</option>
           </Select>
         </Field>
-        <p className="rounded-xl bg-[#f1eeea] p-4 text-sm text-[#625b55]">{CATEGORIA_DESC[categoria]}</p>
+        <p className="rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">{CATEGORIA_DESC[categoria]}</p>
       </div>
       <div className="mt-4">
         <ActionFeedback state={state} successMessage="Medio de pago guardado." />

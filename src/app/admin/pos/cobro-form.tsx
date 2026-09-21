@@ -161,8 +161,8 @@ export function CobroForm({
     cn(
       "min-h-10 rounded-lg border px-3.5 text-sm font-medium transition-colors",
       seleccionado
-        ? "border-[#8a5140] bg-[#f2e3dc] text-[#60392e]"
-        : "border-[#e3d9d1] bg-white text-[#625b55] hover:border-[#c9a899] hover:text-[#8a5140]",
+        ? "border-primary bg-accent/70 text-primary"
+        : "border-border bg-card text-muted-foreground hover:border-accent-foreground/30 hover:text-primary",
     );
 
   const inputClass =
@@ -171,7 +171,7 @@ export function CobroForm({
   return (
     <form
       action={formAction}
-      className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm sm:p-6"
+      className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"
     >
       <input name="organizacionId" type="hidden" value={organizationId} />
       <input name="ventaId" type="hidden" value={ventaId} />
@@ -182,13 +182,13 @@ export function CobroForm({
       <input name="idempotencia" type="hidden" value={idempotencia} />
 
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="font-semibold text-[#2d2926]">Cobrar</h2>
-        <p className="text-2xl font-bold tabular-nums text-[#8a5140]">
+        <h2 className="font-semibold text-foreground">Cobrar</h2>
+        <p className="text-2xl font-bold tabular-nums text-primary">
           {formatCurrency(aCubrir)}
         </p>
       </div>
       {propina > 0 || anticipo > 0 ? (
-        <p className="mt-0.5 text-xs tabular-nums text-[#6e6159]">
+        <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
           {formatCurrency(total)}
           {anticipo > 0 ? ` − ${formatCurrency(anticipo)} anticipo` : ""}
           {propina > 0 ? ` + ${formatCurrency(propina)} propina` : ""}
@@ -196,7 +196,7 @@ export function CobroForm({
       ) : null}
 
       <div className="mt-4">
-        <p className="text-xs font-medium text-[#6e6159]">Propina</p>
+        <p className="text-xs font-medium text-muted-foreground">Propina</p>
         <div aria-label="Propina" className="mt-1.5 flex flex-wrap gap-1.5" role="group">
           {PROPINA_OPCIONES.map((opcion) => (
             <button
@@ -204,8 +204,8 @@ export function CobroForm({
               className={cn(
                 "min-h-9 rounded-lg border px-3 text-xs font-medium transition-colors",
                 propinaOpcion === opcion.value
-                  ? "border-[#8a5140] bg-[#f2e3dc] text-[#60392e]"
-                  : "border-[#e3d9d1] bg-white text-[#625b55] hover:border-[#c9a899] hover:text-[#8a5140]",
+                  ? "border-primary bg-accent/70 text-primary"
+                  : "border-border bg-card text-muted-foreground hover:border-accent-foreground/30 hover:text-primary",
               )}
               key={opcion.value}
               onClick={() => seleccionarPropina(opcion.value)}
@@ -237,7 +237,7 @@ export function CobroForm({
       </div>
 
       {cubiertoPorAnticipo ? (
-        <p className="mt-5 rounded-xl border border-[#b5d4bd] bg-[#f1faf3] px-4 py-3 text-sm font-medium text-[#347052]">
+        <p className="mt-5 rounded-xl border border-[#9fcfc4] bg-[#e2f5f1] px-4 py-3 text-sm font-medium text-success">
           {anticipo > 0
             ? `El anticipo cubre el total${propina > 0 ? " y la propina" : ""}; confirma para cerrar la venta.`
             : "El total ya está cubierto; confirma para cerrar la venta."}
@@ -246,12 +246,12 @@ export function CobroForm({
 
       <div className={cubiertoPorAnticipo ? "hidden" : "mt-5 space-y-3"}>
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-medium text-[#6e6159]">
+          <p className="text-xs font-medium text-muted-foreground">
             Pagos{pagos.length > 1 ? ` (${pagos.length})` : ""}
           </p>
           {pagos.length < MAX_PAGOS && mediosPago.length > 0 ? (
             <button
-              className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-medium text-[#8a5140] transition-colors hover:bg-[#f2e3dc]"
+              className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-medium text-primary transition-colors hover:bg-accent/70"
               onClick={agregarPago}
               type="button"
             >
@@ -262,7 +262,7 @@ export function CobroForm({
         </div>
 
         {mediosPago.length === 0 ? (
-          <p className="rounded-xl bg-[#fbf4e2] px-4 py-3 text-sm text-[#986b16]">
+          <p className="rounded-xl bg-[#fff1d1] px-4 py-3 text-sm text-warning">
             No hay medios de pago configurados.
           </p>
         ) : null}
@@ -273,7 +273,7 @@ export function CobroForm({
           const resto = restoPara(index);
           return (
             <div
-              className="space-y-2 rounded-xl border border-[#eee8e3] p-3"
+              className="space-y-2 rounded-xl border border-border p-3"
               key={`pago-${index}`}
             >
               <div
@@ -306,7 +306,7 @@ export function CobroForm({
                   value={pago.monto}
                 />
                 <button
-                  className="min-h-10 rounded-lg border border-[#e3d9d1] bg-white px-3 text-xs font-medium text-[#8a5140] transition-colors hover:bg-[#f2e3dc] disabled:opacity-50"
+                  className="min-h-10 rounded-lg border border-border bg-card px-3 text-xs font-medium text-primary transition-colors hover:bg-accent/70 disabled:opacity-50"
                   disabled={resto <= 0}
                   onClick={() => updatePago(index, { monto: resto.toFixed(2) })}
                   type="button"
@@ -316,7 +316,7 @@ export function CobroForm({
                 {pagos.length > 1 ? (
                   <button
                     aria-label={`Quitar pago ${index + 1}`}
-                    className="flex size-10 items-center justify-center rounded-lg text-[#a8443a] transition-colors hover:bg-[#f7e9e6]"
+                    className="flex size-10 items-center justify-center rounded-lg text-destructive transition-colors hover:bg-muted/60"
                     onClick={() => quitarPago(index)}
                     type="button"
                   >
@@ -343,16 +343,16 @@ export function CobroForm({
 
       <div className="mt-4">
         {cubiertoPorAnticipo ? null : cubre ? (
-          <p className="rounded-xl border border-[#b5d4bd] bg-[#f1faf3] px-4 py-2.5 text-sm font-medium text-[#347052]">
+          <p className="rounded-xl border border-[#9fcfc4] bg-[#e2f5f1] px-4 py-2.5 text-sm font-medium text-success">
             {cambio > 0.005 ? `Cambio ${formatCurrency(cambio)}` : "Monto exacto"}
           </p>
         ) : (
-          <p className="rounded-xl border border-[#ecd9ae] bg-[#fbf4e2] px-4 py-2.5 text-sm font-medium text-[#986b16]">
+          <p className="rounded-xl border border-[#e7bd66] bg-[#fff1d1] px-4 py-2.5 text-sm font-medium text-warning">
             Falta {formatCurrency(faltante)}
           </p>
         )}
         {cubre && !pagosCompletos ? (
-          <p className="mt-1.5 text-xs text-[#986b16]">
+          <p className="mt-1.5 text-xs text-warning">
             Completa medio, monto y referencia de cada pago.
           </p>
         ) : null}

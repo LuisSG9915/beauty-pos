@@ -55,8 +55,8 @@ export default async function TelemetriaPage({
               <a
                 className={`inline-flex min-h-10 items-center rounded-xl border px-4 text-sm font-medium transition-colors ${
                   dias === rango
-                    ? "border-[#8a5140] bg-[#f2e3dc] text-[#60392e]"
-                    : "border-[#ded8d2] bg-white text-[#625b55] hover:bg-[#faf6f3]"
+                    ? "border-primary bg-accent/70 text-primary"
+                    : "border-border bg-card text-muted-foreground hover:bg-muted/60"
                 }`}
                 href={`/admin/telemetria?dias=${rango}`}
                 key={rango}
@@ -81,34 +81,34 @@ export default async function TelemetriaPage({
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <AdminCard>
-              <p className="text-xs font-medium text-[#6e6159]">Sesiones</p>
+              <p className="text-xs font-medium text-muted-foreground">Sesiones</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">{resumen.sesiones}</p>
-              <p className="mt-1 text-xs text-[#6e6159]">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {resumen.usuariosUnicos} usuarios únicos
               </p>
             </AdminCard>
             <AdminCard>
-              <p className="text-xs font-medium text-[#6e6159]">Rebote</p>
+              <p className="text-xs font-medium text-muted-foreground">Rebote</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">{resumen.tasaRebote}%</p>
-              <p className="mt-1 text-xs text-[#6e6159]">
+              <p className="mt-1 text-xs text-muted-foreground">
                 sesiones sin engagement (&lt;10 s, 1 página, sin acción)
               </p>
             </AdminCard>
             <AdminCard>
-              <p className="text-xs font-medium text-[#6e6159]">Páginas / sesión</p>
+              <p className="text-xs font-medium text-muted-foreground">Páginas / sesión</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">
                 {resumen.promedioPaginas.toFixed(1)}
               </p>
-              <p className="mt-1 text-xs text-[#6e6159]">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {resumen.paginasTotales} vistas en total
               </p>
             </AdminCard>
             <AdminCard>
-              <p className="text-xs font-medium text-[#6e6159]">Tiempo activo</p>
+              <p className="text-xs font-medium text-muted-foreground">Tiempo activo</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">
                 {Math.round(resumen.promedioActivoSeg)}s
               </p>
-              <p className="mt-1 text-xs text-[#6e6159]">promedio por sesión</p>
+              <p className="mt-1 text-xs text-muted-foreground">promedio por sesión</p>
             </AdminCard>
           </div>
 
@@ -198,13 +198,13 @@ function Tabla({
   filas: (React.ReactNode | string | number)[][];
 }) {
   if (filas.length === 0) {
-    return <p className="text-sm text-[#6e6159]">Sin datos en el rango.</p>;
+    return <p className="text-sm text-muted-foreground">Sin datos en el rango.</p>;
   }
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-[#eee6e0] text-left text-xs text-[#6e6159]">
+          <tr className="border-b border-border text-left text-xs text-muted-foreground">
             {columnas.map((col) => (
               <th className="pb-2 pr-4 font-medium" key={col}>{col}</th>
             ))}
@@ -212,7 +212,7 @@ function Tabla({
         </thead>
         <tbody>
           {filas.map((fila, i) => (
-            <tr className="border-b border-[#f4eeea] last:border-0" key={i}>
+            <tr className="border-b border-border last:border-0" key={i}>
               {fila.map((celda, j) => (
                 <td className="py-2 pr-4 tabular-nums" key={j}>{celda}</td>
               ))}

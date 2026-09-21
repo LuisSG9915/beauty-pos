@@ -1,12 +1,14 @@
 import Link from "next/link";
 
-export const metadata = { title: "Aviso de privacidad — Beauty POS" };
+import { BrandWordmark } from "@/components/brand-mark";
+
+export const metadata = { title: "Aviso de privacidad" };
 
 const secciones = [
   {
     titulo: "Responsable y datos que recabamos",
     cuerpo:
-      "Beauty POS recaba los datos necesarios para operar tu cuenta: nombre, correo y los datos de operación que registras (clientes, citas, ventas). No recabamos datos personales sensibles por cuenta propia.",
+      "Melena recaba los datos necesarios para operar tu cuenta: nombre, correo y los datos de operación que registras (clientes, citas, ventas). No recabamos datos personales sensibles por cuenta propia.",
   },
   {
     titulo: "Uso de la información",
@@ -31,22 +33,19 @@ const secciones = [
   {
     titulo: "Tus derechos (ARCO)",
     cuerpo:
-      "Puedes ejercer tus derechos de acceso, rectificación, cancelación y oposición escribiendo a soporte@beautypos.app. Respondemos en los plazos previstos por la legislación mexicana aplicable.",
+      "Puedes ejercer tus derechos de acceso, rectificación, cancelación y oposición escribiendo a soporte@melena.app. Respondemos en los plazos previstos por la legislación mexicana aplicable.",
   },
 ];
 
 export default function PrivacidadPage() {
   return (
-    <main className="min-h-screen bg-[#faf9f7] text-[#292522]">
+    <main className="min-h-screen bg-[#f9f8f9] text-[#272328]">
       <header className="mx-auto flex w-full max-w-4xl items-center justify-between px-6 py-6 lg:px-10">
-        <Link className="flex items-center gap-3" href="/">
-          <div className="flex size-10 items-center justify-center rounded-2xl bg-[#2c2522] text-sm font-semibold text-[#f6eadf]">
-            BP
-          </div>
-          <p className="font-semibold tracking-tight">Beauty POS</p>
+        <Link className="inline-flex rounded-lg outline-offset-4" href="/">
+          <BrandWordmark markSize={40} />
         </Link>
         <Link
-          className="inline-flex h-8 items-center rounded-lg border border-[#ded5ce] bg-white px-4 text-sm font-medium transition-colors hover:bg-[#f4f1ee]"
+          className="inline-flex h-8 items-center rounded-lg border border-[#d8d3d9] bg-white px-4 text-sm font-medium transition-colors hover:bg-[#f2f0f2]"
           href="/registro"
         >
           Crear cuenta
@@ -54,15 +53,15 @@ export default function PrivacidadPage() {
       </header>
 
       <article className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10 lg:px-10">
-        <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#ae6f54]">Legal</p>
+        <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#7a5c88]">Legal</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">Aviso de privacidad</h1>
-        <p className="mt-4 text-sm text-[#6e6159]">Última actualización: enero 2026</p>
+        <p className="mt-4 text-sm text-[#675d6a]">Última actualización: enero 2026</p>
 
         <div className="mt-10 space-y-8">
           {secciones.map((seccion) => (
             <section key={seccion.titulo}>
               <h2 className="font-semibold">{seccion.titulo}</h2>
-              <p className="mt-2 text-sm leading-7 text-[#5d524b]">{seccion.cuerpo}</p>
+              <p className="mt-2 text-sm leading-7 text-[#574e5a]">{seccion.cuerpo}</p>
             </section>
           ))}
         </div>

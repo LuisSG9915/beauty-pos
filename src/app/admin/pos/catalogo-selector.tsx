@@ -145,7 +145,7 @@ export function CatalogoSelector({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div
           aria-label="Tipo de catálogo"
-          className="flex rounded-xl border border-[#ded8d2] bg-[#f1eeea] p-1"
+          className="flex rounded-xl border border-border bg-muted/60 p-1"
           role="group"
         >
           {TABS.map((opcion) => {
@@ -157,8 +157,8 @@ export function CatalogoSelector({
                 className={cn(
                   "inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-medium whitespace-nowrap transition-colors sm:px-4",
                   activo
-                    ? "bg-white text-[#60392e] shadow-sm"
-                    : "text-[#625b55] hover:text-[#8a5140]",
+                    ? "bg-card text-primary shadow-sm"
+                    : "text-muted-foreground hover:text-primary",
                 )}
                 key={opcion.value}
                 onClick={() => {
@@ -217,13 +217,13 @@ export function CatalogoSelector({
       ) : null}
 
       {(tab === "paquetes" || tab === "membresias") && !hasCliente ? (
-        <p className="rounded-xl bg-[#fbf3ec] px-4 py-3 text-xs text-[#8a5140]">
+        <p className="rounded-xl bg-accent/70 px-4 py-3 text-xs text-primary">
           Asigna un cliente a la venta para vender {tab === "paquetes" ? "paquetes: el saldo" : "membresías: la vigencia"} se crea a su nombre al cobrar.
         </p>
       ) : null}
 
       {filtrados.length === 0 ? (
-        <p className="rounded-xl bg-[#f1eeea] px-4 py-3 text-sm text-[#625b55]">
+        <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
           {tab === "servicios"
             ? "No hay servicios que coincidan."
             : tab === "paquetes"
@@ -246,14 +246,14 @@ export function CatalogoSelector({
               onClick={() => agregar(item)}
               type="button"
             >
-              <span className="line-clamp-2 text-sm font-medium leading-5 text-[#2d2926]">
+              <span className="line-clamp-2 text-sm font-medium leading-5 text-foreground">
                 {item.nombre}
               </span>
               <span className="flex items-baseline justify-between gap-2">
-                <span className="text-sm font-semibold tabular-nums text-[#60392e]">
+                <span className="text-sm font-semibold tabular-nums text-primary">
                   {formatCurrency(item.precio, { currency })}
                 </span>
-                <span className="truncate text-xs tabular-nums text-[#6e6159]">
+                <span className="truncate text-xs tabular-nums text-muted-foreground">
                   {"duracionMinutos" in item
                     ? `${item.duracionMinutos} min`
                     : "sesiones" in item

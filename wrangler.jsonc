@@ -2,6 +2,13 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "beauty-pos",
   "main": ".open-next/worker.js",
+  // Dominio canónico de Melena. `workers.dev` se mantiene activo durante la
+  // migración como ruta de verificación/rollback.
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "melena.app", "custom_domain": true },
+    { "pattern": "www.melena.app", "custom_domain": true }
+  ],
   "compatibility_date": "2026-09-07",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "assets": {
