@@ -237,7 +237,7 @@ export function CobroForm({
       </div>
 
       {cubiertoPorAnticipo ? (
-        <p className="mt-5 rounded-xl border border-[#9fcfc4] bg-[#e2f5f1] px-4 py-3 text-sm font-medium text-success">
+        <p className="mt-5 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm font-medium text-success">
           {anticipo > 0
             ? `El anticipo cubre el total${propina > 0 ? " y la propina" : ""}; confirma para cerrar la venta.`
             : "El total ya está cubierto; confirma para cerrar la venta."}
@@ -262,7 +262,7 @@ export function CobroForm({
         </div>
 
         {mediosPago.length === 0 ? (
-          <p className="rounded-xl bg-[#fff1d1] px-4 py-3 text-sm text-warning">
+          <p className="rounded-xl bg-warning/10 px-4 py-3 text-sm text-warning">
             No hay medios de pago configurados.
           </p>
         ) : null}
@@ -343,11 +343,11 @@ export function CobroForm({
 
       <div className="mt-4">
         {cubiertoPorAnticipo ? null : cubre ? (
-          <p className="rounded-xl border border-[#9fcfc4] bg-[#e2f5f1] px-4 py-2.5 text-sm font-medium text-success">
+          <p className="rounded-xl border border-success/30 bg-success/10 px-4 py-2.5 text-sm font-medium text-success">
             {cambio > 0.005 ? `Cambio ${formatCurrency(cambio)}` : "Monto exacto"}
           </p>
         ) : (
-          <p className="rounded-xl border border-[#e7bd66] bg-[#fff1d1] px-4 py-2.5 text-sm font-medium text-warning">
+          <p className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-2.5 text-sm font-medium text-warning">
             Falta {formatCurrency(faltante)}
           </p>
         )}

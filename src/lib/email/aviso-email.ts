@@ -1,4 +1,22 @@
+import { BRAND, BRAND_COLORS } from "@/lib/brand";
 import { getRuntimeEnv } from "@/lib/runtime-env";
+
+/**
+ * Paleta inline del correo (Bugambilia, siempre clara: los clientes de email
+ * no siguen el dark mode de la app). Valores alineados con globals.css.
+ */
+const EMAIL = {
+  background: "#faf9fb",
+  card: "#ffffff",
+  text: "#241922",
+  muted: "#6f6069",
+  note: "#43293b",
+  primary: BRAND_COLORS.primary,
+  primaryForeground: BRAND_COLORS.primaryForeground,
+  accent: BRAND_COLORS.accent,
+  accentForeground: BRAND_COLORS.accentForeground,
+  border: "#ded5dc",
+} as const;
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>'"]/g, (character) => ({
@@ -105,24 +123,27 @@ export async function sendAvisoCita(tipo: string, input: AvisoCitaInput): Promis
       to: [{ email: input.to, name: input.nombreCliente }],
       subject: plantilla.subject,
       htmlContent: `
-        <main style="font-family: Arial, sans-serif; line-height: 1.6; color: #272328">
-          <h1 style="font-size: 20px">Hola, ${cliente}</h1>
-          <h2 style="font-size: 16px; font-weight: 600">${plantilla.titulo}</h2>
-          <p>${plantilla.mensaje}</p>
-          <table style="border-collapse: collapse">
-            <tr><td style="padding: 4px 12px 4px 0; color: #675d6a">Sucursal</td><td><strong>${sucursal}</strong></td></tr>
-            ${antes ? `<tr><td style="padding: 4px 12px 4px 0; color: #675d6a">Horario anterior</td><td><s>${antes}</s></td></tr>` : ""}
-            <tr><td style="padding: 4px 12px 4px 0; color: #675d6a">Fecha y hora</td><td><strong>${cuando}</strong></td></tr>
-            ${servicio ? `<tr><td style="padding: 4px 12px 4px 0; color: #675d6a">Servicio</td><td><strong>${servicio}</strong></td></tr>` : ""}
-          </table>
-          ${nota ? `<p style="color: #554d58">${nota}</p>` : ""}
-          ${
-            gestion
-              ? `<p style="margin: 20px 0"><a href="${gestion}" style="background: #272328; color: #ffffff; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block">Consultar o modificar mi cita</a></p>
-                 <p style="color: #675d6a; font-size: 12px">Guarda este enlace: con él puedes consultar el estado de tu cita, reagendarla o cancelarla según la política del negocio.</p>`
-              : `<p>Si necesitas cambiar o cancelar tu cita, comunícate con el negocio.</p>`
-          }
-          <p style="color: #675d6a; font-size: 12px">Enviado por Melena a nombre de ${escapeHtml(input.nombreNegocio)}.</p>
+        <main style="font-family: Arial, sans-serif; line-height: 1.6; color: ${EMAIL.text}; background: ${EMAIL.background}; padding: 24px 12px">
+          <section style="max-width: 560px; margin: 0 auto; background: ${EMAIL.card}; border: 1px solid ${EMAIL.border}; border-radius: 12px; padding: 24px">
+            <p style="margin: 0 0 16px; font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: ${EMAIL.accentForeground}">${escapeHtml(BRAND.name)}</p>
+            <h1 style="font-size: 20px; margin: 0 0 8px">Hola, ${cliente}</h1>
+            <h2 style="font-size: 16px; font-weight: 600; margin: 0 0 8px; color: ${EMAIL.accentForeground}">${plantilla.titulo}</h2>
+            <p style="margin: 0 0 12px">${plantilla.mensaje}</p>
+            <table style="border-collapse: collapse">
+              <tr><td style="padding: 4px 12px 4px 0; color: ${EMAIL.muted}">Sucursal</td><td><strong>${sucursal}</strong></td></tr>
+              ${antes ? `<tr><td style="padding: 4px 12px 4px 0; color: ${EMAIL.muted}">Horario anterior</td><td><s>${antes}</s></td></tr>` : ""}
+              <tr><td style="padding: 4px 12px 4px 0; color: ${EMAIL.muted}">Fecha y hora</td><td><strong>${cuando}</strong></td></tr>
+              ${servicio ? `<tr><td style="padding: 4px 12px 4px 0; color: ${EMAIL.muted}">Servicio</td><td><strong>${servicio}</strong></td></tr>` : ""}
+            </table>
+            ${nota ? `<p style="color: ${EMAIL.note}; background: ${EMAIL.accent}; border-radius: 8px; padding: 10px 12px">${nota}</p>` : ""}
+            ${
+              gestion
+                ? `<p style="margin: 20px 0"><a href="${gestion}" style="background: ${EMAIL.primary}; color: ${EMAIL.primaryForeground}; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: 600">Consultar o modificar mi cita</a></p>
+                   <p style="color: ${EMAIL.muted}; font-size: 12px">Guarda este enlace: con él puedes consultar el estado de tu cita, reagendarla o cancelarla según la política del negocio.</p>`
+                : `<p>Si necesitas cambiar o cancelar tu cita, comunícate con el negocio.</p>`
+            }
+            <p style="color: ${EMAIL.muted}; font-size: 12px; margin-bottom: 0">Enviado por ${escapeHtml(BRAND.name)} a nombre de ${escapeHtml(input.nombreNegocio)}.</p>
+          </section>
         </main>
       `,
     }),

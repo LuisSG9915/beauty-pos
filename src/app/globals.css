@@ -47,6 +47,10 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-brand-icon-bg: var(--brand-icon-bg);
+  --color-brand-icon-bg-end: var(--brand-icon-bg-end);
+  --color-brand-icon-fg: var(--brand-icon-fg);
+  --color-brand-fg-on-dark: var(--brand-fg-on-dark);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -56,130 +60,200 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * Bugambilia viva — sistema global de Melena.
+ *
+ * Una sola paleta para toda la app (público y /admin): bugambilia profundo
+ * sobre neutros limpios en claro, fucsia luminoso sobre ciruela oscuro en
+ * `.dark`. El modo se controla con la clase `.dark` en <html> (la aplica el
+ * bootstrap inline del layout y la sincroniza ThemeRuntime); sin JS ni
+ * preferencia guardada se usa siempre el modo claro.
+ */
 :root {
-  --background: #fbf9fc;
-  --foreground: #26202c;
+  color-scheme: light;
+  --background: #faf9fb;
+  --foreground: #241922;
   --card: #ffffff;
-  --card-foreground: #26202c;
+  --card-foreground: #241922;
   --popover: #ffffff;
-  --popover-foreground: #26202c;
-  --primary: #6f4b7d;
-  --primary-foreground: #fdfbfe;
-  --secondary: #f2eef4;
-  --secondary-foreground: #43364e;
-  --muted: #f2eef4;
-  --muted-foreground: #6c6170;
-  --accent: #efe6f4;
-  --accent-foreground: #4a3356;
-  --destructive: #a8443a;
-  --destructive-foreground: #fff6f2;
-  --success: #347052;
-  --success-foreground: #f2f9f4;
-  --warning: #7a5510;
-  --warning-foreground: #fffaf0;
-  --info: #3e6390;
-  --info-foreground: #f2f6fb;
-  --border: #e2dae7;
-  --input: #e2dae7;
-  --ring: #6f4b7d;
-  --chart-1: #6f4b7d;
-  --chart-2: #347052;
-  --chart-3: #7a5510;
-  --chart-4: #6c6170;
-  --chart-5: #26202c;
-  --radius: 0.625rem;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #26202c;
-  --sidebar-primary: #6f4b7d;
-  --sidebar-primary-foreground: #fdfbfe;
-  --sidebar-accent: #efe6f4;
-  --sidebar-accent-foreground: #4a3356;
-  --sidebar-border: #e2dae7;
-  --sidebar-ring: #6f4b7d;
-}
-
-/* Coral Editorial: tema del panel operativo. Cambiar estos tokens actualiza
-   todo /admin sin depender de colores dispersos en componentes. */
-.admin-theme {
-  --background: #fbf7f2;
-  --foreground: #211b19;
-  --card: #ffffff;
-  --card-foreground: #211b19;
-  --popover: #ffffff;
-  --popover-foreground: #211b19;
-  --primary: #b7442e;
-  --primary-foreground: #fffaf7;
-  --secondary: #f6efe8;
-  --secondary-foreground: #57352b;
-  --muted: #f6efe8;
-  --muted-foreground: #685b55;
-  --accent: #fbe5dc;
-  --accent-foreground: #7a2e20;
-  --destructive: #9d2f22;
-  --destructive-foreground: #fff7f4;
-  --success: #205a50;
-  --success-foreground: #f0faf6;
-  --warning: #7d4a00;
+  --popover-foreground: #241922;
+  --primary: #a91d5d;
+  --primary-foreground: #fff7fb;
+  --secondary: #f1eef1;
+  --secondary-foreground: #43293b;
+  --muted: #f3eff2;
+  --muted-foreground: #6f6069;
+  --accent: #f8e2ee;
+  --accent-foreground: #7b1749;
+  --destructive: #a8362f;
+  --destructive-foreground: #fff7f5;
+  --success: #276451;
+  --success-foreground: #f2faf6;
+  --warning: #77510a;
   --warning-foreground: #fff8e8;
-  --info: #24536b;
-  --info-foreground: #f0f7fc;
-  --border: #e7dcd3;
-  --input: #e0d2c7;
-  --ring: #b7442e;
-  --chart-1: #b7442e;
-  --chart-2: #205a50;
-  --chart-3: #7d4a00;
-  --chart-4: #762c49;
-  --chart-5: #24536b;
-  --sidebar: #fffdfa;
-  --sidebar-foreground: #211b19;
-  --sidebar-primary: #b7442e;
-  --sidebar-primary-foreground: #fffaf7;
-  --sidebar-accent: #fbe5dc;
-  --sidebar-accent-foreground: #7a2e20;
-  --sidebar-border: #eadfd6;
-  --sidebar-ring: #b7442e;
+  --info: #305f86;
+  --info-foreground: #f2f7fc;
+  --border: #ded5dc;
+  --input: #d7c8d1;
+  --ring: #a91d5d;
+  --chart-1: #a91d5d;
+  --chart-2: #276451;
+  --chart-3: #77510a;
+  --chart-4: #305f86;
+  --chart-5: #6f6069;
+  --radius: 0.625rem;
+  --sidebar: #fdfbfc;
+  --sidebar-foreground: #241922;
+  --sidebar-primary: #a91d5d;
+  --sidebar-primary-foreground: #fff7fb;
+  --sidebar-accent: #f8e2ee;
+  --sidebar-accent-foreground: #7b1749;
+  --sidebar-border: #ded5dc;
+  --sidebar-ring: #a91d5d;
+
+  /* Isotipo "M fluida": tile degradado + glifo. Se invierte en oscuro. */
+  --brand-icon-bg: #341523;
+  --brand-icon-bg-end: #a91d5d;
+  --brand-icon-fg: #fff7fb;
+  /* Texto claro fijo para superficies oscuras de marca (login, footer). */
+  --brand-fg-on-dark: #fff7fb;
+
+  /* Tonos de categoría/servicio del catálogo POS (chips, tarjetas).
+     Contrato por tono N ∈ 1..8, consumido por src/lib/category-color.ts:
+       --category-N             acento fuerte (borde hover, marcadores)
+       --category-N-border      borde en reposo
+       --category-N-bg          superficie tinteada de tarjeta
+       --category-N-soft        superficie aún más suave (chips/filtros)
+       --category-N-foreground  texto legible sobre el tinte
+     1 coral · 2 mango · 3 menta · 4 cielo · 5 rosa · 6 violeta · 7 lima · 8 durazno */
+  --category-1: #dd9a86;
+  --category-1-border: #efc0b4;
+  --category-1-bg: #ffd9cf;
+  --category-1-soft: #fbe5dc;
+  --category-1-foreground: #7a2e20;
+  --category-2: #d3a040;
+  --category-2-border: #e7bd66;
+  --category-2-bg: #ffe3ad;
+  --category-2-soft: #fff1d1;
+  --category-2-foreground: #654300;
+  --category-3: #78b5a9;
+  --category-3-border: #9fcfc4;
+  --category-3-bg: #d4efe9;
+  --category-3-soft: #e2f5f1;
+  --category-3-foreground: #205a50;
+  --category-4: #82b2d0;
+  --category-4-border: #a9cbe0;
+  --category-4-bg: #d7ebf7;
+  --category-4-soft: #e3f1fa;
+  --category-4-foreground: #24536b;
+  --category-5: #cd8aa0;
+  --category-5-border: #e2aabb;
+  --category-5-bg: #f8d8e3;
+  --category-5-soft: #fbe5ed;
+  --category-5-foreground: #762c49;
+  --category-6: #a191ca;
+  --category-6-border: #beb2de;
+  --category-6-bg: #e6e0f7;
+  --category-6-soft: #eeeaf9;
+  --category-6-foreground: #4a3d72;
+  --category-7: #a8b36b;
+  --category-7-border: #c1ca8b;
+  --category-7-bg: #e5edcb;
+  --category-7-soft: #eef2dc;
+  --category-7-foreground: #42551e;
+  --category-8: #dc9d72;
+  --category-8-border: #edb894;
+  --category-8-bg: #fbdcc6;
+  --category-8-soft: #fce7d7;
+  --category-8-foreground: #6e3819;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.985 0 0);
-  --success: oklch(0.72 0.12 155);
-  --success-foreground: oklch(0.15 0 0);
-  --warning: oklch(0.8 0.14 85);
-  --warning-foreground: oklch(0.15 0 0);
-  --info: oklch(0.75 0.11 230);
-  --info-foreground: oklch(0.15 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  color-scheme: dark;
+  --background: #1a1117;
+  --foreground: #faf0f5;
+  --card: #241822;
+  --card-foreground: #faf0f5;
+  --popover: #2b1b28;
+  --popover-foreground: #faf0f5;
+  --primary: #f0649d;
+  --primary-foreground: #3b0b25;
+  --secondary: #352231;
+  --secondary-foreground: #faf0f5;
+  --muted: #2d1e2a;
+  --muted-foreground: #bdabb5;
+  --accent: #492038;
+  --accent-foreground: #ffc3df;
+  --destructive: #e47d70;
+  --destructive-foreground: #35100d;
+  --success: #73c9a7;
+  --success-foreground: #082017;
+  --warning: #e3b65c;
+  --warning-foreground: #241700;
+  --info: #8ebde3;
+  --info-foreground: #0c1e2d;
+  --border: #442e3e;
+  --input: #513549;
+  --ring: #f0649d;
+  --chart-1: #f0649d;
+  --chart-2: #73c9a7;
+  --chart-3: #e3b65c;
+  --chart-4: #8ebde3;
+  --chart-5: #bdabb5;
+  --sidebar: #221720;
+  --sidebar-foreground: #faf0f5;
+  --sidebar-primary: #f0649d;
+  --sidebar-primary-foreground: #3b0b25;
+  --sidebar-accent: #492038;
+  --sidebar-accent-foreground: #ffc3df;
+  --sidebar-border: #442e3e;
+  --sidebar-ring: #f0649d;
+
+  /* Tile claro con glifo oscuro: mantiene contraste en modo oscuro. */
+  --brand-icon-bg: #f0649d;
+  --brand-icon-bg-end: #8c2050;
+  --brand-icon-fg: #3b0b25;
+
+  --category-1: #d99a86;
+  --category-1-border: #7a4b3f;
+  --category-1-bg: #452720;
+  --category-1-soft: #39201a;
+  --category-1-foreground: #f2c6b6;
+  --category-2: #d5a44a;
+  --category-2-border: #7a5c22;
+  --category-2-bg: #433311;
+  --category-2-soft: #372a0e;
+  --category-2-foreground: #f0d08e;
+  --category-3: #7ab8ab;
+  --category-3-border: #40695f;
+  --category-3-bg: #1f3833;
+  --category-3-soft: #1a2e2a;
+  --category-3-foreground: #a9ddd0;
+  --category-4: #85b5d3;
+  --category-4-border: #3f5f77;
+  --category-4-bg: #1f3342;
+  --category-4-soft: #1b2b39;
+  --category-4-foreground: #b3d5ec;
+  --category-5: #cf8ea4;
+  --category-5-border: #74455a;
+  --category-5-bg: #412030;
+  --category-5-soft: #371b29;
+  --category-5-foreground: #f0bacd;
+  --category-6: #a496cd;
+  --category-6-border: #51457a;
+  --category-6-bg: #2c2541;
+  --category-6-soft: #262038;
+  --category-6-foreground: #ccc1ea;
+  --category-7: #a9b56e;
+  --category-7-border: #57622c;
+  --category-7-bg: #303718;
+  --category-7-soft: #2a2f14;
+  --category-7-foreground: #d4dd9e;
+  --category-8: #dd9f74;
+  --category-8-border: #765035;
+  --category-8-bg: #402818;
+  --category-8-soft: #372215;
+  --category-8-foreground: #f0c6a4;
 }
 
 @layer base {
@@ -197,6 +271,20 @@
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
+}
+
+/* Barra fina de navegación del shell; se mueve sin ocupar layout. */
+@keyframes admin-nav-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(300%);
+  }
+}
+
+.admin-nav-progress {
+  animation: admin-nav-progress 0.9s ease-in-out infinite;
 }
 
 /* Respeta usuarios con movimiento reducido: apaga animaciones y transiciones. */

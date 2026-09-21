@@ -104,13 +104,14 @@ const PX_PER_MIN = HOUR_PX / 60;
 const COLUMN_HEADER_PX = 46;
 
 // Estado como badge compacto (datos funcionales, no paleta estructural).
+// Los tonos semánticos translúcidos se leen sobre cualquier tinte de categoría.
 const ESTADO_CHIP: Record<string, string> = {
-  pendiente: "bg-[#f0ebe6]/90 text-muted-foreground",
-  confirmada: "bg-[#d7ebf7]/95 text-info",
-  en_proceso: "bg-[#ffe3ad]/95 text-warning",
-  completada: "bg-[#d4efe9]/95 text-success",
-  cancelada: "bg-[#f6d9d2]/95 text-destructive",
-  no_asistio: "bg-[#efe9e4]/95 text-muted-foreground",
+  pendiente: "bg-muted/80 text-muted-foreground",
+  confirmada: "bg-info/15 text-info",
+  en_proceso: "bg-warning/15 text-warning",
+  completada: "bg-success/15 text-success",
+  cancelada: "bg-destructive/15 text-destructive",
+  no_asistio: "bg-muted/80 text-muted-foreground",
 };
 
 const ESTADO_ATENUADO = new Set(["cancelada", "no_asistio"]);
@@ -255,7 +256,7 @@ function CitaCard({
     <button
       aria-label={`${ESTADO_LABEL[cita.estado] ?? cita.estado}, ${formatTime(cita.fechaHora, { timeZone })}, ${cita.clienteNombre}`}
       className={cn(
-        "w-full overflow-hidden rounded-lg border px-2 py-1.5 text-left shadow-[0_1px_2px_rgba(33,27,25,0.08)] transition-[box-shadow,transform] hover:z-10 hover:shadow-md focus-visible:z-20",
+        "w-full overflow-hidden rounded-lg border px-2 py-1.5 text-left shadow-sm transition-[box-shadow,transform] hover:z-10 hover:shadow-md focus-visible:z-20",
         draggable && "cursor-grab active:cursor-grabbing",
         tone.card,
         ESTADO_ATENUADO.has(cita.estado) && "opacity-70 saturate-[0.55]",

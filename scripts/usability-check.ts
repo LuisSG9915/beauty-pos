@@ -208,6 +208,60 @@ async function main() {
   }
   await page.close();
 
+  // Caso crítico reportado en móvil: Agenda → Mi día debe responder al primer
+  // toque con una señal visible y completar sin una segunda activación.
+  const mobilePage = await browser.newPage();
+  await mobilePage.setViewport(VIEWPORTS[1]);
+  await login(mobilePage, E2E_EMAIL);
+  console.log("\n=== Recorrido táctil (móvil) ===");
+  await mobilePage.goto(`${BASE_URL}/admin/agenda`, { waitUntil: "networkidle0", timeout: 60000 });
+  const tapOk = await mobilePage.evaluate(() => {
+    const link = [...document.querySelectorAll<HTMLAnchorElement>("a")].find(
+      (a) =>
+        new URL(a.href).pathname === "/admin/mi-dia" &&
+        a.getBoundingClientRect().width > 0,
+    );
+    link?.click();
+    return Boolean(link);
+  });
+  const feedbackOk = tapOk
+    ? await mobilePage
+        .waitForFunction(
+          () =>
+            Boolean(
+              document.querySelector(".admin-nav-progress") ||
+                document.querySelector('[data-pending="true"]'),
+            ),
+          { timeout: 1500, polling: 16 },
+        )
+        .then(() => true)
+        .catch(() => false)
+    : false;
+  const completedOk = tapOk
+    ? await mobilePage
+        .waitForFunction(
+          () =>
+            location.pathname === "/admin/mi-dia" &&
+            document.querySelector("main h1")?.textContent?.trim() === "Mi día",
+          { timeout: 15000, polling: 100 },
+        )
+        .then(() => true)
+        .catch(() => false)
+    : false;
+  console.log(
+    `Agenda → Mi día: toque=${tapOk ? "OK" : "FALLO"}, feedback=${feedbackOk ? "OK" : "FALLO"}, destino=${completedOk ? "OK" : "FALLO"}`,
+  );
+  if (!tapOk || !feedbackOk || !completedOk) {
+    findings.push({
+      pagina: "/admin/agenda → /admin/mi-dia",
+      viewport: "movil",
+      tipo: "accion-primaria",
+      severidad: "error",
+      detalle: `un toque no produjo navegación confirmada (toque=${tapOk}, feedback=${feedbackOk}, destino=${completedOk})`,
+    });
+  }
+  await mobilePage.close();
+
   const errores = findings.filter((f) => f.severidad === "error");
   const avisos = findings.filter((f) => f.severidad === "aviso");
   console.log(`\n=== Resumen: ${errores.length} errores, ${avisos.length} avisos ===`);

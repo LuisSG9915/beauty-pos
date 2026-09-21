@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { crearVentaDirecta } from "@/app/admin/pos/actions";
 import { OfflineCatalogoCache } from "@/app/admin/pos/offline-cache";
+import { VentaDirectaSubmit } from "@/app/admin/pos/venta-directa-submit";
 import { VentaTicket } from "@/app/admin/pos/venta-ticket";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { StatusBadge } from "@/components/status-badge";
@@ -183,9 +184,7 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
                 ))}
               </Select>
             </Field>
-            <Button className="rounded-xl" data-action-clave="1" data-action-id="pos.venta.abrir" disabled={branches.length === 0} size="touch" type="submit">
-              Abrir venta
-            </Button>
+            <VentaDirectaSubmit disabled={branches.length === 0} />
           </form>
           {branches.length === 0 ? (
             <p className="mt-3 text-sm font-medium text-warning">Necesitas una sucursal activa para vender.</p>

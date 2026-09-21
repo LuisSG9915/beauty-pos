@@ -37,7 +37,7 @@ function AccessError({ error }: { error?: string }) {
   const message = error ? ERROR_MESSAGES[error] : undefined;
   if (!message) return null;
   return (
-    <p className="rounded-xl border border-[#efc0b4] bg-[#f6d9d2] px-4 py-3 text-sm text-destructive" role="alert">
+    <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
       {message}
     </p>
   );
@@ -107,7 +107,7 @@ function MemberDashboard({
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                           alerta.tono === "critico"
-                            ? "bg-[#f6d9d2] text-destructive"
+                            ? "bg-destructive/10 text-destructive"
                             : "bg-accent/70 text-primary"
                         }`}
                       >

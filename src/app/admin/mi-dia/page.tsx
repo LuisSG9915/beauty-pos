@@ -80,48 +80,90 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
 
   const db = getDatabase();
 
-  const citaRows = await db
-    .select({
-      id: citas.id,
-      fechaHora: citas.fechaHora,
-      duracionMinutos: citas.duracionMinutos,
-      estado: citas.estado,
-      notas: citas.notas,
-      totalEstimado: citas.totalEstimado,
-      clienteId: clientes.id,
-      clienteNombre: clientes.nombre,
-      clienteNotas: clientes.notasOperativas,
-      ventaId: ventas.id,
-      ventaEstado: ventas.estado,
-    })
-    .from(citas)
-    .leftJoin(clientes, eq(citas.clienteId, clientes.id))
-    .leftJoin(ventas, and(eq(ventas.citaId, citas.id), eq(ventas.activo, true)))
-    .where(
-      and(
-        eq(citas.organizacionId, organization.id),
-        eq(citas.sucursalId, branch.id),
-        eq(citas.usuarioId, user.id),
-        eq(citas.activo, true),
-        gte(citas.fechaHora, bounds.iniciaAt),
-        lt(citas.fechaHora, bounds.terminaAt),
+  // Las citas y los agregados monetarios son independientes: lanzarlos juntos
+  // evita dos idas y vueltas extra a Postgres antes de que la pantalla exista.
+  const fechaVenta = sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`;
+  const [citaRows, propinaRows, comisionRows] = await Promise.all([
+    db
+      .select({
+        id: citas.id,
+        fechaHora: citas.fechaHora,
+        duracionMinutos: citas.duracionMinutos,
+        estado: citas.estado,
+        notas: citas.notas,
+        totalEstimado: citas.totalEstimado,
+        clienteId: clientes.id,
+        clienteNombre: clientes.nombre,
+        clienteNotas: clientes.notasOperativas,
+        ventaId: ventas.id,
+        ventaEstado: ventas.estado,
+      })
+      .from(citas)
+      .leftJoin(clientes, eq(citas.clienteId, clientes.id))
+      .leftJoin(ventas, and(eq(ventas.citaId, citas.id), eq(ventas.activo, true)))
+      .where(
+        and(
+          eq(citas.organizacionId, organization.id),
+          eq(citas.sucursalId, branch.id),
+          eq(citas.usuarioId, user.id),
+          eq(citas.activo, true),
+          gte(citas.fechaHora, bounds.iniciaAt),
+          lt(citas.fechaHora, bounds.terminaAt),
+        ),
+      )
+      .orderBy(asc(citas.fechaHora)),
+    db
+      .select({ total: sql<string>`coalesce(sum(${detalleVentasPropinas.monto}), 0)` })
+      .from(detalleVentasPropinas)
+      .innerJoin(ventas, eq(detalleVentasPropinas.ventaId, ventas.id))
+      .where(
+        and(
+          eq(detalleVentasPropinas.usuarioId, user.id),
+          eq(detalleVentasPropinas.activo, true),
+          eq(ventas.organizacionId, organization.id),
+          eq(ventas.sucursalId, branch.id),
+          eq(ventas.activo, true),
+          gte(fechaVenta, bounds.iniciaAt),
+          lt(fechaVenta, bounds.terminaAt),
+        ),
       ),
-    )
-    .orderBy(asc(citas.fechaHora));
+    db
+      .select({ total: sql<string>`coalesce(sum(${detalleVentasComisiones.monto}), 0)` })
+      .from(detalleVentasComisiones)
+      .innerJoin(ventas, eq(detalleVentasComisiones.ventaId, ventas.id))
+      .where(
+        and(
+          eq(detalleVentasComisiones.usuarioId, user.id),
+          eq(detalleVentasComisiones.activo, true),
+          eq(ventas.organizacionId, organization.id),
+          eq(ventas.sucursalId, branch.id),
+          eq(ventas.activo, true),
+          gte(fechaVenta, bounds.iniciaAt),
+          lt(fechaVenta, bounds.terminaAt),
+        ),
+      ),
+  ]);
 
   const citaIds = citaRows.map((row) => row.id);
-  const detalles = citaIds.length > 0
-    ? await db
-        .select({ citaId: detalleCitasServicios.citaId, nombre: servicios.nombre })
-        .from(detalleCitasServicios)
-        .innerJoin(servicios, eq(detalleCitasServicios.servicioId, servicios.id))
-        .where(
-          and(
-            inArray(detalleCitasServicios.citaId, citaIds),
-            eq(detalleCitasServicios.activo, true),
-          ),
-        )
-    : [];
+  const clienteIdsVisibles = [
+    ...new Set(citaRows.map((row) => row.clienteId).filter((id): id is string => Boolean(id))),
+  ];
+  const [detalles, alergias] = await Promise.all([
+    citaIds.length > 0
+      ? db
+          .select({ citaId: detalleCitasServicios.citaId, nombre: servicios.nombre })
+          .from(detalleCitasServicios)
+          .innerJoin(servicios, eq(detalleCitasServicios.servicioId, servicios.id))
+          .where(
+            and(
+              inArray(detalleCitasServicios.citaId, citaIds),
+              eq(detalleCitasServicios.activo, true),
+            ),
+          )
+      : Promise.resolve([] as Array<{ citaId: string; nombre: string }>),
+    // Alergias del expediente — visibles solo con `expedientes.alergias_ver`.
+    alergiasPorCliente(db, organization.id, clienteIdsVisibles, context.access),
+  ]);
 
   const serviciosPorCita = new Map<string, string[]>();
   for (const detalle of detalles) {
@@ -130,57 +172,8 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
     serviciosPorCita.set(detalle.citaId, list);
   }
 
-  // Ventas cobradas del día de la sucursal para acotar propinas/comisiones al turno.
-  const fechaVenta = sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`;
-  const ventasDelDia = await db
-    .select({ id: ventas.id })
-    .from(ventas)
-    .where(
-      and(
-        eq(ventas.organizacionId, organization.id),
-        eq(ventas.sucursalId, branch.id),
-        eq(ventas.activo, true),
-        gte(fechaVenta, bounds.iniciaAt),
-        lt(fechaVenta, bounds.terminaAt),
-      ),
-    );
-  const ventaIds = ventasDelDia.map((row) => row.id);
-
-  const [propinaRows, comisionRows] = ventaIds.length > 0
-    ? await Promise.all([
-        db
-          .select({ monto: detalleVentasPropinas.monto })
-          .from(detalleVentasPropinas)
-          .where(
-            and(
-              eq(detalleVentasPropinas.usuarioId, user.id),
-              eq(detalleVentasPropinas.activo, true),
-              inArray(detalleVentasPropinas.ventaId, ventaIds),
-            ),
-          ),
-        db
-          .select({ monto: detalleVentasComisiones.monto })
-          .from(detalleVentasComisiones)
-          .where(
-            and(
-              eq(detalleVentasComisiones.usuarioId, user.id),
-              eq(detalleVentasComisiones.activo, true),
-              inArray(detalleVentasComisiones.ventaId, ventaIds),
-            ),
-          ),
-      ])
-    : [[], []];
-
-  const suma = (rows: Array<{ monto: string }>) =>
-    rows.reduce((total, row) => total + Number(row.monto), 0);
-
-  // Alergias del expediente — visibles solo con `expedientes.alergias_ver`.
-  const alergias = await alergiasPorCliente(
-    db,
-    organization.id,
-    [...new Set(citaRows.map((row) => row.clienteId).filter((id): id is string => Boolean(id)))],
-    context.access,
-  );
+  const propinas = Number(propinaRows[0]?.total ?? 0);
+  const comisiones = Number(comisionRows[0]?.total ?? 0);
 
   const citasSerializadas: MiDiaCita[] = citaRows.map((row) => ({
     id: row.id,
@@ -213,8 +206,8 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
           pendientes: citasSerializadas.filter((cita) =>
             ["pendiente", "confirmada", "en_proceso"].includes(cita.estado),
           ).length,
-          propinas: suma(propinaRows),
-          comisiones: suma(comisionRows),
+          propinas,
+          comisiones,
         }}
         sucursalId={branch.id}
         timeZone={timeZone}

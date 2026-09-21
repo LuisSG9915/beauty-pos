@@ -57,11 +57,11 @@ export function RegistroForm() {
   return (
     <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
       <Field className="space-y-2" name="negocio">
-        <FieldLabel className="text-[#453d48]" required>
+        <FieldLabel required>
           Nombre de tu negocio
         </FieldLabel>
-        <div className="flex items-center gap-3 rounded-xl border border-[#dcd6de] bg-white px-3.5 focus-within:border-[#724b7f] focus-within:ring-3 focus-within:ring-[#724b7f]/10">
-          <Building2 className="size-4 text-[#97869c]" />
+        <div className="flex items-center gap-3 rounded-xl border border-input bg-card px-3.5 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20">
+          <Building2 className="size-4 text-muted-foreground" />
           <Input
             required
             autoComplete="organization"
@@ -75,11 +75,11 @@ export function RegistroForm() {
       </Field>
 
       <Field className="space-y-2" name="nombre">
-        <FieldLabel className="text-[#453d48]" required>
+        <FieldLabel required>
           Tu nombre
         </FieldLabel>
-        <div className="flex items-center gap-3 rounded-xl border border-[#dcd6de] bg-white px-3.5 focus-within:border-[#724b7f] focus-within:ring-3 focus-within:ring-[#724b7f]/10">
-          <User className="size-4 text-[#97869c]" />
+        <div className="flex items-center gap-3 rounded-xl border border-input bg-card px-3.5 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20">
+          <User className="size-4 text-muted-foreground" />
           <Input
             required
             autoComplete="name"
@@ -93,11 +93,11 @@ export function RegistroForm() {
       </Field>
 
       <Field className="space-y-2" name="correo">
-        <FieldLabel className="text-[#453d48]" required>
+        <FieldLabel required>
           Correo de acceso
         </FieldLabel>
-        <div className="flex items-center gap-3 rounded-xl border border-[#dcd6de] bg-white px-3.5 focus-within:border-[#724b7f] focus-within:ring-3 focus-within:ring-[#724b7f]/10">
-          <Mail className="size-4 text-[#97869c]" />
+        <div className="flex items-center gap-3 rounded-xl border border-input bg-card px-3.5 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20">
+          <Mail className="size-4 text-muted-foreground" />
           <Input
             required
             autoComplete="email"
@@ -111,11 +111,11 @@ export function RegistroForm() {
       </Field>
 
       <Field className="space-y-2" name="password">
-        <FieldLabel className="text-[#453d48]" required>
+        <FieldLabel required>
           Contraseña
         </FieldLabel>
-        <div className="flex items-center gap-3 rounded-xl border border-[#dcd6de] bg-white px-3.5 focus-within:border-[#724b7f] focus-within:ring-3 focus-within:ring-[#724b7f]/10">
-          <LockKeyhole className="size-4 text-[#97869c]" />
+        <div className="flex items-center gap-3 rounded-xl border border-input bg-card px-3.5 focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/20">
+          <LockKeyhole className="size-4 text-muted-foreground" />
           <Input
             required
             autoComplete="new-password"
@@ -129,13 +129,13 @@ export function RegistroForm() {
       </Field>
 
       {errorMessage ? (
-        <p className="rounded-xl border border-[#efc9b8] bg-[#fdf0ea] px-4 py-3 text-sm text-[#8a3c1d]" role="alert">
+        <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
           {errorMessage}
         </p>
       ) : null}
 
       <Button
-        className="w-full rounded-xl bg-[#29242a] py-3 text-sm font-semibold text-[#faf6fd] hover:bg-[#44382f]"
+        className="w-full rounded-xl py-3 text-sm font-semibold"
         disabled={isPending}
         type="submit"
       >
@@ -143,7 +143,7 @@ export function RegistroForm() {
         <ArrowRight className="ml-2 size-4" />
       </Button>
 
-      <p className="text-center text-xs leading-5 text-[#675d6a]">
+      <p className="text-center text-xs leading-5 text-muted-foreground">
         14 días de prueba sin tarjeta. Tus datos se conservan al contratar.
       </p>
     </form>

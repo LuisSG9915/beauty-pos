@@ -139,7 +139,7 @@ export default async function SucursalesPage({ searchParams }: Props) {
           </p>
         ) : null}
         {cubiertas != null && activas >= cubiertas ? (
-          <p className="mt-3 rounded-xl bg-[#fff1d1] px-4 py-3 text-sm text-warning">
+          <p className="mt-3 rounded-xl bg-warning/10 px-4 py-3 text-sm text-warning">
             Ya usas las {cubiertas} sucursal(es) cubiertas por tu suscripción. Para activar o crear otra,
             solicita ampliar la cobertura en{" "}
             <Link className="font-medium text-primary underline" href={`/admin/suscripcion?organizationId=${organization.id}`}>

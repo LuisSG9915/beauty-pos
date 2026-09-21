@@ -623,7 +623,7 @@ export function CitaSidePanel({
           ) : null}
           {puedeCobrar ? (
             <Button
-              className="rounded-xl bg-[#205a50] text-white hover:bg-[#205a50]"
+              className="rounded-xl bg-success text-success-foreground hover:bg-success/90"
               disabled={ocupado}
               onClick={() => onCobrar(cita)}
               size="touch"
@@ -771,7 +771,7 @@ export function CitaSidePanel({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-warning">
             Notas del cliente / alergias
           </h3>
-          <p className="mt-2 rounded-xl border border-[#e7bd66] bg-[#ffe3ad] px-4 py-3 text-sm leading-6 text-warning">
+          <p className="mt-2 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-6 text-warning">
             {cita.clienteNotas}
           </p>
         </section>

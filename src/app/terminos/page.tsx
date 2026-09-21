@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { BrandWordmark } from "@/components/brand-mark";
+import { ThemeModeSelector } from "@/components/theme-mode-selector";
 
 export const metadata = { title: "Términos de servicio" };
 
@@ -49,29 +50,32 @@ const secciones = [
 
 export default function TerminosPage() {
   return (
-    <main className="min-h-screen bg-[#f9f8f9] text-[#272328]">
+    <main className="min-h-screen bg-background text-foreground">
       <header className="mx-auto flex w-full max-w-4xl items-center justify-between px-6 py-6 lg:px-10">
         <Link className="inline-flex rounded-lg outline-offset-4" href="/">
           <BrandWordmark markSize={40} />
         </Link>
-        <Link
-          className="inline-flex h-8 items-center rounded-lg border border-[#d8d3d9] bg-white px-4 text-sm font-medium transition-colors hover:bg-[#f2f0f2]"
-          href="/registro"
-        >
-          Crear cuenta
-        </Link>
+        <nav className="flex items-center gap-2">
+          <ThemeModeSelector iconOnly />
+          <Link
+            className="inline-flex h-8 items-center rounded-lg border border-border bg-card px-4 text-sm font-medium transition-colors hover:bg-muted"
+            href="/registro"
+          >
+            Crear cuenta
+          </Link>
+        </nav>
       </header>
 
       <article className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10 lg:px-10">
-        <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#7a5c88]">Legal</p>
+        <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary">Legal</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">Términos de servicio</h1>
-        <p className="mt-4 text-sm text-[#675d6a]">Última actualización: enero 2026</p>
+        <p className="mt-4 text-sm text-muted-foreground">Última actualización: enero 2026</p>
 
         <div className="mt-10 space-y-8">
           {secciones.map((seccion) => (
             <section key={seccion.titulo}>
               <h2 className="font-semibold">{seccion.titulo}</h2>
-              <p className="mt-2 text-sm leading-7 text-[#574e5a]">{seccion.cuerpo}</p>
+              <p className="mt-2 text-sm leading-7 text-muted-foreground">{seccion.cuerpo}</p>
             </section>
           ))}
         </div>

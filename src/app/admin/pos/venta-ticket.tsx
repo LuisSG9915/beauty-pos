@@ -284,7 +284,7 @@ function TicketLine({
         <div className="mt-1.5 flex items-center gap-2">
           {paquete.usado ? (
             <>
-              <span className="inline-flex items-center gap-1 rounded-full bg-[#d4efe9] px-2.5 py-1 text-xs font-medium text-success">
+              <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
                 <PackageCheck aria-hidden="true" className="size-3.5" />
                 Paquete{paquete.nombre ? ` · ${paquete.nombre}` : ""}
               </span>
@@ -299,7 +299,7 @@ function TicketLine({
             </>
           ) : paquete.disponible > 0 ? (
             <button
-              className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-[#9fcfc4] px-2.5 text-xs font-medium text-success transition-colors hover:bg-[#d4efe9] disabled:opacity-50"
+              className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-success/30 px-2.5 text-xs font-medium text-success transition-colors hover:bg-success/10 disabled:opacity-50"
               disabled={pending}
               onClick={() => run(usarPaqueteEnLinea, {})}
               type="button"
@@ -1046,7 +1046,7 @@ export function VentaTicket({
               ))}
             </ul>
             {editable && anticipos.some((a) => a.estado === "vigente") && anticipoPorAplicar === 0 ? (
-              <p className="mt-3 rounded-xl bg-[#fff1d1] px-4 py-2.5 text-xs text-warning">
+              <p className="mt-3 rounded-xl bg-warning/10 px-4 py-2.5 text-xs text-warning">
                 El anticipo vigente excede el total del ticket; no se aplicará automáticamente.
                 Devuélvelo desde la cita.
               </p>
@@ -1066,7 +1066,7 @@ export function VentaTicket({
             ventaId={venta.id}
           />
         ) : cancelada ? (
-          <section className="rounded-2xl border border-[#efc0b4] bg-[#f6d9d2] p-6 shadow-sm">
+          <section className="rounded-2xl border border-destructive/30 bg-destructive/10 p-6 shadow-sm">
             <h2 className="font-semibold text-destructive">Venta cancelada</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               Se generó una devolución compensatoria: el stock de productos fue
@@ -1082,7 +1082,7 @@ export function VentaTicket({
             ) : null}
           </section>
         ) : (
-          <section className="rounded-2xl border border-[#9fcfc4] bg-[#e2f5f1] p-6 shadow-sm">
+          <section className="rounded-2xl border border-success/30 bg-success/10 p-6 shadow-sm">
             <h2 className="font-semibold text-success">Venta cerrada</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               Esta venta ya fue cobrada y no puede modificarse.
@@ -1090,7 +1090,7 @@ export function VentaTicket({
             <div className="mt-4 flex flex-wrap items-center gap-3">
               {modo !== "inline" ? (
                 <Link
-                  className="inline-flex min-h-10 items-center rounded-xl border border-[#9fcfc4] bg-card px-4 text-sm font-medium text-success"
+                  className="inline-flex min-h-10 items-center rounded-xl border border-success/30 bg-card px-4 text-sm font-medium text-success"
                   href={returnTo}
                 >
                   ← Volver
@@ -1273,7 +1273,7 @@ function CancelarVentaButton({
   if (!abierto) {
     return (
       <button
-        className="inline-flex min-h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-destructive transition-colors hover:bg-[#f6d9d2]"
+        className="inline-flex min-h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
         onClick={() => setAbierto(true)}
         type="button"
       >
@@ -1285,7 +1285,7 @@ function CancelarVentaButton({
   return (
     <form
       action={formAction}
-      className="w-full space-y-3 rounded-xl border border-[#efc0b4] bg-accent/70 p-4"
+      className="w-full space-y-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4"
     >
       <input name="organizacionId" type="hidden" value={organizationId} />
       <input name="ventaId" type="hidden" value={ventaId} />

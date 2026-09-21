@@ -40,7 +40,7 @@ export function InsumosManager({ organizationId, servicioId, insumos, disponible
                     <form action={removeServicioInsumo}>
                       <input name="organizacionId" type="hidden" value={organizationId} />
                       <input name="insumoRelId" type="hidden" value={insumo.id} />
-                      <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-destructive hover:bg-[#f6d9d2]" type="submit">Quitar</button>
+                      <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-destructive hover:bg-destructive/10" type="submit">Quitar</button>
                     </form>
                   </td>
                 </tr>

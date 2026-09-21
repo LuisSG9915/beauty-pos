@@ -486,7 +486,7 @@ export default async function ReportesPage({ searchParams }: Props) {
           </section>
 
           {num(productosSinCosto[0]?.unidades) > 0 ? (
-            <p className="rounded-xl border border-[#e7bd66] bg-[#fff1d1] px-4 py-3 text-sm text-warning">
+            <p className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
               {productosSinCosto[0]?.productos} producto(s) vendidos en el periodo no tienen costo capturado
               ({productosSinCosto[0]?.unidades} unidad(es)). El «resultado estimado» no descuenta costo de
               insumos — captura el costo en el catálogo para márgenes reales.
@@ -507,6 +507,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             >
               <div className="mb-4">
                 <BarChart
+                  color="var(--chart-1)"
                   formato={(v) => fmt(v)}
                   puntos={ventasPorDia.map((row) => ({
                     etiqueta: row.dia.slice(5),
@@ -531,6 +532,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             <AdminCard description="Monto cobrado por medio de pago" title="Cobros por medio de pago">
               <div className="mb-4">
                 <HBarChart
+                  color="var(--chart-4)"
                   formato={(v) => fmt(v)}
                   puntos={pagosPorMedio.map((row) => ({
                     etiqueta: row.nombre,
@@ -583,7 +585,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             >
               <div className="mb-4">
                 <HBarChart
-                  color="#b7442e"
+                  color="var(--chart-3)"
                   formato={(v) => fmt(v)}
                   puntos={gastosResumen.porCategoria.map((row) => ({
                     etiqueta: row.nombre,

@@ -122,7 +122,7 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
               <span
                 aria-hidden="true"
                 className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
-                  paso.hecho ? "bg-[#d4efe9] text-success" : "bg-muted/60 text-muted-foreground"
+                  paso.hecho ? "bg-success/10 text-success" : "bg-muted/60 text-muted-foreground"
                 }`}
               >
                 {paso.hecho ? <CheckCircle2 className="size-5" /> : <Circle className="size-5" />}

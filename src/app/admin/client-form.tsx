@@ -81,7 +81,7 @@ export function ClientForm({ organizationId, initial }: { organizationId: string
       </details>
 
       {state.warning ? (
-        <label className="mt-5 flex items-start gap-3 rounded-xl border border-[#e7bd66] bg-accent/70 p-4 text-sm text-warning">
+        <label className="mt-5 flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
           <input className="mt-1" name="confirmarDuplicado" type="checkbox" value="true" />
           <span>{state.warning} Deseo guardar el cliente de todas formas.</span>
         </label>

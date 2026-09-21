@@ -35,15 +35,15 @@ function estadoLabel(estado: EstadoSuscripcionAdmin): { texto: string; tono: str
     case "trialing":
       return {
         texto: `Prueba${estado.diasRestantes !== null ? ` · ${estado.diasRestantes} días` : ""}`,
-        tono: "bg-accent/70 text-warning border-[#e7bd66]",
+        tono: "bg-warning/10 text-warning border-warning/30",
       };
     case "activa":
       return {
         texto: `Activa${estado.termina ? ` · hasta ${estado.termina}` : ""}`,
-        tono: "bg-[#e2f5f1] text-success border-[#9fcfc4]",
+        tono: "bg-success/10 text-success border-success/30",
       };
     case "vencida":
-      return { texto: "Vencida (solo lectura)", tono: "bg-accent/70 text-destructive border-[#efc0b4]" };
+      return { texto: "Vencida (solo lectura)", tono: "bg-destructive/10 text-destructive border-destructive/30" };
     default:
       return { texto: "Sin suscripción", tono: "bg-muted/60 text-muted-foreground border-border" };
   }

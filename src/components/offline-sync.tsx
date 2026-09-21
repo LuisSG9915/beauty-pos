@@ -64,7 +64,7 @@ export function OfflineSyncBadge() {
   if (pendientes.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-80 rounded-2xl border border-[#e7bd66] bg-accent/70 p-4 shadow-lg" role="status">
+    <div className="fixed bottom-4 right-4 z-50 w-80 rounded-2xl border border-warning/40 bg-accent/70 p-4 shadow-lg" role="status">
       <p className="text-sm font-semibold text-warning">
         {pendientes.length === 1 ? "1 venta offline por sincronizar" : `${pendientes.length} ventas offline por sincronizar`}
       </p>
@@ -78,7 +78,7 @@ export function OfflineSyncBadge() {
         {pendientes.length > 4 ? <li>y {pendientes.length - 4} más…</li> : null}
       </ul>
       <button
-        className="mt-3 w-full rounded-xl bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-[#a63c28] disabled:opacity-50"
+        className="mt-3 w-full rounded-xl bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-[color-mix(in_oklch,var(--primary),black_10%)] disabled:opacity-50"
         disabled={sincronizando || !enLinea}
         onClick={() => void sincronizar()}
         type="button"

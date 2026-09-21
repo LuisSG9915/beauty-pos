@@ -7,7 +7,9 @@ const RUNS = Number(process.env.PERF_RUNS ?? 3);
 const ROUTES = [
   "/admin",
   "/admin/agenda",
+  "/admin/mi-dia",
   "/admin/pos",
+  "/admin/caja",
   "/admin/clientes",
   "/admin/reportes",
   "/admin/sucursales",
@@ -145,72 +147,110 @@ async function main() {
     await page.close();
   }
 
-  // Navegación cliente solo en escritorio: mide el costo de las transiciones
-  // del App Router sin el ruido del primer render.
-  const page = await browser.newPage();
-  await page.setViewport(VIEWPORTS[0]);
-  const navNet = freshNet();
-  watchRequests(page, navNet);
-  await login(page, E2E_EMAIL);
-  console.log("\n=== Navegación cliente (desktop) ===");
-  const clientSamples: Record<string, number[]> = {};
-  const clientReqs: Record<string, { req: number; prefetch: number }[]> = {};
-  for (const route of ROUTES.slice(1)) {
-    clientSamples[route] = [];
-    clientReqs[route] = [];
-  }
+  // Navegación cliente en ambos contextos: además del tiempo total, medimos
+  // el primer feedback visual para detectar el patrón "tuve que tocar dos veces".
+  const NAV_MARKERS: Record<string, string> = {
+    "/admin/agenda": "Agenda de citas",
+    "/admin/mi-dia": "Mi día",
+    "/admin/pos": "Cobrar",
+    "/admin/caja": "Caja",
+  };
+  const NAV_ROUTES = Object.keys(NAV_MARKERS);
 
-  for (let i = 0; i < RUNS; i++) {
-    for (const route of ROUTES.slice(1)) {
-      Object.assign(navNet, freshNet(), { paths: {}, prefetchPaths: {} });
-      const t0 = Date.now();
-      const clicked = await page.evaluate((h) => {
-        const link = [...document.querySelectorAll("a")].find(
-          (a) => new URL(a.href).pathname === h && a.getBoundingClientRect().width > 0,
-        );
-        link?.click();
-        return Boolean(link);
-      }, route);
-      if (!clicked) {
-        // Rutas secundarias viven tras "Más opciones": abrirla y reintentar.
-        await page.click('[data-action-id="nav.mas_opciones"]').catch(() => {});
-        await new Promise((resolve) => setTimeout(resolve, 400));
-        await page.evaluate((h) => {
+  for (const viewport of VIEWPORTS) {
+    const page = await browser.newPage();
+    await page.setViewport(viewport);
+    const navNet = freshNet();
+    watchRequests(page, navNet);
+    await login(page, E2E_EMAIL);
+    console.log(`\n=== Navegación cliente (${viewport.nombre}) ===`);
+
+    const clientSamples: Record<string, number[]> = {};
+    const feedbackSamples: Record<string, number[]> = {};
+    const clientReqs: Record<string, { req: number; prefetch: number }[]> = {};
+    for (const route of NAV_ROUTES) {
+      clientSamples[route] = [];
+      feedbackSamples[route] = [];
+      clientReqs[route] = [];
+    }
+
+    for (let i = 0; i < RUNS; i++) {
+      for (const route of NAV_ROUTES) {
+        await page.goto(`${BASE_URL}/admin`, { waitUntil: "load", timeout: 60000 });
+        Object.assign(navNet, freshNet(), { paths: {}, prefetchPaths: {} });
+
+        const t0 = Date.now();
+        let clicked = await page.evaluate((h) => {
           const link = [...document.querySelectorAll("a")].find(
-            (a) => new URL(a.href).pathname === h,
+            (a) => new URL(a.href).pathname === h && a.getBoundingClientRect().width > 0,
           );
           link?.click();
+          return Boolean(link);
         }, route);
-      }
-      try {
-        await page.waitForFunction((h) => location.pathname === h, { timeout: 15000, polling: 100 }, route);
-        clientSamples[route].push(Date.now() - t0);
-      } catch {
-        console.log(`  !! ${route}: clicked=${clicked} url=${page.url()}`);
-        clientSamples[route].push(NaN);
-      }
-      // Settle breve para contar requests de la navegación sin medir su
-      // duración: el dev server mantiene conexiones vivas y un idle largo
-      // inflaría el tiempo registrado.
-      await page.waitForNetworkIdle({ idleTime: 300, timeout: 3000 }).catch(() => {});
-      clientReqs[route].push({ req: navNet.total, prefetch: navNet.prefetch });
-      // Regresar a /admin para que el siguiente clic parta del mismo origen.
-      await page.goto(`${BASE_URL}/admin`, { waitUntil: "load" });
-    }
-  }
+        if (!clicked) {
+          // Rutas secundarias viven tras "Más" en el tab bar móvil.
+          await page.click('[data-action-id="nav.mas_abrir"]').catch(() => {});
+          await page.waitForSelector(`a[href*="${route}"]`, { visible: true, timeout: 3000 }).catch(() => {});
+          clicked = await page.evaluate((h) => {
+            const link = [...document.querySelectorAll("a")].find(
+              (a) => new URL(a.href).pathname === h && a.getBoundingClientRect().width > 0,
+            );
+            link?.click();
+            return Boolean(link);
+          }, route);
+        }
 
-  for (const [route, samples] of Object.entries(clientSamples)) {
-    const ok = samples.filter((v) => Number.isFinite(v));
-    const reqs = clientReqs[route];
-    const avgReq = reqs.reduce((a, r) => a + r.req, 0) / reqs.length;
-    const avgPre = reqs.reduce((a, r) => a + r.prefetch, 0) / reqs.length;
-    if (ok.length === 0) {
-      console.log(`nav -> ${route.padEnd(20)} FALLO: ${samples.length}/${samples.length} navegaciones sin completar`);
-      continue;
+        const feedback = await page
+          .waitForFunction(
+            () =>
+              Boolean(
+                document.querySelector(".admin-nav-progress") ||
+                  document.querySelector('[data-pending="true"]'),
+              ),
+            { timeout: 1500, polling: 16 },
+          )
+          .then(() => Date.now() - t0)
+          .catch(() => NaN);
+        feedbackSamples[route].push(feedback);
+
+        try {
+          await page.waitForFunction(
+            (h, marker) =>
+              location.pathname === h &&
+              document.querySelector("main h1")?.textContent?.trim() === marker,
+            { timeout: 15000, polling: 100 },
+            route,
+            NAV_MARKERS[route],
+          );
+          clientSamples[route].push(Date.now() - t0);
+        } catch {
+          console.log(`  !! ${route}: clicked=${clicked} url=${page.url()}`);
+          clientSamples[route].push(NaN);
+        }
+
+        await page.waitForNetworkIdle({ idleTime: 300, timeout: 3000 }).catch(() => {});
+        clientReqs[route].push({ req: navNet.total, prefetch: navNet.prefetch });
+      }
     }
-    const s = stats(ok);
-    const fallos = samples.length - ok.length;
-    console.log(`nav -> ${route.padEnd(20)} p50 ${s.p50}ms (p95 ${s.p95}, min ${s.min}) | req ${avgReq.toFixed(0)} (prefetch ${avgPre.toFixed(0)})${fallos ? ` | ${fallos} fallo(s)` : ""}`);
+
+    for (const [route, samples] of Object.entries(clientSamples)) {
+      const ok = samples.filter((v) => Number.isFinite(v));
+      const feedbackOk = feedbackSamples[route].filter((v) => Number.isFinite(v));
+      const reqs = clientReqs[route];
+      const avgReq = reqs.reduce((a, r) => a + r.req, 0) / reqs.length;
+      const avgPre = reqs.reduce((a, r) => a + r.prefetch, 0) / reqs.length;
+      if (ok.length === 0) {
+        console.log(`nav -> ${route.padEnd(20)} FALLO: ${samples.length}/${samples.length} navegaciones sin completar`);
+        continue;
+      }
+      const s = stats(ok);
+      const f = stats(feedbackOk);
+      const fallos = samples.length - ok.length;
+      console.log(
+        `nav -> ${route.padEnd(20)} feedback p50 ${f.p50}ms | total p50 ${s.p50}ms (p95 ${s.p95}, min ${s.min}) | req ${avgReq.toFixed(0)} (prefetch ${avgPre.toFixed(0)})${fallos ? ` | ${fallos} fallo(s)` : ""}`,
+      );
+    }
+    await page.close();
   }
 
   await browser.close();

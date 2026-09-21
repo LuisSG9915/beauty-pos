@@ -229,6 +229,20 @@ function enviarMetrica(metrica: string, valor: number) {
   });
 }
 
+/**
+ * Métrica puntual de interacción (p. ej. latencia de navegación cliente). La
+ * ruta se normaliza antes de encolar; nunca persistir query ni identificadores.
+ */
+export function trackPerformance(metrica: string, valor: number, ruta?: string) {
+  encolar({
+    tipo: "performance",
+    metrica,
+    valor: Math.round(valor * 1000) / 1000,
+    ruta: normalizarRuta(ruta ?? location.pathname),
+    clientAt: Date.now(),
+  });
+}
+
 function iniciarVitals() {
   try {
     // TTFB + FCP desde las entradas de navegación/paint ya disponibles.

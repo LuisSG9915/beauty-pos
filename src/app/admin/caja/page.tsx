@@ -225,7 +225,7 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                       </p>
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                          Math.abs(diferenciaTotal) < 0.005 ? "bg-[#d4efe9] text-success" : "bg-[#f6d9d2] text-destructive"
+                          Math.abs(diferenciaTotal) < 0.005 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
                         }`}
                       >
                         {Math.abs(diferenciaTotal) < 0.005 ? "Cuadrado" : `Diferencia ${fmt(diferenciaTotal)}`}

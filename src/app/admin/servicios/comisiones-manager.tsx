@@ -23,7 +23,7 @@ export function ComisionesManager({ organizationId, servicioId, comisiones, role
               <form action={removeComision}>
                 <input name="organizacionId" type="hidden" value={organizationId} />
                 <input name="comisionId" type="hidden" value={c.id} />
-                <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-destructive hover:bg-[#f6d9d2]" type="submit">Quitar</button>
+                <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-destructive hover:bg-destructive/10" type="submit">Quitar</button>
               </form>
             </div>
           ))}

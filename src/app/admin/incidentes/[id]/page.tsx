@@ -112,7 +112,7 @@ export default async function IncidenteDetallePage({
               </pre>
             ) : null}
             {incidente.resueltoAt ? (
-              <p className="mt-4 rounded-xl border border-[#9fcfc4] bg-[#e2f5f1] px-4 py-3 text-sm text-success">
+              <p className="mt-4 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
                 Resuelto por {incidente.resueltoNombre ?? "—"} el{" "}
                 {formatDateTime(incidente.resueltoAt)}.
                 {incidente.notaResolucion ? ` ${incidente.notaResolucion}` : ""}

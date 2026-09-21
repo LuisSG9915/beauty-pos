@@ -160,7 +160,7 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
                 </StatusBadge>
               </div>
               {actual.motivoCancelacion || actual.canceladaAt ? (
-                <p className="rounded-xl border border-[#e7bd66] bg-accent/70 px-3 py-2 text-xs text-warning">
+                <p className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
                   Cancelación registrada{actual.canceladaAt ? ` el ${actual.canceladaAt.toISOString().slice(0, 10)}` : ""}.
                   Conservas el acceso hasta el fin del periodo ya cubierto.
                 </p>

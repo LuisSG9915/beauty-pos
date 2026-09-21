@@ -19,9 +19,9 @@ type SearchParams = Promise<AdminSearchParams>;
 
 const ESTADO_BADGE: Record<string, { label: string; className: string }> = {
   borrador: { label: "Borrador", className: "bg-muted/60 text-warning" },
-  timbrada: { label: "Emitida", className: "bg-[#d4efe9] text-success" },
+  timbrada: { label: "Emitida", className: "bg-success/10 text-success" },
   cancelada: { label: "Cancelada", className: "bg-muted/60 text-muted-foreground" },
-  error: { label: "Error", className: "bg-[#f6d9d2] text-destructive" },
+  error: { label: "Error", className: "bg-destructive/10 text-destructive" },
 };
 
 export default async function FacturacionPage({ searchParams }: { searchParams: SearchParams }) {
@@ -64,7 +64,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
       />
 
       {stub ? (
-        <p className="rounded-xl border border-[#e7bd66] bg-[#fff1d1] px-4 py-3 text-sm text-warning">
+        <p className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
           Proveedor de timbrado: <strong>sin PAC contratado</strong>. Los comprobantes se generan con un folio
           simulado — son documentos internos del negocio y <strong>no tienen validez fiscal ante el SAT</strong>.
         </p>

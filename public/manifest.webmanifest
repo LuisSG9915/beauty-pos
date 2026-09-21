@@ -4,8 +4,8 @@
   "description": "Gestión para salones y estudios de belleza",
   "start_url": "/admin",
   "display": "standalone",
-  "background_color": "#fbf9fc",
-  "theme_color": "#6f4b7d",
+  "background_color": "#faf9fb",
+  "theme_color": "#a91d5d",
   "icons": [
     {
       "src": "/icon.png",

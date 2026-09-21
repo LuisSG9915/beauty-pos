@@ -55,7 +55,7 @@ export function PracticaFlow({
   return (
     <div className="space-y-5">
       <p
-        className="flex items-center gap-2 rounded-xl border border-[#e7bd66] bg-accent/70 px-4 py-3 text-sm font-medium text-warning"
+        className="flex items-center gap-2 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm font-medium text-warning"
         role="status"
       >
         <FlaskConical aria-hidden="true" className="size-4 shrink-0" />
@@ -69,9 +69,9 @@ export function PracticaFlow({
             className={cn(
               "rounded-full px-3 py-1 text-xs font-medium",
               index === paso
-                ? "bg-primary text-white"
+                ? "bg-primary text-primary-foreground"
                 : index < paso
-                  ? "bg-[#d4efe9] text-success"
+                  ? "bg-success/10 text-success"
                   : "bg-muted/60 text-muted-foreground",
             )}
             key={nombre}
@@ -108,7 +108,7 @@ export function PracticaFlow({
                   <p className="text-sm font-medium text-foreground">9:00 · {CLIENTE}</p>
                   <p className="text-xs text-muted-foreground">Retoque de tinte</p>
                 </div>
-                <span className="rounded-full bg-[#d4efe9] px-2.5 py-1 text-xs font-medium text-success">Confirmada</span>
+                <span className="rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success">Confirmada</span>
               </div>
               <div className="flex items-center justify-between rounded-xl border border-dashed border-border px-4 py-3">
                 <p className="text-sm text-muted-foreground">11:30 · libre</p>
@@ -182,7 +182,7 @@ export function PracticaFlow({
         {paso === 3 ? (
           <div className="max-w-xl">
             <h2 className="text-lg font-semibold text-foreground">La cita quedó en la agenda</h2>
-            <div className="mt-4 rounded-xl border border-[#9fcfc4] bg-[#e2f5f1] px-4 py-3">
+            <div className="mt-4 rounded-xl border border-success/30 bg-success/10 px-4 py-3">
               <p className="text-sm font-medium text-foreground">
                 {HORAS[hora]} · {CLIENTE}
               </p>

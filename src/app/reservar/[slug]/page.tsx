@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 
 import { ReservaFlow } from "@/app/reservar/[slug]/reserva-flow";
+import { BrandMark } from "@/components/brand-mark";
+import { ThemeModeSelector } from "@/components/theme-mode-selector";
 import { getPortalReservas, getProfesionalesReservables, getServiciosReservables } from "@/modules/reservas/queries";
 import { dayKey } from "@/modules/agenda/timezone";
 
@@ -55,15 +57,16 @@ export default async function ReservarPage({
   }
 
   return (
-    <main className="min-h-screen bg-[#f9f8f9] text-[#272328]">
-      <header className="mx-auto flex w-full max-w-3xl items-center gap-3 px-6 py-6">
-        <div className="flex size-10 items-center justify-center rounded-2xl bg-[#29242a] text-sm font-semibold text-[#f3ecf8]">
-          {portal.organizacion.nombre.slice(0, 2).toUpperCase()}
+    <main className="min-h-screen bg-background text-foreground">
+      <header className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-6 py-6">
+        <div className="flex items-center gap-3">
+          <BrandMark size={40} />
+          <div>
+            <p className="font-semibold tracking-tight">{portal.organizacion.nombre}</p>
+            <p className="text-xs text-muted-foreground">Reserva tu cita en línea</p>
+          </div>
         </div>
-        <div>
-          <p className="font-semibold tracking-tight">{portal.organizacion.nombre}</p>
-          <p className="text-xs text-[#675d6a]">Reserva tu cita en línea</p>
-        </div>
+        <ThemeModeSelector iconOnly />
       </header>
       <ReservaFlow
         dias={dias}

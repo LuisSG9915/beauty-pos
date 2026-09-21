@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { BrandMark } from "@/components/brand-mark";
+import { ThemeModeSelector } from "@/components/theme-mode-selector";
 import { clientIp } from "@/lib/client-ip";
 import { obtenerReservaPorToken } from "@/modules/reservas/gestion";
 import { GestionPanel } from "./gestion-panel";
@@ -16,12 +18,12 @@ const ETIQUETA_ESTADO: Record<string, string> = {
 };
 
 const ESTILO_ESTADO: Record<string, string> = {
-  pendiente: "bg-[#fdf3e3] text-[#a06a1f] border-[#ecd9ae]",
-  confirmada: "bg-[#eaf5ee] text-[#3f7a55] border-[#c8e2d2]",
-  en_proceso: "bg-[#eef3f8] text-[#4d6a8a] border-[#d3dfec]",
-  completada: "bg-[#f1eff1] text-[#6d6271] border-[#dad6dc]",
-  cancelada: "bg-[#faecea] text-[#a0473f] border-[#e2d5e6]",
-  no_asistio: "bg-[#f1eff1] text-[#6d6271] border-[#dad6dc]",
+  pendiente: "bg-warning/10 text-warning border-warning/30",
+  confirmada: "bg-success/10 text-success border-success/30",
+  en_proceso: "bg-info/10 text-info border-info/30",
+  completada: "bg-muted text-muted-foreground border-border",
+  cancelada: "bg-destructive/10 text-destructive border-destructive/30",
+  no_asistio: "bg-muted text-muted-foreground border-border",
 };
 
 function formatoFechaHora(iso: string, zonaHoraria: string) {
@@ -46,10 +48,10 @@ export default async function MiCitaPage({ params }: { params: Promise<{ token: 
 
   if (!reserva) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f9f8f9] px-6 text-[#272328]">
-        <div className="w-full max-w-md rounded-3xl border border-[#dcd5de] bg-white p-8 text-center shadow-sm">
+      <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
+        <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 text-center shadow-sm">
           <h1 className="text-xl font-semibold tracking-tight">Enlace no válido</h1>
-          <p className="mt-3 text-sm leading-6 text-[#6d6271]">
+          <p className="mt-3 text-sm leading-6 text-muted-foreground">
             Este enlace no corresponde a ninguna cita, fue revocado o se usó demasiadas veces en
             poco tiempo. Revisa tu correo de confirmación o comunícate con el negocio.
           </p>
@@ -62,19 +64,20 @@ export default async function MiCitaPage({ params }: { params: Promise<{ token: 
   const estilo = ESTILO_ESTADO[reserva.estado] ?? ESTILO_ESTADO.completada;
 
   return (
-    <main className="min-h-screen bg-[#f9f8f9] text-[#272328]">
-      <header className="mx-auto flex w-full max-w-3xl items-center gap-3 px-6 py-6">
-        <div className="flex size-10 items-center justify-center rounded-2xl bg-[#29242a] text-sm font-semibold text-[#f3ecf8]">
-          {reserva.organizacionNombre.slice(0, 2).toUpperCase()}
+    <main className="min-h-screen bg-background text-foreground">
+      <header className="mx-auto flex w-full max-w-3xl items-center justify-between gap-3 px-6 py-6">
+        <div className="flex items-center gap-3">
+          <BrandMark size={40} />
+          <div>
+            <p className="font-semibold tracking-tight">{reserva.organizacionNombre}</p>
+            <p className="text-xs text-muted-foreground">Estado de tu cita</p>
+          </div>
         </div>
-        <div>
-          <p className="font-semibold tracking-tight">{reserva.organizacionNombre}</p>
-          <p className="text-xs text-[#675d6a]">Estado de tu cita</p>
-        </div>
+        <ThemeModeSelector iconOnly />
       </header>
 
       <section className="mx-auto w-full max-w-3xl px-6 pb-16">
-        <div className="rounded-3xl border border-[#dcd5de] bg-white p-8 shadow-sm">
+        <div className="rounded-3xl border border-border bg-card p-8 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">Tu cita</h1>
             <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${estilo}`}>
@@ -82,30 +85,30 @@ export default async function MiCitaPage({ params }: { params: Promise<{ token: 
             </span>
           </div>
 
-          <dl className="mt-6 space-y-3 rounded-2xl bg-[#f7f5f8] p-5 text-sm">
+          <dl className="mt-6 space-y-3 rounded-2xl bg-muted p-5 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-[#675d6a]">Fecha y hora</dt>
+              <dt className="text-muted-foreground">Fecha y hora</dt>
               <dd className="font-medium capitalize">
                 {formatoFechaHora(reserva.fechaHora, reserva.zonaHoraria)}
               </dd>
             </div>
             {reserva.servicioNombre ? (
               <div className="flex justify-between gap-4">
-                <dt className="text-[#675d6a]">Servicio</dt>
+                <dt className="text-muted-foreground">Servicio</dt>
                 <dd className="font-medium">{reserva.servicioNombre}</dd>
               </div>
             ) : null}
             <div className="flex justify-between gap-4">
-              <dt className="text-[#675d6a]">Duración</dt>
+              <dt className="text-muted-foreground">Duración</dt>
               <dd className="font-medium">{reserva.duracionMinutos} min</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-[#675d6a]">Sucursal</dt>
+              <dt className="text-muted-foreground">Sucursal</dt>
               <dd className="font-medium">{reserva.sucursalNombre}</dd>
             </div>
             {reserva.clienteNombre ? (
               <div className="flex justify-between gap-4">
-                <dt className="text-[#675d6a]">A nombre de</dt>
+                <dt className="text-muted-foreground">A nombre de</dt>
                 <dd className="font-medium">{reserva.clienteNombre}</dd>
               </div>
             ) : null}
@@ -116,7 +119,7 @@ export default async function MiCitaPage({ params }: { params: Promise<{ token: 
             reserva={reserva}
           />
 
-          <p className="mt-6 text-xs leading-5 text-[#675d6a]">
+          <p className="mt-6 text-xs leading-5 text-muted-foreground">
             ¿No fuiste tú? Alguien con tu enlace puede ver esta cita. Comunícate con{" "}
             {reserva.organizacionNombre} si necesitas ayuda.{" "}
             <Link className="underline" href={`/reservar/${reserva.organizacionSlug}`}>

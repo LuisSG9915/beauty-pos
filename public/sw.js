@@ -6,7 +6,7 @@
 //   del turno: no se cachean — solo el shell offline.
 // - Todo lo demás (APIs, server actions, queries) → directo a red.
 
-const CACHE_VERSION = "melena-v1";
+const CACHE_VERSION = "melena-v2";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 // Prefijos históricos: purga también las cachés de la etapa "beauty-pos".

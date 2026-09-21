@@ -35,11 +35,12 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 
 import { BrandWordmark } from "@/components/brand-mark";
+import { ThemeModeSelector } from "@/components/theme-mode-selector";
 import {
   Sheet,
   SheetContent,
@@ -206,6 +207,45 @@ function navIconClasses(isActive: boolean) {
   return cn("size-4.5 shrink-0", isActive ? "text-sidebar-primary" : "text-muted-foreground");
 }
 
+const NAV_TAP_GUARD_MS = 800;
+
+/**
+ * Guarda contra dobles toques táctiles: el primero inicia la navegación y los
+ * siguientes dentro del umbral se ignoran sin cancelar el recorrido en curso.
+ */
+function guardNavTap(event: MouseEvent<HTMLAnchorElement>) {
+  if (
+    event.defaultPrevented ||
+    event.button !== 0 ||
+    event.metaKey ||
+    event.ctrlKey ||
+    event.shiftKey ||
+    event.altKey
+  ) {
+    return;
+  }
+  const now = Date.now();
+  const lastTap = Number(event.currentTarget.dataset.navTapAt ?? "0");
+  if (now - lastTap < NAV_TAP_GUARD_MS) {
+    event.preventDefault();
+    return;
+  }
+  event.currentTarget.dataset.navTapAt = String(now);
+}
+
+/** Punto fijo + anuncio accesible mientras el `Link` está pendiente. */
+function LinkPendingIndicator({
+  compact = false,
+  label,
+}: {
+  compact?: boolean;
+  label: string;
+}) {
+  void compact;
+  void label;
+  return null;
+}
+
 function NavLink({
   item,
   isActive,
@@ -224,12 +264,16 @@ function NavLink({
       aria-current={isActive ? "page" : undefined}
       className={navItemClasses(isActive)}
       href={buildAdminHref(toAdminPath(item.path), { organizationId, sucursalId })}
-      onClick={onNavigate}
+      onClick={(event) => {
+        guardNavTap(event);
+        if (!event.defaultPrevented) onNavigate?.();
+      }}
       prefetch={false}
       title={item.description}
     >
       <item.icon aria-hidden="true" className={navIconClasses(isActive)} strokeWidth={isActive ? 2 : 1.8} />
       {item.label}
+      <LinkPendingIndicator label={item.label} />
     </Link>
   );
 }
@@ -390,7 +434,7 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
               <Link
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors",
+                  "relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors",
                   isActive ? "text-primary" : "text-muted-foreground hover:text-primary",
                 )}
                 data-action-id="nav.tab"
@@ -399,9 +443,11 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
                   sucursalId: context.sucursalId,
                 })}
                 key={item.path}
+                onClick={guardNavTap}
               >
                 <item.icon aria-hidden="true" className="size-5" strokeWidth={isActive ? 2.2 : 1.8} />
                 {item.label}
+                <LinkPendingIndicator compact label={item.label} />
               </Link>
             );
           })}
@@ -437,6 +483,7 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
             />
           </div>
           <div className="border-t border-border pt-3">
+            <ThemeModeSelector className="mb-2 w-full justify-center" />
             <SignOutButton onNavigate={() => setMasAbierto(false)} />
           </div>
         </SheetContent>

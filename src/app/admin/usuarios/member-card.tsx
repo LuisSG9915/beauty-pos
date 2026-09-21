@@ -219,7 +219,7 @@ export function PendingInvitations({
                 <input name="organizacionId" type="hidden" value={organizationId} />
                 <input name="invitacionId" type="hidden" value={inv.id} />
                 <button
-                  className="min-h-8 rounded-lg border border-border px-2.5 text-xs text-destructive hover:bg-[#f6d9d2] disabled:opacity-50"
+                  className="min-h-8 rounded-lg border border-border px-2.5 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
                   disabled={isPending}
                   type="submit"
                 >

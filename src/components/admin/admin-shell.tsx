@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useId, type ReactNode } from "react";
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import { AdminSidebarNav, AdminTabBar, SignOutButton } from "@/components/admin-nav";
 import {
@@ -10,7 +18,9 @@ import {
   type BillingBadge,
 } from "@/components/admin/subscription-banner";
 import { BrandWordmark } from "@/components/brand-mark";
+import { ThemeModeSelector } from "@/components/theme-mode-selector";
 import { ToastProvider } from "@/components/ui/toast";
+import { trackPerformance } from "@/lib/telemetry/cliente";
 import { buildAdminHref, buildHref, firstParam } from "@/lib/url-context";
 
 /** Organización accesible por el usuario, para el selector del shell. */
@@ -195,6 +205,120 @@ function initials(name: string) {
     .join("") || "·";
 }
 
+const NAVIGATION_TIMEOUT_MS = 10_000;
+
+/**
+ * Barra de progreso persistente para navegaciones del App Router. El shell no
+ * se desmonta entre rutas, así que puede confirmar el toque aunque el destino
+ * tarde en resolver sus datos.
+ */
+function NavigationActivity() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchKey = searchParams.toString();
+  const [pendingLabel, setPendingLabel] = useState<string | null>(null);
+  const startedAt = useRef<number | null>(null);
+  const targetPath = useRef<string | null>(null);
+  const timeoutRef = useRef<number | null>(null);
+  const frameRef = useRef<number | null>(null);
+  const feedbackSent = useRef(false);
+
+  const finish = useCallback((completed: boolean) => {
+    if (startedAt.current === null) return;
+    const elapsed = performance.now() - startedAt.current;
+    trackPerformance(
+      completed ? "nav_complete_ms" : "nav_timeout_ms",
+      elapsed,
+      targetPath.current ?? undefined,
+    );
+    startedAt.current = null;
+    targetPath.current = null;
+    setPendingLabel(null);
+    if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+    if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
+    timeoutRef.current = null;
+    frameRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    finish(true);
+  }, [finish, pathname, searchKey]);
+
+  useEffect(() => {
+    const onClick = (event: globalThis.MouseEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.button !== 0 ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.shiftKey ||
+        event.altKey ||
+        !(event.target instanceof Element)
+      ) {
+        return;
+      }
+      const anchor = event.target.closest<HTMLAnchorElement>("a[href]");
+      if (!anchor || anchor.hasAttribute("download")) return;
+      if (anchor.target && anchor.target !== "_self") return;
+      const rawHref = anchor.getAttribute("href");
+      if (!rawHref || rawHref.startsWith("#")) return;
+
+      let url: URL;
+      try {
+        url = new URL(anchor.href);
+      } catch {
+        return;
+      }
+      if (url.origin !== window.location.origin) return;
+      if (url.pathname === window.location.pathname && url.search === window.location.search) {
+        return;
+      }
+
+      if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+      if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
+      feedbackSent.current = false;
+      startedAt.current = performance.now();
+      targetPath.current = url.pathname;
+      const label = anchor.textContent?.replace(/\s+/g, " ").trim().slice(0, 40) || "sección";
+      setPendingLabel(label);
+
+      frameRef.current = window.requestAnimationFrame(() => {
+        if (startedAt.current === null || feedbackSent.current) return;
+        trackPerformance(
+          "nav_feedback_ms",
+          performance.now() - startedAt.current,
+          targetPath.current ?? undefined,
+        );
+        feedbackSent.current = true;
+      });
+      timeoutRef.current = window.setTimeout(() => finish(false), NAVIGATION_TIMEOUT_MS);
+    };
+
+    document.addEventListener("click", onClick);
+    return () => {
+      document.removeEventListener("click", onClick);
+      if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+      if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
+    };
+  }, [finish]);
+
+  return (
+    <>
+      {pendingLabel ? (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 top-0 z-[70] h-0.5 overflow-hidden bg-primary/15"
+        >
+          <span className="admin-nav-progress block h-full w-1/3 bg-primary" />
+        </div>
+      ) : null}
+      <span className="sr-only" role="status">
+        {pendingLabel ? `Abriendo ${pendingLabel}…` : ""}
+      </span>
+    </>
+  );
+}
+
 function HomeLink({ organizationId }: { organizationId?: string }) {
   return (
     <Link
@@ -230,7 +354,8 @@ export function AdminShell({
   };
   return (
     <ToastProvider>
-      <div className="admin-theme flex min-h-dvh bg-background text-foreground">
+      <div className="flex min-h-dvh bg-background text-foreground">
+        {null}
         <a
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-foreground focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-background"
           href="#contenido-admin"
@@ -267,11 +392,12 @@ export function AdminShell({
               >
                 {initials(userName)}
               </span>
-              <div className="min-w-0 leading-tight">
+              <div className="min-w-0 flex-1 leading-tight">
                 <p className="truncate text-sm font-medium">{userName}</p>
                 <p className="truncate text-[11px] text-muted-foreground">{userEmail}</p>
               </div>
             </div>
+            <ThemeModeSelector className="mb-2.5 w-full justify-center" />
             <SignOutButton />
           </div>
         </aside>

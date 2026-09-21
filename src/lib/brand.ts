@@ -17,12 +17,20 @@ export const BRAND = {
 } as const;
 
 export const BRAND_COLORS = {
-  /** Coral profundo — acción primaria, enlaces y foco. */
-  primary: "#b7442e",
-  /** Espresso/vino — superficies oscuras y tile del isotipo. */
-  ink: "#211b19",
-  /** Crema cálida — fondo operativo del panel. */
-  background: "#fbf7f2",
-  /** Coral pálido — acentos y estados activos. */
-  accent: "#fbe5dc",
+  /** Bugambilia profundo — acción primaria, enlaces y foco (modo claro). */
+  primary: "#a91d5d",
+  /** Bugambilia luminoso — acción primaria en modo oscuro. */
+  primaryDark: "#f0649d",
+  /** Ciruela oscuro — inicio del tile del isotipo y superficies de marca. */
+  ink: "#341523",
+  /** Fondo base de la app en modo claro. */
+  background: "#faf9fb",
+  /** Rosa pálido — acentos y estados activos (modo claro). */
+  accent: "#f8e2ee",
+  /** Texto sobre primary en claro / glifo del isotipo. */
+  primaryForeground: "#fff7fb",
+  /** Texto sobre accent (bugambilia oscuro, contraste AA). */
+  accentForeground: "#7b1749",
+  /** Fin del degradado del tile del isotipo (= primary). */
+  brandIconBgEnd: "#a91d5d",
 } as const;

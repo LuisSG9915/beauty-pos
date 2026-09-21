@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { PreciosPlanes, type PlanPrecioCard } from "@/app/precios/precios-planes";
 import { BrandWordmark } from "@/components/brand-mark";
+import { ThemeModeSelector } from "@/components/theme-mode-selector";
 import { TelemetriaPing } from "@/components/telemetria-ping";
 import {
   CAPACIDADES,
@@ -120,34 +121,37 @@ export default async function PreciosPage() {
   const lista = await cargarPlanes();
 
   return (
-    <main className="min-h-screen bg-[#f9f8f9] text-[#272328]">
+    <main className="min-h-screen bg-background text-foreground">
       <TelemetriaPing origen="precios" />
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-6 lg:px-10">
         <Link className="inline-flex rounded-lg outline-offset-4" href="/">
           <BrandWordmark markSize={40} withDescriptor />
         </Link>
-        <Link
-          className="inline-flex h-8 items-center rounded-lg border border-[#d8d3d9] bg-white px-4 text-sm font-medium transition-colors hover:bg-[#f2f0f2]"
-          href="/login"
-        >
-          Iniciar sesión
-        </Link>
+        <nav className="flex items-center gap-2">
+          <ThemeModeSelector iconOnly />
+          <Link
+            className="inline-flex h-8 items-center rounded-lg border border-border bg-card px-4 text-sm font-medium transition-colors hover:bg-muted"
+            href="/login"
+          >
+            Iniciar sesión
+          </Link>
+        </nav>
       </header>
 
       <section className="mx-auto w-full max-w-6xl px-6 pb-8 pt-10 text-center lg:px-10">
-        <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#7a5c88]">
+        <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary">
           Planes simples
         </p>
         <h1 className="mx-auto mt-4 max-w-2xl font-serif text-4xl font-semibold tracking-[-0.03em] sm:text-5xl">
           Un precio por tu negocio.{" "}
-          <span className="italic text-[#6f4b7d]">No por cada persona del equipo.</span>
+          <span className="italic text-primary">No por cada persona del equipo.</span>
         </h1>
-        <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-[#6d6271]">
+        <p className="mx-auto mt-4 max-w-xl text-base leading-7 text-muted-foreground">
           Prueba {TRIAL_DIAS} días gratis, sin tarjeta. Registra tu salón, trabaja
           con datos reales durante la prueba y, si te convence, conserva todo al
           contratar. Nada se borra.
         </p>
-        <p className="mx-auto mt-5 w-fit rounded-full border border-[#e3dce6] bg-[#f2ecf4] px-4 py-2 text-sm font-medium text-[#6f4b7d]">
+        <p className="mx-auto mt-5 w-fit rounded-full border border-border bg-accent px-4 py-2 text-sm font-medium text-accent-foreground">
           Precio fundador para los primeros 100 negocios: tu tarifa queda
           protegida mientras tu suscripción esté activa.
         </p>
@@ -155,19 +159,19 @@ export default async function PreciosPage() {
 
       <section className="mx-auto w-full max-w-6xl px-6 pb-16 lg:px-10">
         <PreciosPlanes planes={lista} />
-        <p className="mt-6 text-center text-sm text-[#6d6271]">
+        <p className="mt-6 text-center text-sm text-muted-foreground">
           Todos los planes son por negocio: tu equipo entra en el límite de
           usuarios de cada plan, sin costo por colaborador ni comisión por
           cliente nuevo.
         </p>
       </section>
 
-      <section className="border-t border-[#e8e4ea] bg-white/70">
+      <section className="border-t border-border bg-card/70">
         <div className="mx-auto w-full max-w-4xl space-y-6 px-6 py-12 lg:px-10">
           <h2 className="text-2xl font-semibold tracking-tight">Preguntas frecuentes</h2>
-          <div className="space-y-5 text-sm leading-6 text-[#574e5a]">
+          <div className="space-y-5 text-sm leading-6 text-muted-foreground">
             <div>
-              <p className="font-semibold text-[#272328]">¿Por qué cobran por negocio y no por persona?</p>
+              <p className="font-semibold text-foreground">¿Por qué cobran por negocio y no por persona?</p>
               <p className="mt-1">
                 Otras plataformas cobran por cada miembro del equipo disponible
                 para reservar: un salón de 5 personas puede terminar pagando más
@@ -176,7 +180,7 @@ export default async function PreciosPage() {
               </p>
             </div>
             <div>
-              <p className="font-semibold text-[#272328]">¿Qué es el precio fundador?</p>
+              <p className="font-semibold text-foreground">¿Qué es el precio fundador?</p>
               <p className="mt-1">
                 Es una tarifa de lanzamiento para los primeros 100 negocios que
                 contraten. Si mantienes tu suscripción activa conservas ese precio
@@ -185,7 +189,7 @@ export default async function PreciosPage() {
               </p>
             </div>
             <div>
-              <p className="font-semibold text-[#272328]">¿Cómo funciona el precio por sucursal?</p>
+              <p className="font-semibold text-foreground">¿Cómo funciona el precio por sucursal?</p>
               <p className="mt-1">
                 Cada plan incluye sucursales en su precio base: Esencial 1,
                 Crecimiento hasta 2 y Profesional 3 — el plan para cadenas se
@@ -194,14 +198,14 @@ export default async function PreciosPage() {
               </p>
             </div>
             <div>
-              <p className="font-semibold text-[#272328]">¿Melena cobra comisión por mis ventas o clientes nuevos?</p>
+              <p className="font-semibold text-foreground">¿Melena cobra comisión por mis ventas o clientes nuevos?</p>
               <p className="mt-1">
                 No. No cobramos porcentaje sobre tus ventas ni tarifa por cliente
                 nuevo que llegue a tu agenda. Lo que vendes es tuyo.
               </p>
             </div>
             <div>
-              <p className="font-semibold text-[#272328]">¿Qué pasa cuando termina la prueba?</p>
+              <p className="font-semibold text-foreground">¿Qué pasa cuando termina la prueba?</p>
               <p className="mt-1">
                 Tu cuenta pasa a solo lectura: puedes consultar toda tu información,
                 pero no registrar cambios hasta reactivar tu plan. Tus datos se
@@ -209,30 +213,30 @@ export default async function PreciosPage() {
               </p>
             </div>
             <div>
-              <p className="font-semibold text-[#272328]">¿Pierdo mis datos si no contrato de inmediato?</p>
+              <p className="font-semibold text-foreground">¿Pierdo mis datos si no contrato de inmediato?</p>
               <p className="mt-1">
                 No. Clientes, ventas, agenda y configuración permanecen guardados y
                 listos para seguir usándose cuando actives tu suscripción.
               </p>
             </div>
             <div>
-              <p className="font-semibold text-[#272328]">¿Cómo pago mi suscripción?</p>
+              <p className="font-semibold text-foreground">¿Cómo pago mi suscripción?</p>
               <p className="mt-1">
                 Aceptamos transferencia y tarjeta. Escríbenos desde la sección de
                 Ayuda dentro del sistema y activamos tu plan el mismo día.
               </p>
             </div>
             <div>
-              <p className="font-semibold text-[#272328]">¿Emiten facturas fiscales (CFDI)?</p>
+              <p className="font-semibold text-foreground">¿Emiten facturas fiscales (CFDI)?</p>
               <p className="mt-1">
                 El sistema genera comprobantes internos de tus ventas. La emisión de
                 CFDI con validez fiscal estará disponible en una etapa posterior.
               </p>
             </div>
           </div>
-          <p className="pt-2 text-center text-sm text-[#675d6a]">
+          <p className="pt-2 text-center text-sm text-muted-foreground">
             ¿Dudas?{" "}
-            <Link className="font-semibold text-[#724b7f] hover:text-[#7a4c89]" href="/registro">
+            <Link className="font-semibold text-primary hover:text-primary/80" href="/registro">
               Crea tu cuenta gratis
             </Link>{" "}
             y descúbrelo por dentro.

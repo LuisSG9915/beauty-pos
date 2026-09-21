@@ -10,7 +10,7 @@ export type PuntoGrafica = { etiqueta: string; valor: number; detalle?: string }
 export function BarChart({
   puntos,
   alto = 160,
-  color = "#b7442e",
+  color = "var(--chart-1)",
   formato = (v: number) => String(v),
 }: {
   puntos: PuntoGrafica[];
@@ -41,7 +41,7 @@ export function BarChart({
           return (
             <g key={punto.etiqueta}>
               <title>{`${punto.etiqueta}: ${formato(punto.valor)}${punto.detalle ? ` — ${punto.detalle}` : ""}`}</title>
-              <rect fill={color} height={h} rx={4} width={anchoBarra} x={x} y={y} />
+              <rect height={h} rx={4} style={{ fill: color }} width={anchoBarra} x={x} y={y} />
               {i % mostrarEtiquetaCada === 0 ? (
                 <text
                   className="fill-muted-foreground"
@@ -64,7 +64,7 @@ export function BarChart({
 /** Barras horizontales con etiqueta y valor (p.ej. cobros por medio de pago). */
 export function HBarChart({
   puntos,
-  color = "#b7442e",
+  color = "var(--chart-1)",
   formato = (v: number) => String(v),
 }: {
   puntos: PuntoGrafica[];

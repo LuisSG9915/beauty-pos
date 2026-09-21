@@ -358,8 +358,8 @@ export function DisponibilidadPanel({
                           className={cn(
                             "flex w-full items-center justify-between rounded-lg px-2 py-1 text-xs tabular-nums transition-colors",
                             turno.activo
-                              ? "bg-card text-foreground hover:bg-[#f6d9d2]"
-                              : "bg-muted/60 text-muted-foreground line-through hover:bg-[#d4efe9]",
+                              ? "bg-card text-foreground hover:bg-destructive/10"
+                              : "bg-muted/60 text-muted-foreground line-through hover:bg-success/10",
                           )}
                           disabled={pending}
                           key={turno.id}

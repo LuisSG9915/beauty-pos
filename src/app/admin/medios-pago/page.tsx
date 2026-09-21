@@ -21,10 +21,10 @@ type SearchParams = Promise<AdminSearchParams>;
 
 const CATEGORIA_LABEL: Record<string, string> = { efectivo: "Efectivo", tarjeta: "Tarjeta", transferencia: "Transferencia", wallet: "Wallet", otro: "Otro" };
 const CATEGORIA_COLOR: Record<string, string> = {
-  efectivo: "bg-[#d4efe9] text-success",
+  efectivo: "bg-success/10 text-success",
   tarjeta: "bg-accent/70 text-primary",
-  transferencia: "bg-[#e3f1fa] text-info",
-  wallet: "bg-muted/60 text-warning",
+  transferencia: "bg-info/10 text-info",
+  wallet: "bg-warning/10 text-warning",
   otro: "bg-muted/60 text-muted-foreground",
 };
 

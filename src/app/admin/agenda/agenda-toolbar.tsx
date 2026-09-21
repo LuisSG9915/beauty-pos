@@ -1,9 +1,9 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useRef } from "react";
+import { useRef, useState, useTransition, type MouseEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { buildHref } from "@/lib/url-context";
@@ -22,6 +22,29 @@ function shiftByView(fecha: string, vista: AgendaVista, direction: -1 | 1) {
   const amount = vista === "semana" ? 7 : vista === "lista" ? 14 : 1;
   return shiftDateKey(fecha, amount * direction) ?? fecha;
 }
+
+function guardRepeatedTap(event: MouseEvent<HTMLAnchorElement>) {
+  const now = Date.now();
+  const lastTap = Number(event.currentTarget.dataset.navTapAt ?? "0");
+  if (now - lastTap < 800) {
+    event.preventDefault();
+    return;
+  }
+  event.currentTarget.dataset.navTapAt = String(now);
+}
+
+function ViewPendingIndicator({ label }: { label: string }) {
+  void label;
+  return null;
+}
+
+type PendingControl = "fecha" | "sucursal" | "buscar";
+
+const PENDING_LABEL: Record<PendingControl, string> = {
+  fecha: "Actualizando fecha…",
+  sucursal: "Cambiando sucursal…",
+  buscar: "Buscando citas…",
+};
 
 /** Controles de contexto de Agenda: sucursal, fecha, vista y búsqueda. */
 export function AgendaToolbar({
@@ -44,16 +67,28 @@ export function AgendaToolbar({
   const router = useRouter();
   const searchParams = useSearchParams();
   const searchTimeout = useRef<number | null>(null);
+  const [navigationPending, startNavigation] = useTransition();
+  const [pendingControl, setPendingControl] = useState<PendingControl | null>(null);
+  const activePending = navigationPending ? pendingControl : null;
+
+  const navigate = (control: PendingControl, href: string) => {
+    if (navigationPending && pendingControl === control) return;
+    setPendingControl(control);
+    startNavigation(() => router.push(href));
+  };
 
   const updateSearch = (value: string) => {
     if (searchTimeout.current !== null) window.clearTimeout(searchTimeout.current);
     searchTimeout.current = window.setTimeout(() => {
-      router.replace(
-        buildHref(pathname, {
-          params: searchParams,
-          preserve: ["fecha", "vista", "sucursalId", "q"],
-          extra: { q: value || null },
-        }),
+      setPendingControl("buscar");
+      startNavigation(() =>
+        router.replace(
+          buildHref(pathname, {
+            params: searchParams,
+            preserve: ["fecha", "vista", "sucursalId", "q"],
+            extra: { q: value || null },
+          }),
+        ),
       );
     }, 300);
   };
@@ -72,7 +107,8 @@ export function AgendaToolbar({
           <Button
             aria-label="Periodo anterior"
             className="rounded-xl"
-            onClick={() => router.push(hrefFor({ fecha: shiftByView(fecha, vista, -1) }))}
+            disabled={activePending === "fecha"}
+            onClick={() => navigate("fecha", hrefFor({ fecha: shiftByView(fecha, vista, -1) }))}
             size="icon"
             type="button"
             variant="outline"
@@ -81,7 +117,8 @@ export function AgendaToolbar({
           </Button>
           <Button
             className={cn("rounded-xl", fecha === hoy && "border-primary/40 bg-accent text-accent-foreground")}
-            onClick={() => router.push(hrefFor({ fecha: hoy }))}
+            disabled={activePending === "fecha"}
+            onClick={() => navigate("fecha", hrefFor({ fecha: hoy }))}
             type="button"
             variant="outline"
           >
@@ -90,7 +127,8 @@ export function AgendaToolbar({
           <Button
             aria-label="Periodo siguiente"
             className="rounded-xl"
-            onClick={() => router.push(hrefFor({ fecha: shiftByView(fecha, vista, 1) }))}
+            disabled={activePending === "fecha"}
+            onClick={() => navigate("fecha", hrefFor({ fecha: shiftByView(fecha, vista, 1) }))}
             size="icon"
             type="button"
             variant="outline"
@@ -102,9 +140,10 @@ export function AgendaToolbar({
           <span className="sr-only">Fecha de la agenda</span>
           <input
             aria-label="Fecha de la agenda"
-            className="h-10 w-full min-w-40 rounded-xl border border-input bg-background px-3 text-sm font-medium outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+            className="h-10 w-full min-w-40 rounded-xl border border-input bg-background px-3 text-sm font-medium outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 disabled:opacity-60"
+            disabled={activePending === "fecha"}
             onChange={(event) => {
-              if (event.target.value) router.push(hrefFor({ fecha: event.target.value }));
+              if (event.target.value) navigate("fecha", hrefFor({ fecha: event.target.value }));
             }}
             type="date"
             value={fecha}
@@ -114,8 +153,9 @@ export function AgendaToolbar({
           <span className="sr-only">Sucursal de la agenda</span>
           <select
             aria-label="Sucursal de la agenda"
-            className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
-            onChange={(event) => router.push(hrefFor({ sucursalId: event.target.value }))}
+            className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 disabled:opacity-60"
+            disabled={activePending === "sucursal"}
+            onChange={(event) => navigate("sucursal", hrefFor({ sucursalId: event.target.value }))}
             value={sucursalId}
           >
             {branches.map((branch) => (
@@ -125,6 +165,16 @@ export function AgendaToolbar({
             ))}
           </select>
         </label>
+        <span
+          aria-live="polite"
+          className={cn(
+            "min-h-5 text-xs font-medium text-primary transition-opacity",
+            activePending ? "opacity-100" : "opacity-0",
+          )}
+          role="status"
+        >
+          {activePending ? PENDING_LABEL[activePending] : "Actualizando…"}
+        </span>
       </div>
 
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
@@ -148,15 +198,17 @@ export function AgendaToolbar({
             <Link
               aria-current={vista === view.value ? "page" : undefined}
               className={cn(
-                "inline-flex min-h-8 flex-1 items-center justify-center rounded-lg px-3 text-xs font-medium whitespace-nowrap transition-colors",
+                "relative inline-flex min-h-8 flex-1 items-center justify-center rounded-lg px-3 text-xs font-medium whitespace-nowrap transition-colors",
                 vista === view.value
                   ? "bg-card font-semibold text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-primary",
               )}
               href={hrefFor({ vista: view.value })}
               key={view.value}
+              onClick={guardRepeatedTap}
             >
               {view.label}
+              <ViewPendingIndicator label={view.label} />
             </Link>
           ))}
         </div>

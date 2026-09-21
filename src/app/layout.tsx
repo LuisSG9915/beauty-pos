@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Geist, Geist_Mono } from "next/font/google";
 import { PwaRegister } from "@/components/pwa-register";
+import { ThemeRuntime } from "@/components/theme-runtime";
 import { BRAND } from "@/lib/brand";
+import { BOOTSTRAP_SCRIPT, THEME_COLOR } from "@/lib/theme-preference";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -56,7 +58,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#b7442e",
+  // El bootstrap inline y ThemeRuntime reescriben el content según la
+  // preferencia guardada; los media queries cubren el arranque sin JS.
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: THEME_COLOR.light },
+    { media: "(prefers-color-scheme: dark)", color: THEME_COLOR.dark },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -64,9 +71,18 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="es-MX"
       className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
+        {/* Aplica .dark/data-theme-* y el meta theme-color antes de pintar el
+            contenido del body leyendo la cookie melena_theme (sin cookies()
+            de servidor, para no romper el prerender estático). */}
+        <script
+          dangerouslySetInnerHTML={{ __html: BOOTSTRAP_SCRIPT }}
+          suppressHydrationWarning
+        />
         {children}
+        <ThemeRuntime />
         <PwaRegister />
       </body>
     </html>

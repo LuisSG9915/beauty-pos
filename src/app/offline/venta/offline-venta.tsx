@@ -162,26 +162,26 @@ export function OfflineVenta() {
   const cambio = Math.max(recibido - total, 0);
 
   return (
-    <div className="min-h-dvh bg-[#f9f8f9] px-4 py-6 text-[#2b272c]">
+    <div className="min-h-dvh bg-background px-4 py-6 text-foreground">
       <div className="mx-auto max-w-3xl space-y-5">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">Venta sin conexión</h1>
-            <p className="text-sm text-[#5f5562]">
+            <p className="text-sm text-muted-foreground">
               {catalogo ? `${catalogo.sucursalNombre || "Sucursal"} · catálogo del ${new Date(catalogo.guardadoAt).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })}` : "Ticket de emergencia"}
             </p>
           </div>
-          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${enLinea ? "bg-[#e3efe3] text-[#2f6b3a]" : "bg-[#f6e3d9] text-[#9a4a1f]"}`}>
+          <span className={`rounded-full px-3 py-1 text-xs font-semibold ${enLinea ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}>
             {enLinea ? "En línea" : "Sin conexión"}
           </span>
         </header>
 
-        {!cargado ? <p className="text-sm text-[#5f5562]">Cargando catálogo guardado…</p> : null}
+        {!cargado ? <p className="text-sm text-muted-foreground">Cargando catálogo guardado…</p> : null}
         {cargado && !catalogo ? (
-          <div className="rounded-2xl border border-[#eae6eb] bg-white p-5 text-sm text-[#5f5562]">
-            <p className="font-medium text-[#2b272c]">No hay catálogo guardado en este dispositivo.</p>
+          <div className="rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
+            <p className="font-medium text-foreground">No hay catálogo guardado en este dispositivo.</p>
             <p className="mt-1">Abre el punto de venta con conexión al menos una vez para que el catálogo quede disponible sin red.</p>
-            <a className="mt-3 inline-block rounded-xl bg-[#724b7f] px-4 py-2 text-sm font-medium text-white" href="/admin/pos">
+            <a className="mt-3 inline-block rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground" href="/admin/pos">
               Ir al punto de venta
             </a>
           </div>
@@ -190,53 +190,53 @@ export function OfflineVenta() {
         {catalogo ? (
           <>
             <section className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-[#eae6eb] bg-white p-4">
+              <div className="rounded-2xl border border-border bg-card p-4">
                 <h2 className="text-sm font-semibold">Servicios</h2>
                 <div className="mt-2 flex max-h-48 flex-wrap gap-2 overflow-y-auto">
                   {catalogo.servicios.map((s) => (
                     <button
-                      className="rounded-xl border border-[#eae6eb] px-3 py-2 text-left text-xs transition-colors hover:bg-[#f3f1f4]"
+                      className="rounded-xl border border-border px-3 py-2 text-left text-xs transition-colors hover:bg-muted"
                       key={s.id}
                       onClick={() => agregarLinea("servicio", s)}
                       type="button"
                     >
                       <span className="block font-medium">{s.nombre}</span>
-                      <span className="text-[#86798b]">{formatMonto(Number(s.precio), moneda)}</span>
+                      <span className="text-muted-foreground">{formatMonto(Number(s.precio), moneda)}</span>
                     </button>
                   ))}
-                  {catalogo.servicios.length === 0 ? <p className="text-xs text-[#86798b]">Sin servicios en el catálogo guardado.</p> : null}
+                  {catalogo.servicios.length === 0 ? <p className="text-xs text-muted-foreground">Sin servicios en el catálogo guardado.</p> : null}
                 </div>
               </div>
-              <div className="rounded-2xl border border-[#eae6eb] bg-white p-4">
+              <div className="rounded-2xl border border-border bg-card p-4">
                 <h2 className="text-sm font-semibold">Productos</h2>
                 <div className="mt-2 flex max-h-48 flex-wrap gap-2 overflow-y-auto">
                   {catalogo.productos.map((p) => (
                     <button
-                      className="rounded-xl border border-[#eae6eb] px-3 py-2 text-left text-xs transition-colors hover:bg-[#f3f1f4]"
+                      className="rounded-xl border border-border px-3 py-2 text-left text-xs transition-colors hover:bg-muted"
                       key={p.id}
                       onClick={() => agregarLinea("producto", p)}
                       type="button"
                     >
                       <span className="block font-medium">{p.nombre}</span>
-                      <span className="text-[#86798b]">{formatMonto(Number(p.precio), moneda)}</span>
+                      <span className="text-muted-foreground">{formatMonto(Number(p.precio), moneda)}</span>
                     </button>
                   ))}
-                  {catalogo.productos.length === 0 ? <p className="text-xs text-[#86798b]">Sin productos en el catálogo guardado.</p> : null}
+                  {catalogo.productos.length === 0 ? <p className="text-xs text-muted-foreground">Sin productos en el catálogo guardado.</p> : null}
                 </div>
               </div>
             </section>
 
-            <section className="rounded-2xl border border-[#eae6eb] bg-white p-4">
+            <section className="rounded-2xl border border-border bg-card p-4">
               <h2 className="text-sm font-semibold">Ticket</h2>
-              {lineas.length === 0 ? <p className="mt-2 text-sm text-[#86798b]">Ticket vacío — toca servicios o productos para agregarlos.</p> : null}
+              {lineas.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">Ticket vacío — toca servicios o productos para agregarlos.</p> : null}
               <ul className="mt-2 space-y-2">
                 {lineas.map((linea, idx) => (
-                  <li className="flex flex-wrap items-center gap-2 rounded-xl bg-[#f9f8f9] px-3 py-2 text-sm" key={`${linea.tipo}-${linea.id}`}>
+                  <li className="flex flex-wrap items-center gap-2 rounded-xl bg-muted px-3 py-2 text-sm" key={`${linea.tipo}-${linea.id}`}>
                     <span className="min-w-0 flex-1 truncate font-medium">{linea.nombre}</span>
                     {linea.tipo === "servicio" && catalogo.staff.length > 0 ? (
                       <select
                         aria-label="Profesional"
-                        className="rounded-lg border border-[#dfdae1] bg-white px-2 py-1 text-xs"
+                        className="rounded-lg border border-input bg-background px-2 py-1 text-xs"
                         onChange={(e) => setLineas((prev) => prev.map((l, i) => (i === idx ? { ...l, usuarioId: e.target.value || null } : l)))}
                         value={linea.usuarioId ?? ""}
                       >
@@ -249,16 +249,16 @@ export function OfflineVenta() {
                       </select>
                     ) : null}
                     <span className="flex items-center gap-1">
-                      <button aria-label="Quitar uno" className="size-7 rounded-lg border border-[#dfdae1] text-sm" onClick={() => cambiarCantidad(idx, -1)} type="button">
+                      <button aria-label="Quitar uno" className="size-7 rounded-lg border border-input text-sm" onClick={() => cambiarCantidad(idx, -1)} type="button">
                         −
                       </button>
                       <span className="w-6 text-center tabular-nums">{linea.cantidad}</span>
-                      <button aria-label="Agregar uno" className="size-7 rounded-lg border border-[#dfdae1] text-sm" onClick={() => cambiarCantidad(idx, 1)} type="button">
+                      <button aria-label="Agregar uno" className="size-7 rounded-lg border border-input text-sm" onClick={() => cambiarCantidad(idx, 1)} type="button">
                         +
                       </button>
                     </span>
                     <span className="w-20 text-right tabular-nums">{formatMonto(Number(linea.precio) * linea.cantidad, moneda)}</span>
-                    <button aria-label="Quitar línea" className="text-xs text-[#9a4a1f] underline" onClick={() => setLineas((prev) => prev.filter((_, i) => i !== idx))} type="button">
+                    <button aria-label="Quitar línea" className="text-xs text-destructive underline" onClick={() => setLineas((prev) => prev.filter((_, i) => i !== idx))} type="button">
                       Quitar
                     </button>
                   </li>
@@ -267,12 +267,12 @@ export function OfflineVenta() {
               <p className="mt-3 text-right text-base font-semibold">Total {formatMonto(total, moneda)}</p>
             </section>
 
-            <section className="rounded-2xl border border-[#eae6eb] bg-white p-4">
+            <section className="rounded-2xl border border-border bg-card p-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold">Pagos</h2>
                 {pagos.length < 4 ? (
                   <button
-                    className="text-xs font-medium text-[#724b7f] underline"
+                    className="text-xs font-medium text-primary underline"
                     onClick={() => setPagos((prev) => [...prev, { medioPagoId: "", monto: "", referencia: null }])}
                     type="button"
                   >
@@ -285,7 +285,7 @@ export function OfflineVenta() {
                   <div className="flex flex-wrap items-center gap-2" key={idx}>
                     <select
                       aria-label="Medio de pago"
-                      className="min-w-36 flex-1 rounded-xl border border-[#dfdae1] bg-white px-3 py-2 text-sm"
+                      className="min-w-36 flex-1 rounded-xl border border-input bg-background px-3 py-2 text-sm"
                       onChange={(e) => setPagos((prev) => prev.map((p, i) => (i === idx ? { ...p, medioPagoId: e.target.value } : p)))}
                       value={pago.medioPagoId}
                     >
@@ -298,7 +298,7 @@ export function OfflineVenta() {
                     </select>
                     <input
                       aria-label="Monto"
-                      className="w-28 rounded-xl border border-[#dfdae1] px-3 py-2 text-right text-sm tabular-nums"
+                      className="w-28 rounded-xl border border-input px-3 py-2 text-right text-sm tabular-nums"
                       inputMode="decimal"
                       onChange={(e) => setPagos((prev) => prev.map((p, i) => (i === idx ? { ...p, monto: e.target.value } : p)))}
                       placeholder="0.00"
@@ -307,47 +307,47 @@ export function OfflineVenta() {
                     {pago.medioPagoId && !esEfectivo(pago.medioPagoId) ? (
                       <input
                         aria-label="Referencia"
-                        className="min-w-32 flex-1 rounded-xl border border-[#dfdae1] px-3 py-2 text-sm"
+                        className="min-w-32 flex-1 rounded-xl border border-input px-3 py-2 text-sm"
                         onChange={(e) => setPagos((prev) => prev.map((p, i) => (i === idx ? { ...p, referencia: e.target.value } : p)))}
                         placeholder="Referencia"
                         value={pago.referencia ?? ""}
                       />
                     ) : null}
                     {pagos.length > 1 ? (
-                      <button aria-label="Quitar pago" className="text-xs text-[#9a4a1f] underline" onClick={() => setPagos((prev) => prev.filter((_, i) => i !== idx))} type="button">
+                      <button aria-label="Quitar pago" className="text-xs text-destructive underline" onClick={() => setPagos((prev) => prev.filter((_, i) => i !== idx))} type="button">
                         Quitar
                       </button>
                     ) : null}
                   </div>
                 ))}
               </div>
-              {cambio > 0 ? <p className="mt-2 text-sm text-[#6d5320]">Cambio a devolver: {formatMonto(cambio, moneda)}</p> : null}
+              {cambio > 0 ? <p className="mt-2 text-sm text-warning">Cambio a devolver: {formatMonto(cambio, moneda)}</p> : null}
               <input
                 aria-label="Nota de la venta"
-                className="mt-3 w-full rounded-xl border border-[#dfdae1] px-3 py-2 text-sm"
+                className="mt-3 w-full rounded-xl border border-input px-3 py-2 text-sm"
                 maxLength={500}
                 onChange={(e) => setNota(e.target.value)}
                 placeholder="Nota de la venta (opcional)"
                 value={nota}
               />
               <button
-                className="mt-3 w-full rounded-xl bg-[#724b7f] px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-[#5e396a] disabled:opacity-50"
+                className="mt-3 w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
                 disabled={lineas.length === 0}
                 onClick={registrar}
                 type="button"
               >
                 Registrar venta{enLinea ? "" : " (sin conexión)"}
               </button>
-              {mensaje ? <p className="mt-2 text-sm font-medium text-[#724b7f]">{mensaje}</p> : null}
+              {mensaje ? <p className="mt-2 text-sm font-medium text-primary">{mensaje}</p> : null}
             </section>
           </>
         ) : null}
 
-        <section className="rounded-2xl border border-[#eae6eb] bg-white p-4">
+        <section className="rounded-2xl border border-border bg-card p-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold">Por sincronizar ({pendientes.length})</h2>
             <button
-              className="rounded-xl border border-[#724b7f] px-3 py-1.5 text-xs font-semibold text-[#724b7f] disabled:opacity-50"
+              className="rounded-xl border border-primary px-3 py-1.5 text-xs font-semibold text-primary disabled:opacity-50"
               disabled={sincronizando || !enLinea || pendientes.length === 0}
               onClick={() => void sincronizar()}
               type="button"
@@ -355,13 +355,13 @@ export function OfflineVenta() {
               {sincronizando ? "Sincronizando…" : "Sincronizar"}
             </button>
           </div>
-          {pendientes.length === 0 ? <p className="mt-2 text-sm text-[#86798b]">Sin ventas pendientes.</p> : null}
+          {pendientes.length === 0 ? <p className="mt-2 text-sm text-muted-foreground">Sin ventas pendientes.</p> : null}
           <ul className="mt-2 space-y-1.5">
             {pendientes.map((v) => (
-              <li className="rounded-xl bg-[#f9f8f9] px-3 py-2 text-sm" key={v.clave}>
+              <li className="rounded-xl bg-muted px-3 py-2 text-sm" key={v.clave}>
                 <span className="font-medium tabular-nums">{formatMonto(totalVentaOffline([...v.servicios, ...v.productos]), moneda)}</span>
-                <span className="text-[#86798b]"> · {new Date(v.cobradaAt).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })}</span>
-                {errores[v.clave] ? <p className="mt-1 text-xs font-medium text-[#9a4a1f]">{errores[v.clave]}</p> : null}
+                <span className="text-muted-foreground"> · {new Date(v.cobradaAt).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })}</span>
+                {errores[v.clave] ? <p className="mt-1 text-xs font-medium text-destructive">{errores[v.clave]}</p> : null}
               </li>
             ))}
           </ul>

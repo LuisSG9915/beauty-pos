@@ -47,13 +47,13 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
   return (
     <div>
       <div className="mb-8 flex flex-col items-center justify-center gap-4 sm:flex-row sm:gap-8">
-        <div className="inline-flex rounded-full border border-[#dbd6dd] bg-white p-1">
+        <div className="inline-flex rounded-full border border-border bg-card p-1">
           {(["mensual", "anual"] as const).map((modo) => (
             <button
               className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${
                 (modo === "anual") === anual
-                  ? "bg-[#29242a] text-[#faf6fd]"
-                  : "text-[#6d6271] hover:text-[#29242a]"
+                  ? "bg-foreground text-background"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
               key={modo}
               onClick={() => setAnual(modo === "anual")}
@@ -63,11 +63,11 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
             </button>
           ))}
         </div>
-        <div className="inline-flex items-center gap-3 rounded-full border border-[#dbd6dd] bg-white px-4 py-1.5">
-          <span className="text-sm text-[#6d6271]">Sucursales:</span>
+        <div className="inline-flex items-center gap-3 rounded-full border border-border bg-card px-4 py-1.5">
+          <span className="text-sm text-muted-foreground">Sucursales:</span>
           <button
             aria-label="Quitar sucursal"
-            className="flex size-7 items-center justify-center rounded-full border border-[#dbd6dd] text-[#453d48] transition-colors hover:bg-[#f2f0f2] disabled:opacity-40"
+            className="flex size-7 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-muted disabled:opacity-40"
             disabled={sucursales <= 1}
             onClick={() => setSucursales((n) => Math.max(1, n - 1))}
             type="button"
@@ -77,7 +77,7 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
           <span className="w-6 text-center text-sm font-semibold">{sucursales}</span>
           <button
             aria-label="Agregar sucursal"
-            className="flex size-7 items-center justify-center rounded-full border border-[#dbd6dd] text-[#453d48] transition-colors hover:bg-[#f2f0f2] disabled:opacity-40"
+            className="flex size-7 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-muted disabled:opacity-40"
             disabled={sucursales >= MAX_SELECTOR}
             onClick={() => setSucursales((n) => Math.min(MAX_SELECTOR, n + 1))}
             type="button"
@@ -110,23 +110,23 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
 
           return (
             <article
-              className={`flex flex-col rounded-3xl border bg-white p-7 ${
+              className={`flex flex-col rounded-3xl border bg-card p-7 ${
                 plan.destacado
-                  ? "border-[#724b7f] shadow-[0_20px_60px_-28px_rgba(70,45,33,0.4)]"
-                  : "border-[#e8e4ea]"
+                  ? "border-primary shadow-xl"
+                  : "border-border"
               }`}
               key={plan.clave}
             >
               {plan.destacado ? (
-                <span className="mb-4 w-fit rounded-full bg-[#f2ecf4] px-3 py-1 text-xs font-semibold text-[#885699]">
+                <span className="mb-4 w-fit rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground">
                   El más elegido
                 </span>
               ) : null}
               <h2 className="text-xl font-semibold">{plan.nombre}</h2>
-              <p className="mt-1 text-sm text-[#675d6a]">{plan.descripcion}</p>
+              <p className="mt-1 text-sm text-muted-foreground">{plan.descripcion}</p>
 
               {excedeMax ? (
-                <p className="mt-5 text-sm font-medium text-[#885699]">
+                <p className="mt-5 text-sm font-medium text-primary">
                   Este plan permite hasta {plan.maxSucursales} sucursal(es).{" "}
                   {plan.clave === "profesional" ? "" : "El plan Profesional cubre más."}
                 </p>
@@ -134,10 +134,10 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
                 <>
                   {esFundador && listaTotal != null ? (
                     <p className="mt-5 flex flex-wrap items-center gap-2 text-sm">
-                      <span className="text-[#a99fb0] line-through">
+                      <span className="text-muted-foreground line-through">
                         {formatoPrecio(listaTotal, plan.moneda)}
                       </span>
-                      <span className="rounded-full bg-[#f2ecf4] px-2 py-0.5 text-xs font-semibold text-[#885699]">
+                      <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground">
                         Precio fundador
                       </span>
                     </p>
@@ -146,19 +146,19 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
                     <span className="text-3xl font-semibold tracking-tight">
                       {formatoPrecio(total, plan.moneda)}
                     </span>
-                    <span className="text-sm text-[#675d6a]">
+                    <span className="text-sm text-muted-foreground">
                       {" "}
                       / {anual ? "año" : "mes"}
                       {sucursales > 1 ? ` · ${sucursales} sucursales` : ""}
                     </span>
                   </p>
                   {equivMensual !== null ? (
-                    <p className="mt-1 text-xs text-[#675d6a]">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Equivale a {formatoPrecio(equivMensual, plan.moneda)}/mes — ahorras{" "}
                       {formatoPrecio((mensual + extras * extraMensual) * 12 - total, plan.moneda)} al año.
                     </p>
                   ) : (
-                    <p className="mt-1 text-xs text-[#675d6a]">
+                    <p className="mt-1 text-xs text-muted-foreground">
                       Incluye {plan.sucursalesIncluidas} sucursal(es)
                       {extras > 0
                         ? ` + ${extras} × ${formatoPrecio(extraMensual, plan.moneda)}`
@@ -169,22 +169,18 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
                   )}
                 </>
               )}
-              <p className="mt-1 text-xs text-[#97869c]">Precios en MXN, IVA incluido.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Precios en MXN, IVA incluido.</p>
 
-              <ul className="mt-6 flex-1 space-y-2.5 text-sm text-[#453d48]">
+              <ul className="mt-6 flex-1 space-y-2.5 text-sm">
                 {plan.beneficios.map((beneficio) => (
                   <li className="flex items-start gap-2.5" key={beneficio}>
-                    <Check className="mt-0.5 size-4 shrink-0 text-[#5d9a76]" />
+                    <Check className="mt-0.5 size-4 shrink-0 text-success" />
                     {beneficio}
                   </li>
                 ))}
               </ul>
               <Button
-                className={`mt-7 w-full rounded-xl ${
-                  plan.destacado
-                    ? "bg-[#29242a] text-[#faf6fd] hover:bg-[#403743]"
-                    : "border-[#d8d3d9] bg-white hover:bg-[#f2f0f2]"
-                }`}
+                className="mt-7 w-full rounded-xl"
                 nativeButton={false}
                 render={<Link href="/registro" />}
                 variant={plan.destacado ? "default" : "outline"}

@@ -30,10 +30,12 @@ const TIPO_LABEL: Record<string, string> = {
   nota: "Nota",
 };
 
+// Expediente monocromático: los tipos son etiquetas neutras; solo la alergia
+// usa color porque es una advertencia real de seguridad.
 const TIPO_TONE: Record<string, string> = {
-  color: "bg-[#d7ebf7] text-info",
-  tratamiento: "bg-accent/70 text-primary",
-  alergia: "bg-[#f6d9d2] text-destructive",
+  color: "bg-muted/60 text-muted-foreground",
+  tratamiento: "bg-muted/60 text-muted-foreground",
+  alergia: "bg-destructive/10 text-destructive",
   nota: "bg-muted/60 text-muted-foreground",
 };
 
@@ -148,7 +150,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
   const historialTab = (
     <div className="space-y-6">
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">Citas</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Citas</h3>
         {citaRows.length === 0 ? (
           <p className="mt-3 rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">Sin citas registradas.</p>
         ) : (
@@ -166,7 +168,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
         )}
       </section>
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">Ventas</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ventas</h3>
         {ventaRows.length === 0 ? (
           <p className="mt-3 rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">Sin ventas registradas.</p>
         ) : (
@@ -199,7 +201,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
                 {TIPO_LABEL[ficha.tipo] ?? ficha.tipo}
               </span>
               {ficha.privada ? (
-                <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-white">Privada</span>
+                <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">Privada</span>
               ) : null}
               {ficha.tiempoPoseMinutos != null ? (
                 <span className="text-xs font-medium text-warning">Pose {ficha.tiempoPoseMinutos} min</span>
@@ -293,7 +295,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
                 <span className="text-sm font-semibold text-foreground">{consent.titulo}</span>
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                    consent.respuesta === "aceptado" ? "bg-[#e2f5f1] text-success" : "bg-[#f6d9d2] text-destructive"
+                    consent.respuesta === "aceptado" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
                   }`}
                 >
                   {consent.respuesta === "aceptado" ? "Aceptado" : "Rechazado"}

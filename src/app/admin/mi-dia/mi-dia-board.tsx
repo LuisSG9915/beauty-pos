@@ -3,7 +3,7 @@
 import { CheckCircle2, CirclePlay, ClipboardList, Coins, Scissors, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 
 import { updateCitaEstado } from "@/app/admin/agenda/actions";
 import { CitaStatusBadge } from "@/app/admin/agenda/cita-side-panel";
@@ -62,13 +62,21 @@ export function MiDiaBoard({
   const router = useRouter();
   const toast = useToast();
   const [pending, startTransition] = useTransition();
+  const [pendingAction, setPendingAction] = useState<string | null>(null);
 
-  const cambiarEstado = (cita: MiDiaCita, estado: string) => {
+  const runCitaAction = (cita: MiDiaCita, action: string, work: () => Promise<void>) => {
+    const key = `${cita.id}:${action}`;
+    if (pending && pendingAction?.startsWith(`${cita.id}:`)) return;
+    setPendingAction(key);
+    startTransition(work);
+  };
+
+  const cambiarEstado = (cita: MiDiaCita, estado: string, action: string) => {
     const data = new FormData();
     data.set("organizacionId", organizationId);
     data.set("citaId", cita.id);
     data.set("estado", estado);
-    startTransition(async () => {
+    runCitaAction(cita, action, async () => {
       const result = await updateCitaEstado(data);
       if (result.success) {
         toast.success(result.message ?? "Estado actualizado.");
@@ -83,7 +91,7 @@ export function MiDiaBoard({
     const data = new FormData();
     data.set("organizacionId", organizationId);
     data.set("citaId", cita.id);
-    startTransition(async () => {
+    runCitaAction(cita, "cobrar", async () => {
       const result = await iniciarVentaDeCita(initialActionState as ActionState<{ ventaId: string }>, data);
       if (!result.success || !result.data?.ventaId) {
         toast.error(result.error ?? "No se pudo abrir la venta.");
@@ -171,11 +179,14 @@ export function MiDiaBoard({
             const ventaCobrada = cita.ventaId != null && cita.ventaEstado === "completada";
             const enCurso = cita.estado === "en_proceso";
             const puedeCheckIn = ["pendiente", "confirmada"].includes(cita.estado);
+            const citaBusy = pending && (pendingAction?.startsWith(`${cita.id}:`) ?? false);
+            const accionBusy = (action: string) => pending && pendingAction === `${cita.id}:${action}`;
             return (
               <li
+                aria-busy={citaBusy}
                 className={cn(
                   "rounded-2xl border bg-card p-4 shadow-sm sm:p-5",
-                  enCurso ? "border-[#e7bd66]" : "border-border",
+                  enCurso ? "border-warning/60" : "border-border",
                 )}
                 key={cita.id}
               >
@@ -206,7 +217,7 @@ export function MiDiaBoard({
                       <p className="mt-1 text-xs text-muted-foreground">Nota: {cita.notas}</p>
                     ) : null}
                     {cita.clienteNotas ? (
-                      <p className="mt-1.5 rounded-lg bg-[#ffe3ad] px-2.5 py-1.5 text-xs font-medium text-warning">
+                      <p className="mt-1.5 rounded-lg bg-warning/10 px-2.5 py-1.5 text-xs font-medium text-warning">
                         {cita.clienteNotas}
                       </p>
                     ) : null}
@@ -224,12 +235,13 @@ export function MiDiaBoard({
                     <Button
                       data-action-clave="1"
                       data-action-id="mi_dia.cita.check_in"
-                      disabled={pending}
-                      onClick={() => cambiarEstado(cita, "en_proceso")}
+                      disabled={citaBusy}
+                      onClick={() => cambiarEstado(cita, "en_proceso", "check_in")}
                       size="touch"
                       type="button"
                     >
-                      <CirclePlay aria-hidden="true" /> Cliente en silla
+                      <CirclePlay aria-hidden="true" />
+                      {accionBusy("check_in") ? "Registrando…" : "Cliente en silla"}
                     </Button>
                   ) : null}
                   {enCurso ? (
@@ -242,23 +254,24 @@ export function MiDiaBoard({
                         <Button
                           data-action-clave="1"
                           data-action-id="mi_dia.cita.cobrar"
-                          disabled={pending}
+                          disabled={citaBusy}
                           onClick={() => cobrar(cita)}
                           size="touch"
                           type="button"
                         >
-                          Cobrar
+                          {accionBusy("cobrar") ? "Abriendo cobro…" : "Cobrar"}
                         </Button>
                       )}
                       {!ventaAbierta ? (
                         <Button
-                          disabled={pending}
-                          onClick={() => cambiarEstado(cita, "completada")}
+                          disabled={citaBusy}
+                          onClick={() => cambiarEstado(cita, "completada", "completar")}
                           size="touch"
                           type="button"
                           variant="outline"
                         >
-                          <CheckCircle2 aria-hidden="true" /> Terminado
+                          <CheckCircle2 aria-hidden="true" />
+                          {accionBusy("completar") ? "Finalizando…" : "Terminado"}
                         </Button>
                       ) : null}
                     </>
