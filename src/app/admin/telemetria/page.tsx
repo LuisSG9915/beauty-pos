@@ -81,34 +81,34 @@ export default async function TelemetriaPage({
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <AdminCard>
-              <p className="text-xs font-medium text-[#8a7b72]">Sesiones</p>
+              <p className="text-xs font-medium text-[#6e6159]">Sesiones</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">{resumen.sesiones}</p>
-              <p className="mt-1 text-xs text-[#8a7b72]">
+              <p className="mt-1 text-xs text-[#6e6159]">
                 {resumen.usuariosUnicos} usuarios únicos
               </p>
             </AdminCard>
             <AdminCard>
-              <p className="text-xs font-medium text-[#8a7b72]">Rebote</p>
+              <p className="text-xs font-medium text-[#6e6159]">Rebote</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">{resumen.tasaRebote}%</p>
-              <p className="mt-1 text-xs text-[#8a7b72]">
+              <p className="mt-1 text-xs text-[#6e6159]">
                 sesiones sin engagement (&lt;10 s, 1 página, sin acción)
               </p>
             </AdminCard>
             <AdminCard>
-              <p className="text-xs font-medium text-[#8a7b72]">Páginas / sesión</p>
+              <p className="text-xs font-medium text-[#6e6159]">Páginas / sesión</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">
                 {resumen.promedioPaginas.toFixed(1)}
               </p>
-              <p className="mt-1 text-xs text-[#8a7b72]">
+              <p className="mt-1 text-xs text-[#6e6159]">
                 {resumen.paginasTotales} vistas en total
               </p>
             </AdminCard>
             <AdminCard>
-              <p className="text-xs font-medium text-[#8a7b72]">Tiempo activo</p>
+              <p className="text-xs font-medium text-[#6e6159]">Tiempo activo</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">
                 {Math.round(resumen.promedioActivoSeg)}s
               </p>
-              <p className="mt-1 text-xs text-[#8a7b72]">promedio por sesión</p>
+              <p className="mt-1 text-xs text-[#6e6159]">promedio por sesión</p>
             </AdminCard>
           </div>
 
@@ -198,13 +198,13 @@ function Tabla({
   filas: (React.ReactNode | string | number)[][];
 }) {
   if (filas.length === 0) {
-    return <p className="text-sm text-[#81746c]">Sin datos en el rango.</p>;
+    return <p className="text-sm text-[#6e6159]">Sin datos en el rango.</p>;
   }
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-[#eee6e0] text-left text-xs text-[#8a7b72]">
+          <tr className="border-b border-[#eee6e0] text-left text-xs text-[#6e6159]">
             {columnas.map((col) => (
               <th className="pb-2 pr-4 font-medium" key={col}>{col}</th>
             ))}

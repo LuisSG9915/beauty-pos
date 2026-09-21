@@ -110,10 +110,10 @@ export async function sendAvisoCita(tipo: string, input: AvisoCitaInput): Promis
           <h2 style="font-size: 16px; font-weight: 600">${plantilla.titulo}</h2>
           <p>${plantilla.mensaje}</p>
           <table style="border-collapse: collapse">
-            <tr><td style="padding: 4px 12px 4px 0; color: #81746c">Sucursal</td><td><strong>${sucursal}</strong></td></tr>
-            ${antes ? `<tr><td style="padding: 4px 12px 4px 0; color: #81746c">Horario anterior</td><td><s>${antes}</s></td></tr>` : ""}
-            <tr><td style="padding: 4px 12px 4px 0; color: #81746c">Fecha y hora</td><td><strong>${cuando}</strong></td></tr>
-            ${servicio ? `<tr><td style="padding: 4px 12px 4px 0; color: #81746c">Servicio</td><td><strong>${servicio}</strong></td></tr>` : ""}
+            <tr><td style="padding: 4px 12px 4px 0; color: #6e6159">Sucursal</td><td><strong>${sucursal}</strong></td></tr>
+            ${antes ? `<tr><td style="padding: 4px 12px 4px 0; color: #6e6159">Horario anterior</td><td><s>${antes}</s></td></tr>` : ""}
+            <tr><td style="padding: 4px 12px 4px 0; color: #6e6159">Fecha y hora</td><td><strong>${cuando}</strong></td></tr>
+            ${servicio ? `<tr><td style="padding: 4px 12px 4px 0; color: #6e6159">Servicio</td><td><strong>${servicio}</strong></td></tr>` : ""}
           </table>
           ${nota ? `<p style="color: #57534e">${nota}</p>` : ""}
           ${

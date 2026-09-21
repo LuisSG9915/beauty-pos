@@ -51,7 +51,7 @@ export function ClientForm({ organizationId, initial }: { organizationId: string
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
       <h2 className="text-xl font-semibold">{initial ? "Editar cliente" : "Nuevo cliente"}</h2>
-      <p className="mt-1 text-sm text-[#81746c]">Solo el nombre es obligatorio; el teléfono ayuda a confirmar citas.</p>
+      <p className="mt-1 text-sm text-[#6e6159]">Solo el nombre es obligatorio; el teléfono ayuda a confirmar citas.</p>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         {PERSONAL_FIELDS.map((field) => (
@@ -91,7 +91,7 @@ export function ClientForm({ organizationId, initial }: { organizationId: string
       <div className="mt-4">
         <ActionFeedback state={state} successMessage="Cliente guardado correctamente." />
       </div>
-      <Button className="mt-6 rounded-xl" data-action-clave="1" data-action-id="clientes.cliente.guardar" disabled={isPending} type="submit">
+      <Button className="mt-6 rounded-xl" data-action-clave="1" data-action-id="clientes.cliente.guardar" disabled={isPending} size="touch" type="submit">
         {isPending ? "Guardando…" : "Guardar cliente"}
       </Button>
     </form>

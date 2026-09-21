@@ -18,7 +18,7 @@ export default async function LoginPage({
   return (
     <main className="grid min-h-screen bg-[#faf9f7] lg:grid-cols-[1.05fr_0.95fr]">
       <section className="relative hidden overflow-hidden bg-[#2c2522] px-10 py-10 text-[#fffaf5] lg:flex lg:flex-col lg:justify-between">
-        <div className="absolute -right-32 -top-32 size-96 rounded-full bg-[#b8795d]/25 blur-3xl" />
+        <div className="absolute -right-32 -top-32 size-96 rounded-full bg-[#8a5140]/25 blur-3xl" />
         <div className="absolute -bottom-32 -left-24 size-96 rounded-full bg-[#ead2c4]/10 blur-3xl" />
         <div className="relative flex items-center gap-3">
           <div className="flex size-10 items-center justify-center rounded-2xl bg-[#f1dfd3] text-sm font-semibold text-[#2c2522]">BP</div>
@@ -46,9 +46,9 @@ export default async function LoginPage({
             <span className="font-semibold">Beauty POS</span>
           </Link>
           <div className="mt-12 lg:mt-0">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#b8795d]">Bienvenido de vuelta</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8a5140]">Bienvenido de vuelta</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-[#2c2522]">Ingresa a tu operación</h1>
-            <p className="mt-4 text-sm leading-6 text-[#81746c]">Usa las credenciales de tu invitación administrativa para continuar.</p>
+            <p className="mt-4 text-sm leading-6 text-[#6e6159]">Usa las credenciales de tu invitación administrativa para continuar.</p>
             {aviso ? (
               <p className="mt-5 rounded-xl border border-[#d8e6d3] bg-[#f0f7ec] px-4 py-3 text-sm text-[#3d6b4a]" role="status">
                 {aviso}

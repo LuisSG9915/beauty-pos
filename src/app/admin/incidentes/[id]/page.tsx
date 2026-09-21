@@ -60,48 +60,48 @@ export default async function IncidenteDetallePage({
           <AdminCard title="Detalle del error">
             <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <div>
-                <dt className="text-xs text-[#8a7b72]">Estado</dt>
+                <dt className="text-xs text-[#6e6159]">Estado</dt>
                 <dd className="mt-1"><StatusBadge tone={estado.tone}>{estado.label}</StatusBadge></dd>
               </div>
               <div>
-                <dt className="text-xs text-[#8a7b72]">Prioridad</dt>
+                <dt className="text-xs text-[#6e6159]">Prioridad</dt>
                 <dd className="mt-1"><StatusBadge tone={prioridad.tone}>{prioridad.label}</StatusBadge></dd>
               </div>
               <div>
-                <dt className="text-xs text-[#8a7b72]">Fuente</dt>
+                <dt className="text-xs text-[#6e6159]">Fuente</dt>
                 <dd className="mt-1">{incidente.fuente}</dd>
               </div>
               <div>
-                <dt className="text-xs text-[#8a7b72]">Módulo / ruta</dt>
+                <dt className="text-xs text-[#6e6159]">Módulo / ruta</dt>
                 <dd className="mt-1">
                   {incidente.modulo ?? "—"} {incidente.ruta ? `· ${incidente.ruta}` : ""}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-[#8a7b72]">Ocurrencias</dt>
+                <dt className="text-xs text-[#6e6159]">Ocurrencias</dt>
                 <dd className="mt-1 tabular-nums">{incidente.ocurrencias}</dd>
               </div>
               <div>
-                <dt className="text-xs text-[#8a7b72]">Negocios afectados</dt>
+                <dt className="text-xs text-[#6e6159]">Negocios afectados</dt>
                 <dd className="mt-1 tabular-nums">{incidente.organizacionesAfectadas}</dd>
               </div>
               <div>
-                <dt className="text-xs text-[#8a7b72]">Primera vez</dt>
+                <dt className="text-xs text-[#6e6159]">Primera vez</dt>
                 <dd className="mt-1">{formatDateTime(incidente.primeraVezAt)}</dd>
               </div>
               <div>
-                <dt className="text-xs text-[#8a7b72]">Última vez</dt>
+                <dt className="text-xs text-[#6e6159]">Última vez</dt>
                 <dd className="mt-1">{formatDateTime(incidente.ultimaVezAt)}</dd>
               </div>
               {incidente.releaseAparece ? (
                 <div>
-                  <dt className="text-xs text-[#8a7b72]">Apareció en</dt>
+                  <dt className="text-xs text-[#6e6159]">Apareció en</dt>
                   <dd className="mt-1">{incidente.releaseAparece}</dd>
                 </div>
               ) : null}
               {incidente.releaseCorregido ? (
                 <div>
-                  <dt className="text-xs text-[#8a7b72]">Corregido en</dt>
+                  <dt className="text-xs text-[#6e6159]">Corregido en</dt>
                   <dd className="mt-1">{incidente.releaseCorregido}</dd>
                 </div>
               ) : null}
@@ -122,12 +122,12 @@ export default async function IncidenteDetallePage({
 
           <AdminCard title="Ocurrencias recientes">
             {ocurrencias.length === 0 ? (
-              <p className="text-sm text-[#81746c]">Sin ocurrencias registradas.</p>
+              <p className="text-sm text-[#6e6159]">Sin ocurrencias registradas.</p>
             ) : (
               <ul className="divide-y divide-[#f4eeea]">
                 {ocurrencias.map((oc) => (
                   <li className="py-3" key={oc.id}>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#8a7b72]">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[#6e6159]">
                       <span className="font-mono">{oc.correlationId}</span>
                       <span>{formatDateTime(oc.createdAt)}</span>
                       {oc.ruta ? <span>{oc.ruta}</span> : null}
@@ -141,7 +141,7 @@ export default async function IncidenteDetallePage({
                       </pre>
                     ) : null}
                     {Array.isArray(oc.contexto?.rastro) && oc.contexto.rastro.length > 0 ? (
-                      <p className="mt-2 text-[11px] text-[#8a7b72]">
+                      <p className="mt-2 text-[11px] text-[#6e6159]">
                         Acciones previas: {oc.contexto.rastro.join(" → ")}
                       </p>
                     ) : null}
@@ -169,7 +169,7 @@ export default async function IncidenteDetallePage({
 
           <AdminCard title="Distribución por navegador">
             {porNavegador.length === 0 ? (
-              <p className="text-sm text-[#81746c]">Sin datos.</p>
+              <p className="text-sm text-[#6e6159]">Sin datos.</p>
             ) : (
               <ul className="space-y-1 text-sm">
                 {porNavegador.map((fila) => (
@@ -187,7 +187,7 @@ export default async function IncidenteDetallePage({
             <ul className="mt-4 space-y-3">
               {historial.map((item) => (
                 <li className="border-l-2 border-[#eadfd8] pl-3 text-sm" key={item.id}>
-                  <p className="text-xs text-[#8a7b72]">
+                  <p className="text-xs text-[#6e6159]">
                     {formatDateTime(item.createdAt)} · {item.usuario ?? "Sistema"} ·{" "}
                     {TIPO_HISTORIAL[item.tipo] ?? item.tipo}
                     {item.valorAnterior || item.valorNuevo

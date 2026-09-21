@@ -31,17 +31,17 @@ export default function SoportePage() {
 
         <div className="mt-10 grid gap-5 sm:grid-cols-3">
           <div className="rounded-3xl border border-[#eee6e0] bg-white p-6">
-            <LifeBuoy className="size-5 text-[#b8795d]" />
+            <LifeBuoy className="size-5 text-[#8a5140]" />
             <h2 className="mt-4 font-semibold">Dentro del sistema</h2>
-            <p className="mt-2 text-sm leading-6 text-[#81746c]">
+            <p className="mt-2 text-sm leading-6 text-[#6e6159]">
               La sección <strong>Ayuda</strong> del panel tiene la guía paso a paso
               y el modo práctica para aprender sin riesgo.
             </p>
           </div>
           <div className="rounded-3xl border border-[#eee6e0] bg-white p-6">
-            <Mail className="size-5 text-[#b8795d]" />
+            <Mail className="size-5 text-[#8a5140]" />
             <h2 className="mt-4 font-semibold">Correo</h2>
-            <p className="mt-2 text-sm leading-6 text-[#81746c]">
+            <p className="mt-2 text-sm leading-6 text-[#6e6159]">
               Escríbenos a{" "}
               <a className="font-medium text-[#a76348] underline underline-offset-2" href="mailto:soporte@beautypos.app">
                 soporte@beautypos.app
@@ -50,9 +50,9 @@ export default function SoportePage() {
             </p>
           </div>
           <div className="rounded-3xl border border-[#eee6e0] bg-white p-6">
-            <MessageCircleQuestion className="size-5 text-[#b8795d]" />
+            <MessageCircleQuestion className="size-5 text-[#8a5140]" />
             <h2 className="mt-4 font-semibold">Preguntas frecuentes</h2>
-            <p className="mt-2 text-sm leading-6 text-[#81746c]">
+            <p className="mt-2 text-sm leading-6 text-[#6e6159]">
               Revisa las dudas más comunes en la{" "}
               <Link className="font-medium text-[#a76348] underline underline-offset-2" href="/precios">
                 página de precios

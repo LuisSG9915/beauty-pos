@@ -201,7 +201,7 @@ export function CitaForm({
                     value={recurso.id}
                   />
                   <span className="flex-1 font-medium">{recurso.nombre}</span>
-                  <span className="text-[10px] uppercase tracking-wide text-[#81746c]">{recurso.tipo}</span>
+                  <span className="text-[10px] uppercase tracking-wide text-[#6e6159]">{recurso.tipo}</span>
                 </label>
               ))}
             </div>
@@ -299,7 +299,7 @@ export function CitaForm({
               </button>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-[#81746c]">
+          <p className="mt-2 text-[11px] text-[#6e6159]">
             Elige una sugerencia para rellenar fecha y hora, luego guarda de nuevo.
           </p>
         </div>

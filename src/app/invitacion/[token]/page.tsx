@@ -23,7 +23,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
     <main className="flex min-h-screen items-center justify-center bg-[#faf9f7] px-6 py-12 text-[#292522]">
       <section className="w-full max-w-md rounded-3xl border border-[#eadfd8] bg-white p-8 shadow-[0_24px_80px_-32px_rgba(70,45,33,0.35)]">
         <div className="flex size-10 items-center justify-center rounded-2xl bg-[#2c2522] text-sm font-semibold text-[#f6eadf]">BP</div>
-        <p className="mt-8 text-sm font-semibold uppercase tracking-[0.2em] text-[#b8795d]">Beauty POS</p>
+        <p className="mt-8 text-sm font-semibold uppercase tracking-[0.2em] text-[#8a5140]">Beauty POS</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em]">Acepta tu invitación</h1>
         {valid ? (
           <AcceptInvitationForm token={token} email={invitation.correo} name={invitation.nombre} />

@@ -119,7 +119,7 @@ export function MiDiaBoard({
         className="grid grid-cols-2 gap-3 sm:grid-cols-4"
       >
         <div className="rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-[#81746c]">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-[#6e6159]">
             <Scissors aria-hidden="true" className="size-3.5 text-[#8a5140]" /> Completadas
           </p>
           <p className="mt-1.5 text-2xl font-bold tabular-nums text-[#2d2926]">
@@ -127,7 +127,7 @@ export function MiDiaBoard({
           </p>
         </div>
         <div className="rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-[#81746c]">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-[#6e6159]">
             <ClipboardList aria-hidden="true" className="size-3.5 text-[#8a5140]" /> Por atender
           </p>
           <p className="mt-1.5 text-2xl font-bold tabular-nums text-[#2d2926]">
@@ -135,7 +135,7 @@ export function MiDiaBoard({
           </p>
         </div>
         <div className="rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-[#81746c]">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-[#6e6159]">
             <Coins aria-hidden="true" className="size-3.5 text-[#8a5140]" /> Propinas
           </p>
           <p className="mt-1.5 text-2xl font-bold tabular-nums text-[#347052]">
@@ -143,7 +143,7 @@ export function MiDiaBoard({
           </p>
         </div>
         <div className="rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-[#81746c]">
+          <p className="flex items-center gap-1.5 text-xs font-medium text-[#6e6159]">
             <Wallet aria-hidden="true" className="size-3.5 text-[#8a5140]" /> Comisiones
           </p>
           <p className="mt-1.5 text-2xl font-bold tabular-nums text-[#347052]">
@@ -152,7 +152,7 @@ export function MiDiaBoard({
         </div>
       </section>
 
-      <p className="text-sm text-[#81746c]">
+      <p className="text-sm text-[#6e6159]">
         {formatDate(`${fecha}T12:00:00Z`, { timeZone: "UTC" })} · {citas.length}{" "}
         {citas.length === 1 ? "cita" : "citas"}
       </p>
@@ -160,7 +160,7 @@ export function MiDiaBoard({
       {citas.length === 0 ? (
         <section className="rounded-2xl border border-dashed border-[#ded8d2] bg-white px-6 py-14 text-center shadow-sm">
           <p className="text-base font-medium text-[#403a35]">Sin citas asignadas hoy</p>
-          <p className="mt-1.5 text-sm text-[#81746c]">
+          <p className="mt-1.5 text-sm text-[#6e6159]">
             Cuando la recepción te asigne una cita aparecerá aquí.
           </p>
         </section>
@@ -183,7 +183,7 @@ export function MiDiaBoard({
                   <div className="min-w-0">
                     <p className="flex flex-wrap items-baseline gap-x-2 text-lg font-bold tabular-nums text-[#2d2926]">
                       {formatTime(cita.fechaHora, { timeZone })}
-                      <span className="text-sm font-normal text-[#81746c]">
+                      <span className="text-sm font-normal text-[#6e6159]">
                         {cita.duracionMinutos} min
                       </span>
                     </p>
@@ -203,7 +203,7 @@ export function MiDiaBoard({
                       {cita.servicios.join(" · ") || "Sin servicios"}
                     </p>
                     {cita.notas ? (
-                      <p className="mt-1 text-xs text-[#81746c]">Nota: {cita.notas}</p>
+                      <p className="mt-1 text-xs text-[#6e6159]">Nota: {cita.notas}</p>
                     ) : null}
                     {cita.clienteNotas ? (
                       <p className="mt-1.5 rounded-lg bg-[#fdf3e8] px-2.5 py-1.5 text-xs font-medium text-[#986b16]">
@@ -222,6 +222,8 @@ export function MiDiaBoard({
                 <div className="mt-4 flex flex-wrap gap-2">
                   {puedeCheckIn ? (
                     <Button
+                      data-action-clave="1"
+                      data-action-id="mi_dia.cita.check_in"
                       disabled={pending}
                       onClick={() => cambiarEstado(cita, "en_proceso")}
                       size="touch"
@@ -238,6 +240,8 @@ export function MiDiaBoard({
                         </Button>
                       ) : (
                         <Button
+                          data-action-clave="1"
+                          data-action-id="mi_dia.cita.cobrar"
                           disabled={pending}
                           onClick={() => cobrar(cita)}
                           size="touch"

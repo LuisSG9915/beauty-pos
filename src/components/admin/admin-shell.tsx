@@ -56,7 +56,7 @@ function OrganizationSelector({
 
   if (organizations.length === 0) {
     return (
-      <span className="rounded-full border border-dashed border-[#ded8d2] px-3 py-1.5 text-xs text-[#8a7b72]">
+      <span className="rounded-full border border-dashed border-[#ded8d2] px-3 py-1.5 text-xs text-[#6e6159]">
         Sin organización asignada
       </span>
     );
@@ -73,7 +73,7 @@ function OrganizationSelector({
 
   return (
     <label className="flex min-w-0 items-center gap-2" htmlFor={selectId}>
-      <span className="hidden text-xs font-medium text-[#8a7b72] sm:inline">
+      <span className="hidden text-xs font-medium text-[#6e6159] sm:inline">
         Organización
       </span>
       <select
@@ -209,7 +209,7 @@ export function AdminShell({
               </div>
               <div className="leading-tight">
                 <p className="text-sm font-semibold tracking-tight">Beauty POS</p>
-                <p className="text-[11px] text-[#8a7b72]">
+                <p className="text-[11px] text-[#6e6159]">
                   {isPlatformAdmin ? "Plataforma" : "Panel de operación"}
                 </p>
               </div>
@@ -225,7 +225,7 @@ export function AdminShell({
               </Suspense>
               <div className="hidden text-right leading-tight sm:block">
                 <p className="max-w-40 truncate text-sm font-medium">{userName}</p>
-                <p className="max-w-40 truncate text-[11px] text-[#8a7b72]">
+                <p className="max-w-40 truncate text-[11px] text-[#6e6159]">
                   {userEmail}
                 </p>
               </div>

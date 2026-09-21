@@ -102,18 +102,18 @@ export default async function SucursalesPage({ searchParams }: Props) {
       >
         <dl className="grid gap-3 sm:grid-cols-3">
           <div>
-            <dt className="text-xs uppercase tracking-wide text-[#81746c]">Plan</dt>
+            <dt className="text-xs uppercase tracking-wide text-[#6e6159]">Plan</dt>
             <dd className="mt-0.5 font-semibold text-[#2d2926]">{ctx.plan?.nombre ?? "Sin suscripción"}</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-[#81746c]">Sucursales activas</dt>
+            <dt className="text-xs uppercase tracking-wide text-[#6e6159]">Sucursales activas</dt>
             <dd className="mt-0.5 font-semibold text-[#2d2926]">
               {activas}
               {maxSucursales != null ? ` de ${maxSucursales} permitidas` : ""}
             </dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-[#81746c]">Cobertura facturada</dt>
+            <dt className="text-xs uppercase tracking-wide text-[#6e6159]">Cobertura facturada</dt>
             <dd className="mt-0.5 font-semibold text-[#2d2926]">
               {cubiertas != null ? `${cubiertas} sucursal(es)` : "—"}
             </dd>

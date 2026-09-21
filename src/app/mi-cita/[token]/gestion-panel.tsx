@@ -145,7 +145,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
       {modo === "menu" ? (
         <div className="flex flex-wrap gap-3">
           <button
-            className="inline-flex items-center gap-2 rounded-xl border border-[#d8c9bf] px-4 py-2.5 text-sm font-medium transition-colors hover:border-[#b8795d] hover:bg-[#fdf6f1]"
+            className="inline-flex items-center gap-2 rounded-xl border border-[#d8c9bf] px-4 py-2.5 text-sm font-medium transition-colors hover:border-[#8a5140] hover:bg-[#fdf6f1]"
             onClick={() => setModo("reagendar")}
             type="button"
           >
@@ -230,7 +230,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
                 <button
                   className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
                     dk === diaKeySel
-                      ? "border-[#b8795d] bg-[#fdf0e8] text-[#8a5038]"
+                      ? "border-[#8a5140] bg-[#fdf0e8] text-[#8a5038]"
                       : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
                   }`}
                   key={dk}
@@ -252,18 +252,18 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
             <div className="mt-4">
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[#a76348]">Horario</p>
               {slots === null ? (
-                <p className="mt-2 text-sm text-[#8a7b72]">Buscando horarios…</p>
+                <p className="mt-2 text-sm text-[#6e6159]">Buscando horarios…</p>
               ) : slotsError ? (
                 <p className="mt-2 text-sm text-[#a0473f]">{slotsError}</p>
               ) : slots.length === 0 ? (
-                <p className="mt-2 text-sm text-[#8a7b72]">No hay horarios libres este día.</p>
+                <p className="mt-2 text-sm text-[#6e6159]">No hay horarios libres este día.</p>
               ) : (
                 <div className="mt-2 flex flex-wrap gap-2">
                   {slots.map((iso) => (
                     <button
                       className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
                         iso === slotIso
-                          ? "border-[#b8795d] bg-[#fdf0e8] text-[#8a5038]"
+                          ? "border-[#8a5140] bg-[#fdf0e8] text-[#8a5038]"
                           : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
                       }`}
                       key={iso}

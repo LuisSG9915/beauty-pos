@@ -139,7 +139,7 @@ export default async function IncidentesPage({
         <AdminCard className="overflow-x-auto p-0 sm:p-0">
           <table className="w-full min-w-[720px] text-sm">
             <thead>
-              <tr className="border-b border-[#eee6e0] text-left text-xs text-[#8a7b72]">
+              <tr className="border-b border-[#eee6e0] text-left text-xs text-[#6e6159]">
                 <th className="px-5 py-3 font-medium">Prioridad</th>
                 <th className="px-5 py-3 font-medium">Error</th>
                 <th className="px-5 py-3 font-medium">Estado</th>
@@ -168,7 +168,7 @@ export default async function IncidentesPage({
                       >
                         {incidente.titulo}
                       </Link>
-                      <p className="mt-0.5 truncate text-xs text-[#8a7b72]">
+                      <p className="mt-0.5 truncate text-xs text-[#6e6159]">
                         {FUENTE_LABELS[incidente.fuente] ?? incidente.fuente}
                         {incidente.modulo ? ` · ${incidente.modulo}` : ""}
                         {incidente.ruta ? ` · ${incidente.ruta}` : ""}

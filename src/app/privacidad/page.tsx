@@ -56,7 +56,7 @@ export default function PrivacidadPage() {
       <article className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10 lg:px-10">
         <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#ae6f54]">Legal</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">Aviso de privacidad</h1>
-        <p className="mt-4 text-sm text-[#81746c]">Última actualización: enero 2026</p>
+        <p className="mt-4 text-sm text-[#6e6159]">Última actualización: enero 2026</p>
 
         <div className="mt-10 space-y-8">
           {secciones.map((seccion) => (

@@ -142,7 +142,7 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
         <div className="overflow-hidden rounded-2xl border border-[#eadfd8] bg-white shadow-sm">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#eee6e0] bg-[#faf6f3] text-left text-xs uppercase tracking-wide text-[#8a7b72]">
+              <tr className="border-b border-[#eee6e0] bg-[#faf6f3] text-left text-xs uppercase tracking-wide text-[#6e6159]">
                 <th className="px-4 py-3 font-medium">Fecha</th>
                 <th className="px-4 py-3 font-medium">Usuario</th>
                 <th className="px-4 py-3 font-medium">Acción</th>
@@ -164,7 +164,7 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
                   </td>
                   <td className="hidden px-4 py-3 text-[#625b55] md:table-cell">{evento.sucursal ?? "—"}</td>
                   <td className="hidden max-w-72 px-4 py-3 lg:table-cell">
-                    <span className="block truncate text-xs text-[#81746c]" title={evento.detalle ? JSON.stringify(evento.detalle) : undefined}>
+                    <span className="block truncate text-xs text-[#6e6159]" title={evento.detalle ? JSON.stringify(evento.detalle) : undefined}>
                       {evento.detalle ? JSON.stringify(evento.detalle) : evento.entidad ? `${evento.entidad} ${evento.entidadId ?? ""}` : "—"}
                     </span>
                   </td>
@@ -176,7 +176,7 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
       )}
 
       <div className="flex items-center justify-between text-sm">
-        <span className="text-[#81746c]">Página {page}</span>
+        <span className="text-[#6e6159]">Página {page}</span>
         <div className="flex gap-2">
           {page > 1 ? (
             <Button nativeButton={false} render={<Link href={buildAdminHref("/auditoria", { ...baseParams, extra: { ...baseParams.extra, page: String(page - 1) } })} />} variant="outline">

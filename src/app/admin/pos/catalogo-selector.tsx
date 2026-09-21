@@ -253,7 +253,7 @@ export function CatalogoSelector({
                 <span className="text-sm font-semibold tabular-nums text-[#60392e]">
                   {formatCurrency(item.precio, { currency })}
                 </span>
-                <span className="truncate text-xs tabular-nums text-[#81746c]">
+                <span className="truncate text-xs tabular-nums text-[#6e6159]">
                   {"duracionMinutos" in item
                     ? `${item.duracionMinutos} min`
                     : "sesiones" in item

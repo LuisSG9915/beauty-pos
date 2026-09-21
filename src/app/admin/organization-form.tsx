@@ -19,7 +19,7 @@ export function OrganizationForm() {
         </div>
         <div>
           <h2 className="font-semibold">Crear organización</h2>
-          <p className="mt-1 text-sm leading-6 text-[#81746c]">Registra el negocio y su primera sucursal.</p>
+          <p className="mt-1 text-sm leading-6 text-[#6e6159]">Registra el negocio y su primera sucursal.</p>
         </div>
       </div>
 

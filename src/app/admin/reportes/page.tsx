@@ -65,7 +65,7 @@ function Tabla({
         <thead>
           <tr className="border-b border-[#eee8e3] text-left">
             {encabezados.map((h) => (
-              <th className="pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-[#81746c] last:pr-0" key={h}>
+              <th className="pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-[#6e6159] last:pr-0" key={h}>
                 {h}
               </th>
             ))}
@@ -90,9 +90,9 @@ function Tabla({
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="rounded-xl border border-[#eee8e3] bg-[#faf9f7] px-4 py-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-[#81746c]">{label}</p>
+      <p className="text-xs font-medium uppercase tracking-wide text-[#6e6159]">{label}</p>
       <p className="mt-1 text-xl font-semibold tabular-nums text-[#2d2926]">{value}</p>
-      {hint ? <p className="mt-0.5 text-xs text-[#81746c]">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-[#6e6159]">{hint}</p> : null}
     </div>
   );
 }
@@ -278,7 +278,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             Exportar CSV
           </a>
         ) : null}
-        <div className="flex w-full flex-wrap items-center gap-2 pt-1 text-xs text-[#81746c]">
+        <div className="flex w-full flex-wrap items-center gap-2 pt-1 text-xs text-[#6e6159]">
           <span className="font-medium text-[#6f665e]">Rangos rápidos:</span>
           {presets.map((preset) => {
             const href = `?${new URLSearchParams({
@@ -639,7 +639,7 @@ export default async function ReportesPage({ searchParams }: Props) {
           ].map(([termino, definicion]) => (
             <div key={termino}>
               <dt className="font-medium text-[#403a35]">{termino}</dt>
-              <dd className="mt-0.5 text-xs leading-5 text-[#81746c]">{definicion}</dd>
+              <dd className="mt-0.5 text-xs leading-5 text-[#6e6159]">{definicion}</dd>
             </div>
           ))}
         </dl>

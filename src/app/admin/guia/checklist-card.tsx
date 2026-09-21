@@ -38,7 +38,7 @@ export function GuiaChecklistCard({
           </span>
           <div>
             <h2 className="font-semibold text-[#2d2926]">Prepara tu negocio</h2>
-            <p className="text-sm text-[#81746c]">
+            <p className="text-sm text-[#6e6159]">
               {resumen.completados} de {resumen.total} pasos listos
             </p>
           </div>
@@ -67,14 +67,14 @@ export function GuiaChecklistCard({
               <Circle aria-hidden="true" className="size-5 shrink-0 text-[#c4b7ae]" />
             )}
             <Link
-              className="min-w-0 flex-1 truncate text-sm font-medium text-[#2d2926] hover:text-[#8a5140]"
+              className="inline-flex min-h-6 min-w-0 flex-1 items-center truncate text-sm font-medium text-[#2d2926] hover:text-[#8a5140]"
               href={href(paso.href)}
             >
               {paso.titulo}
-              {paso.opcional ? <span className="ml-2 text-xs font-normal text-[#a89d95]">Opcional</span> : null}
+              {paso.opcional ? <span className="ml-2 text-xs font-normal text-[#6f635a]">Opcional</span> : null}
             </Link>
             {!paso.hecho ? (
-              <Link className="shrink-0 text-xs font-medium text-[#8a5140] hover:underline" href={href(paso.href)}>
+              <Link className="inline-flex min-h-6 shrink-0 items-center text-xs font-medium text-[#8a5140] hover:underline" href={href(paso.href)}>
                 Ir
               </Link>
             ) : null}
@@ -83,7 +83,7 @@ export function GuiaChecklistCard({
       </ol>
 
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[#f4eeea] pt-4">
-        <Link className="text-sm font-medium text-[#8a5140] hover:underline" href={href("/practica")}>
+        <Link className="inline-flex min-h-6 items-center text-sm font-medium text-[#8a5140] hover:underline" href={href("/practica")}>
           Practicar con datos de ejemplo
         </Link>
         <form action={omitirGuia} className="ml-auto">

@@ -62,7 +62,7 @@ export default async function ReservarPage({
         </div>
         <div>
           <p className="font-semibold tracking-tight">{portal.organizacion.nombre}</p>
-          <p className="text-xs text-[#8a7b72]">Reserva tu cita en línea</p>
+          <p className="text-xs text-[#6e6159]">Reserva tu cita en línea</p>
         </div>
       </header>
       <ReservaFlow

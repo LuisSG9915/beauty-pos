@@ -122,7 +122,7 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="text-lg font-semibold text-[#2d2926]">{actual.planNombre ?? "Plan desconocido"}</p>
-                  <p className="text-sm text-[#81746c]">
+                  <p className="text-sm text-[#6e6159]">
                     {actual.periodicidad === "anual" ? "Facturación anual" : "Facturación mensual"} ·{" "}
                     {actual.sucursalesFacturadas} sucursal(es) cubierta(s)
                   </p>
@@ -192,18 +192,18 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
             const esActual = actual?.planClave === plan.clave;
             return (
               <div
-                className={`rounded-2xl border p-4 ${plan.recomendado ? "border-[#b8795d] bg-[#fdf7f2]" : "border-[#eee6e0] bg-white"}`}
+                className={`rounded-2xl border p-4 ${plan.recomendado ? "border-[#8a5140] bg-[#fdf7f2]" : "border-[#eee6e0] bg-white"}`}
                 key={plan.id}
               >
                 <div className="flex items-center justify-between gap-2">
                   <p className="font-semibold text-[#2d2926]">{plan.nombre}</p>
                   {esActual ? <StatusBadge tone="neutral">Actual</StatusBadge> : null}
                 </div>
-                <p className="mt-1 text-xs leading-5 text-[#81746c]">{plan.descripcion}</p>
+                <p className="mt-1 text-xs leading-5 text-[#6e6159]">{plan.descripcion}</p>
                 <p className="mt-3 text-lg font-semibold text-[#2d2926]">
-                  {fmt(plan.precioMensual)} <span className="text-xs font-normal text-[#81746c]">/mes</span>
+                  {fmt(plan.precioMensual)} <span className="text-xs font-normal text-[#6e6159]">/mes</span>
                 </p>
-                <p className="text-xs text-[#81746c]">
+                <p className="text-xs text-[#6e6159]">
                   Incluye {plan.sucursalesIncluidas} sucursal(es)
                   {plan.precioSucursalExtra
                     ? ` · ${fmt(plan.precioSucursalExtra)}/mes por sucursal adicional`
@@ -212,7 +212,7 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
                       : ""}
                 </p>
                 {plan.precioAnual ? (
-                  <p className="text-xs text-[#81746c]">
+                  <p className="text-xs text-[#6e6159]">
                     o {fmt(plan.precioAnual)} /año (equivale a {fmt(Number(plan.precioAnual) / 12)}/mes)
                   </p>
                 ) : null}

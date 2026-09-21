@@ -36,7 +36,7 @@ type ClienteFiscal = {
 const ESTADO_BADGE: Record<string, { label: string; className: string }> = {
   borrador: { label: "Borrador", className: "bg-[#f4ede6] text-[#7a5a2e]" },
   timbrada: { label: "Emitida", className: "bg-[#e3f2e8] text-[#347052]" },
-  cancelada: { label: "Cancelada", className: "bg-[#f1eeea] text-[#81746c]" },
+  cancelada: { label: "Cancelada", className: "bg-[#f1eeea] text-[#6e6159]" },
   error: { label: "Error", className: "bg-[#fae8e6] text-[#a8443a]" },
 };
 
@@ -74,20 +74,20 @@ export function FacturarPanel({
       {comprobante ? (
         <div className="mt-3 space-y-2 text-sm">
           <div className="flex justify-between gap-3">
-            <span className="text-[#81746c]">Folio</span>
+            <span className="text-[#6e6159]">Folio</span>
             <span className="font-mono text-xs">{comprobante.serie}-{comprobante.folio}</span>
           </div>
           <div className="flex justify-between gap-3">
-            <span className="text-[#81746c]">Receptor</span>
-            <span className="text-right">{comprobante.receptorNombre} <span className="font-mono text-xs text-[#81746c]">{comprobante.receptorRfc}</span></span>
+            <span className="text-[#6e6159]">Receptor</span>
+            <span className="text-right">{comprobante.receptorNombre} <span className="font-mono text-xs text-[#6e6159]">{comprobante.receptorRfc}</span></span>
           </div>
           <div className="flex justify-between gap-3">
-            <span className="text-[#81746c]">Total</span>
+            <span className="text-[#6e6159]">Total</span>
             <span className="tabular-nums">{formatCurrency(comprobante.total, { currency })}</span>
           </div>
           {comprobante.uuid ? (
             <div className="flex justify-between gap-3">
-              <span className="text-[#81746c]">UUID simulado</span>
+              <span className="text-[#6e6159]">UUID simulado</span>
               <span className="max-w-56 truncate font-mono text-xs" title={comprobante.uuid}>{comprobante.uuid}</span>
             </div>
           ) : null}

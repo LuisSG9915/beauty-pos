@@ -38,7 +38,7 @@ export default function Home() {
           </div>
           <div>
             <p className="font-semibold tracking-tight">Beauty POS</p>
-            <p className="text-xs text-[#8a7b72]">Gestión para tu belleza</p>
+            <p className="text-xs text-[#6e6159]">Gestión para tu belleza</p>
           </div>
         </div>
         <nav className="flex items-center gap-2">
@@ -64,7 +64,7 @@ export default function Home() {
           </p>
           <h1 className="max-w-3xl text-5xl font-semibold leading-[1.03] tracking-[-0.05em] text-[#292522] sm:text-6xl lg:text-7xl">
             Menos administración.
-            <span className="block text-[#b8795d]">Más tiempo para consentir.</span>
+            <span className="block text-[#8a5140]">Más tiempo para consentir.</span>
           </h1>
           <p className="mt-7 max-w-xl text-lg leading-8 text-[#74675f]">
             Una operación sencilla para conectar citas, clientes, servicios,
@@ -152,16 +152,16 @@ export default function Home() {
         <div className="mx-auto grid w-full max-w-7xl gap-4 px-6 py-10 sm:grid-cols-2 lg:grid-cols-4 lg:px-10">
           {modules.map(({ icon: Icon, title, description }) => (
             <div className="rounded-2xl p-4" key={title}>
-              <Icon className="size-5 text-[#b8795d]" strokeWidth={1.8} />
+              <Icon className="size-5 text-[#8a5140]" strokeWidth={1.8} />
               <h2 className="mt-4 font-semibold">{title}</h2>
-              <p className="mt-2 text-sm leading-6 text-[#81746c]">{description}</p>
+              <p className="mt-2 text-sm leading-6 text-[#6e6159]">{description}</p>
             </div>
           ))}
         </div>
       </section>
 
       <footer className="border-t border-[#eee6e0]">
-        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-8 text-sm text-[#8a7b72] lg:px-10">
+        <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-8 text-sm text-[#6e6159] lg:px-10">
           <p>© Beauty POS · Hecho para estéticas y salones en México</p>
           <nav className="flex flex-wrap gap-x-6 gap-y-2">
             <Link className="hover:text-[#5d524b]" href="/precios">Precios</Link>

@@ -72,7 +72,7 @@ export function PracticaFlow({
                 ? "bg-[#8a5140] text-white"
                 : index < paso
                   ? "bg-[#e8f0ea] text-[#347052]"
-                  : "bg-[#f1eeea] text-[#81746c]",
+                  : "bg-[#f1eeea] text-[#6e6159]",
             )}
             key={nombre}
           >
@@ -101,22 +101,22 @@ export function PracticaFlow({
               <CalendarCheck aria-hidden="true" className="size-5 text-[#8a5140]" />
               Agenda de ejemplo
             </h2>
-            <p className="mt-1 text-sm text-[#81746c]">Martes · cada bloqueo es una cita.</p>
+            <p className="mt-1 text-sm text-[#6e6159]">Martes · cada bloqueo es una cita.</p>
             <div className="mt-4 space-y-2">
               <div className="flex items-center justify-between rounded-xl border border-[#f4eeea] bg-[#faf6f3] px-4 py-3">
                 <div>
                   <p className="text-sm font-medium text-[#2d2926]">9:00 · {CLIENTE}</p>
-                  <p className="text-xs text-[#81746c]">Retoque de tinte</p>
+                  <p className="text-xs text-[#6e6159]">Retoque de tinte</p>
                 </div>
                 <span className="rounded-full bg-[#e8f0ea] px-2.5 py-1 text-xs font-medium text-[#347052]">Confirmada</span>
               </div>
               <div className="flex items-center justify-between rounded-xl border border-dashed border-[#ded8d2] px-4 py-3">
-                <p className="text-sm text-[#a89d95]">11:30 · libre</p>
-                <span className="text-xs text-[#a89d95]">Disponible</span>
+                <p className="text-sm text-[#6f635a]">11:30 · libre</p>
+                <span className="text-xs text-[#6f635a]">Disponible</span>
               </div>
               <div className="flex items-center justify-between rounded-xl border border-dashed border-[#ded8d2] px-4 py-3">
-                <p className="text-sm text-[#a89d95]">16:00 · libre</p>
-                <span className="text-xs text-[#a89d95]">Disponible</span>
+                <p className="text-sm text-[#6f635a]">16:00 · libre</p>
+                <span className="text-xs text-[#6f635a]">Disponible</span>
               </div>
             </div>
             <Button className="mt-5" onClick={() => setPaso(2)} type="button">
@@ -128,9 +128,9 @@ export function PracticaFlow({
         {paso === 2 ? (
           <div className="max-w-xl">
             <h2 className="text-lg font-semibold text-[#2d2926]">Nueva cita para {CLIENTE}</h2>
-            <p className="mt-1 text-sm text-[#81746c]">Elige un servicio y una hora disponible.</p>
+            <p className="mt-1 text-sm text-[#6e6159]">Elige un servicio y una hora disponible.</p>
 
-            <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-[#8a7b72]">Servicio</p>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-[#6e6159]">Servicio</p>
             <div className="mt-2 grid gap-2 sm:grid-cols-3" role="group" aria-label="Servicio de ejemplo">
               {SERVICIOS.map((item, index) => (
                 <button
@@ -146,14 +146,14 @@ export function PracticaFlow({
                   type="button"
                 >
                   <span className="block text-sm font-medium text-[#2d2926]">{item.nombre}</span>
-                  <span className="mt-0.5 block text-xs text-[#81746c]">
+                  <span className="mt-0.5 block text-xs text-[#6e6159]">
                     {item.duracion} min · {money.format(item.precio)}
                   </span>
                 </button>
               ))}
             </div>
 
-            <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-[#8a7b72]">Hora</p>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-[#6e6159]">Hora</p>
             <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Hora de ejemplo">
               {HORAS.map((valor, index) => (
                 <button
@@ -213,7 +213,7 @@ export function PracticaFlow({
               </div>
             </div>
 
-            <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-[#8a7b72]">Medio de pago</p>
+            <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-[#6e6159]">Medio de pago</p>
             <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Medio de pago de ejemplo">
               {MEDIOS.map((valor, index) => (
                 <button
@@ -246,7 +246,7 @@ export function PracticaFlow({
               Ticket de ejemplo
             </h2>
             <div className="mt-4 rounded-xl border border-[#f4eeea] bg-[#faf6f3] px-4 py-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7b72]">Venta completada</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#6e6159]">Venta completada</p>
               <div className="mt-3 space-y-1.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-[#625b55]">{elegido.nombre} · {CLIENTE}</span>

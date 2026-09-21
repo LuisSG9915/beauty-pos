@@ -138,7 +138,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
   const stockTable = (rows: typeof catalogoProductos) => (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[720px] text-left text-sm">
-        <thead className="bg-[#f8f7f5] text-xs uppercase tracking-wide text-[#81746c]">
+        <thead className="bg-[#f8f7f5] text-xs uppercase tracking-wide text-[#6e6159]">
           <tr>
             <th className="px-4 py-3 font-medium">SKU</th>
             <th className="px-4 py-3 font-medium">Producto</th>
@@ -230,7 +230,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
                                 {consumoPorServicio.map((row, i) => (
                                   <li className="flex items-baseline justify-between gap-3 text-sm" key={i}>
                                     <span className="text-[#625b55]">
-                                      {row.servicio} <span className="text-xs text-[#81746c]">· {row.insumo}</span>
+                                      {row.servicio} <span className="text-xs text-[#6e6159]">· {row.insumo}</span>
                                     </span>
                                     <span className="font-semibold tabular-nums text-[#2d2926]">
                                       {Number(row.consumo).toFixed(3)}{row.unidad ? ` ${row.unidad}` : ""}
@@ -253,7 +253,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
             <AdminCard className="overflow-hidden p-0 sm:p-0">
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead className="bg-[#f8f7f5] text-xs uppercase tracking-wide text-[#81746c]">
+                  <thead className="bg-[#f8f7f5] text-xs uppercase tracking-wide text-[#6e6159]">
                     <tr>
                       <th className="px-4 py-3 font-medium">Fecha</th>
                       <th className="px-4 py-3 font-medium">Producto</th>

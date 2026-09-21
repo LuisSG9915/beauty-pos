@@ -50,14 +50,14 @@ export function SucursalAsignacionForm({
             />
             <span>
               <span className="block font-medium text-[#2d2926]">{miembro.nombre}</span>
-              <span className="block text-xs text-[#81746c]">
+              <span className="block text-xs text-[#6e6159]">
                 {miembro.sinRestriccion ? "Sin restricción: ve todas las sucursales" : (miembro.correo ?? "")}
               </span>
             </span>
           </label>
         ))}
       </div>
-      <p className="text-xs leading-5 text-[#81746c]">
+      <p className="text-xs leading-5 text-[#6e6159]">
         Marca quién puede operar esta sucursal. Un miembro sin ninguna asignación en el negocio ve todas las
         sucursales; quitarle la última ampliaría su acceso.
       </p>

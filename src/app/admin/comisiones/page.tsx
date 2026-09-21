@@ -112,7 +112,7 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
             {resumen.map((item) => (
               <div className="rounded-2xl border border-[#eadfd8] bg-[#faf9f7] p-4" key={item.usuarioId}>
                 <p className="font-medium text-[#2d2926]">{item.nombre}</p>
-                <p className="mt-1 text-xs text-[#81746c]">{item.cantidad} línea(s) de servicio</p>
+                <p className="mt-1 text-xs text-[#6e6159]">{item.cantidad} línea(s) de servicio</p>
                 <p className="mt-2 text-xl font-semibold tabular-nums text-[#2d2926]">{fmt(item.total)}</p>
                 {puedeEditar ? (
                   <div className="mt-3">

@@ -184,7 +184,7 @@ function TicketLine({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="min-w-0 flex-1 basis-44">
           <p className="truncate font-medium">{line.nombre}</p>
-          <p className="mt-0.5 text-xs tabular-nums text-[#81746c]">
+          <p className="mt-0.5 text-xs tabular-nums text-[#6e6159]">
             {formatCurrency(line.precio, { currency })} c/u
             {paquete?.usado ? " · cubierto por paquete" : ""}
             {!editable && profesionalNombre ? ` · ${profesionalNombre}` : ""}
@@ -250,7 +250,7 @@ function TicketLine({
       {esServicio && editable ? (
         <div className="mt-1.5 flex items-center gap-2">
           <label
-            className="shrink-0 text-xs text-[#81746c]"
+            className="shrink-0 text-xs text-[#6e6159]"
             htmlFor={`profesional-${line.id}`}
           >
             Profesional
@@ -590,7 +590,7 @@ export function VentaTicket({
             <h2 className="flex items-center gap-2 text-lg font-semibold text-[#2d2926]">
               <ReceiptText aria-hidden="true" className="size-5 text-[#8a5140]" /> Ticket
             </h2>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[#81746c]">
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-[#6e6159]">
               <span>
                 Cliente: {venta.clienteNombre ?? "Walk-in"}
                 {venta.citaId ? " · desde cita" : ""}
@@ -709,7 +709,7 @@ export function VentaTicket({
                     <PackageCheck aria-hidden="true" className="size-4 shrink-0 text-[#347052]" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{linea.nombre}</p>
-                      <p className="mt-0.5 text-xs tabular-nums text-[#81746c]">
+                      <p className="mt-0.5 text-xs tabular-nums text-[#6e6159]">
                         {linea.cantidad} × {formatCurrency(linea.precio, { currency })}
                       </p>
                     </div>
@@ -745,7 +745,7 @@ export function VentaTicket({
                     <PackageCheck aria-hidden="true" className="size-4 shrink-0 text-[#6b4d8f]" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{linea.nombre}</p>
-                      <p className="mt-0.5 text-xs tabular-nums text-[#81746c]">
+                      <p className="mt-0.5 text-xs tabular-nums text-[#6e6159]">
                         {linea.cantidad} × {formatCurrency(linea.precio, { currency })}
                       </p>
                     </div>
@@ -1033,7 +1033,7 @@ export function VentaTicket({
                     <span className="font-medium tabular-nums">
                       {formatCurrency(ant.monto, { currency })}
                     </span>
-                    <span className="ml-2 text-xs text-[#81746c]">
+                    <span className="ml-2 text-xs text-[#6e6159]">
                       {ant.medioNombre ?? "Medio"}
                     </span>
                   </span>
@@ -1117,7 +1117,7 @@ export function VentaTicket({
                     <span className="font-medium text-[#a8443a]">
                       -{formatCurrency(dev.monto, { currency })}
                     </span>
-                    <span className="text-xs text-[#81746c]">{dev.usuarioNombre ?? "—"}</span>
+                    <span className="text-xs text-[#6e6159]">{dev.usuarioNombre ?? "—"}</span>
                   </div>
                   <ul className="mt-1.5 space-y-0.5 text-xs text-[#625b55]">
                     {dev.lineas.map((linea, i) => (
@@ -1126,7 +1126,7 @@ export function VentaTicket({
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-1 text-xs text-[#81746c]">{dev.motivo}</p>
+                  <p className="mt-1 text-xs text-[#6e6159]">{dev.motivo}</p>
                 </li>
               ))}
             </ul>
@@ -1159,7 +1159,7 @@ export function VentaTicket({
                     <span>
                       {pago.nombre}
                       {Number(pago.cambio) > 0 ? (
-                        <span className="text-xs text-[#81746c]">
+                        <span className="text-xs text-[#6e6159]">
                           {" "}
                           · recibió {formatCurrency(pago.recibido, { currency })}, cambio{" "}
                           {formatCurrency(pago.cambio, { currency })}
@@ -1169,7 +1169,7 @@ export function VentaTicket({
                     <span className="tabular-nums">{formatCurrency(pago.monto, { currency })}</span>
                   </div>
                   {pago.ajustes.length > 0 ? (
-                    <ul className="mt-2 space-y-1 text-xs text-[#81746c]">
+                    <ul className="mt-2 space-y-1 text-xs text-[#6e6159]">
                       {pago.ajustes.map((ajuste) => (
                         <li key={ajuste.id}>
                           Reclasificado a <span className="font-medium text-[#60392e]">{ajuste.destinoNombre ?? "medio inactivo"}</span> por {formatCurrency(ajuste.monto, { currency })} · {ajuste.motivo}
@@ -1415,7 +1415,7 @@ function DevolucionParcialPanel({
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{linea.nombre}</p>
-                  <p className="text-xs tabular-nums text-[#81746c]">
+                  <p className="text-xs tabular-nums text-[#6e6159]">
                     {linea.tipo} · {linea.cantidad} vendida(s)
                     {devueltas > 0 ? ` · ${devueltas} devuelta(s)` : ""}
                     {(cantidades[linea.detalleId] ?? 0) > 0
@@ -1440,7 +1440,7 @@ function DevolucionParcialPanel({
                     value={cantidades[linea.detalleId] ?? 0}
                   />
                 ) : (
-                  <span className="text-xs text-[#a89f97]">devuelta</span>
+                  <span className="text-xs text-[#6f635a]">devuelta</span>
                 )}
               </li>
             );
@@ -1464,7 +1464,7 @@ function DevolucionParcialPanel({
             Volver
           </Button>
         </div>
-        <p className="text-[11px] leading-4 text-[#a89f97]">
+        <p className="text-[11px] leading-4 text-[#6f635a]">
           El descuento del ticket se prorratea en el monto devuelto; el stock de productos vuelve a inventario.
         </p>
       </form>

@@ -183,7 +183,7 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
                 ))}
               </Select>
             </Field>
-            <Button className="rounded-xl" disabled={branches.length === 0} type="submit">
+            <Button className="rounded-xl" data-action-clave="1" data-action-id="pos.venta.abrir" disabled={branches.length === 0} size="touch" type="submit">
               Abrir venta
             </Button>
           </form>

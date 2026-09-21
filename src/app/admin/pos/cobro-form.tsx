@@ -188,7 +188,7 @@ export function CobroForm({
         </p>
       </div>
       {propina > 0 || anticipo > 0 ? (
-        <p className="mt-0.5 text-xs tabular-nums text-[#81746c]">
+        <p className="mt-0.5 text-xs tabular-nums text-[#6e6159]">
           {formatCurrency(total)}
           {anticipo > 0 ? ` − ${formatCurrency(anticipo)} anticipo` : ""}
           {propina > 0 ? ` + ${formatCurrency(propina)} propina` : ""}
@@ -196,7 +196,7 @@ export function CobroForm({
       ) : null}
 
       <div className="mt-4">
-        <p className="text-xs font-medium text-[#81746c]">Propina</p>
+        <p className="text-xs font-medium text-[#6e6159]">Propina</p>
         <div aria-label="Propina" className="mt-1.5 flex flex-wrap gap-1.5" role="group">
           {PROPINA_OPCIONES.map((opcion) => (
             <button
@@ -246,7 +246,7 @@ export function CobroForm({
 
       <div className={cubiertoPorAnticipo ? "hidden" : "mt-5 space-y-3"}>
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-medium text-[#81746c]">
+          <p className="text-xs font-medium text-[#6e6159]">
             Pagos{pagos.length > 1 ? ` (${pagos.length})` : ""}
           </p>
           {pagos.length < MAX_PAGOS && mediosPago.length > 0 ? (

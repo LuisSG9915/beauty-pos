@@ -149,7 +149,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
         <div className="overflow-hidden rounded-2xl border border-[#eadfd8] bg-white shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[680px] text-sm">
-              <thead className="border-b border-[#eee6e0] bg-[#faf6f3] text-left text-xs uppercase tracking-wide text-[#8a7b72]">
+              <thead className="border-b border-[#eee6e0] bg-[#faf6f3] text-left text-xs uppercase tracking-wide text-[#6e6159]">
                 <tr>
                   <th className="px-4 py-3 font-medium">Fecha de cobro</th>
                   <th className="px-4 py-3 font-medium">Cliente</th>
@@ -175,7 +175,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-[#2d2926]">{[venta.clienteNombre, venta.clienteApellidoPaterno].filter(Boolean).join(" ") || "Walk-in"}</p>
-                        <p className="mt-0.5 font-mono text-[11px] text-[#a89d95]" title={venta.id}>{venta.id.slice(0, 8)}…</p>
+                        <p className="mt-0.5 font-mono text-[11px] text-[#6f635a]" title={venta.id}>{venta.id.slice(0, 8)}…</p>
                       </td>
                       <td className="px-4 py-3"><StatusBadge tone={ESTADO_TONE[estadoVenta]}>{ESTADO_LABEL[estadoVenta]}</StatusBadge></td>
                       <td className="px-4 py-3 text-right font-semibold tabular-nums">
@@ -194,7 +194,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
       )}
 
       <div className="flex items-center justify-between text-sm">
-        <span className="text-[#81746c]">Página {page}</span>
+        <span className="text-[#6e6159]">Página {page}</span>
         <div className="flex gap-2">
           {page > 1 ? <Button nativeButton={false} render={<Link href={pageHref(page - 1)} />} variant="outline">← Anterior</Button> : null}
           {hasMore ? <Button nativeButton={false} render={<Link href={pageHref(page + 1)} />} variant="outline">Siguiente →</Button> : null}

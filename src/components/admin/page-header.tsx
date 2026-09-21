@@ -20,7 +20,7 @@ export function AdminBreadcrumbs({
   if (items.length === 0) return null;
   return (
     <nav aria-label="Ruta de navegación" className={className}>
-      <ol className="flex flex-wrap items-center gap-1 text-xs text-[#8a7b72]">
+      <ol className="flex flex-wrap items-center gap-1 text-xs text-[#6e6159]">
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
           return (
@@ -79,7 +79,7 @@ export function AdminPageHeader({
           {title}
         </h1>
         {description ? (
-          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-[#81746c]">
+          <p className="mt-1.5 max-w-2xl text-sm leading-6 text-[#6e6159]">
             {description}
           </p>
         ) : null}
@@ -121,7 +121,7 @@ export function AdminSection({
               </h2>
             ) : null}
             {description ? (
-              <p className="mt-1 text-sm text-[#81746c]">{description}</p>
+              <p className="mt-1 text-sm text-[#6e6159]">{description}</p>
             ) : null}
           </div>
           {actions ? (
@@ -166,7 +166,7 @@ export function AdminCard({
               <h2 className="font-semibold text-[#2d2926]">{title}</h2>
             ) : null}
             {description ? (
-              <p className="mt-1 text-sm text-[#81746c]">{description}</p>
+              <p className="mt-1 text-sm text-[#6e6159]">{description}</p>
             ) : null}
           </div>
           {actions ? (

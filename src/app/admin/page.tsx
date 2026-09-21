@@ -65,7 +65,7 @@ function MemberDashboard({
       <AdminPageHeader
         actions={
           first ? (
-            <Button nativeButton={false} render={<Link href={buildAdminHref("/agenda", { organizationId: first.organizationId, sucursalId: first.branchId })} />}>
+            <Button data-action-clave="1" nativeButton={false} render={<Link href={buildAdminHref("/agenda", { organizationId: first.organizationId, sucursalId: first.branchId })} />} size="lg">
               Ir a la agenda
             </Button>
           ) : undefined
@@ -130,9 +130,9 @@ function MemberDashboard({
               href={buildAdminHref("/agenda", { organizationId: item.organizationId, sucursalId: item.branchId })}
               key={`${item.organizationId}-${item.branchId}`}
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b8795d]">Organización</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a5140]">Organización</p>
               <h2 className="mt-2 text-xl font-semibold text-[#2d2926]">{item.organization}</h2>
-              <p className="mt-3 text-sm text-[#81746c]">Sucursal: {item.branch} ({item.branchKey})</p>
+              <p className="mt-3 text-sm text-[#6e6159]">Sucursal: {item.branch} ({item.branchKey})</p>
             </Link>
           ))}
         </div>
@@ -158,7 +158,7 @@ function MemberDashboard({
               >
                 <accion.icon aria-hidden="true" className="size-5 text-[#8a5140]" strokeWidth={1.9} />
                 <span className="text-sm font-semibold text-[#2d2926]">{accion.label}</span>
-                <span className="text-xs leading-4 text-[#81746c]">{accion.ayuda}</span>
+                <span className="text-xs leading-4 text-[#6e6159]">{accion.ayuda}</span>
               </Link>
             ))}
           </div>
@@ -392,7 +392,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <dl className="grid gap-3 sm:grid-cols-5">
           {embudo.map((etapa) => (
             <div className="rounded-xl bg-[#faf6f3] px-3 py-2" key={etapa.etiqueta}>
-              <dt className="text-[11px] uppercase tracking-wide text-[#81746c]">{etapa.etiqueta}</dt>
+              <dt className="text-[11px] uppercase tracking-wide text-[#6e6159]">{etapa.etiqueta}</dt>
               <dd className="mt-0.5 text-lg font-semibold text-[#2d2926]">
                 {etapa.valor}
                 {etapa.pct != null ? <span className="ml-1 text-xs font-normal text-[#95877e]">{etapa.pct}%</span> : null}
@@ -418,13 +418,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   { etiqueta: "Conversión visita→registro", valor: `${conversion}%` },
                 ].map((etapa) => (
                   <div className="rounded-xl bg-[#faf6f3] px-3 py-2" key={etapa.etiqueta}>
-                    <dt className="text-[11px] uppercase tracking-wide text-[#81746c]">{etapa.etiqueta}</dt>
+                    <dt className="text-[11px] uppercase tracking-wide text-[#6e6159]">{etapa.etiqueta}</dt>
                     <dd className="mt-0.5 text-lg font-semibold text-[#2d2926]">{etapa.valor}</dd>
                   </div>
                 ))}
               </dl>
               {adquisicionPorOrigen.length > 0 ? (
-                <p className="mt-3 text-xs text-[#81746c]">
+                <p className="mt-3 text-xs text-[#6e6159]">
                   Por origen:{" "}
                   {adquisicionPorOrigen.map((o) => `${o.origen} ${o.unicas}`).join(" · ")}
                 </p>
@@ -490,7 +490,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 <li className="flex flex-wrap items-center justify-between gap-2 py-2.5" key={solicitud.id}>
                   <div>
                     <p className="font-medium text-[#2d2926]">{solicitud.organizacion}</p>
-                    <p className="text-xs text-[#81746c]">
+                    <p className="text-xs text-[#6e6159]">
                       {solicitud.tipo === "plan.cambio_solicitado"
                         ? `Cambio a ${String(payload.planNombre ?? payload.planClave ?? "?")} (${String(payload.periodicidad ?? "mensual")}${typeof payload.sucursales === "number" ? ` · ${payload.sucursales} sucursal(es)` : ""})`
                         : `Cancelación${payload.motivo ? ` — ${String(payload.motivo)}` : ""}`}

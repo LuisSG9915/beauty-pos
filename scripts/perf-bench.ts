@@ -1,16 +1,7 @@
-import "dotenv/config";
-
-import { randomBytes } from "node:crypto";
-
-import { and, eq } from "drizzle-orm";
 import puppeteer, { type Page } from "puppeteer";
 
-import { getDatabase } from "@/db/client";
-import { account, user } from "@/db/schema/auth";
-import { createAuth } from "@/lib/auth/server";
+import { BASE_URL, E2E_EMAIL, login } from "./lib/e2e";
 
-const BASE_URL = process.env.SMOKE_BASE_URL ?? "http://localhost:3000";
-const BENCH_EMAIL = process.env.PERF_EMAIL ?? "e2e-salon@test.dev";
 const RUNS = Number(process.env.PERF_RUNS ?? 3);
 
 const ROUTES = [
@@ -22,12 +13,43 @@ const ROUTES = [
   "/admin/sucursales",
 ];
 
-type Sample = { ttfb: number; total: number; fcp: number };
+// Mismo criterio que la telemetría de producto: escritorio de mostrador y
+// teléfono modesto, los dos contextos reales del salón.
+const VIEWPORTS = [
+  { nombre: "desktop", width: 1366, height: 900 },
+  { nombre: "movil", width: 390, height: 844, isMobile: true, hasTouch: true },
+];
+
+type Sample = { ttfb: number; total: number; fcp: number; lcp: number; cls: number };
 
 function stats(values: number[]) {
   const sorted = [...values].sort((a, b) => a - b);
   const pick = (p: number) => sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * p) - 1)];
   return { p50: pick(0.5), p95: pick(0.95), min: sorted[0], max: sorted[sorted.length - 1] };
+}
+
+// Observadores de LCP/CLS se instalan antes de navegar (evaluateOnNewDocument
+// corre en cada carga); los valores quedan en window.__perf para leerlos al
+// final. `buffered: true` recupera entradas ya emitidas.
+async function instrumentVitals(page: Page) {
+  await page.evaluateOnNewDocument(() => {
+    const vitals = { lcp: 0, cls: 0 };
+    (window as unknown as { __perf: typeof vitals }).__perf = vitals;
+    try {
+      new PerformanceObserver((list) => {
+        const entries = list.getEntries();
+        if (entries.length > 0) vitals.lcp = entries[entries.length - 1].startTime;
+      }).observe({ type: "largest-contentful-paint", buffered: true });
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          const shift = entry as PerformanceEntry & { hadRecentInput?: boolean; value?: number };
+          if (!shift.hadRecentInput) vitals.cls += shift.value ?? 0;
+        }
+      }).observe({ type: "layout-shift", buffered: true });
+    } catch {
+      // Navegador sin soporte: las métricas quedan en 0.
+    }
+  });
 }
 
 async function measure(page: Page, url: string): Promise<Sample> {
@@ -36,61 +58,48 @@ async function measure(page: Page, url: string): Promise<Sample> {
   return page.evaluate(() => {
     const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
     const paint = performance.getEntriesByType("paint").find((p) => p.name === "first-contentful-paint");
+    const vitals = (window as unknown as { __perf?: { lcp: number; cls: number } }).__perf ?? { lcp: 0, cls: 0 };
     return {
       ttfb: Math.round(nav.responseStart - nav.requestStart),
       total: Math.round(nav.loadEventEnd || nav.duration),
       fcp: Math.round(paint?.startTime ?? -1),
+      lcp: Math.round(vitals.lcp),
+      cls: Number(vitals.cls.toFixed(3)),
     };
   });
 }
 
-// Genera una contraseña aleatoria para la cuenta de pruebas y la aplica con el
-// mismo hasher de better-auth. La contraseña solo vive en este proceso.
-async function resetTestPassword(email: string) {
-  const password = `Bench!${randomBytes(12).toString("hex")}`;
-  const auth = createAuth();
-  const ctx = await (auth as unknown as { $context: Promise<{ password: { hash: (p: string) => Promise<string> } }> }).$context;
-  const hash = await ctx.password.hash(password);
-  const db = getDatabase();
-  const target = await db.select({ id: user.id }).from(user).where(eq(user.email, email)).limit(1);
-  if (!target[0]) throw new Error(`Usuario ${email} no existe`);
-  await db
-    .update(account)
-    .set({ password: hash })
-    .where(and(eq(account.userId, target[0].id), eq(account.providerId, "credential")));
-  return password;
-}
-
 async function main() {
-  const password = await resetTestPassword(BENCH_EMAIL);
-  console.log(`Cuenta de pruebas lista: ${BENCH_EMAIL}`);
-
   const browser = await puppeteer.launch({ headless: true });
-  const page = await browser.newPage();
-  await page.setViewport({ width: 1366, height: 900 });
 
-  await page.goto(`${BASE_URL}/login`, { waitUntil: "load" });
-  await page.type('input[name="email"]', BENCH_EMAIL);
-  await page.type('input[name="password"]', password);
-  await page.click('button[type="submit"]');
-  await page.waitForFunction(() => location.pathname.startsWith("/admin"), { timeout: 30000 });
+  for (const viewport of VIEWPORTS) {
+    const page = await browser.newPage();
+    await page.setViewport(viewport);
+    await instrumentVitals(page);
+    await login(page, E2E_EMAIL);
+    console.log(`\n=== ${viewport.nombre} ${viewport.width}x${viewport.height} — cargas completas ===`);
 
-  console.log("Sesión OK. Midiendo cargas completas de documento...\n");
-
-  for (const route of ROUTES) {
-    const samples: Sample[] = [];
-    for (let i = 0; i < RUNS; i++) {
-      samples.push(await measure(page, `${BASE_URL}${route}`));
+    for (const route of ROUTES) {
+      const samples: Sample[] = [];
+      for (let i = 0; i < RUNS; i++) {
+        samples.push(await measure(page, `${BASE_URL}${route}`));
+      }
+      const t = stats(samples.map((s) => s.ttfb));
+      const lcp = stats(samples.map((s) => s.lcp).filter((v) => v > 0));
+      const cls = Math.max(...samples.map((s) => s.cls));
+      console.log(
+        `${route.padEnd(20)} TTFB p50 ${t.p50}ms (p95 ${t.p95}) | LCP p50 ${lcp.p50}ms | CLS máx ${cls}`,
+      );
     }
-    const t = stats(samples.map((s) => s.ttfb));
-    const l = stats(samples.map((s) => s.total));
-    const f = stats(samples.map((s) => s.fcp).filter((v) => v >= 0));
-    console.log(
-      `${route.padEnd(20)} TTFB p50 ${t.p50}ms (p95 ${t.p95}) | load p50 ${l.p50}ms | fcp p50 ${f.p50}ms`,
-    );
+    await page.close();
   }
 
-  console.log("\nMidiendo navegación cliente entre rutas...");
+  // Navegación cliente solo en escritorio: mide el costo de las transiciones
+  // del App Router sin el ruido del primer render.
+  const page = await browser.newPage();
+  await page.setViewport(VIEWPORTS[0]);
+  await login(page, E2E_EMAIL);
+  console.log("\n=== Navegación cliente (desktop) ===");
   const clientSamples: Record<string, number[]> = {};
   for (const route of ROUTES.slice(1)) clientSamples[route] = [];
 
@@ -106,6 +115,8 @@ async function main() {
       await page.waitForFunction((h) => location.pathname === h, { timeout: 30000 }, route);
       await page.waitForNetworkIdle({ idleTime: 400, timeout: 30000 }).catch(() => {});
       clientSamples[route].push(Date.now() - t0);
+      // Regresar a /admin para que el siguiente clic parta del mismo origen.
+      await page.goto(`${BASE_URL}/admin`, { waitUntil: "load" });
     }
   }
 

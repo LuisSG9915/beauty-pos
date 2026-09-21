@@ -138,7 +138,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
         ["Régimen fiscal", cliente.regimenFiscal],
       ].map(([label, value]) => (
         <div key={label}>
-          <dt className="text-xs font-medium uppercase tracking-wide text-[#81746c]">{label}</dt>
+          <dt className="text-xs font-medium uppercase tracking-wide text-[#6e6159]">{label}</dt>
           <dd className="mt-1 text-sm text-[#2d2926]">{value || "—"}</dd>
         </div>
       ))}
@@ -158,7 +158,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
                 <span className="tabular-nums text-[#625b55]">
                   {formatDate(cita.fechaHora, { timeZone })} · {formatTime(cita.fechaHora, { timeZone })}
                 </span>
-                <span className="text-xs font-medium uppercase tracking-wide text-[#81746c]">{cita.estado}</span>
+                <span className="text-xs font-medium uppercase tracking-wide text-[#6e6159]">{cita.estado}</span>
                 <span className="font-semibold tabular-nums">{formatCurrency(cita.total, { currency })}</span>
               </li>
             ))}
@@ -174,7 +174,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
             {ventaRows.map((venta) => (
               <li className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm" key={venta.id}>
                 <span className="tabular-nums text-[#625b55]">{formatDate(venta.fecha, { timeZone })}</span>
-                <span className="text-xs font-medium uppercase tracking-wide text-[#81746c]">{venta.estado}</span>
+                <span className="text-xs font-medium uppercase tracking-wide text-[#6e6159]">{venta.estado}</span>
                 <span className="font-semibold tabular-nums">
                   {formatCurrency(venta.total, { currency })}
                   {Number(venta.propina) > 0 ? ` (+${formatCurrency(venta.propina, { currency })} prop.)` : ""}
@@ -205,9 +205,9 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
                 <span className="text-xs font-medium text-[#986b16]">Pose {ficha.tiempoPoseMinutos} min</span>
               ) : null}
               {ficha.servicioNombre ? (
-                <span className="text-xs text-[#81746c]">· {ficha.servicioNombre}</span>
+                <span className="text-xs text-[#6e6159]">· {ficha.servicioNombre}</span>
               ) : null}
-              <span className="ml-auto text-xs tabular-nums text-[#81746c]">
+              <span className="ml-auto text-xs tabular-nums text-[#6e6159]">
                 {formatDate(ficha.createdAt, { timeZone })}
                 {ficha.autorNombre ? ` · ${ficha.autorNombre}` : ""}
               </span>
@@ -257,7 +257,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
     <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
       <section className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
         <h3 className="text-sm font-semibold text-[#2d2926]">Registrar nota privada</h3>
-        <p className="mt-1 text-xs text-[#81746c]">
+        <p className="mt-1 text-xs text-[#6e6159]">
           Solo visible para usuarios con permiso de expediente privado.
         </p>
         <div className="mt-4">
@@ -272,7 +272,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
     <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
       <section className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
         <h3 className="text-sm font-semibold text-[#2d2926]">Registrar consentimiento informado</h3>
-        <p className="mt-1 text-xs text-[#81746c]">
+        <p className="mt-1 text-xs text-[#6e6159]">
           Evidencia de que el cliente aceptó (o rechazó) el procedimiento tras informarse.
         </p>
         <div className="mt-4">
@@ -299,9 +299,9 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
                   {consent.respuesta === "aceptado" ? "Aceptado" : "Rechazado"}
                 </span>
                 {consent.servicioNombre ? (
-                  <span className="text-xs text-[#81746c]">· {consent.servicioNombre}</span>
+                  <span className="text-xs text-[#6e6159]">· {consent.servicioNombre}</span>
                 ) : null}
-                <span className="ml-auto text-xs tabular-nums text-[#81746c]">
+                <span className="ml-auto text-xs tabular-nums text-[#6e6159]">
                   {formatDate(consent.createdAt, { timeZone })}
                   {consent.autorNombre ? ` · ${consent.autorNombre}` : ""}
                 </span>
@@ -347,7 +347,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
           ]}
         />
       </div>
-      <p className="text-xs text-[#81746c]">
+      <p className="text-xs text-[#6e6159]">
         <Link className="font-medium text-[#8a5140] hover:underline" href={buildAdminHref("/clientes", { organizationId: organization.id, extra: { edit: cliente.id } })}>
           Editar datos del cliente →
         </Link>

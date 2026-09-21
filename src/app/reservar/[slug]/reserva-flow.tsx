@@ -167,11 +167,11 @@ export function ReservaFlow({
           </p>
           <dl className="mx-auto mt-6 max-w-sm space-y-2 rounded-2xl bg-[#faf6f3] p-5 text-left text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-[#8a7b72]">Servicio</dt>
+              <dt className="text-[#6e6159]">Servicio</dt>
               <dd className="font-medium">{servicio?.nombre}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-[#8a7b72]">Horario</dt>
+              <dt className="text-[#6e6159]">Horario</dt>
               <dd className="font-medium">
                 {dias.find((d) => d.diaKey === diaKey)?.etiqueta ?? diaKey} ·{" "}
                 {formatoHora(slotIso, sucursal.zonaHoraria)}
@@ -179,12 +179,12 @@ export function ReservaFlow({
             </div>
             {profesional ? (
               <div className="flex justify-between gap-4">
-                <dt className="text-[#8a7b72]">Profesional</dt>
+                <dt className="text-[#6e6159]">Profesional</dt>
                 <dd className="font-medium">{profesional.nombre}</dd>
               </div>
             ) : null}
             <div className="flex justify-between gap-4">
-              <dt className="text-[#8a7b72]">Sucursal</dt>
+              <dt className="text-[#6e6159]">Sucursal</dt>
               <dd className="font-medium">{sucursal.nombre}</dd>
             </div>
           </dl>
@@ -218,7 +218,7 @@ export function ReservaFlow({
               <button
                 className={`rounded-2xl border p-4 text-left transition-colors ${
                   s.id === sucursal.id
-                    ? "border-[#b8795d] bg-[#fdf6f1]"
+                    ? "border-[#8a5140] bg-[#fdf6f1]"
                     : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
                 }`}
                 key={s.id}
@@ -234,7 +234,7 @@ export function ReservaFlow({
               >
                 <p className="font-medium">{s.nombre}</p>
                 {s.direccion ? (
-                  <p className="mt-1 flex items-center gap-1 text-xs text-[#8a7b72]">
+                  <p className="mt-1 flex items-center gap-1 text-xs text-[#6e6159]">
                     <MapPin className="size-3" /> {s.direccion}
                   </p>
                 ) : null}
@@ -252,7 +252,7 @@ export function ReservaFlow({
             <button
               className={`rounded-2xl border p-4 text-left transition-colors ${
                 s.id === servicioId
-                  ? "border-[#b8795d] bg-[#fdf6f1]"
+                  ? "border-[#8a5140] bg-[#fdf6f1]"
                   : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
               }`}
               key={s.id}
@@ -260,7 +260,7 @@ export function ReservaFlow({
               type="button"
             >
               <p className="font-medium">{s.nombre}</p>
-              <p className="mt-1 flex items-center gap-2 text-xs text-[#8a7b72]">
+              <p className="mt-1 flex items-center gap-2 text-xs text-[#6e6159]">
                 <Clock3 className="size-3" />
                 {s.duracionMinutos} min · {formatoPrecio(s.precio)}
               </p>
@@ -277,20 +277,20 @@ export function ReservaFlow({
             <button
               className={`rounded-2xl border p-4 text-left transition-colors ${
                 usuarioId === ""
-                  ? "border-[#b8795d] bg-[#fdf6f1]"
+                  ? "border-[#8a5140] bg-[#fdf6f1]"
                   : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
               }`}
               onClick={() => elegir(setUsuarioId)("")}
               type="button"
             >
               <p className="font-medium">Cualquiera disponible</p>
-              <p className="mt-1 text-xs text-[#8a7b72]">Te asignamos quien esté libre</p>
+              <p className="mt-1 text-xs text-[#6e6159]">Te asignamos quien esté libre</p>
             </button>
             {profesionalesSucursal.map((p) => (
               <button
                 className={`rounded-2xl border p-4 text-left transition-colors ${
                   p.usuarioId === usuarioId
-                    ? "border-[#b8795d] bg-[#fdf6f1]"
+                    ? "border-[#8a5140] bg-[#fdf6f1]"
                     : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
                 }`}
                 key={p.usuarioId}
@@ -313,7 +313,7 @@ export function ReservaFlow({
               <button
                 className={`rounded-xl border px-4 py-2 text-sm transition-colors ${
                   dia.diaKey === diaKey
-                    ? "border-[#b8795d] bg-[#fdf6f1] font-semibold"
+                    ? "border-[#8a5140] bg-[#fdf6f1] font-semibold"
                     : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
                 }`}
                 key={dia.diaKey}
@@ -332,13 +332,13 @@ export function ReservaFlow({
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-[#a76348]">Horario</h2>
           {pending && slots === null ? (
-            <p className="mt-3 text-sm text-[#8a7b72]">Buscando horarios disponibles…</p>
+            <p className="mt-3 text-sm text-[#6e6159]">Buscando horarios disponibles…</p>
           ) : null}
           {slotsError ? (
             <p className="mt-3 text-sm text-[#a8443a]">{slotsError}</p>
           ) : null}
           {slots !== null && slots.length === 0 && !slotsError ? (
-            <p className="mt-3 text-sm text-[#8a7b72]">
+            <p className="mt-3 text-sm text-[#6e6159]">
               No quedan horarios libres ese día. Prueba con otra fecha.
             </p>
           ) : null}
@@ -348,7 +348,7 @@ export function ReservaFlow({
                 <button
                   className={`rounded-xl border px-3 py-2 text-sm tabular-nums transition-colors ${
                     iso === slotIso
-                      ? "border-[#b8795d] bg-[#2c2522] font-semibold text-[#fffaf5]"
+                      ? "border-[#8a5140] bg-[#2c2522] font-semibold text-[#fffaf5]"
                       : "border-[#eee6e0] bg-white hover:border-[#d8c9bf]"
                   }`}
                   key={iso}
@@ -409,7 +409,7 @@ export function ReservaFlow({
               {pending ? "Reservando…" : "Confirmar reserva"}
             </Button>
           </div>
-          <p className="mt-3 text-xs leading-5 text-[#8a7b72]">
+          <p className="mt-3 text-xs leading-5 text-[#6e6159]">
             {sucursal.autoConfirmar
               ? "Tu cita queda confirmada al instante."
               : "El equipo revisará tu solicitud y te confirmará por teléfono."}

@@ -47,9 +47,9 @@ export function RoleCard({
           <div className="min-w-0">
             <p className="truncate font-medium text-[#2d2926]">
               {role.nombre}
-              {role.esSistema ? <span className="ml-2 text-xs font-normal text-[#81746c]">sistema</span> : null}
+              {role.esSistema ? <span className="ml-2 text-xs font-normal text-[#6e6159]">sistema</span> : null}
             </p>
-            <p className="truncate text-xs text-[#81746c]">
+            <p className="truncate text-xs text-[#6e6159]">
               {role.clave} · {permisoIds.length} permisos · {memberCount} miembro(s)
             </p>
           </div>
@@ -87,7 +87,7 @@ export function RoleCard({
           <input name="rolId" type="hidden" value={role.id} />
           {modulos.map((modulo) => (
             <div key={modulo}>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#b8795d]">{modulo}</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#8a5140]">{modulo}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {permisos
                   .filter((permiso) => permiso.modulo === modulo)
@@ -126,7 +126,7 @@ export function RoleCard({
               </Button>
             </div>
           ) : (
-            <p className="text-xs text-[#81746c]">
+            <p className="text-xs text-[#6e6159]">
               {protegido ? "El rol Propietario tiene todos los permisos y no se puede modificar." : "Solo lectura."}
             </p>
           )}

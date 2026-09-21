@@ -64,7 +64,7 @@ export function MemberInviteForm({
           <a className="mt-2 block break-all text-[#a76348] underline" href={invitationUrl}>
             {invitationUrl}
           </a>
-          <p className="mt-2 text-xs leading-5 text-[#81746c]">
+          <p className="mt-2 text-xs leading-5 text-[#6e6159]">
             Este enlace solo se muestra en desarrollo porque no hay envío de correo habilitado.
           </p>
         </div>

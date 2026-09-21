@@ -132,7 +132,7 @@ export function SucursalEditarForm({ organizationId, sucursal }: { organizationI
       </div>
 
       <fieldset className="space-y-2 rounded-xl border border-[#eee8e3] p-4">
-        <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-[#81746c]">Caja y reservas</legend>
+        <legend className="px-1 text-xs font-semibold uppercase tracking-wide text-[#6e6159]">Caja y reservas</legend>
         <label className="flex items-center gap-2 text-sm text-[#403a35]">
           <input defaultChecked={sucursal.exigirCorteParaCobrar} name="exigirCorteParaCobrar" type="checkbox" />
           Exigir corte de caja abierto para cobrar

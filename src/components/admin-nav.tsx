@@ -206,7 +206,7 @@ export function AdminNav({
     <nav aria-label="Secciones del panel" className="space-y-8">
       {sections.map((section) => (
         <section aria-label={section.title} key={section.title}>
-          <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b8795d]">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a5140]">
             {section.title}
           </h3>
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -239,7 +239,7 @@ export function AdminNav({
                   </div>
                   <div className="min-w-0">
                     <p className="font-medium text-[#2d2926]">{item.label}</p>
-                    <p className="mt-0.5 text-xs leading-5 text-[#81746c]">
+                    <p className="mt-0.5 text-xs leading-5 text-[#6e6159]">
                       {item.description}
                     </p>
                   </div>
@@ -284,7 +284,7 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors",
-                  isActive ? "text-[#8a5140]" : "text-[#81746c] hover:text-[#8a5140]",
+                  isActive ? "text-[#8a5140]" : "text-[#6e6159] hover:text-[#8a5140]",
                 )}
                 data-action-id="nav.tab"
                 href={buildAdminHref(toAdminPath(item.path), {
@@ -300,7 +300,7 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
           })}
           <button
             aria-expanded={masAbierto}
-            className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-[#81746c] transition-colors hover:text-[#8a5140]"
+            className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-[#6e6159] transition-colors hover:text-[#8a5140]"
             data-action-id="nav.mas_abrir"
             onClick={() => setMasAbierto(true)}
             type="button"
@@ -355,7 +355,7 @@ function AdminNavList({
     <>
       {sections.map((section) => (
         <section aria-label={section.title} key={section.title}>
-          <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#b8795d]">
+          <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8a5140]">
             {section.title}
           </h3>
           <ul className="mt-2 space-y-1">
@@ -495,7 +495,7 @@ export function AdminNavCompact({
               "inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-medium whitespace-nowrap transition-colors",
               masAbierto || activoEnMas
                 ? "border-[#8a5140] bg-[#f2e3dc] text-[#60392e]"
-                : "border-dashed border-[#c9b8ae] bg-transparent text-[#81746c] hover:border-[#c9a899] hover:text-[#8a5140]",
+                : "border-dashed border-[#c9b8ae] bg-transparent text-[#6e6159] hover:border-[#c9a899] hover:text-[#8a5140]",
             )}
             data-action-id="nav.mas_opciones"
             onClick={() => setAbiertoManual(masAbierto ? false : true)}

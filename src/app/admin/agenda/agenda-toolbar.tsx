@@ -69,7 +69,7 @@ export function AgendaToolbar({
     <div className="flex flex-col gap-4 rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm lg:flex-row lg:items-end lg:justify-between">
       <div className="grid gap-3 sm:grid-cols-2 lg:flex lg:items-end">
         <label className="min-w-44 space-y-1.5">
-          <span className="text-xs font-medium text-[#81746c]">Sucursal</span>
+          <span className="text-xs font-medium text-[#6e6159]">Sucursal</span>
           <select
             aria-label="Sucursal de la agenda"
             className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
@@ -84,7 +84,7 @@ export function AgendaToolbar({
           </select>
         </label>
         <label className="space-y-1.5">
-          <span className="text-xs font-medium text-[#81746c]">Fecha</span>
+          <span className="text-xs font-medium text-[#6e6159]">Fecha</span>
           <input
             aria-label="Fecha de la agenda"
             className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"

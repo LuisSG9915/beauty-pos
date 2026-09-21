@@ -138,7 +138,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
                   {clientRows.map((client) => (
                     <tr className="border-b border-[#f1eeea] last:border-0" key={client.id}>
                       <td className="px-3 py-4 font-medium">
-                        <Link className="hover:text-[#8a5140] hover:underline" href={buildAdminHref(`/clientes/${client.id}`, { organizationId })}>
+                        <Link className="inline-flex min-h-6 items-center hover:text-[#8a5140] hover:underline" href={buildAdminHref(`/clientes/${client.id}`, { organizationId })}>
                           {[client.nombre, client.apellidoPaterno, client.apellidoMaterno].filter(Boolean).join(" ")}
                         </Link>
                       </td>

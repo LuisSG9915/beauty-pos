@@ -16,7 +16,7 @@ export function RoleForm({ organizationId }: { organizationId: string }) {
       <Field>
         <FieldLabel required>Clave</FieldLabel>
         <Input name="clave" placeholder="ej. supervisor" required />
-        <p className="mt-1 text-xs text-[#81746c]">Minúsculas, números y guion bajo.</p>
+        <p className="mt-1 text-xs text-[#6e6159]">Minúsculas, números y guion bajo.</p>
       </Field>
       <Field>
         <FieldLabel required>Nombre</FieldLabel>

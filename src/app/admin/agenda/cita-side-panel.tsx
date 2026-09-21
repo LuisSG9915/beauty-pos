@@ -136,13 +136,13 @@ function CitaHistorial({
       </summary>
       <ul className="mt-3 space-y-2">
         {eventos === null ? (
-          <li className="text-xs text-[#81746c]">{cargando ? "Cargando…" : ""}</li>
+          <li className="text-xs text-[#6e6159]">{cargando ? "Cargando…" : ""}</li>
         ) : eventos.length === 0 ? (
-          <li className="text-xs text-[#81746c]">Sin movimientos registrados.</li>
+          <li className="text-xs text-[#6e6159]">Sin movimientos registrados.</li>
         ) : (
           eventos.map((evento) => (
             <li className="flex items-baseline gap-2 text-xs" key={evento.id}>
-              <span className="shrink-0 tabular-nums text-[#a89f97]">
+              <span className="shrink-0 tabular-nums text-[#6f635a]">
                 {formatDate(evento.createdAt, { timeZone })} {formatTime(evento.createdAt, { timeZone })}
               </span>
               <span className="min-w-0 flex-1 text-[#625b55]">
@@ -303,7 +303,7 @@ function CitaAnticipos({
                   <span className="font-medium tabular-nums">
                     {formatCurrency(ant.monto, { currency })}
                   </span>
-                  <span className="ml-2 text-xs text-[#81746c]">{ant.medioNombre ?? "Medio"}</span>
+                  <span className="ml-2 text-xs text-[#6e6159]">{ant.medioNombre ?? "Medio"}</span>
                 </span>
                 <StatusBadge tone={ANTICIPO_ESTADO_TONE[ant.estado] ?? "neutral"}>
                   {ANTICIPO_ESTADO_LABEL[ant.estado] ?? ant.estado}
@@ -582,7 +582,7 @@ export function CitaSidePanel({
             </h2>
             <CitaStatusBadge estado={cita.estado} />
           </div>
-          <p className="mt-1 text-sm text-[#81746c]">
+          <p className="mt-1 text-sm text-[#6e6159]">
             {formatDate(cita.fechaHora, { timeZone })} · {formatTime(cita.fechaHora, { timeZone })} ·{" "}
             {cita.duracionMinutos} min
           </p>

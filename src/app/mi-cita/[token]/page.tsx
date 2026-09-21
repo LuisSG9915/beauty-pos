@@ -69,7 +69,7 @@ export default async function MiCitaPage({ params }: { params: Promise<{ token: 
         </div>
         <div>
           <p className="font-semibold tracking-tight">{reserva.organizacionNombre}</p>
-          <p className="text-xs text-[#8a7b72]">Estado de tu cita</p>
+          <p className="text-xs text-[#6e6159]">Estado de tu cita</p>
         </div>
       </header>
 
@@ -84,28 +84,28 @@ export default async function MiCitaPage({ params }: { params: Promise<{ token: 
 
           <dl className="mt-6 space-y-3 rounded-2xl bg-[#faf6f3] p-5 text-sm">
             <div className="flex justify-between gap-4">
-              <dt className="text-[#8a7b72]">Fecha y hora</dt>
+              <dt className="text-[#6e6159]">Fecha y hora</dt>
               <dd className="font-medium capitalize">
                 {formatoFechaHora(reserva.fechaHora, reserva.zonaHoraria)}
               </dd>
             </div>
             {reserva.servicioNombre ? (
               <div className="flex justify-between gap-4">
-                <dt className="text-[#8a7b72]">Servicio</dt>
+                <dt className="text-[#6e6159]">Servicio</dt>
                 <dd className="font-medium">{reserva.servicioNombre}</dd>
               </div>
             ) : null}
             <div className="flex justify-between gap-4">
-              <dt className="text-[#8a7b72]">Duración</dt>
+              <dt className="text-[#6e6159]">Duración</dt>
               <dd className="font-medium">{reserva.duracionMinutos} min</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-[#8a7b72]">Sucursal</dt>
+              <dt className="text-[#6e6159]">Sucursal</dt>
               <dd className="font-medium">{reserva.sucursalNombre}</dd>
             </div>
             {reserva.clienteNombre ? (
               <div className="flex justify-between gap-4">
-                <dt className="text-[#8a7b72]">A nombre de</dt>
+                <dt className="text-[#6e6159]">A nombre de</dt>
                 <dd className="font-medium">{reserva.clienteNombre}</dd>
               </div>
             ) : null}

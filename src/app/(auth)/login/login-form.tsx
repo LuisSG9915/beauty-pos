@@ -48,7 +48,7 @@ export function LoginForm() {
         <FieldLabel className="text-[#4b403a]" required>
           Correo de acceso
         </FieldLabel>
-        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#b8795d] focus-within:ring-3 focus-within:ring-[#b8795d]/10">
+        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#8a5140] focus-within:ring-3 focus-within:ring-[#8a5140]/10">
           <Mail className="size-4 text-[#a18d81]" />
           <Input
             required
@@ -64,7 +64,7 @@ export function LoginForm() {
         <FieldLabel className="text-[#4b403a]" required>
           Contraseña
         </FieldLabel>
-        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#b8795d] focus-within:ring-3 focus-within:ring-[#b8795d]/10">
+        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#8a5140] focus-within:ring-3 focus-within:ring-[#8a5140]/10">
           <LockKeyhole className="size-4 text-[#a18d81]" />
           <Input
             required

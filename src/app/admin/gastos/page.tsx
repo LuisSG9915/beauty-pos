@@ -131,11 +131,11 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
 
       <section className="grid gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7b72]">Gastos confirmados</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#6e6159]">Gastos confirmados</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-[#2d2926]">{fmt(resumen.totalConfirmado)}</p>
         </div>
         <div className="rounded-2xl border border-[#eadfd8] bg-white p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#8a7b72]">Revertidos en el periodo</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[#6e6159]">Revertidos en el periodo</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-[#a8443a]">{fmt(resumen.totalRevertido)}</p>
         </div>
       </section>
@@ -177,7 +177,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
                       <td className="whitespace-nowrap py-3 pr-4 text-[#625b55]">{gasto.fechaGasto}</td>
                       <td className="py-3 pr-4">
                         <p className="font-medium text-[#2d2926]">{gasto.concepto}</p>
-                        <p className="mt-0.5 text-xs text-[#a89d95]">
+                        <p className="mt-0.5 text-xs text-[#6f635a]">
                           {[gasto.proveedor, gasto.referencia, gasto.registradoPor].filter(Boolean).join(" · ")}
                         </p>
                         {gasto.motivoReversion ? (
@@ -188,7 +188,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
                       <td className="py-3 pr-4">
                         <span className="text-[#625b55]">{gasto.medio}</span>
                         {gasto.cajaVinculada ? (
-                          <span className="ml-1 text-xs text-[#a89d95]" title="Salió del corte de caja">· caja</span>
+                          <span className="ml-1 text-xs text-[#6f635a]" title="Salió del corte de caja">· caja</span>
                         ) : null}
                       </td>
                       <td className="py-3 pr-4 text-right font-semibold tabular-nums">{fmt(gasto.importe)}</td>

@@ -98,9 +98,9 @@ export function MemberCard({
           <div className="min-w-0">
             <p className="truncate font-medium text-[#2d2926]">
               {member.nombre}
-              {isSelf ? <span className="ml-2 text-xs font-normal text-[#81746c]">(tú)</span> : null}
+              {isSelf ? <span className="ml-2 text-xs font-normal text-[#6e6159]">(tú)</span> : null}
             </p>
-            <p className="truncate text-xs text-[#81746c]">{member.correo}</p>
+            <p className="truncate text-xs text-[#6e6159]">{member.correo}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -130,7 +130,7 @@ export function MemberCard({
         <form action={rolesAction} className="space-y-2">
           <input name="organizacionId" type="hidden" value={organizationId} />
           <input name="miembroId" type="hidden" value={member.miembroId} />
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#b8795d]">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#8a5140]">
             <ShieldCheck aria-hidden="true" className="size-3.5" /> Roles
           </p>
           <CheckboxList
@@ -152,7 +152,7 @@ export function MemberCard({
         <form action={branchesAction} className="space-y-2">
           <input name="organizacionId" type="hidden" value={organizationId} />
           <input name="miembroId" type="hidden" value={member.miembroId} />
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#b8795d]">
+          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-[#8a5140]">
             <Store aria-hidden="true" className="size-3.5" /> Sucursales
           </p>
           <CheckboxList
@@ -165,7 +165,7 @@ export function MemberCard({
             name="sucursalIds"
           />
           {fueraDeAlcance.length > 0 ? (
-            <p className="text-xs text-[#81746c]">
+            <p className="text-xs text-[#6e6159]">
               Fuera de tu alcance: {fueraDeAlcance.map((id) => allBranchNames[id] ?? "—").join(", ")}
             </p>
           ) : null}
@@ -210,8 +210,8 @@ export function PendingInvitations({
         {invitations.map((inv) => (
           <li className="rounded-xl border border-[#eee8e3] p-3 text-sm" key={inv.id}>
             <p className="font-medium text-[#2d2926]">{inv.nombre}</p>
-            <p className="mt-0.5 text-xs text-[#81746c]">{inv.correo}</p>
-            <p className="mt-1 text-xs text-[#81746c]">
+            <p className="mt-0.5 text-xs text-[#6e6159]">{inv.correo}</p>
+            <p className="mt-1 text-xs text-[#6e6159]">
               {inv.rolNombre} · {inv.sucursalNombre} · expira {formatDate(inv.expiraAt)}
             </p>
             {canCancel ? (

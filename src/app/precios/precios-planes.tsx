@@ -99,7 +99,7 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
             <article
               className={`flex flex-col rounded-3xl border bg-white p-7 ${
                 plan.destacado
-                  ? "border-[#b8795d] shadow-[0_20px_60px_-28px_rgba(70,45,33,0.4)]"
+                  ? "border-[#8a5140] shadow-[0_20px_60px_-28px_rgba(70,45,33,0.4)]"
                   : "border-[#eee6e0]"
               }`}
               key={plan.clave}
@@ -110,7 +110,7 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
                 </span>
               ) : null}
               <h2 className="text-xl font-semibold">{plan.nombre}</h2>
-              <p className="mt-1 text-sm text-[#81746c]">{plan.descripcion}</p>
+              <p className="mt-1 text-sm text-[#6e6159]">{plan.descripcion}</p>
 
               {excedeMax ? (
                 <p className="mt-5 text-sm font-medium text-[#a76348]">
@@ -123,19 +123,19 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
                     <span className="text-3xl font-semibold tracking-tight">
                       {formatoPrecio(total, plan.moneda)}
                     </span>
-                    <span className="text-sm text-[#8a7b72]">
+                    <span className="text-sm text-[#6e6159]">
                       {" "}
                       / {anual ? "año" : "mes"}
                       {sucursales > 1 ? ` · ${sucursales} sucursales` : ""}
                     </span>
                   </p>
                   {equivMensual !== null ? (
-                    <p className="mt-1 text-xs text-[#8a7b72]">
+                    <p className="mt-1 text-xs text-[#6e6159]">
                       Equivale a {formatoPrecio(equivMensual, plan.moneda)}/mes — ahorras{" "}
                       {formatoPrecio((mensual + extras * extraMensual) * 12 - total, plan.moneda)} al año.
                     </p>
                   ) : (
-                    <p className="mt-1 text-xs text-[#8a7b72]">
+                    <p className="mt-1 text-xs text-[#6e6159]">
                       Incluye {plan.sucursalesIncluidas} sucursal(es)
                       {extras > 0
                         ? ` + ${extras} × ${formatoPrecio(extraMensual, plan.moneda)}`

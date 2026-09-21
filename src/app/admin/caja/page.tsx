@@ -180,7 +180,7 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                     >
                       <div className="min-w-0">
                         <p className="font-medium capitalize text-[#2d2926]">{mov.tipo}</p>
-                        <p className="text-xs text-[#81746c]">
+                        <p className="text-xs text-[#6e6159]">
                           {formatTime(mov.createdAt, { timeZone })} · {mov.medioNombre} · {mov.usuarioNombre}
                           {mov.notas ? ` · ${mov.notas}` : ""}
                         </p>
@@ -231,12 +231,12 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                         {Math.abs(diferenciaTotal) < 0.005 ? "Cuadrado" : `Diferencia ${fmt(diferenciaTotal)}`}
                       </span>
                     </div>
-                    <p className="mt-1 text-xs text-[#81746c]">
+                    <p className="mt-1 text-xs text-[#6e6159]">
                       {corte.abiertoPor ?? "—"} · {tot?.ventasCount ?? 0} venta(s) · {fmt(tot?.total)} ventas ·{" "}
                       {fmt(tot?.propinas)} propinas · {fmt(comisionesPorCorte.get(corte.id))} comisiones
                     </p>
                     <table className="mt-3 w-full text-left text-sm">
-                      <thead className="text-xs uppercase tracking-wide text-[#81746c]">
+                      <thead className="text-xs uppercase tracking-wide text-[#6e6159]">
                         <tr>
                           <th className="py-1 pr-3 font-medium">Medio</th>
                           <th className="py-1 pr-3 text-right font-medium">Esperado</th>
@@ -261,7 +261,7 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                         ))}
                       </tbody>
                     </table>
-                    {corte.notas ? <p className="mt-2 text-xs text-[#81746c]">Notas: {corte.notas}</p> : null}
+                    {corte.notas ? <p className="mt-2 text-xs text-[#6e6159]">Notas: {corte.notas}</p> : null}
                   </li>
                 );
               })}

@@ -60,7 +60,7 @@ export function RegistroForm() {
         <FieldLabel className="text-[#4b403a]" required>
           Nombre de tu negocio
         </FieldLabel>
-        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#b8795d] focus-within:ring-3 focus-within:ring-[#b8795d]/10">
+        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#8a5140] focus-within:ring-3 focus-within:ring-[#8a5140]/10">
           <Building2 className="size-4 text-[#a18d81]" />
           <Input
             required
@@ -78,7 +78,7 @@ export function RegistroForm() {
         <FieldLabel className="text-[#4b403a]" required>
           Tu nombre
         </FieldLabel>
-        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#b8795d] focus-within:ring-3 focus-within:ring-[#b8795d]/10">
+        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#8a5140] focus-within:ring-3 focus-within:ring-[#8a5140]/10">
           <User className="size-4 text-[#a18d81]" />
           <Input
             required
@@ -96,7 +96,7 @@ export function RegistroForm() {
         <FieldLabel className="text-[#4b403a]" required>
           Correo de acceso
         </FieldLabel>
-        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#b8795d] focus-within:ring-3 focus-within:ring-[#b8795d]/10">
+        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#8a5140] focus-within:ring-3 focus-within:ring-[#8a5140]/10">
           <Mail className="size-4 text-[#a18d81]" />
           <Input
             required
@@ -114,7 +114,7 @@ export function RegistroForm() {
         <FieldLabel className="text-[#4b403a]" required>
           Contraseña
         </FieldLabel>
-        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#b8795d] focus-within:ring-3 focus-within:ring-[#b8795d]/10">
+        <div className="flex items-center gap-3 rounded-xl border border-[#e3d9d1] bg-white px-3.5 focus-within:border-[#8a5140] focus-within:ring-3 focus-within:ring-[#8a5140]/10">
           <LockKeyhole className="size-4 text-[#a18d81]" />
           <Input
             required
@@ -143,7 +143,7 @@ export function RegistroForm() {
         <ArrowRight className="ml-2 size-4" />
       </Button>
 
-      <p className="text-center text-xs leading-5 text-[#8a7b72]">
+      <p className="text-center text-xs leading-5 text-[#6e6159]">
         14 días de prueba sin tarjeta. Tus datos se conservan al contratar.
       </p>
     </form>

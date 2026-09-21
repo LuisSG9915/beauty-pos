@@ -312,7 +312,7 @@ export function DisponibilidadPanel({
       <summary className="flex cursor-pointer items-center gap-3 rounded-2xl px-5 py-4 text-sm font-semibold text-[#403a35] select-none hover:bg-[#faf9f7]">
         <Settings2 aria-hidden="true" className="size-4 text-[#8a5140]" />
         Disponibilidad de la sucursal
-        <span className="text-xs font-normal text-[#81746c]">
+        <span className="text-xs font-normal text-[#6e6159]">
           horarios, bloqueos y citas sin asignar
         </span>
         <span className="ml-auto text-xs text-[#8a5140] group-open:hidden">Configurar</span>
@@ -333,7 +333,7 @@ export function DisponibilidadPanel({
                   <p className="text-xs font-semibold text-[#625b55]">{nombre}</p>
                   <div className="mt-2 space-y-1.5">
                     {turnos.length === 0 ? (
-                      <p className="text-[11px] text-[#a89f97]">Cerrado</p>
+                      <p className="text-[11px] text-[#6f635a]">Cerrado</p>
                     ) : (
                       turnos.map((turno) => (
                         <button
@@ -346,7 +346,7 @@ export function DisponibilidadPanel({
                             "flex w-full items-center justify-between rounded-lg px-2 py-1 text-xs tabular-nums transition-colors",
                             turno.activo
                               ? "bg-white text-[#403a35] hover:bg-[#fdf1ee]"
-                              : "bg-[#f1eeea] text-[#a89f97] line-through hover:bg-[#eaf5ed]",
+                              : "bg-[#f1eeea] text-[#6f635a] line-through hover:bg-[#eaf5ed]",
                           )}
                           disabled={pending}
                           key={turno.id}
@@ -365,7 +365,7 @@ export function DisponibilidadPanel({
               );
             })}
           </div>
-          <p className="text-xs text-[#81746c]">
+          <p className="text-xs text-[#6e6159]">
             Para huecos intermedios (comida, limpieza) registra dos turnos por día, p. ej. 09:00–14:00 y 16:00–20:00.
           </p>
         </section>
@@ -397,7 +397,7 @@ export function DisponibilidadPanel({
                 Guardar
               </Button>
             </div>
-            <p className="text-xs leading-5 text-[#81746c]">
+            <p className="text-xs leading-5 text-[#6e6159]">
               Cuántas citas sin asignar pueden coexistir en el mismo horario. 1 = solo una a la vez;
               súbelo si recepción agenda varias y asigna profesional al llegar.
             </p>
@@ -418,7 +418,7 @@ export function DisponibilidadPanel({
               />
               <span>
                 Permitir que clientes reserven desde el portal público.
-                <span className="block text-xs text-[#81746c]">
+                <span className="block text-xs text-[#6e6159]">
                   Las reservas web usan el carril «sin asignar» y aparecen en la agenda.
                 </span>
                 {!permiteReservasOnline ? (
@@ -440,7 +440,7 @@ export function DisponibilidadPanel({
                   />
                   <span>
                     Confirmar automáticamente.
-                    <span className="block text-xs text-[#81746c]">
+                    <span className="block text-xs text-[#6e6159]">
                       Si lo desactivas, cada reserva queda pendiente hasta que el equipo la confirme.
                     </span>
                     {!permiteAutoConfirmar ? (
@@ -460,7 +460,7 @@ export function DisponibilidadPanel({
                       type="number"
                       value={anticipacionMinutos}
                     />
-                    <span className="mt-0.5 block font-normal text-[#81746c]">
+                    <span className="mt-0.5 block font-normal text-[#6e6159]">
                       Reservas con al menos esta anticipación.
                     </span>
                   </label>
@@ -473,7 +473,7 @@ export function DisponibilidadPanel({
                       type="number"
                       value={horizonteDias}
                     />
-                    <span className="mt-0.5 block font-normal text-[#81746c]">
+                    <span className="mt-0.5 block font-normal text-[#6e6159]">
                       Qué tan adelante pueden reservar.
                     </span>
                   </label>
@@ -486,7 +486,7 @@ export function DisponibilidadPanel({
                       type="number"
                       value={cancelacionHoras}
                     />
-                    <span className="mt-0.5 block font-normal text-[#81746c]">
+                    <span className="mt-0.5 block font-normal text-[#6e6159]">
                       Cancelar/reagendar en línea hasta antes de la cita.
                     </span>
                   </label>
@@ -544,7 +544,7 @@ export function DisponibilidadPanel({
               />
               <span>
                 Enviar recordatorio automático a clientes con correo.
-                <span className="block text-xs text-[#81746c]">
+                <span className="block text-xs text-[#6e6159]">
                   Aplica a toda la organización; solo citas pendientes o confirmadas.
                 </span>
                 {!permiteRecordatorios ? (
@@ -566,7 +566,7 @@ export function DisponibilidadPanel({
                     value={horasAntes}
                   />
                 </Field>
-                <p className="pb-2 text-xs text-[#81746c]">24 = un día antes de la cita.</p>
+                <p className="pb-2 text-xs text-[#6e6159]">24 = un día antes de la cita.</p>
               </div>
             ) : null}
             <Button
@@ -590,7 +590,7 @@ export function DisponibilidadPanel({
               Últimos avisos de cita
             </h3>
             {avisos.length === 0 ? (
-              <p className="text-xs text-[#81746c]">
+              <p className="text-xs text-[#6e6159]">
                 Aún no hay avisos. Las confirmaciones, cambios, cancelaciones y recordatorios por correo aparecen aquí.
               </p>
             ) : (
@@ -601,7 +601,7 @@ export function DisponibilidadPanel({
                       <p className="truncate text-sm font-medium text-[#403a35]">
                         {ETIQUETA_AVISO[aviso.tipo] ?? aviso.tipo} · {aviso.correoDestino}
                       </p>
-                      <p className="text-xs text-[#81746c]">
+                      <p className="text-xs text-[#6e6159]">
                         {aviso.citaFechaHora
                           ? `Cita: ${formatDate(aviso.citaFechaHora, { timeZone })} ${formatTime(aviso.citaFechaHora, { timeZone })}`
                           : `Programado: ${formatDate(aviso.programadoPara, { timeZone })} ${formatTime(aviso.programadoPara, { timeZone })}`}
@@ -615,7 +615,7 @@ export function DisponibilidadPanel({
                 ))}
               </ul>
             )}
-            <p className="text-xs text-[#81746c]">
+            <p className="text-xs text-[#6e6159]">
               «Aceptado» significa que el proveedor de correo recibió el envío; no garantiza que el cliente lo haya leído.
             </p>
           </section>
@@ -670,13 +670,13 @@ export function DisponibilidadPanel({
                   <Plus aria-hidden="true" /> Agregar bloqueo
                 </Button>
               </div>
-              <p className="text-[11px] text-[#a89f97]">
+              <p className="text-[11px] text-[#6f635a]">
                 Las horas se interpretan en {timeZone}. Un bloqueo de toda la sucursal impide cualquier cita en ese rango.
               </p>
             </form>
 
             {bloqueosOrdenados.length === 0 ? (
-              <p className="rounded-xl bg-[#f8f7f5] px-4 py-3 text-xs text-[#81746c]">Sin bloqueos registrados.</p>
+              <p className="rounded-xl bg-[#f8f7f5] px-4 py-3 text-xs text-[#6e6159]">Sin bloqueos registrados.</p>
             ) : (
               <ul className="space-y-1.5">
                 {bloqueosOrdenados.slice(0, 12).map((bloqueo) => (
@@ -693,7 +693,7 @@ export function DisponibilidadPanel({
                         {formatDate(bloqueo.iniciaAt, { timeZone })} ·{" "}
                         {formatTime(bloqueo.iniciaAt, { timeZone })}–{formatTime(bloqueo.terminaAt, { timeZone })}
                       </p>
-                      <p className="truncate text-[#81746c]">
+                      <p className="truncate text-[#6e6159]">
                         {BLOQUEO_LABEL[bloqueo.tipo] ?? bloqueo.tipo} ·{" "}
                         {bloqueo.usuarioId ? (bloqueo.usuarioNombre ?? "Profesional") : "Toda la sucursal"}
                         {bloqueo.motivo ? ` · ${bloqueo.motivo}` : ""}
@@ -752,14 +752,14 @@ export function DisponibilidadPanel({
                   <Plus aria-hidden="true" /> Agregar recurso
                 </Button>
               </div>
-              <p className="text-[11px] text-[#a89f97]">
+              <p className="text-[11px] text-[#6f635a]">
                 Capacidad mayor a 1 registra recursos compartibles (p. ej. 2 sillas iguales). Las citas
                 que reserven el recurso no podrán traslaparse más allá de su capacidad.
               </p>
             </form>
 
             {recursos.length === 0 ? (
-              <p className="rounded-xl bg-[#f8f7f5] px-4 py-3 text-xs text-[#81746c]">Sin recursos registrados.</p>
+              <p className="rounded-xl bg-[#f8f7f5] px-4 py-3 text-xs text-[#6e6159]">Sin recursos registrados.</p>
             ) : (
               <ul className="space-y-1.5">
                 {recursos.map((recurso) => (
@@ -772,7 +772,7 @@ export function DisponibilidadPanel({
                   >
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-[#403a35]">{recurso.nombre}</p>
-                      <p className="truncate text-[#81746c]">
+                      <p className="truncate text-[#6e6159]">
                         {RECURSO_TIPO_LABEL[recurso.tipo as (typeof RECURSO_TIPOS)[number]] ?? recurso.tipo}
                         {recurso.capacidad > 1 ? ` · capacidad ${recurso.capacidad}` : ""}
                       </p>

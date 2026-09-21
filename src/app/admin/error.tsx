@@ -31,7 +31,7 @@ export default function AdminError({
       <h2 className="text-xl font-semibold text-[#2d2926]">
         No se pudo cargar esta sección
       </h2>
-      <p className="mt-3 text-sm leading-6 text-[#81746c]">
+      <p className="mt-3 text-sm leading-6 text-[#6e6159]">
         Ocurrió un problema al cargar el contenido. Intenta de nuevo; si el
         problema persiste, vuelve al panel o contacta a soporte.
       </p>

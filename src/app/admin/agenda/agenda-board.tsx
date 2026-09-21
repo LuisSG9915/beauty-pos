@@ -107,7 +107,7 @@ const ESTADO_STYLE: Record<string, string> = {
   en_proceso: "bg-[#fdf3e8] text-[#986b16]",
   completada: "bg-[#eaf5ed] text-[#347052]",
   cancelada: "bg-[#fdf1ee] text-[#a8443a]",
-  no_asistio: "bg-[#f3efe8] text-[#8a7b72]",
+  no_asistio: "bg-[#f3efe8] text-[#6e6159]",
 };
 
 const ESTADO_STRIPE: Record<string, string> = {
@@ -301,7 +301,7 @@ function MoveCitaDialog({
                   </button>
                 ))}
               </div>
-              <p className="mt-2 text-[11px] text-[#81746c]">
+              <p className="mt-2 text-[11px] text-[#6e6159]">
                 Elige una sugerencia para rellenar fecha y hora, luego confirma.
               </p>
             </div>
@@ -505,12 +505,18 @@ export function AgendaBoard({
   const dayGrid = (
     // Scroll interno en ambos ejes: permite que los encabezados de columna
     // queden sticky (top-0) al desplazarse verticalmente por el día.
-    <div className="max-h-[calc(100dvh-10rem)] overflow-auto rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm">
+    // tabIndex: la región scrollable debe ser alcanzable con teclado (WCAG).
+    <div
+      aria-label={`Citas del día por profesional en ${sucursal.nombre}`}
+      className="max-h-[calc(100dvh-10rem)] overflow-auto rounded-2xl border border-[#eadfd8] bg-white p-4 shadow-sm"
+      role="region"
+      tabIndex={0}
+    >
       <div className="flex min-w-[760px] gap-2">
         <div className="w-16 shrink-0 pt-10">
           {hours.map((hour) => (
             <div className="relative" key={hour} style={{ height: HOUR_PX }}>
-              <span className="absolute -top-2 right-2 text-[10px] font-medium text-[#a89f97]">
+              <span className="absolute -top-2 right-2 text-[10px] font-medium text-[#6f635a]">
                 {pad2(hour)}:00
               </span>
             </div>
@@ -556,7 +562,7 @@ export function AgendaBoard({
                   )),
                 )}
                 {turnosDia.length === 0 ? (
-                  <div className="absolute inset-0 z-0 rounded-xl bg-[#f1eeea]/70 p-3 text-center text-xs font-medium text-[#8a7b72]">
+                  <div className="absolute inset-0 z-0 rounded-xl bg-[#f1eeea]/70 p-3 text-center text-xs font-medium text-[#6e6159]">
                     Sin horario configurado
                   </div>
                 ) : null}
@@ -638,7 +644,7 @@ export function AgendaBoard({
                   timeZone={timeZone}
                 />
               ))}
-              {dayCitas.length === 0 ? <p className="rounded-lg bg-[#f8f7f5] px-3 py-4 text-center text-xs text-[#81746c]">Sin citas</p> : null}
+              {dayCitas.length === 0 ? <p className="rounded-lg bg-[#f8f7f5] px-3 py-4 text-center text-xs text-[#6e6159]">Sin citas</p> : null}
             </div>
           </section>
         );
@@ -650,7 +656,7 @@ export function AgendaBoard({
     <AdminCard className="overflow-hidden p-0 sm:p-0">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="bg-[#f8f7f5] text-xs uppercase tracking-wide text-[#81746c]">
+          <thead className="bg-[#f8f7f5] text-xs uppercase tracking-wide text-[#6e6159]">
             <tr>
               <th className="px-4 py-3 font-medium">Fecha y hora</th>
               <th className="px-4 py-3 font-medium">Cliente</th>
@@ -666,14 +672,14 @@ export function AgendaBoard({
               <tr className="hover:bg-[#faf9f7]" key={cita.id}>
                 <td className="px-4 py-3 whitespace-nowrap">
                   {formatDate(cita.fechaHora, { timeZone })}
-                  <span className="ml-2 text-xs text-[#81746c]">{formatTime(cita.fechaHora, { timeZone })}</span>
+                  <span className="ml-2 text-xs text-[#6e6159]">{formatTime(cita.fechaHora, { timeZone })}</span>
                 </td>
                 <td className="px-4 py-3 font-medium">{cita.clienteNombre}</td>
                 <td className="px-4 py-3 text-xs text-[#625b55]">{cita.usuarioNombre ?? "Sin asignar"}</td>
                 <td className="max-w-56 truncate px-4 py-3 text-xs text-[#625b55]">
                   {cita.servicios.map((servicio) => servicio.nombre).join(", ") || "Sin servicios"}
                   {cita.recursos.length > 0 ? (
-                    <span className="block text-[10px] text-[#81746c]">{cita.recursos.map((r) => r.nombre).join(", ")}</span>
+                    <span className="block text-[10px] text-[#6e6159]">{cita.recursos.map((r) => r.nombre).join(", ")}</span>
                   ) : null}
                 </td>
                 <td className="px-4 py-3"><CitaStatusBadge estado={cita.estado} /></td>
@@ -744,7 +750,7 @@ export function AgendaBoard({
           </span>
           {pending ? <span role="status">Aplicando cambio…</span> : null}
         </div>
-        <Button className="rounded-xl" data-action-id="agenda.cita.abrir_formulario" onClick={() => { setEditing(null); setCreateInitial(null); setCreateOpen(true); }} type="button">
+        <Button className="rounded-xl" data-action-clave="1" data-action-id="agenda.cita.abrir_formulario" onClick={() => { setEditing(null); setCreateInitial(null); setCreateOpen(true); }} size="lg" type="button">
           <CalendarPlus aria-hidden="true" /> Nueva cita
         </Button>
       </div>

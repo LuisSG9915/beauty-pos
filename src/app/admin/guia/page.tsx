@@ -122,7 +122,7 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
               <span
                 aria-hidden="true"
                 className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
-                  paso.hecho ? "bg-[#e8f0ea] text-[#347052]" : "bg-[#f1eeea] text-[#a89d95]"
+                  paso.hecho ? "bg-[#e8f0ea] text-[#347052]" : "bg-[#f1eeea] text-[#6f635a]"
                 }`}
               >
                 {paso.hecho ? <CheckCircle2 className="size-5" /> : <Circle className="size-5" />}
@@ -132,7 +132,7 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
                   {index + 1}. {paso.titulo}
                   {paso.opcional ? <StatusBadge tone="neutral">Opcional</StatusBadge> : null}
                 </p>
-                <p className="mt-0.5 text-sm leading-6 text-[#81746c]">{paso.descripcion}</p>
+                <p className="mt-0.5 text-sm leading-6 text-[#6e6159]">{paso.descripcion}</p>
               </div>
               <Button
                 nativeButton={false}

@@ -102,7 +102,7 @@ export default async function PreciosPage() {
           </div>
           <div>
             <p className="font-semibold tracking-tight">Beauty POS</p>
-            <p className="text-xs text-[#8a7b72]">Gestión para tu belleza</p>
+            <p className="text-xs text-[#6e6159]">Gestión para tu belleza</p>
           </div>
         </Link>
         <Link
@@ -173,9 +173,9 @@ export default async function PreciosPage() {
               </p>
             </div>
           </div>
-          <p className="pt-2 text-center text-sm text-[#81746c]">
+          <p className="pt-2 text-center text-sm text-[#6e6159]">
             ¿Dudas?{" "}
-            <Link className="font-semibold text-[#b8795d] hover:text-[#96573f]" href="/registro">
+            <Link className="font-semibold text-[#8a5140] hover:text-[#96573f]" href="/registro">
               Crea tu cuenta gratis
             </Link>{" "}
             y descúbrelo por dentro.

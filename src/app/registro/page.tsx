@@ -14,21 +14,21 @@ export default function RegistroPage() {
             <span className="font-semibold">Beauty POS</span>
           </Link>
           <div className="mt-10">
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#b8795d]">
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#8a5140]">
               Prueba gratis 14 días
             </p>
             <h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-[#2c2522]">
               Pon tu salón en orden hoy
             </h1>
-            <p className="mt-4 text-sm leading-6 text-[#81746c]">
+            <p className="mt-4 text-sm leading-6 text-[#6e6159]">
               Crea tu cuenta y empieza con tu agenda, tus clientes y tu caja. Sin
               tarjeta, sin compromiso — y si te gusta, todo lo que registraste se
               queda contigo al contratar.
             </p>
             <RegistroForm />
-            <p className="mt-6 text-center text-sm text-[#81746c]">
+            <p className="mt-6 text-center text-sm text-[#6e6159]">
               ¿Ya tienes cuenta?{" "}
-              <Link className="font-semibold text-[#b8795d] hover:text-[#96573f]" href="/login">
+              <Link className="font-semibold text-[#8a5140] hover:text-[#96573f]" href="/login">
                 Inicia sesión
               </Link>
             </p>
@@ -37,7 +37,7 @@ export default function RegistroPage() {
       </section>
 
       <section className="relative hidden overflow-hidden bg-[#2c2522] px-10 py-10 text-[#fffaf5] lg:flex lg:flex-col lg:justify-between">
-        <div className="absolute -right-32 -top-32 size-96 rounded-full bg-[#b8795d]/25 blur-3xl" />
+        <div className="absolute -right-32 -top-32 size-96 rounded-full bg-[#8a5140]/25 blur-3xl" />
         <div className="absolute -bottom-32 -left-24 size-96 rounded-full bg-[#ead2c4]/10 blur-3xl" />
         <p className="relative text-sm font-semibold uppercase tracking-[0.22em] text-[#e9b59d]">
           Pensado para tu día a día
@@ -57,7 +57,7 @@ export default function RegistroPage() {
               detalle: "Una guía paso a paso te ayuda a cargar tus servicios y hacer tu primera venta.",
             },
           ].map((item) => (
-            <div className="border-l-2 border-[#b8795d]/50 pl-5" key={item.titulo}>
+            <div className="border-l-2 border-[#8a5140]/50 pl-5" key={item.titulo}>
               <p className="font-semibold">{item.titulo}</p>
               <p className="mt-1 text-sm leading-6 text-[#d6c7bf]">{item.detalle}</p>
             </div>
