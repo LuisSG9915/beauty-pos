@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 
 import { toggleTax } from "@/app/admin/impuestos/actions";
 import { TaxForm } from "@/app/admin/impuestos/tax-form";
+import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -41,22 +43,53 @@ export default async function TaxesPage({ searchParams }: { searchParams: Search
   return (
     <div className="space-y-6">
       <AdminPageHeader description="Tasas aplicables a ventas y servicios." title="Impuestos" />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-        <TaxForm initial={editing} key={`${editing?.id ?? "nuevo"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} />
-        <AdminCard
-          actions={
-            <Button nativeButton={false} render={<Link href={buildAdminHref("/impuestos", { organizationId })} />}>
-              Nuevo
-            </Button>
-          }
-          className="self-start"
-          description={`${taxes.length} resultado(s)`}
-          title="Impuestos registrados"
-        >
-          {taxes.length === 0 ? (
-            <EmptyState description="Crea impuestos como IVA (16%) o IEPS para aplicarlos en el POS." title="No hay impuestos" />
-          ) : (
-            <div className="overflow-x-auto">
+      <AdminCard
+        actions={
+          <Button
+            data-action-clave="1" size="lg"
+            data-action-id="catalogo.impuestos.nuevo"
+            nativeButton={false}
+            render={<Link href={buildAdminHref("/impuestos", { organizationId, extra: { nuevo: "1" } })} />}
+          >
+            Nuevo
+          </Button>
+        }
+        description={`${taxes.length} resultado(s)`}
+        title="Impuestos registrados"
+      >
+        {taxes.length === 0 ? (
+          <EmptyState description="Crea impuestos como IVA (16%) o IEPS para aplicarlos en el POS." title="No hay impuestos" />
+        ) : (
+          <>
+            <RegistroList>
+              {taxes.map((tax) => (
+                <RegistroCard
+                  acciones={
+                    <div className="flex flex-wrap gap-2">
+                      <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/impuestos", { organizationId, extra: { edit: tax.id } })}>Editar</Link>
+                      <form action={toggleTax}>
+                        <input name="organizacionId" type="hidden" value={organizationId} />
+                        <input name="id" type="hidden" value={tax.id} />
+                        <input name="activo" type="hidden" value={String(tax.activo)} />
+                        <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">{tax.activo ? "Ocultar" : "Activar"}</button>
+                      </form>
+                    </div>
+                  }
+                  badge={<StatusBadge active={tax.activo} />}
+                  campos={[
+                    { label: "Tasa", value: `${tax.tasa}%` },
+                    {
+                      label: "Tipo",
+                      value: <span className="rounded-full bg-muted/60 px-2.5 py-1 text-xs text-muted-foreground">{TIPO_LABEL[tax.tipo] ?? tax.tipo}</span>,
+                    },
+                  ]}
+                  key={tax.id}
+                  subtitulo={<span className="font-mono">{tax.clave}</span>}
+                  titulo={tax.nombre}
+                />
+              ))}
+            </RegistroList>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[560px] text-left text-sm">
                 <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
@@ -92,9 +125,18 @@ export default async function TaxesPage({ searchParams }: { searchParams: Search
                 </tbody>
               </table>
             </div>
-          )}
-        </AdminCard>
-      </div>
+          </>
+        )}
+      </AdminCard>
+      {editing || firstParam(params.nuevo) === "1" ? (
+        <FormSheet
+          closeHref={buildAdminHref("/impuestos", { organizationId })}
+          description={editing ? "Ajusta los datos del impuesto." : "Crea un impuesto para aplicar en el POS."}
+          title={editing ? "Editar impuesto" : "Nuevo impuesto"}
+        >
+          <TaxForm initial={editing} key={`${editing?.id ?? "nuevo"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} />
+        </FormSheet>
+      ) : null}
     </div>
   );
 }

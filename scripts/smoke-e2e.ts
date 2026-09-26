@@ -1,7 +1,6 @@
 import "dotenv/config";
 
-import puppeteer from "puppeteer";
-
+import { withBrowser } from "./lib/browser";
 import { BASE_URL, E2E_EMAIL, login } from "./lib/e2e";
 
 const OUT_DIR = ".smoke-shots";
@@ -21,7 +20,7 @@ async function main() {
   const { mkdir } = await import("node:fs/promises");
   await mkdir(OUT_DIR, { recursive: true });
 
-  const browser = await puppeteer.launch({ headless: true });
+  await withBrowser(async (browser) => {
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 900 });
 
@@ -65,8 +64,7 @@ async function main() {
   } else {
     console.log("\nSin errores de consola.");
   }
-
-  await browser.close();
+  });
 }
 
 main().catch((error) => {

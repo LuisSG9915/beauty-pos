@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input } from "@/components/ui/field";
+import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
 import { auditoriaEventos } from "@/db/schema/access";
 import { sucursales, usuarios } from "@/db/schema/core";
@@ -109,37 +109,59 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
         </Field>
         <Field className="w-52">
           <FieldLabel>Acción</FieldLabel>
-          <select
-            className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground"
-            defaultValue={accion}
-            name="accion"
-          >
+          <Select defaultValue={accion} name="accion">
             <option value="">Todas</option>
             {accionesRows.map((row) => (
               <option key={row.accion} value={row.accion}>{row.accion}</option>
             ))}
-          </select>
+          </Select>
         </Field>
         <Field className="w-52">
           <FieldLabel>Usuario</FieldLabel>
-          <select
-            className="h-10 w-full rounded-xl border border-border bg-card px-3 text-sm text-foreground"
-            defaultValue={usuarioId}
-            name="usuarioId"
-          >
+          <Select defaultValue={usuarioId} name="usuarioId">
             <option value="">Todos</option>
             {usuariosRows.map((row) => (
               <option key={row.id} value={row.id}>{row.nombre}</option>
             ))}
-          </select>
+          </Select>
         </Field>
-        <Button className="rounded-xl" type="submit">Filtrar</Button>
+        <Button className="rounded-xl" data-action-clave="1" data-action-id="auditoria.filtro.aplicar" size="lg" type="submit">Filtrar</Button>
       </form>
 
       {pageRows.length === 0 ? (
         <EmptyState description="No hay eventos registrados con esos filtros." title="Sin eventos" />
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <>
+          <div className="space-y-3 md:hidden">
+            {pageRows.map((evento) => (
+              <article className="rounded-xl border border-border bg-card p-4 shadow-sm" key={evento.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold leading-5 text-foreground">{evento.usuario ?? "Sistema"}</h3>
+                    <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                      {formatDate(evento.createdAt)} · {formatTime(evento.createdAt)}
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-primary">
+                    {evento.accion}
+                  </span>
+                </div>
+                <dl className="mt-3 space-y-1.5">
+                  <div className="flex items-baseline justify-between gap-3 text-sm">
+                    <dt className="shrink-0 text-xs text-muted-foreground">Sucursal</dt>
+                    <dd className="min-w-0 text-right font-medium text-foreground">{evento.sucursal ?? "—"}</dd>
+                  </div>
+                  <div className="flex items-baseline justify-between gap-3 text-sm">
+                    <dt className="shrink-0 text-xs text-muted-foreground">Detalle</dt>
+                    <dd className="min-w-0 truncate text-right text-xs text-muted-foreground" title={evento.detalle ? JSON.stringify(evento.detalle) : undefined}>
+                      {evento.detalle ? JSON.stringify(evento.detalle) : evento.entidad ? `${evento.entidad} ${evento.entidadId ?? ""}` : "—"}
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+          </div>
+          <div className="hidden overflow-hidden rounded-2xl border border-border bg-card shadow-sm md:block">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -172,7 +194,8 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
               ))}
             </tbody>
           </table>
-        </div>
+          </div>
+        </>
       )}
 
       <div className="flex items-center justify-between text-sm">

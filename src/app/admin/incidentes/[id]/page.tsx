@@ -55,10 +55,10 @@ export default async function IncidenteDetallePage({
         title={incidente.titulo}
       />
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
           <AdminCard title="Detalle del error">
-            <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <div>
                 <dt className="text-xs text-muted-foreground">Estado</dt>
                 <dd className="mt-1"><StatusBadge tone={estado.tone}>{estado.label}</StatusBadge></dd>
@@ -136,12 +136,12 @@ export default async function IncidenteDetallePage({
                       {oc.organizacion ? <span>{oc.organizacion}</span> : null}
                     </div>
                     {typeof oc.contexto?.stack === "string" && oc.contexto.stack ? (
-                      <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-muted/60 p-3 text-[11px] leading-4 whitespace-pre-wrap text-muted-foreground">
+                      <pre className="mt-2 max-h-32 overflow-auto rounded-lg bg-muted/60 p-3 text-op-xs leading-4 whitespace-pre-wrap text-muted-foreground">
                         {oc.contexto.stack}
                       </pre>
                     ) : null}
                     {Array.isArray(oc.contexto?.rastro) && oc.contexto.rastro.length > 0 ? (
-                      <p className="mt-2 text-[11px] text-muted-foreground">
+                      <p className="mt-2 text-op-xs text-muted-foreground">
                         Acciones previas: {oc.contexto.rastro.join(" → ")}
                       </p>
                     ) : null}

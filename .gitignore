@@ -45,3 +45,9 @@ next-env.d.ts
 
 # smoke screenshots
 .smoke-shots/
+
+# artefactos JSON de los checks (--json)
+.artifacts/
+
+# scripts desechables de depuración (git add -f para conservar uno)
+scripts/scratch/

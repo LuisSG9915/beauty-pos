@@ -79,7 +79,7 @@ export default async function TelemetriaPage({
         />
       ) : (
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <AdminCard>
               <p className="text-xs font-medium text-muted-foreground">Sesiones</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">{resumen.sesiones}</p>
@@ -112,7 +112,7 @@ export default async function TelemetriaPage({
             </AdminCard>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <AdminCard title="Páginas más visitadas">
               <Tabla
                 columnas={["Ruta", "Vistas", "Sesiones"]}

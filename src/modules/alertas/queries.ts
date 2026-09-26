@@ -1,14 +1,6 @@
-import { and, count, eq, gte, inArray, isNull, lt, sql, sum } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
-import { productos } from "@/db/schema/catalogs";
-import {
-  citas,
-  cortesCaja,
-  detalleCortes,
-  inventarioStock,
-  notificacionesEnvios,
-} from "@/db/schema/operations";
 
 /**
  * Tablero central de alertas operativas del negocio. Cada alerta es un
@@ -27,8 +19,24 @@ export type AlertaOperativa = {
   tono: "advertencia" | "critico";
 };
 
-type AlertasDb = Pick<ReturnType<typeof getDatabase>, "select">;
+type AlertasDb = Pick<ReturnType<typeof getDatabase>, "execute">;
 
+type AlertasRow = {
+  citas_pendientes: number | null;
+  citas_sin_profesional: number | null;
+  avisos_fallidos: number | null;
+  corte_sin_cerrar: number | null;
+  diferencias_caja: number | null;
+  stock_bajo: number | null;
+};
+
+/**
+ * Todas las señales en UNA consulta con subselects escalares: antes eran
+ * hasta 7 queries paralelas que saturaban el pool y encolaban conexiones
+ * frías; con la BD remota cada ronda cuesta ~50-100 ms. Los subselects solo
+ * se incluyen cuando el usuario tiene el permiso del módulo (la columna
+ * queda en `null` si no aplica).
+ */
 export async function cargarAlertas(
   db: AlertasDb,
   params: {
@@ -46,170 +54,103 @@ export async function cargarAlertas(
   const en24h = new Date(ahora.getTime() + 24 * 60 * 60_000);
   const hace7d = new Date(ahora.getTime() - 7 * 24 * 60 * 60_000);
 
-  const alertas: AlertaOperativa[] = [];
-  const consultas: Promise<void>[] = [];
+  const enSucursales = (columna: SQL) =>
+    sucursalIds ? sql`and ${columna} = any(${sucursalIds})` : sql``;
 
-  // ---------- Agenda ----------
+  const columnas: SQL[] = [];
   if (permisos.has("agenda.ver")) {
-    consultas.push(
-      db
-        .select({ total: count() })
-        .from(citas)
-        .where(
-          and(
-            eq(citas.organizacionId, organizacionId),
-            eq(citas.activo, true),
-            eq(citas.estado, "pendiente"),
-            gte(citas.fechaHora, ahora),
-            sucursalIds ? inArray(citas.sucursalId, sucursalIds) : undefined,
-          ),
-        )
-        .then(([row]) => {
-          if ((row?.total ?? 0) > 0) {
-            alertas.push({
-              clave: "citas_pendientes",
-              titulo: "Reservas por confirmar",
-              cantidad: row.total,
-              href: "/agenda",
-              tono: "advertencia",
-            });
-          }
-        }),
-      db
-        .select({ total: count() })
-        .from(citas)
-        .where(
-          and(
-            eq(citas.organizacionId, organizacionId),
-            eq(citas.activo, true),
-            isNull(citas.usuarioId),
-            gte(citas.fechaHora, ahora),
-            lt(citas.fechaHora, en24h),
-            sql`${citas.estado} in ('pendiente','confirmada')`,
-            sucursalIds ? inArray(citas.sucursalId, sucursalIds) : undefined,
-          ),
-        )
-        .then(([row]) => {
-          if ((row?.total ?? 0) > 0) {
-            alertas.push({
-              clave: "citas_sin_profesional",
-              titulo: "Citas próximas sin profesional",
-              cantidad: row.total,
-              href: "/agenda",
-              tono: "advertencia",
-            });
-          }
-        }),
-      db
-        .select({ total: count() })
-        .from(notificacionesEnvios)
-        .where(
-          and(
-            eq(notificacionesEnvios.organizacionId, organizacionId),
-            eq(notificacionesEnvios.estado, "fallido"),
-            gte(notificacionesEnvios.createdAt, hace7d),
-          ),
-        )
-        .then(([row]) => {
-          if ((row?.total ?? 0) > 0) {
-            alertas.push({
-              clave: "avisos_fallidos",
-              titulo: "Avisos de correo fallidos (7 días)",
-              cantidad: row.total,
-              href: "/agenda",
-              tono: "critico",
-            });
-          }
-        }),
+    columnas.push(
+      sql`(select count(*)::int from citas c
+        where c.organizacion_id = ${organizacionId} and c.activo
+          and c.estado = 'pendiente' and c.fecha_hora >= ${ahora}
+          ${enSucursales(sql`c.sucursal_id`)}) as citas_pendientes`,
+      sql`(select count(*)::int from citas c
+        where c.organizacion_id = ${organizacionId} and c.activo
+          and c.usuario_id is null and c.fecha_hora >= ${ahora}
+          and c.fecha_hora < ${en24h}
+          and c.estado in ('pendiente','confirmada')
+          ${enSucursales(sql`c.sucursal_id`)}) as citas_sin_profesional`,
+      sql`(select count(*)::int from notificaciones_envios n
+        where n.organizacion_id = ${organizacionId}
+          and n.estado = 'fallido' and n.created_at >= ${hace7d}) as avisos_fallidos`,
     );
   }
-
-  // ---------- Caja ----------
   if (permisos.has("caja.ver")) {
-    consultas.push(
-      db
-        .select({ total: count() })
-        .from(cortesCaja)
-        .where(
-          and(
-            eq(cortesCaja.organizacionId, organizacionId),
-            eq(cortesCaja.activo, true),
-            eq(cortesCaja.estado, "abierto"),
-            lt(cortesCaja.createdAt, hace24h),
-            sucursalIds ? inArray(cortesCaja.sucursalId, sucursalIds) : undefined,
-          ),
-        )
-        .then(([row]) => {
-          if ((row?.total ?? 0) > 0) {
-            alertas.push({
-              clave: "corte_sin_cerrar",
-              titulo: "Turno de caja sin cerrar (>24 h)",
-              cantidad: row.total,
-              href: "/caja",
-              tono: "critico",
-            });
-          }
-        }),
-      db
-        .select({ corteId: detalleCortes.corteId, diferencia: sum(detalleCortes.diferencia) })
-        .from(detalleCortes)
-        .innerJoin(cortesCaja, eq(detalleCortes.corteId, cortesCaja.id))
-        .where(
-          and(
-            eq(cortesCaja.organizacionId, organizacionId),
-            eq(detalleCortes.activo, true),
-            gte(detalleCortes.createdAt, hace7d),
-            sucursalIds ? inArray(cortesCaja.sucursalId, sucursalIds) : undefined,
-          ),
-        )
-        .groupBy(detalleCortes.corteId)
-        .then((rows) => {
-          const conDiferencia = rows.filter(
-            (row) => Math.abs(Number(row.diferencia ?? 0)) >= 0.005,
-          ).length;
-          if (conDiferencia > 0) {
-            alertas.push({
-              clave: "diferencias_caja",
-              titulo: "Cortes con diferencia (7 días)",
-              cantidad: conDiferencia,
-              href: "/caja",
-              tono: "critico",
-            });
-          }
-        }),
+    columnas.push(
+      sql`(select count(*)::int from cortes_caja cc
+        where cc.organizacion_id = ${organizacionId} and cc.activo
+          and cc.estado = 'abierto' and cc.created_at < ${hace24h}
+          ${enSucursales(sql`cc.sucursal_id`)}) as corte_sin_cerrar`,
+      sql`(select count(*)::int from (
+          select d.corte_id
+            from detalle_cortes d
+            join cortes_caja cc2 on d.corte_id = cc2.id
+           where cc2.organizacion_id = ${organizacionId} and d.activo
+             and d.created_at >= ${hace7d}
+             ${enSucursales(sql`cc2.sucursal_id`)}
+           group by d.corte_id
+          having abs(coalesce(sum(d.diferencia), 0)::numeric) >= 0.005
+        ) t) as diferencias_caja`,
     );
   }
-
-  // ---------- Inventario ----------
   if (permisos.has("inventario.ver")) {
-    consultas.push(
-      db
-        .select({ total: count() })
-        .from(inventarioStock)
-        .innerJoin(productos, eq(inventarioStock.productoId, productos.id))
-        .where(
-          and(
-            eq(inventarioStock.organizacionId, organizacionId),
-            eq(productos.activo, true),
-            sql`${productos.stockMinimo} > 0`,
-            sql`${inventarioStock.stockActual} <= ${productos.stockMinimo}`,
-            sucursalIds ? inArray(inventarioStock.sucursalId, sucursalIds) : undefined,
-          ),
-        )
-        .then(([row]) => {
-          if ((row?.total ?? 0) > 0) {
-            alertas.push({
-              clave: "stock_bajo",
-              titulo: "Productos bajo el mínimo",
-              cantidad: row.total,
-              href: "/inventario",
-              tono: "advertencia",
-            });
-          }
-        }),
+    columnas.push(
+      sql`(select count(*)::int from inventario_stock i
+        join productos p on i.producto_id = p.id
+        where i.organizacion_id = ${organizacionId} and p.activo
+          and p.stock_minimo > 0 and i.stock_actual <= p.stock_minimo
+          ${enSucursales(sql`i.sucursal_id`)}) as stock_bajo`,
     );
   }
 
-  await Promise.all(consultas);
+  if (columnas.length === 0) return [];
+
+  const { rows } = await db.execute<AlertasRow>(
+    sql`select ${sql.join(columnas, sql`, `)}`,
+  );
+  const row = rows[0] ?? {};
+
+  const alertas: AlertaOperativa[] = [];
+  const empujar = (cantidad: number | null | undefined, alerta: Omit<AlertaOperativa, "cantidad">) => {
+    if ((cantidad ?? 0) > 0) alertas.push({ ...alerta, cantidad: cantidad! });
+  };
+
+  empujar(row.citas_pendientes, {
+    clave: "citas_pendientes",
+    titulo: "Reservas por confirmar",
+    href: "/agenda",
+    tono: "advertencia",
+  });
+  empujar(row.citas_sin_profesional, {
+    clave: "citas_sin_profesional",
+    titulo: "Citas próximas sin profesional",
+    href: "/agenda",
+    tono: "advertencia",
+  });
+  empujar(row.avisos_fallidos, {
+    clave: "avisos_fallidos",
+    titulo: "Avisos de correo fallidos (7 días)",
+    href: "/agenda",
+    tono: "critico",
+  });
+  empujar(row.corte_sin_cerrar, {
+    clave: "corte_sin_cerrar",
+    titulo: "Turno de caja sin cerrar (>24 h)",
+    href: "/caja",
+    tono: "critico",
+  });
+  empujar(row.diferencias_caja, {
+    clave: "diferencias_caja",
+    titulo: "Cortes con diferencia (7 días)",
+    href: "/caja",
+    tono: "critico",
+  });
+  empujar(row.stock_bajo, {
+    clave: "stock_bajo",
+    titulo: "Productos bajo el mínimo",
+    href: "/inventario",
+    tono: "advertencia",
+  });
+
   return alertas;
 }

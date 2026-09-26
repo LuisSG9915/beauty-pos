@@ -46,7 +46,7 @@ export function InvitationForm({ organizations, roles, branches }: InvitationFor
             ))}
           </Select>
         </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel required>Rol</FieldLabel>
             <Select disabled={!organizationId} name="rolId" required>

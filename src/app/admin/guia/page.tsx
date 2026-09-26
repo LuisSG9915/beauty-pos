@@ -117,7 +117,9 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
         </div>
 
         <ol className="divide-y divide-border">
-          {resumen.pasos.map((paso, index) => (
+          {resumen.pasos.map((paso, index) => {
+            const esSiguiente = !paso.hecho && resumen.pasos.slice(0, index).every((p) => p.hecho);
+            return (
             <li className="flex items-center gap-4 py-4 first:pt-0 last:pb-0" key={paso.clave}>
               <span
                 aria-hidden="true"
@@ -135,15 +137,18 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
                 <p className="mt-0.5 text-sm leading-6 text-muted-foreground">{paso.descripcion}</p>
               </div>
               <Button
+                data-action-clave={esSiguiente ? "1" : undefined}
+                data-action-id={esSiguiente ? "guia.paso.ir" : undefined}
                 nativeButton={false}
                 render={<Link href={buildAdminHref(paso.href, { organizationId, sucursalId })} />}
-                size="sm"
+                size="lg"
                 variant={paso.hecho ? "ghost" : "outline"}
               >
                 {paso.hecho ? "Ver" : "Ir"}
               </Button>
             </li>
-          ))}
+            );
+          })}
         </ol>
       </AdminCard>
 
@@ -160,7 +165,7 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
           </form>
         )}
         <Link
-          className="text-sm font-medium text-primary hover:underline"
+          className="inline-flex min-h-6 items-center text-sm font-medium text-primary hover:underline"
           href={buildAdminHref("/ayuda", { organizationId, sucursalId })}
         >
           Ir a Ayuda

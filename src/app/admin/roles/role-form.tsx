@@ -23,7 +23,7 @@ export function RoleForm({ organizationId }: { organizationId: string }) {
         <Input name="nombre" placeholder="ej. Supervisor de piso" required />
       </Field>
       <ActionFeedback state={state} />
-      <Button className="rounded-xl" disabled={isPending} type="submit">
+      <Button className="rounded-xl" data-action-clave="1" size="lg" data-action-id="roles.rol.crear" disabled={isPending} type="submit">
         <ShieldPlus aria-hidden="true" className="size-4" />
         {isPending ? "Creando…" : "Crear rol"}
       </Button>

@@ -50,7 +50,7 @@ export function CierreCajaForm({
         Cuenta el efectivo y los vouchers de cada medio sin consultar el sistema. Las diferencias se calculan al confirmar.
       </p>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {medios.map((medio) => (
           <Field key={medio.id}>
             <FieldLabel required>{medio.nombre}</FieldLabel>

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import puppeteer from "puppeteer";
 import pg from "pg";
-import { BASE_URL, E2E_EMAIL, login } from "./lib/e2e";
+import { BASE_URL, E2E_EMAIL, login } from "../lib/e2e";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const ORG = "652c172c-bf32-4b9c-90d1-006eded7ff56";

@@ -15,7 +15,7 @@ export function ServiceForm({ organizationId, categories, initial }: { organizat
   const value = (key: keyof ServiceData) => initial?.[key] ?? "";
 
   const general = (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field>
         <FieldLabel required>Clave</FieldLabel>
         <Input defaultValue={String(value("clave"))} name="clave" placeholder="CORTE_DAMA" required />
@@ -41,7 +41,7 @@ export function ServiceForm({ organizationId, categories, initial }: { organizat
   );
 
   const operation = (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field>
         <FieldLabel required>Duración en minutos</FieldLabel>
         <Input defaultValue={String(value("duracionMinutos") || 60)} min={5} name="duracionMinutos" required type="number" />

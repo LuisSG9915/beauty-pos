@@ -1,13 +1,17 @@
 import { asc, eq, inArray } from "drizzle-orm";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { RoleCard } from "@/app/admin/roles/role-card";
 import { RoleForm } from "@/app/admin/roles/role-form";
+import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
 import { catPermisos, catRoles, relMiembrosRoles, relRolesPermisos } from "@/db/schema/access";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
+import { buildAdminHref, firstParam } from "@/lib/url-context";
 
 export const dynamic = "force-dynamic";
 
@@ -72,10 +76,23 @@ export default async function RolesPage({ searchParams }: { searchParams: Search
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        actions={
+          canEdit ? (
+            <Button
+              data-action-clave="1"
+              data-action-id="roles.rol.abrir_formulario"
+              nativeButton={false}
+              render={<Link href={buildAdminHref("/roles", { organizationId, extra: { nuevo: "rol" } })} />}
+              size="lg"
+            >
+              Nuevo rol
+            </Button>
+          ) : undefined
+        }
         description="Roles del equipo y los permisos que otorgan dentro de la organización."
         title="Roles y permisos"
       />
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <div className="space-y-4">
           {roles.map((role) => (
             <RoleCard
@@ -91,11 +108,6 @@ export default async function RolesPage({ searchParams }: { searchParams: Search
           ))}
         </div>
         <div className="space-y-4">
-          {canEdit ? (
-            <AdminCard description="Los permisos se asignan después de crear el rol." title="Nuevo rol">
-              <RoleForm organizationId={organizationId} />
-            </AdminCard>
-          ) : null}
           <AdminCard title="Notas">
             <ul className="list-disc space-y-1 pl-5 text-sm leading-6 text-muted-foreground">
               <li>El rol <strong>Propietario</strong> no se puede modificar ni desactivar.</li>
@@ -105,6 +117,16 @@ export default async function RolesPage({ searchParams }: { searchParams: Search
           </AdminCard>
         </div>
       </div>
+
+      {canEdit && firstParam(params.nuevo) === "rol" ? (
+        <FormSheet
+          closeHref={buildAdminHref("/roles", { organizationId })}
+          description="Los permisos se asignan después de crear el rol."
+          title="Nuevo rol"
+        >
+          <RoleForm organizationId={organizationId} />
+        </FormSheet>
+      ) : null}
     </div>
   );
 }

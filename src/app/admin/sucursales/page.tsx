@@ -5,13 +5,16 @@ import { notFound } from "next/navigation";
 import { SucursalAsignacionForm } from "@/app/admin/sucursales/asignacion-form";
 import { SucursalEditarForm, SucursalNuevaForm } from "@/app/admin/sucursales/sucursal-form";
 import { SucursalToggleForm } from "@/app/admin/sucursales/toggle-form";
+import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
 import { planes } from "@/db/schema/billing";
 import { miembrosOrganizaciones, relUsuariosSucursales, sucursales, usuarios } from "@/db/schema/core";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/format";
+import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { contextoSuscripcionCache, getSuscripcionActualCache } from "@/modules/billing/queries";
 import { motivoBloqueoSucursal, puedeCrearOtraSucursal } from "@/modules/sucursales/rules";
 
@@ -92,6 +95,19 @@ export default async function SucursalesPage({ searchParams }: Props) {
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        actions={
+          puedeCrearOtra ? (
+            <Button
+              data-action-clave="1"
+              data-action-id="sucursales.sucursal.abrir_formulario"
+              nativeButton={false}
+              render={<Link href={buildAdminHref("/sucursales", { organizationId: organization.id, extra: { nuevo: "sucursal" } })} />}
+              size="lg"
+            >
+              Nueva sucursal
+            </Button>
+          ) : undefined
+        }
         description={`${organization.nombre} · ${activas} sucursal(es) activa(s)`}
         title="Sucursales"
       />
@@ -100,7 +116,7 @@ export default async function SucursalesPage({ searchParams }: Props) {
         description="Tu plan incluye sucursales en el precio base y cada adicional tiene su costo. Desactivar conserva todo el historial."
         title="Cobertura del plan"
       >
-        <dl className="grid gap-3 sm:grid-cols-3">
+        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <dt className="text-xs uppercase tracking-wide text-muted-foreground">Plan</dt>
             <dd className="mt-0.5 font-semibold text-foreground">{ctx.plan?.nombre ?? "Sin suscripción"}</dd>
@@ -150,7 +166,7 @@ export default async function SucursalesPage({ searchParams }: Props) {
         ) : null}
       </AdminCard>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="space-y-6">
           {lista.map((sucursal) => (
             <AdminCard
@@ -193,28 +209,30 @@ export default async function SucursalesPage({ searchParams }: Props) {
           ))}
         </div>
 
-        {puedeEditar ? (
+        {puedeEditar && !puedeCrearOtra ? (
           <AdminCard
-            description={
-              puedeCrearOtra
-                ? "Datos básicos de la nueva sucursal; las políticas se editan después."
-                : "Tu plan actual no permite más sucursales activas."
-            }
+            description="Tu plan actual no permite más sucursales activas."
             title="Nueva sucursal"
           >
-            {puedeCrearOtra ? (
-              <SucursalNuevaForm organizationId={organization.id} />
-            ) : (
-              <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
-                {motivoBloqueoSucursal(capacidad)}{" "}
-                <Link className="font-medium text-primary underline" href={`/admin/suscripcion?organizationId=${organization.id}`}>
-                  Revisar suscripción
-                </Link>
-              </p>
-            )}
+            <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
+              {motivoBloqueoSucursal(capacidad)}{" "}
+              <Link className="font-medium text-primary underline" href={`/admin/suscripcion?organizationId=${organization.id}`}>
+                Revisar suscripción
+              </Link>
+            </p>
           </AdminCard>
         ) : null}
       </div>
+
+      {puedeCrearOtra && firstParam(params.nuevo) === "sucursal" ? (
+        <FormSheet
+          closeHref={buildAdminHref("/sucursales", { organizationId: organization.id })}
+          description="Datos básicos de la nueva sucursal; las políticas se editan después."
+          title="Nueva sucursal"
+        >
+          <SucursalNuevaForm organizationId={organization.id} />
+        </FormSheet>
+      ) : null}
     </div>
   );
 }

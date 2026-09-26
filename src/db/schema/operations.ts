@@ -49,6 +49,11 @@ export const citas = pgTable(
   (table) => [
     index("citas_organizacion_idx").on(table.organizacionId),
     index("citas_sucursal_fecha_idx").on(table.sucursalId, table.fechaHora),
+    // La agenda filtra siempre por activo=true: el índice parcial omite las
+    // citas ocultas/canceladas históricas (las más numerosas con el tiempo).
+    index("citas_sucursal_fecha_activas_idx")
+      .on(table.sucursalId, table.fechaHora)
+      .where(sql`${table.activo}`),
     index("citas_cliente_idx").on(table.clienteId),
     index("citas_usuario_idx").on(table.usuarioId),
     index("citas_estado_idx").on(table.estado),

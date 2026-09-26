@@ -48,7 +48,7 @@ export function MovimientoCajaForm({
       <input name="organizacionId" type="hidden" value={organizationId} />
       <input name="sucursalId" type="hidden" value={sucursalId} />
 
-      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_9rem]">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_9rem]">
         <Field>
           <FieldLabel className="text-xs">Tipo</FieldLabel>
           <select
@@ -112,7 +112,7 @@ export function MovimientoCajaForm({
       </Field>
 
       <ActionFeedback state={state} />
-      <Button className="rounded-xl" data-action-clave="1" data-action-id="caja.movimiento.registrar" disabled={pending} type="submit" variant="outline">
+      <Button className="rounded-xl" data-action-clave="1" size="lg" data-action-id="caja.movimiento.registrar" disabled={pending} type="submit" variant="outline">
         {pending ? "Registrando…" : "Registrar movimiento"}
       </Button>
     </form>

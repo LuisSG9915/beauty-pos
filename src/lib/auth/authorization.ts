@@ -1,15 +1,29 @@
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql, type SQL } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
-import { catPermisos, catRoles, relMiembrosRoles, relRolesPermisos } from "@/db/schema/access";
-import { relUsuariosSucursales, sucursales } from "@/db/schema/core";
-import { getMembershipId, requireAuthenticatedUser } from "@/lib/auth/access";
-import { getSuscripcionActualCache } from "@/modules/billing/queries";
-import { esPermisoSoloLectura, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
+import { sucursales } from "@/db/schema/core";
+import { requireAuthenticatedUser } from "@/lib/auth/access";
+import { esPermisoSoloLectura, estadoEfectivoSuscripcion, type SuscripcionVista } from "@/modules/billing/rules";
 
 type AuthUser = Awaited<ReturnType<typeof requireAuthenticatedUser>>["user"];
+
+/** Sucursal activa tal como la devuelve la consulta fusionada (jsonb). */
+export type SucursalAcceso = {
+  id: string;
+  organizacionId: string;
+  nombre: string;
+  clave: string;
+  activo: boolean;
+  zonaHoraria: string | null;
+  capacidadSinAsignar: number;
+  reservasOnline: boolean;
+  reservasAutoConfirmar: boolean;
+  reservasCancelacionHoras: number;
+  reservasAnticipacionMinutos: number;
+  reservasHorizonteDias: number;
+};
 
 /**
  * Acceso resuelto de un usuario dentro de una organización:
@@ -23,6 +37,11 @@ export type ResolvedAccess = {
   permissions: ReadonlySet<string>;
   /** null = todas las sucursales; Set = solo las asignadas. */
   branchIds: ReadonlySet<string> | null;
+  /**
+   * Sucursales activas de la organización (sin filtrar por `branchIds`);
+   * llegan en la misma consulta fusionada y evitan una ronda extra a la BD.
+   */
+  sucursalesActivas: SucursalAcceso[];
   esPlataforma: boolean;
   /**
    * true cuando la suscripción de la organización venció: las lecturas
@@ -57,6 +76,154 @@ export function canAccessBranch(access: ResolvedAccess, sucursalId: string): boo
  * miembro activo de la organización. La usa el shell para precalcular permisos
  * por organización.
  */
+export type AccesoRow = {
+  membership_id: string | null;
+  permisos: string[] | null;
+  sucursales: string[] | null;
+  sucursales_activas: SucursalAcceso[] | null;
+  suscripcion: {
+    estado: string;
+    trial_termina_at: string | null;
+    periodo_termina_at: string | null;
+  } | null;
+};
+
+/** Organización tal como la devuelve la consulta de contexto (jsonb). */
+export type OrganizacionAcceso = {
+  id: string;
+  nombre: string;
+  slug: string;
+  activo: boolean;
+  zonaHoraria: string;
+  moneda: string;
+  recordatoriosActivos: boolean;
+  recordatoriosHorasAntes: number;
+  /**
+   * Permisos efectivos del usuario en esta organización (solo miembros; el
+   * admin de plataforma recibe `null`). Viaja embebido para que el shell no
+   * necesite una consulta por organización.
+   */
+  permisos: string[] | null;
+};
+
+/** Usuario interno embebido en la consulta de contexto. */
+export type UsuarioSesion = {
+  id: string;
+  authUsuarioId: string;
+  nombre: string;
+  correo: string;
+  esAdministradorPlataforma: boolean;
+};
+
+const ACCESO_FRAGMENT = (
+  organizationId: string | null,
+  usuarioRef: SQL | string,
+) => sql`
+  jsonb_build_object(
+    'membership_id', (select mo.id
+       from miembros_organizaciones mo
+      where mo.organizacion_id = ${organizationId}
+        and mo.usuario_id = ${usuarioRef}
+        and mo.estado = 'activo'
+      limit 1),
+    'permisos', coalesce((
+      select jsonb_agg(distinct p.clave)
+        from rel_miembros_roles mr
+        join miembros_organizaciones mo2 on mr.miembro_organizacion_id = mo2.id
+        join cat_roles r on mr.rol_id = r.id and r.activo
+        join rel_roles_permisos rp on r.id = rp.rol_id
+        join cat_permisos p on rp.permiso_id = p.id and p.activo
+       where mo2.organizacion_id = ${organizationId}
+         and mo2.usuario_id = ${usuarioRef}
+         and mo2.estado = 'activo'
+    ), '[]'::jsonb),
+    'sucursales', coalesce((
+      select jsonb_agg(rus.sucursal_id)
+        from rel_usuarios_sucursales rus
+        join sucursales s on rus.sucursal_id = s.id
+       where rus.organizacion_id = ${organizationId}
+         and rus.usuario_id = ${usuarioRef}
+         and s.activo
+    ), '[]'::jsonb),
+    'sucursales_activas', coalesce((
+      select jsonb_agg(jsonb_build_object(
+          'id', sa.id,
+          'organizacionId', sa.organizacion_id,
+          'nombre', sa.nombre,
+          'clave', sa.clave,
+          'activo', sa.activo,
+          'zonaHoraria', sa.zona_horaria,
+          'capacidadSinAsignar', sa.capacidad_sin_asignar,
+          'reservasOnline', sa.reservas_online,
+          'reservasAutoConfirmar', sa.reservas_auto_confirmar,
+          'reservasCancelacionHoras', sa.reservas_cancelacion_horas,
+          'reservasAnticipacionMinutos', sa.reservas_anticipacion_minutos,
+          'reservasHorizonteDias', sa.reservas_horizonte_dias
+        ) order by sa.nombre)
+        from sucursales sa
+       where sa.organizacion_id = ${organizationId} and sa.activo
+    ), '[]'::jsonb),
+    'suscripcion', (select jsonb_build_object(
+        'estado', s.estado,
+        'trial_termina_at', s.trial_termina_at,
+        'periodo_termina_at', s.periodo_termina_at)
+       from suscripciones s
+      where s.organizacion_id = ${organizationId}
+      order by s.created_at desc
+      limit 1)
+  )`;
+
+/** Convierte la fila `acceso` de la consulta fusionada en `ResolvedAccess`. */
+export function accessFromContextRow(
+  user: AuthUser,
+  organizationId: string,
+  row: AccesoRow,
+): ResolvedAccess | null {
+  if (!row.membership_id) return null;
+
+  const rawSuscripcion = row.suscripcion;
+  const suscripcion: SuscripcionVista | null = rawSuscripcion
+    ? {
+        estado: rawSuscripcion.estado,
+        trialTerminaAt: rawSuscripcion.trial_termina_at ? new Date(rawSuscripcion.trial_termina_at) : null,
+        periodoTerminaAt: rawSuscripcion.periodo_termina_at ? new Date(rawSuscripcion.periodo_termina_at) : null,
+      }
+    : null;
+
+  const sucursalIds = row.sucursales ?? [];
+  return {
+    user,
+    organizationId,
+    membershipId: row.membership_id,
+    permissions: new Set(row.permisos ?? []),
+    branchIds: sucursalIds.length ? new Set(sucursalIds) : null,
+    sucursalesActivas: row.sucursales_activas ?? [],
+    esPlataforma: false,
+    soloLectura: estadoEfectivoSuscripcion(suscripcion) === "vencida",
+  };
+}
+
+function platformAccess(user: AuthUser, organizationId: string): ResolvedAccess {
+  return {
+    user,
+    organizationId,
+    membershipId: null,
+    permissions: new Set(),
+    branchIds: null,
+    // El admin de plataforma conserva su propia consulta de sucursales
+    // (puede incluir inactivas según la página).
+    sucursalesActivas: [],
+    esPlataforma: true,
+    soloLectura: false,
+  };
+}
+
+/**
+ * Membresía + permisos + alcance de sucursales + estado de suscripción en una
+ * sola consulta (subselects `jsonb`). Antes eran 2 rondas secuenciales a la BD
+ * (membresía → permisos‖sucursales‖suscripción); con CockroachDB remoto cada
+ * ronda cuesta ~100 ms y este guard corre en todas las páginas admin.
+ */
 // Cache por request: el layout precalcula el acceso por organización y la
 // página lo reutiliza; `user` llega del `requireAuthenticatedUser` cacheado,
 // así que la identidad del objeto es estable dentro del mismo render.
@@ -64,59 +231,109 @@ export const resolveAccessSafe = cache(async function resolveAccessSafe(
   organizationId: string,
   user: AuthUser,
 ): Promise<ResolvedAccess | null> {
-  const db = getDatabase();
-
   if (user.esAdministradorPlataforma) {
-    return {
-      user,
-      organizationId,
-      membershipId: null,
-      permissions: new Set(),
-      branchIds: null,
-      esPlataforma: true,
-      soloLectura: false,
-    };
+    return platformAccess(user, organizationId);
   }
 
-  const membershipId = await getMembershipId(organizationId, user.id);
-  if (!membershipId) return null;
+  const { rows } = await getDatabase().execute<{ acceso: AccesoRow | null }>(
+    sql`select ${ACCESO_FRAGMENT(organizationId, user.id)} as acceso`,
+  );
 
-  const [permissionRows, branchRows, suscripcion] = await Promise.all([
-    db
-      .select({ clave: catPermisos.clave })
-      .from(relMiembrosRoles)
-      .innerJoin(catRoles, eq(relMiembrosRoles.rolId, catRoles.id))
-      .innerJoin(relRolesPermisos, eq(catRoles.id, relRolesPermisos.rolId))
-      .innerJoin(catPermisos, eq(relRolesPermisos.permisoId, catPermisos.id))
-      .where(
-        and(
-          eq(relMiembrosRoles.miembroOrganizacionId, membershipId),
-          eq(catRoles.activo, true),
-          eq(catPermisos.activo, true),
-        ),
-      ),
-    db
-      .select({ sucursalId: relUsuariosSucursales.sucursalId })
-      .from(relUsuariosSucursales)
-      .innerJoin(sucursales, eq(relUsuariosSucursales.sucursalId, sucursales.id))
-      .where(
-        and(
-          eq(relUsuariosSucursales.organizacionId, organizationId),
-          eq(relUsuariosSucursales.usuarioId, user.id),
-          eq(sucursales.activo, true),
-        ),
-      ),
-    getSuscripcionActualCache(organizationId),
-  ]);
+  const row = rows[0]?.acceso;
+  if (!row) return null;
+  return accessFromContextRow(user, organizationId, row);
+});
 
+type SessionContextRow = {
+  usuario: UsuarioSesion | null;
+  organizaciones: OrganizacionAcceso[] | null;
+  acceso: AccesoRow | null;
+};
+
+/**
+ * Contexto de sesión en UNA consulta: usuario interno + organizaciones
+ * visibles + (opcional) el acceso a la organización pedida por la URL. Con la
+ * sesión en cookie y este query fusionado, una página admin solo paga 2
+ * rondas a la BD: contexto + datos de la página.
+ * `acceso` es `null` cuando no se pidió organización, el usuario es admin de
+ * plataforma (acceso sintético) o no es miembro activo.
+ */
+export const resolveSessionContext = cache(async function resolveSessionContext(
+  authUsuarioId: string,
+  requestedOrganizationId: string | null,
+): Promise<{
+  usuario: UsuarioSesion | null;
+  organizaciones: OrganizacionAcceso[];
+  acceso: AccesoRow | null;
+}> {
+  const { rows } = await getDatabase().execute<SessionContextRow>(sql`
+    with u as (
+      select id, nombre, correo, es_administrador_plataforma
+        from usuarios
+       where auth_usuario_id = ${authUsuarioId}
+       limit 1
+    )
+    select
+      (select jsonb_build_object(
+          'id', id,
+          'authUsuarioId', ${authUsuarioId}::text,
+          'nombre', nombre,
+          'correo', correo,
+          'esAdministradorPlataforma', es_administrador_plataforma)
+         from u) as usuario,
+      case
+        when (select es_administrador_plataforma from u)
+          then coalesce((
+            select jsonb_agg(jsonb_build_object(
+                'id', o.id, 'nombre', o.nombre, 'slug', o.slug,
+                'activo', o.activo, 'zonaHoraria', o.zona_horaria,
+                'moneda', o.moneda,
+                'recordatoriosActivos', o.recordatorios_activos,
+                'recordatoriosHorasAntes', o.recordatorios_horas_antes,
+                'permisos', null
+              ) order by o.nombre)
+              from organizaciones o
+          ), '[]'::jsonb)
+          else coalesce((
+            select jsonb_agg(jsonb_build_object(
+                'id', o.id, 'nombre', o.nombre, 'slug', o.slug,
+                'activo', o.activo, 'zonaHoraria', o.zona_horaria,
+                'moneda', o.moneda,
+                'recordatoriosActivos', o.recordatorios_activos,
+                'recordatoriosHorasAntes', o.recordatorios_horas_antes,
+                'permisos', coalesce((
+                  select jsonb_agg(distinct p.clave)
+                    from rel_miembros_roles mr
+                    join miembros_organizaciones mo2 on mr.miembro_organizacion_id = mo2.id
+                    join cat_roles r on mr.rol_id = r.id and r.activo
+                    join rel_roles_permisos rp on r.id = rp.rol_id
+                    join cat_permisos p on rp.permiso_id = p.id and p.activo
+                   where mo2.organizacion_id = o.id
+                     and mo2.usuario_id = (select id from u)
+                     and mo2.estado = 'activo'
+                ), '[]'::jsonb)
+              ) order by o.nombre)
+              from miembros_organizaciones mo
+              join organizaciones o on mo.organizacion_id = o.id
+             where mo.usuario_id = (select id from u)
+               and mo.estado = 'activo'
+          ), '[]'::jsonb)
+      end as organizaciones,
+      case
+        when ${requestedOrganizationId}::text is null
+          or coalesce((select es_administrador_plataforma from u), false)
+          then null
+        else (
+          select ${ACCESO_FRAGMENT(requestedOrganizationId, sql`(select id from u)`)}
+        )
+      end as acceso
+  `);
+
+  const row = rows[0];
   return {
-    user,
-    organizationId,
-    membershipId,
-    permissions: new Set(permissionRows.map((row) => row.clave)),
-    branchIds: branchRows.length ? new Set(branchRows.map((row) => row.sucursalId)) : null,
-    esPlataforma: false,
-    soloLectura: estadoEfectivoSuscripcion(suscripcion) === "vencida",
+    usuario: row?.usuario ?? null,
+    organizaciones: row?.organizaciones ?? [],
+    acceso: row?.acceso ?? null,
   };
 });
 

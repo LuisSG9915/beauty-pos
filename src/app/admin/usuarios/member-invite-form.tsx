@@ -23,7 +23,7 @@ export function MemberInviteForm({
   return (
     <form action={formAction} className="space-y-4">
       <input name="organizacionId" type="hidden" value={organizationId} />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel required>Nombre</FieldLabel>
           <Input name="nombre" placeholder="Nombre del miembro" required />
@@ -33,7 +33,7 @@ export function MemberInviteForm({
           <Input name="correo" placeholder="persona@salon.com" required type="email" />
         </Field>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel required>Rol</FieldLabel>
           <Select name="rolId" required>
@@ -69,7 +69,7 @@ export function MemberInviteForm({
           </p>
         </div>
       ) : null}
-      <Button className="rounded-xl" disabled={isPending} type="submit">
+      <Button className="rounded-xl" data-action-clave="1" size="lg" data-action-id="usuarios.invitacion.enviar" disabled={isPending} type="submit">
         <MailPlus aria-hidden="true" className="size-4" />
         {isPending ? "Enviando…" : "Enviar invitación"}
       </Button>

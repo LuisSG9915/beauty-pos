@@ -5,7 +5,9 @@ import { notFound } from "next/navigation";
 import { toggleServiceCategory } from "@/app/admin/categorias-servicios/actions";
 import { CategoryForm } from "@/app/admin/categorias-servicios/category-form";
 import { CrudRowActions } from "@/components/admin/crud-actions";
+import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -48,22 +50,45 @@ export default async function ServiceCategoriesPage({ searchParams }: { searchPa
         description="Agrupa los servicios del salón."
         title="Categorías de servicios"
       />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-        <CategoryForm initial={editing} key={`${editing?.id ?? "nueva"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} />
-        <AdminCard
-          actions={
-            <Button nativeButton={false} render={<Link href={buildAdminHref("/categorias-servicios", { organizationId })} />}>
-              Nueva
-            </Button>
-          }
-          className="self-start"
-          description={`${categories.length} resultado(s)`}
-          title="Categorías registradas"
-        >
-          {categories.length === 0 ? (
-            <EmptyState description="Crea categorías para organizar los servicios del salón." title="No hay categorías" />
-          ) : (
-            <div className="overflow-x-auto">
+      <AdminCard
+        actions={
+          <Button
+            data-action-clave="1" size="lg"
+            data-action-id="catalogo.categorias_servicios.nueva"
+            nativeButton={false}
+            render={<Link href={buildAdminHref("/categorias-servicios", { organizationId, extra: { nuevo: "1" } })} />}
+          >
+            Nueva
+          </Button>
+        }
+        description={`${categories.length} resultado(s)`}
+        title="Categorías registradas"
+      >
+        {categories.length === 0 ? (
+          <EmptyState description="Crea categorías para organizar los servicios del salón." title="No hay categorías" />
+        ) : (
+          <>
+            <RegistroList>
+              {categories.map((category) => (
+                <RegistroCard
+                  acciones={
+                    <CrudRowActions
+                      activo={category.activo}
+                      editHref={buildAdminHref("/categorias-servicios", { organizationId, extra: { edit: category.id } })}
+                      id={category.id}
+                      organizationId={organizationId}
+                      toggleAction={toggleServiceCategory}
+                    />
+                  }
+                  badge={<StatusBadge active={category.activo} />}
+                  campos={[{ label: "Descripción", value: category.descripcion ?? "—" }]}
+                  key={category.id}
+                  subtitulo={<span className="font-mono">{category.clave}</span>}
+                  titulo={category.nombre}
+                />
+              ))}
+            </RegistroList>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[520px] text-left text-sm">
                 <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
@@ -95,9 +120,18 @@ export default async function ServiceCategoriesPage({ searchParams }: { searchPa
                 </tbody>
               </table>
             </div>
-          )}
-        </AdminCard>
-      </div>
+          </>
+        )}
+      </AdminCard>
+      {editing || firstParam(params.nuevo) === "1" ? (
+        <FormSheet
+          closeHref={buildAdminHref("/categorias-servicios", { organizationId })}
+          description={editing ? "Ajusta los datos de la categoría." : "Crea una categoría para agrupar servicios."}
+          title={editing ? "Editar categoría" : "Nueva categoría"}
+        >
+          <CategoryForm initial={editing} key={`${editing?.id ?? "nueva"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} />
+        </FormSheet>
+      ) : null}
     </div>
   );
 }

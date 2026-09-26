@@ -150,7 +150,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
             type="button"
           >
             <CalendarClock className="size-4" />
-            Reagendar
+            Cambiar fecha
           </button>
           <button
             className="inline-flex items-center gap-2 rounded-xl border border-destructive/30 px-4 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"

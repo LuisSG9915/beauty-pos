@@ -148,7 +148,7 @@ export function CitaForm({
         }
         label="Cliente"
         name="clienteId"
-        placeholder="Buscar cliente o dejar walk-in"
+        placeholder="Buscar cliente o dejar sin registrar"
         searchUrl={`/api/clientes?organizationId=${organizationId}`}
       />
 
@@ -159,7 +159,7 @@ export function CitaForm({
             No hay servicios activos. Crea servicios primero.
           </p>
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {servicios.map((servicio) => (
               <label
                 className="flex min-h-11 items-center gap-3 rounded-xl border border-border p-3 text-sm transition-colors hover:border-accent-foreground/30"
@@ -186,7 +186,7 @@ export function CitaForm({
             <summary className="cursor-pointer list-none text-sm font-medium text-muted-foreground hover:text-primary">
               Apartar cabina, silla o equipo (opcional)
             </summary>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
               {recursos.map((recurso) => (
                 <label
                   className="flex min-h-11 items-center gap-3 rounded-xl border border-border bg-card p-3 text-sm transition-colors hover:border-accent-foreground/30"
@@ -201,7 +201,7 @@ export function CitaForm({
                     value={recurso.id}
                   />
                   <span className="flex-1 font-medium">{recurso.nombre}</span>
-                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{recurso.tipo}</span>
+                  <span className="text-op-xs uppercase tracking-wide text-muted-foreground">{recurso.tipo}</span>
                 </label>
               ))}
             </div>
@@ -209,7 +209,7 @@ export function CitaForm({
         ) : null}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel required>Fecha y hora</FieldLabel>
           <Input
@@ -299,13 +299,13 @@ export function CitaForm({
               </button>
             ))}
           </div>
-          <p className="mt-2 text-[11px] text-muted-foreground">
+          <p className="mt-2 text-op-xs text-muted-foreground">
             Elige una sugerencia para rellenar fecha y hora, luego guarda de nuevo.
           </p>
         </div>
       ) : null}
       <div className="flex justify-end">
-        <Button className="rounded-xl" data-action-clave="1" data-action-id="agenda.cita.guardar" disabled={pending} type="submit">
+        <Button className="rounded-xl" data-action-clave="1" size="lg" data-action-id="agenda.cita.guardar" disabled={pending} type="submit">
           {pending ? "Guardando..." : initial?.id ? "Guardar cambios" : "Crear cita"}
         </Button>
       </div>

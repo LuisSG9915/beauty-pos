@@ -60,6 +60,8 @@ export type AdminNavItem = {
   permiso?: string | readonly string[];
   /** Capacidad de plan requerida; se oculta cuando el plan vigente no la incluye. */
   capacidad?: string;
+  /** Precarga la ruta al entrar el enlace en pantalla (solo flujos diarios). */
+  prefetch?: boolean;
 };
 
 export type AdminNavSection = {
@@ -70,9 +72,9 @@ export type AdminNavSection = {
 };
 
 const OPERACION: AdminNavItem[] = [
-  { path: "/admin/agenda", label: "Agenda", description: "Citas, estados y venta en proceso", icon: Calendar, permiso: "agenda.ver" },
-  { path: "/admin/mi-dia", label: "Mi día", description: "Tus citas, propinas y comisiones de hoy", icon: CalendarCheck, permiso: "agenda.ver" },
-  { path: "/admin/pos", label: "Cobrar", description: "Ventas directas y cobro de citas", icon: ShoppingCart, permiso: "ventas.ver" },
+  { path: "/admin/agenda", label: "Agenda", description: "Citas, estados y venta en proceso", icon: Calendar, permiso: "agenda.ver", prefetch: true },
+  { path: "/admin/mi-dia", label: "Mi día", description: "Tus citas, propinas y comisiones de hoy", icon: CalendarCheck, permiso: "agenda.ver", prefetch: true },
+  { path: "/admin/pos", label: "Cobrar", description: "Ventas directas y cobro de citas", icon: ShoppingCart, permiso: "ventas.ver", prefetch: true },
   { path: "/admin/ventas", label: "Historial", description: "Busca tickets, devoluciones y cancelaciones", icon: ReceiptText, permiso: "ventas.ver" },
   { path: "/admin/caja", label: "Caja", description: "Apertura, cierre ciego y discrepancias", icon: Wallet, permiso: "caja.ver" },
 ];
@@ -138,7 +140,8 @@ function tienePermiso(permiso: AdminNavItem["permiso"], permissions: ReadonlySet
 /**
  * Secciones visibles según los permisos del usuario en la organización
  * activa. `permissions === null` desactiva el filtro (admin de plataforma).
- * Las secciones secundarias se marcan plegables para no saturar el sidebar.
+ * Lo de uso diario queda visible; catálogos, dinero y administración se
+ * pliegan bajo "Configuración" para no saturar la pantalla.
  */
 export function getAdminNavSections(
   platformAdmin = false,
@@ -154,9 +157,11 @@ export function getAdminNavSections(
   const sections: AdminNavSection[] = [
     { title: "Operación", items: visible(OPERACION) },
     { title: "Clientes y catálogo", items: visible(CLIENTES_CATALOGO) },
-    { title: "Catálogos", items: visible(CATALOGOS), collapsible: true },
-    { title: "Dinero", items: visible(DINERO) },
-    { title: "Negocio", items: visible(NEGOCIO), collapsible: true },
+    {
+      title: "Configuración",
+      items: visible([...CATALOGOS, ...DINERO, ...NEGOCIO]),
+      collapsible: true,
+    },
     { title: "Ayuda", items: visible(AYUDA) },
   ].filter((section) => section.items.length > 0);
   if (platformAdmin) sections.push({ title: "Plataforma", items: PLATAFORMA });
@@ -281,7 +286,7 @@ function NavLink({
         guardNavTap(event);
         if (!event.defaultPrevented) onNavigate?.();
       }}
-      prefetch={false}
+      prefetch={item.prefetch ?? false}
       title={item.description}
     >
       <item.icon aria-hidden="true" className={navIconClasses(isActive)} strokeWidth={isActive ? 2 : 1.8} />
@@ -306,7 +311,9 @@ function SidebarSection({
   onNavigate?: () => void;
 }) {
   const [manual, setManual] = useState<boolean | null>(null);
-  const abierta = !section.collapsible || (manual ?? true);
+  // Plegable arranca cerrada salvo que contenga la ruta activa.
+  const contieneActiva = section.items.some((item) => isItemActive(pathname, item.path));
+  const abierta = !section.collapsible || (manual ?? contieneActiva);
 
   const items = (
     <ul className="mt-1 space-y-0.5">
@@ -327,7 +334,7 @@ function SidebarSection({
   if (!section.collapsible) {
     return (
       <section aria-label={section.title}>
-        <h3 className="px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        <h3 className="px-3 text-op-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           {section.title}
         </h3>
         {items}
@@ -339,7 +346,7 @@ function SidebarSection({
     <section aria-label={section.title}>
       <button
         aria-expanded={abierta}
-        className="flex min-h-8 w-full items-center justify-between rounded-lg px-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary"
+        className="flex min-h-8 w-full items-center justify-between rounded-lg px-3 text-op-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary"
         onClick={() => setManual(!abierta)}
         type="button"
       >
@@ -447,7 +454,7 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
               <Link
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors",
+                  "relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-op-xs font-medium transition-colors",
                   isActive ? "text-primary" : "text-muted-foreground hover:text-primary",
                 )}
                 data-action-id="nav.tab"
@@ -466,7 +473,7 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
           })}
           <button
             aria-expanded={masAbierto}
-            className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:text-primary"
+            className="flex min-h-14 flex-col items-center justify-center gap-0.5 text-op-xs font-medium text-muted-foreground transition-colors hover:text-primary"
             data-action-id="nav.mas_abrir"
             onClick={() => setMasAbierto(true)}
             type="button"

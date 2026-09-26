@@ -7,7 +7,7 @@ export default function CajaLoading() {
         <div className="h-8 w-32 animate-pulse rounded-xl bg-muted/60" />
         <div className="h-4 w-72 max-w-full animate-pulse rounded-lg bg-muted/60" />
       </div>
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="h-64 animate-pulse rounded-2xl bg-muted/60" />
         <div className="h-64 animate-pulse rounded-2xl bg-muted/60" />
       </div>

@@ -79,7 +79,7 @@ export function BrandWordmark({
         {withDescriptor ? (
           <span
             className={cn(
-              "block text-[11px]",
+              "block text-op-xs",
               light ? "text-brand-fg-on-dark/75" : "text-muted-foreground",
             )}
           >

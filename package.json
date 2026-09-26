@@ -17,6 +17,8 @@
     "test:flows": "tsx scripts/flows-e2e.ts",
     "test:usability": "tsx scripts/usability-check.ts",
     "test:perf": "tsx scripts/perf-bench.ts",
+    "test:axe": "tsx scripts/axe-detail.ts",
+    "bench:carga": "tsx scripts/load-bench.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",

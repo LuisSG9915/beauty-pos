@@ -55,7 +55,7 @@ export function PracticaFlow({
   return (
     <div className="space-y-5">
       <p
-        className="flex items-center gap-2 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm font-medium text-warning"
+        className="flex items-center gap-2 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm font-medium text-warning-soft-foreground"
         role="status"
       >
         <FlaskConical aria-hidden="true" className="size-4 shrink-0" />
@@ -89,7 +89,7 @@ export function PracticaFlow({
               En menos de un minuto vas a agendar una cita de ejemplo, cobrarla y ver su ticket.
               Es el mismo camino que seguirás con tus clientes reales.
             </p>
-            <Button className="mt-5" onClick={() => setPaso(1)} type="button">
+            <Button className="mt-5" data-action-clave="1" size="lg" data-action-id="practica.empezar" onClick={() => setPaso(1)} type="button">
               Empezar
             </Button>
           </div>
@@ -131,7 +131,7 @@ export function PracticaFlow({
             <p className="mt-1 text-sm text-muted-foreground">Elige un servicio y una hora disponible.</p>
 
             <p className="mt-5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Servicio</p>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3" role="group" aria-label="Servicio de ejemplo">
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3" role="group" aria-label="Servicio de ejemplo">
               {SERVICIOS.map((item, index) => (
                 <button
                   aria-pressed={servicio === index}
@@ -285,7 +285,7 @@ export function PracticaFlow({
             Anterior
           </Button>
         ) : null}
-        <Link className="text-sm font-medium text-primary hover:underline" href={ayudaHref}>
+        <Link className="inline-flex min-h-6 items-center text-sm font-medium text-primary hover:underline" href={ayudaHref}>
           Salir de la práctica
         </Link>
       </div>

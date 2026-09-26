@@ -101,14 +101,14 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
           <FieldLabel>Hasta</FieldLabel>
           <Input defaultValue={hasta} name="hasta" type="date" />
         </Field>
-        <Button className="rounded-xl" type="submit">Filtrar</Button>
+        <Button className="rounded-xl" data-action-clave="1" data-action-id="comisiones.filtro.aplicar" size="lg" type="submit">Filtrar</Button>
       </form>
 
       <AdminCard description="Comisiones devengadas y activas aún sin pagar en el periodo." title="Pendientes por profesional">
         {resumen.length === 0 ? (
           <EmptyState description="No hay comisiones pendientes en este periodo." title="Sin pendientes" />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {resumen.map((item) => (
               <div className="rounded-2xl border border-border bg-muted/60 p-4" key={item.usuarioId}>
                 <p className="font-medium text-foreground">{item.nombre}</p>

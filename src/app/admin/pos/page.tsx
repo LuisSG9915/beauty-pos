@@ -16,6 +16,7 @@ import { ventas } from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { canAccessBranch, hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatTime } from "@/lib/format";
+import { GLOSARIO } from "@/lib/glosario";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { dayBoundsUtc, dayKey } from "@/modules/agenda/timezone";
 import { getTicketData } from "@/modules/pos/ticket";
@@ -170,8 +171,8 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
         description="Abre una venta directa o continúa una venta del día en la sucursal seleccionada."
         title="Cobrar"
       />
-      <div className="grid gap-6 lg:grid-cols-2">
-        <AdminCard description="Venta directa sin cita: productos y servicios al momento." title="Nueva venta (walk-in)">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <AdminCard description="Cobro al momento: productos y servicios sin cita agendada." title="Venta sin cita">
           <form action={crearVentaDirecta} className="flex flex-wrap items-end gap-3">
             <input name="organizacionId" type="hidden" value={organizationId} />
             <Field className="min-w-56 flex-1">
@@ -228,7 +229,7 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
                 key={venta.id}
               >
                 <span className="min-w-0 truncate">
-                  {venta.clienteNombre ?? "Walk-in"} · {formatTime(venta.fecha, { timeZone: context.timeZone })}
+                  {venta.clienteNombre ?? GLOSARIO.clienteDePaso} · {formatTime(venta.fecha, { timeZone: context.timeZone })}
                 </span>
                 <span className="flex items-center gap-2">
                   <StatusBadge

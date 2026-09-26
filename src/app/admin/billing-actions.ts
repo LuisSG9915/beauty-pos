@@ -9,6 +9,7 @@ import { sucursales } from "@/db/schema/core";
 import { auditEvent } from "@/lib/audit";
 import { requirePlatformAdmin } from "@/lib/auth/access";
 import { cotizarSuscripcion, planPreciosDesdeFila } from "@/modules/billing/precios";
+import { invalidarSuscripcionCache } from "@/modules/billing/queries";
 import { revalidatePath } from "next/cache";
 
 const pagoManualSchema = z.object({
@@ -174,6 +175,10 @@ export async function registrarPagoSuscripcion(
         },
       });
     });
+
+    // El estado de suscripción está cacheado en KV para navegación: hay que
+    // invalidarlo al activar/cambiar el plan.
+    await invalidarSuscripcionCache(input.data.organizacionId);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     if (message === "plan-invalido") {

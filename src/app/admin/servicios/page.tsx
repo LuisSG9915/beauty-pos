@@ -6,7 +6,9 @@ import { toggleService } from "@/app/admin/servicios/actions";
 import { ComisionesManager } from "@/app/admin/servicios/comisiones-manager";
 import { InsumosManager } from "@/app/admin/servicios/insumos-manager";
 import { ServiceForm } from "@/app/admin/servicios/service-form";
+import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -127,31 +129,57 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
         <Button className="rounded-xl" type="submit">Buscar</Button>
       </form>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-        <div className="space-y-6">
-          <ServiceForm categories={categories} initial={editing} key={`${editing?.id ?? "nuevo"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} />
-          {editing ? (
-            <InsumosManager disponibles={insumosDisponibles} insumos={insumosData} organizationId={organizationId} servicioId={editing.id} />
-          ) : null}
-          {editing ? (
-            <ComisionesManager comisiones={comisionesData} organizationId={organizationId} roles={roles} servicioId={editing.id} />
-          ) : null}
-        </div>
-
-        <AdminCard
-          actions={
-            <Button nativeButton={false} render={<Link href={buildAdminHref("/servicios", { organizationId })} />}>
-              Nuevo
-            </Button>
-          }
-          className="self-start"
-          description={`${serviceRows.length} resultado(s)`}
-          title="Servicios registrados"
-        >
-          {serviceRows.length === 0 ? (
-            <EmptyState description="Crea servicios para el salón: cortes, tratamientos, manicure, etc." title="No hay servicios" />
-          ) : (
-            <div className="overflow-x-auto">
+      <AdminCard
+        actions={
+          <Button
+            data-action-clave="1" size="lg"
+            data-action-id="catalogo.servicios.nuevo"
+            nativeButton={false}
+            render={<Link href={buildAdminHref("/servicios", { organizationId, extra: { nuevo: "1", q: query || null } })} />}
+          >
+            Nuevo
+          </Button>
+        }
+        description={`${serviceRows.length} resultado(s)`}
+        title="Servicios registrados"
+      >
+        {serviceRows.length === 0 ? (
+          <EmptyState description="Crea servicios para el salón: cortes, tratamientos, manicure, etc." title="No hay servicios" />
+        ) : (
+          <>
+            <RegistroList>
+              {serviceRows.map((service) => (
+                <RegistroCard
+                  acciones={
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60"
+                        href={buildAdminHref("/servicios", { organizationId, extra: { edit: service.id, q: query || null } })}
+                      >
+                        Editar
+                      </Link>
+                      <form action={toggleService}>
+                        <input name="organizacionId" type="hidden" value={organizationId} />
+                        <input name="id" type="hidden" value={service.id} />
+                        <input name="activo" type="hidden" value={String(service.activo)} />
+                        <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">
+                          {service.activo ? "Ocultar" : "Activar"}
+                        </button>
+                      </form>
+                    </div>
+                  }
+                  badge={<StatusBadge active={service.activo} />}
+                  campos={[
+                    { label: "Duración", value: `${service.duracionMinutos} min` },
+                    { label: "Precio", value: formatCurrency(service.precioBase, { currency: context.currency }) },
+                  ]}
+                  key={service.id}
+                  subtitulo={<span className="font-mono">{service.clave}</span>}
+                  titulo={service.nombre}
+                />
+              ))}
+            </RegistroList>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[560px] text-left text-sm">
                 <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
@@ -194,9 +222,25 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
                 </tbody>
               </table>
             </div>
-          )}
-        </AdminCard>
-      </div>
+          </>
+        )}
+      </AdminCard>
+      {editing || firstParam(params.nuevo) === "1" ? (
+        <FormSheet
+          closeHref={buildAdminHref("/servicios", { organizationId, extra: { q: query || null } })}
+          description={editing ? "Ajusta datos, insumos y comisiones del servicio." : "Crea un servicio para agendarlo y cobrarlo."}
+          title={editing ? "Editar servicio" : "Nuevo servicio"}
+          wide
+        >
+          <ServiceForm categories={categories} initial={editing} key={`${editing?.id ?? "nuevo"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} />
+          {editing ? (
+            <InsumosManager disponibles={insumosDisponibles} insumos={insumosData} organizationId={organizationId} servicioId={editing.id} />
+          ) : null}
+          {editing ? (
+            <ComisionesManager comisiones={comisionesData} organizationId={organizationId} roles={roles} servicioId={editing.id} />
+          ) : null}
+        </FormSheet>
+      ) : null}
     </div>
   );
 }

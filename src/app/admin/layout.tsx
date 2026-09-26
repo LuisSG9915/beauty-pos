@@ -1,10 +1,10 @@
 import { AdminShell } from "@/components/admin/admin-shell";
 import type { BillingBadge } from "@/components/admin/subscription-banner";
 import { OfflineSyncBadge } from "@/components/offline-sync";
-import { getDatabase } from "@/db/client";
-import { getAccessibleOrganizations } from "@/lib/admin-context";
-import { requireAuthenticatedUser } from "@/lib/auth/access";
-import { resolveAccessSafe } from "@/lib/auth/authorization";
+import { redirect } from "next/navigation";
+
+import { getSessionOrRedirect } from "@/lib/auth/access";
+import { resolveSessionContext } from "@/lib/auth/authorization";
 import { CAPACIDADES } from "@/modules/billing/capacidades";
 import { getSuscripcionActualCache } from "@/modules/billing/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
@@ -17,44 +17,42 @@ export const dynamic = "force-dynamic";
  * resto). El shell es client component y conserva el estado entre rutas.
  */
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
-  const { session, user } = await requireAuthenticatedUser();
-  const db = getDatabase();
+  const session = await getSessionOrRedirect();
+  // Usuario + organizaciones en la consulta de contexto única (compartida con
+  // la página vía React.cache cuando coincide la organización pedida).
+  const contextRow = await resolveSessionContext(session.user.id, null);
+  const user = contextRow.usuario;
+  if (!user) {
+    redirect("/login?error=account-not-configured");
+  }
+  const organizations = contextRow.organizaciones;
 
-  // La misma fuente cacheada que usa getAdminContext: una sola consulta por
-  // request entre layout y página.
-  const organizations = await getAccessibleOrganizations(db, user);
-
-  // Permisos por organización para filtrar la navegación del shell.
+  // Permisos por organización para filtrar la navegación del shell: ya viajan
+  // embebidos en la consulta de contexto (sin una ronda extra por org).
   // Admin de plataforma → null (sin filtro).
   let permissionsByOrg: Record<string, string[]> | null = null;
   const billingByOrg: Record<string, BillingBadge> = {};
   const capacidadesFaltantesByOrg: Record<string, string[]> = {};
   if (!user.esAdministradorPlataforma) {
     permissionsByOrg = {};
-    const resolved = await Promise.all(
-      organizations.map(
-        async (org) =>
-          [
-            org.id,
-            await resolveAccessSafe(org.id, user),
-            await getSuscripcionActualCache(org.id),
-          ] as const,
-      ),
+    const suscripciones = await Promise.all(
+      organizations.map((org) => getSuscripcionActualCache(org.id)),
     );
-    for (const [orgId, access, suscripcion] of resolved) {
-      permissionsByOrg[orgId] = access ? [...access.permissions] : [];
+    for (const [index, org] of organizations.entries()) {
+      const suscripcion = suscripciones[index] ?? null;
+      permissionsByOrg[org.id] = org.permisos ?? [];
       // Solo se ocultan accesos cuando el plan vigente no los incluye; una
       // suscripción vencida conserva el acceso de consulta (solo lectura).
       if (suscripcion && estadoEfectivoSuscripcion(suscripcion) === "vigente") {
         const incluidas = new Set(suscripcion.capacidades ?? []);
-        capacidadesFaltantesByOrg[orgId] = Object.keys(CAPACIDADES).filter(
+        capacidadesFaltantesByOrg[org.id] = Object.keys(CAPACIDADES).filter(
           (capacidad) => !incluidas.has(capacidad),
         );
       }
       if (estadoEfectivoSuscripcion(suscripcion) === "vencida") {
-        billingByOrg[orgId] = { estado: "vencida", diasRestantes: null };
+        billingByOrg[org.id] = { estado: "vencida", diasRestantes: null };
       } else if (suscripcion?.estado === "trialing") {
-        billingByOrg[orgId] = {
+        billingByOrg[org.id] = {
           estado: "trialing",
           diasRestantes: diasRestantesTrial(suscripcion),
         };

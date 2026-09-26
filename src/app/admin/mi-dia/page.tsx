@@ -1,8 +1,10 @@
 import { and, asc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import Link from "next/link";
 
 import { MiDiaBoard, type MiDiaCita } from "@/app/admin/mi-dia/mi-dia-board";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
 import { clientes } from "@/db/schema/core";
 import { servicios } from "@/db/schema/catalogs";
@@ -16,6 +18,8 @@ import {
 import { getAdminContext } from "@/lib/admin-context";
 import { requireAccessPermission } from "@/lib/auth/authorization";
 import { todayDateInput } from "@/lib/format";
+import { GLOSARIO } from "@/lib/glosario";
+import { buildAdminHref } from "@/lib/url-context";
 import { dayBoundsUtc } from "@/modules/agenda";
 import { alergiasPorCliente, conAlergias } from "@/modules/expedientes/alergias";
 
@@ -183,7 +187,7 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
     notas: row.notas,
     totalEstimado: row.totalEstimado,
     clienteId: row.clienteId,
-    clienteNombre: row.clienteNombre ?? "Walk-in",
+    clienteNombre: row.clienteNombre ?? GLOSARIO.clienteDePaso,
     clienteNotas: conAlergias(row.clienteNotas, row.clienteId ? alergias.get(row.clienteId) : undefined),
     ventaId: row.ventaId,
     ventaEstado: row.ventaEstado,
@@ -193,6 +197,18 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        actions={
+          <Button
+            data-action-clave="1"
+            data-action-id="mi_dia.agenda.abrir"
+            nativeButton={false}
+            render={<Link href={buildAdminHref("/agenda", { organizationId: organization.id, sucursalId: branch.id })} />}
+            size="lg"
+            variant="outline"
+          >
+            Ver agenda
+          </Button>
+        }
         description={`${branch.nombre} · ${timeZone}`}
         title="Mi día"
       />

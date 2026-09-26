@@ -1,9 +1,11 @@
 import { and, count, desc, eq } from "drizzle-orm";
 import { Check, Minus } from "lucide-react";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { CambioPlanForm, CancelacionForm } from "@/app/admin/suscripcion/suscripcion-forms";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { getDatabase } from "@/db/client";
@@ -13,6 +15,7 @@ import { miembrosOrganizaciones, sucursales } from "@/db/schema/core";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDateTime } from "@/lib/format";
+import { buildAdminHref } from "@/lib/url-context";
 import { CAPACIDADES, planCatalogoPorClave, type CapacidadClave } from "@/modules/billing/capacidades";
 import { getPlanesActivos, getSuscripcionActualCache } from "@/modules/billing/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion, type EstadoEfectivo } from "@/modules/billing/rules";
@@ -119,11 +122,25 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        actions={
+          puedeEditar && planesCatalogo.length > 0 ? (
+            <Button
+              data-action-clave="1"
+              data-action-id="suscripcion.plan.ver_opciones"
+              nativeButton={false}
+              render={<Link href={`${buildAdminHref("/suscripcion", { organizationId })}#cambiar-plan`} />}
+              size="lg"
+              variant="outline"
+            >
+              Ver opciones de plan
+            </Button>
+          ) : undefined
+        }
         description="Plan contratado, uso actual y solicitudes de cambio."
         title="Suscripción"
       />
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AdminCard description="Tu plan y el estado de la suscripción" title="Plan actual">
           {!actual ? (
             <EmptyState
@@ -184,7 +201,7 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
         </AdminCard>
 
         <AdminCard description="Lo que incluye tu plan vigente" title="Capacidades">
-          <ul className="grid gap-1.5 sm:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
             {(Object.keys(CAPACIDADES) as CapacidadClave[]).map((clave) => {
               const incluida = capacidades.has(clave);
               return (
@@ -206,9 +223,10 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
 
       <AdminCard
         description="El precio base incluye sucursales según el plan; cada adicional tiene su precio. IVA incluido. El cambio se confirma por transferencia antes de aplicarse."
+        id="cambiar-plan"
         title="Cambiar de plan"
       >
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           {planesCatalogo.map((plan) => {
             const esActual = actual?.planClave === plan.clave;
             return (
@@ -253,7 +271,7 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
         </div>
       </AdminCard>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <AdminCard description="Pagos confirmados de la suscripción" title="Historial de pagos">
           {pagos.length === 0 ? (
             <EmptyState description="Todavía no hay pagos registrados." title="Sin pagos" />

@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 
 import { togglePaquete } from "@/app/admin/paquetes/actions";
 import { PaqueteForm } from "@/app/admin/paquetes/paquete-form";
+import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -117,27 +119,51 @@ export default async function PaquetesPage({ searchParams }: { searchParams: Sea
         ) : null}
       </form>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-        <PaqueteForm
-          initial={editingData}
-          key={`${editing?.id ?? "nuevo"}-${editing?.updatedAt?.getTime() ?? ""}`}
-          organizationId={organizationId}
-          serviciosItems={serviciosItems}
-        />
-        <AdminCard
-          actions={
-            <Button nativeButton={false} render={<Link href={buildAdminHref("/paquetes", { organizationId })} />}>
-              Nuevo
-            </Button>
-          }
-          className="self-start"
-          description={`${paqueteRows.length} resultado(s)`}
-          title="Paquetes registrados"
-        >
-          {paqueteRows.length === 0 ? (
-            <EmptyState description="Crea un paquete de sesiones prepagadas para venderlo en el punto de venta." title="No hay paquetes" />
-          ) : (
-            <div className="overflow-x-auto">
+      <AdminCard
+        actions={
+          <Button
+            data-action-clave="1" size="lg"
+            data-action-id="catalogo.paquetes.nuevo"
+            nativeButton={false}
+            render={<Link href={buildAdminHref("/paquetes", { organizationId, extra: { ...preserved, nuevo: "1" } })} />}
+          >
+            Nuevo
+          </Button>
+        }
+        description={`${paqueteRows.length} resultado(s)`}
+        title="Paquetes registrados"
+      >
+        {paqueteRows.length === 0 ? (
+          <EmptyState description="Crea un paquete de sesiones prepagadas para venderlo en el punto de venta." title="No hay paquetes" />
+        ) : (
+          <>
+            <RegistroList>
+              {paqueteRows.map((paquete) => (
+                <RegistroCard
+                  acciones={
+                    <div className="flex flex-wrap gap-2">
+                      <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/paquetes", { organizationId, extra: { ...preserved, edit: paquete.id } })}>Editar</Link>
+                      <form action={togglePaquete}>
+                        <input name="organizacionId" type="hidden" value={organizationId} />
+                        <input name="id" type="hidden" value={paquete.id} />
+                        <input name="activo" type="hidden" value={String(paquete.activo)} />
+                        <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">{paquete.activo ? "Ocultar" : "Activar"}</button>
+                      </form>
+                    </div>
+                  }
+                  badge={<StatusBadge active={paquete.activo} />}
+                  campos={[
+                    { label: "Servicio", value: paquete.servicioNombre },
+                    { label: "Sesiones", value: paquete.sesiones },
+                    { label: "Precio", value: formatCurrency(paquete.precio, { currency: context.currency }) },
+                  ]}
+                  key={paquete.id}
+                  subtitulo={<span className="font-mono">{paquete.clave}</span>}
+                  titulo={paquete.nombre}
+                />
+              ))}
+            </RegistroList>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[640px] text-left text-sm">
                 <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
@@ -175,9 +201,23 @@ export default async function PaquetesPage({ searchParams }: { searchParams: Sea
                 </tbody>
               </table>
             </div>
-          )}
-        </AdminCard>
-      </div>
+          </>
+        )}
+      </AdminCard>
+      {editing || firstParam(params.nuevo) === "1" ? (
+        <FormSheet
+          closeHref={buildAdminHref("/paquetes", { organizationId, extra: preserved })}
+          description={editing ? "Ajusta los datos del paquete." : "Crea un paquete de sesiones prepagadas."}
+          title={editing ? "Editar paquete" : "Nuevo paquete"}
+        >
+          <PaqueteForm
+            initial={editingData}
+            key={`${editing?.id ?? "nuevo"}-${editing?.updatedAt?.getTime() ?? ""}`}
+            organizationId={organizationId}
+            serviciosItems={serviciosItems}
+          />
+        </FormSheet>
+      ) : null}
     </div>
   );
 }

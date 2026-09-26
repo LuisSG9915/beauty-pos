@@ -337,6 +337,13 @@
       "when": 1789951361483,
       "tag": "0047_unknown_hardball",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1790213636398,
+      "tag": "0048_complete_franklin_richards",
+      "breakpoints": true
     }
   ]
 }

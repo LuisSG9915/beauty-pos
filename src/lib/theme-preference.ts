@@ -49,13 +49,33 @@ export function parseThemePreference(value: string | null | undefined): ThemePre
   return isThemePreference(normalized) ? normalized : "system";
 }
 
-/** Resuelve el modo efectivo: explícito, o el del sistema si es "system". */
+/**
+ * El panel operativo (`/admin`) arranca en claro aunque el SO esté en oscuro:
+ * el público objetivo trabaja de día en salones iluminados y el modo claro es
+ * la experiencia diseñada por defecto. Quien elija "Oscuro" explícitamente lo
+ * conserva; fuera de /admin "system" sigue al SO.
+ */
+export const ADMIN_DEFAULT_THEME_PREFIX = "/admin";
+
+function isAdminPathname(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    window.location.pathname.startsWith(ADMIN_DEFAULT_THEME_PREFIX)
+  );
+}
+
+/**
+ * Resuelve el modo efectivo: explícito, o el del sistema si es "system" —
+ * salvo en /admin, donde "system" cae a claro (`adminDefaultLight`).
+ */
 export function resolveTheme(
   preference: ThemePreference,
   systemPrefersDark: boolean,
+  adminDefaultLight = false,
 ): ResolvedTheme {
   if (preference === "dark") return "dark";
   if (preference === "light") return "light";
+  if (adminDefaultLight) return "light";
   return systemPrefersDark ? "dark" : "light";
 }
 
@@ -113,7 +133,7 @@ export function currentThemePreference(): ThemePreference {
  * navegación cliente al desmontar la ruta anterior.
  */
 export function applyThemePreference(preference: ThemePreference): ResolvedTheme {
-  const resolved = resolveTheme(preference, systemPrefersDark());
+  const resolved = resolveTheme(preference, systemPrefersDark(), isAdminPathname());
   const root = document.documentElement;
   root.classList.toggle("dark", resolved === "dark");
   root.setAttribute("data-theme-preference", preference);
@@ -172,8 +192,9 @@ export function subscribeThemePreference(callback: () => void): () => void {
 /**
  * Script inline mínimo que corre en <head> antes del primer paint. Replica
  * `applyThemePreference` sin dependencias: lee la cookie, resuelve "system"
- * con matchMedia, fija `.dark` + data-* + color-scheme y sincroniza un meta
- * theme-color propio marcado con `data-theme-runtime`.
+ * con matchMedia (claro fijo bajo /admin), fija `.dark` + data-* +
+ * color-scheme y sincroniza un meta theme-color propio marcado con
+ * `data-theme-runtime`.
  * Va envuelto en try/catch: si falla, la página queda en claro, sin error.
  */
-export const BOOTSTRAP_SCRIPT = `(function(){try{var d=document.documentElement;var p="system";var cs=document.cookie.split(";");for(var i=0;i<cs.length;i++){var at=cs[i].indexOf("=");if(at<0)continue;if(cs[i].slice(0,at).trim()==="${THEME_COOKIE_NAME}"){var v=cs[i].slice(at+1).trim();try{v=decodeURIComponent(v)}catch(x){}if(v==="light"||v==="dark")p=v;break;}}var r=p;if(p==="system"){r=window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";}d.classList.toggle("dark",r==="dark");d.setAttribute("data-theme-preference",p);d.setAttribute("data-theme-resolved",r);d.style.colorScheme=r;var c=r==="dark"?"${THEME_COLOR.dark}":"${THEME_COLOR.light}";var els=document.querySelectorAll('meta[name="theme-color"][data-theme-runtime="true"]');var el=els[0];if(!el){el=document.createElement("meta");el.setAttribute("name","theme-color");el.setAttribute("data-theme-runtime","true");(document.head||d).appendChild(el);}el.setAttribute("content",c);for(var j=1;j<els.length;j++){els[j].remove();}}catch(e){}})();`;
+export const BOOTSTRAP_SCRIPT = `(function(){try{var d=document.documentElement;var p="system";var cs=document.cookie.split(";");for(var i=0;i<cs.length;i++){var at=cs[i].indexOf("=");if(at<0)continue;if(cs[i].slice(0,at).trim()==="${THEME_COOKIE_NAME}"){var v=cs[i].slice(at+1).trim();try{v=decodeURIComponent(v)}catch(x){}if(v==="light"||v==="dark")p=v;break;}}var r=p;if(p==="system"){r=location.pathname.indexOf("${ADMIN_DEFAULT_THEME_PREFIX}")===0?"light":(window.matchMedia&&window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light");}d.classList.toggle("dark",r==="dark");d.setAttribute("data-theme-preference",p);d.setAttribute("data-theme-resolved",r);d.style.colorScheme=r;var c=r==="dark"?"${THEME_COLOR.dark}":"${THEME_COLOR.light}";var els=document.querySelectorAll('meta[name="theme-color"][data-theme-runtime="true"]');var el=els[0];if(!el){el=document.createElement("meta");el.setAttribute("name","theme-color");el.setAttribute("data-theme-runtime","true");(document.head||d).appendChild(el);}el.setAttribute("content",c);for(var j=1;j<els.length;j++){els[j].remove();}}catch(e){}})();`;

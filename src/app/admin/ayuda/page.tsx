@@ -53,7 +53,7 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
         title="Ayuda"
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {guiaAccion ? (
           <section className={cardClass}>
             <div className={iconClass}><Compass aria-hidden="true" className="size-5" /></div>
@@ -67,7 +67,7 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
               Paso a paso sobre tu negocio real: servicios, horario, primera cita y primer cobro.
               Los pasos se marcan solos cuando existen en el sistema.
             </p>
-            <Button className="mt-4" nativeButton={false} render={<Link href={guiaHref} />}>
+            <Button className="mt-4" data-action-clave="1" size="lg" data-action-id="ayuda.guia.abrir" nativeButton={false} render={<Link href={guiaHref} />}>
               {guiaAccion.label}
             </Button>
           </section>

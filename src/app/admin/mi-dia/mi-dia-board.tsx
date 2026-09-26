@@ -171,6 +171,15 @@ export function MiDiaBoard({
           <p className="mt-1.5 text-sm text-muted-foreground">
             Cuando la recepción te asigne una cita aparecerá aquí.
           </p>
+          <Button
+            className="mt-6"
+            data-action-id="mi_dia.agenda.abrir"
+            nativeButton={false}
+            render={<Link href={buildAdminHref("/agenda", { organizationId, sucursalId })} />}
+            size="touch"
+          >
+            Ver agenda
+          </Button>
         </section>
       ) : (
         <ol className="space-y-3">
@@ -223,7 +232,7 @@ export function MiDiaBoard({
                     ) : null}
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
-                    <CitaStatusBadge estado={cita.estado} />
+                    <CitaStatusBadge estado={cita.estado} ventaId={cita.ventaEstado === "completada" ? cita.ventaId : null} />
                     <span className="text-sm font-semibold tabular-nums text-muted-foreground">
                       {formatCurrency(cita.totalEstimado, { currency })}
                     </span>
@@ -233,7 +242,6 @@ export function MiDiaBoard({
                 <div className="mt-4 flex flex-wrap gap-2">
                   {puedeCheckIn ? (
                     <Button
-                      data-action-clave="1"
                       data-action-id="mi_dia.cita.check_in"
                       disabled={citaBusy}
                       onClick={() => cambiarEstado(cita, "en_proceso", "check_in")}
@@ -247,12 +255,16 @@ export function MiDiaBoard({
                   {enCurso ? (
                     <>
                       {ventaAbierta ? (
-                        <Button nativeButton={false} render={<Link href={ticketHref(cita.ventaId!)} />} size="touch">
+                        <Button
+                          data-action-id="mi_dia.cita.abrir_cobro"
+                          nativeButton={false}
+                          render={<Link href={ticketHref(cita.ventaId!)} />}
+                          size="touch"
+                        >
                           Ir a cobro
                         </Button>
                       ) : (
                         <Button
-                          data-action-clave="1"
                           data-action-id="mi_dia.cita.cobrar"
                           disabled={citaBusy}
                           onClick={() => cobrar(cita)}

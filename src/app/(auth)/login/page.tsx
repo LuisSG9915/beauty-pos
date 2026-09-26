@@ -8,6 +8,7 @@ import { BRAND } from "@/lib/brand";
 const AVISOS: Record<string, string> = {
   verifica: "Tu cuenta está lista. Te enviamos un correo con un enlace para verificarla — revísalo antes de iniciar sesión.",
   registrado: "Tu cuenta está lista. Inicia sesión para continuar.",
+  restablecida: "Tu contraseña nueva ya está guardada. Inicia sesión con ella.",
 };
 
 export default async function LoginPage({
@@ -16,7 +17,7 @@ export default async function LoginPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
-  const avisoKey = typeof params.verifica === "string" ? "verifica" : typeof params.registrado === "string" ? "registrado" : null;
+  const avisoKey = typeof params.verifica === "string" ? "verifica" : typeof params.registrado === "string" ? "registrado" : typeof params.restablecida === "string" ? "restablecida" : null;
   const aviso = avisoKey ? AVISOS[avisoKey] : null;
   return (
     <main className="grid min-h-screen bg-background lg:grid-cols-[1.05fr_0.95fr]">

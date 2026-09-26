@@ -1,5 +1,5 @@
 import puppeteer from "puppeteer";
-import { BASE_URL, login } from "./lib/e2e";
+import { BASE_URL, login } from "../lib/e2e";
 const shots: [string, string, number, number][] = [
   ["admin-dashboard", "/admin", 1440, 900],
   ["admin-clientes", "/admin/clientes", 1440, 900],

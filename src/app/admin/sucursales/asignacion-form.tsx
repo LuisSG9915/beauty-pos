@@ -37,7 +37,7 @@ export function SucursalAsignacionForm({
     <form action={action} className="space-y-3">
       <input name="organizacionId" type="hidden" value={organizationId} />
       <input name="sucursalId" type="hidden" value={sucursalId} />
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {miembros.map((miembro) => (
           <label className="flex items-start gap-2 rounded-xl border border-border px-3 py-2.5 text-sm" key={miembro.usuarioId}>
             <input

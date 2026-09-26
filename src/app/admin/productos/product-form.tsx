@@ -42,7 +42,7 @@ export function ProductForm({
   const tipo = (initial?.tipo ?? "producto") as "producto" | "insumo" | "ambos";
 
   const general = (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field>
         <FieldLabel required>SKU</FieldLabel>
         <Input defaultValue={String(value("sku"))} name="sku" placeholder="SHAMPOO-001" required />
@@ -85,7 +85,7 @@ export function ProductForm({
   );
 
   const precios = (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field>
         <FieldLabel required>Costo (MXN)</FieldLabel>
         <Input defaultValue={String(value("costo") || "0")} min="0" name="costo" placeholder="0.00" required step="0.01" type="number" />
@@ -104,7 +104,7 @@ export function ProductForm({
   );
 
   const inventario = (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field>
         <FieldLabel required>Stock mínimo</FieldLabel>
         <Input defaultValue={String(value("stockMinimo") || "0")} min="0" name="stockMinimo" placeholder="0" required step="0.001" type="number" />

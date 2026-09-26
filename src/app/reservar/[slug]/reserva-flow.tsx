@@ -197,7 +197,7 @@ export function ReservaFlow({
                 Consultar o modificar mi cita
               </a>
               <p className="mx-auto mt-3 max-w-sm text-xs leading-5 text-muted-foreground">
-                Guarda este enlace: con él puedes ver el estado de tu cita, reagendarla o cancelarla
+                Guarda este enlace: con él puedes ver el estado de tu cita, cambiarla de fecha o cancelarla
                 según la política del negocio. También llega en tu correo de confirmación.
               </p>
             </>

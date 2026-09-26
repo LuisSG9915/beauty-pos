@@ -1,0 +1,1 @@
+CREATE INDEX "citas_sucursal_fecha_activas_idx" ON "citas" USING btree ("sucursal_id","fecha_hora") WHERE "citas"."activo";

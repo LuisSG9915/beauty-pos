@@ -2,10 +2,12 @@ import Link from "next/link";
 import { and, asc, desc, eq, gte, sql } from "drizzle-orm";
 
 import { MovimientoForm } from "@/app/admin/inventario/movimiento-form";
+import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader, AdminSection } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { FormTabs } from "@/components/form-tabs";
 import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
 import { catUnidadesMedida, productos, relServiciosInsumos, servicios } from "@/db/schema/catalogs";
 import { detalleVentasServicios, inventarioStock, movimientosInventario, ventas } from "@/db/schema/operations";
@@ -20,6 +22,7 @@ export const dynamic = "force-dynamic";
 type SearchParams = Promise<{
   organizationId?: string | string[];
   sucursalId?: string | string[];
+  nuevo?: string | string[];
 }>;
 
 const TIPO_LABEL: Record<string, string> = {
@@ -135,8 +138,44 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
       return stock <= 0 || stock < Number(p.stockMinimo);
     }).length;
 
+  const stockCards = (rows: typeof catalogoProductos) => (
+    <div className="space-y-3 px-4 pb-4 md:hidden">
+      {rows.map((producto) => {
+        const stock = stockPorProducto.get(producto.id) ?? 0;
+        const minimo = Number(producto.stockMinimo);
+        const estado = stockTone(stock, minimo);
+        return (
+          <article className="rounded-xl border border-border p-4" key={producto.id}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold leading-5 text-foreground">{producto.nombre}</h3>
+                <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{producto.sku} · {producto.tipo}</p>
+              </div>
+              <StatusBadge tone={estado.tone}>{estado.label}</StatusBadge>
+            </div>
+            <dl className="mt-3 space-y-1.5">
+              <div className="flex items-baseline justify-between gap-3 text-sm">
+                <dt className="shrink-0 text-xs text-muted-foreground">Stock</dt>
+                <dd className="min-w-0 text-right font-semibold tabular-nums text-foreground">
+                  {stock.toFixed(3)}{producto.unidad ? ` ${producto.unidad}` : ""}
+                </dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3 text-sm">
+                <dt className="shrink-0 text-xs text-muted-foreground">Mínimo</dt>
+                <dd className="min-w-0 text-right text-xs tabular-nums text-muted-foreground">{minimo.toFixed(3)}</dd>
+              </div>
+            </dl>
+          </article>
+        );
+      })}
+      {rows.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">Sin registros en esta categoría.</p>
+      ) : null}
+    </div>
+  );
+
   const stockTable = (rows: typeof catalogoProductos) => (
-    <div className="overflow-x-auto">
+    <div className="hidden overflow-x-auto md:block">
       <table className="w-full min-w-[720px] text-left text-sm">
         <thead className="bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
           <tr>
@@ -177,6 +216,17 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        actions={
+          <Button
+            data-action-clave="1"
+            data-action-id="inventario.movimiento.abrir_formulario"
+            nativeButton={false}
+            render={<Link href={buildAdminHref("/inventario", { organizationId, sucursalId: branch.id, extra: { nuevo: "movimiento" } })} />}
+            size="lg"
+          >
+            Registrar movimiento
+          </Button>
+        }
         description={`${branch.nombre} · ${timeZone}`}
         title="Inventario"
       />
@@ -199,7 +249,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
         ))}
       </nav>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.65fr)]">
+      <div>
         <div className="space-y-6">
           <AdminSection title="Existencias">
             <AdminCard className="overflow-hidden p-0 sm:p-0">
@@ -209,13 +259,19 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
                     {
                       id: "retail",
                       label: `Retail${alertas(retail) ? ` · ${alertas(retail)} bajo` : ""}`,
-                      content: stockTable(retail),
+                      content: (
+                        <>
+                          {stockCards(retail)}
+                          {stockTable(retail)}
+                        </>
+                      ),
                     },
                     {
                       id: "backbar",
                       label: `Backbar${alertas(backbar) ? ` · ${alertas(backbar)} bajo` : ""}`,
                       content: (
                         <div className="space-y-4">
+                          {stockCards(backbar)}
                           {stockTable(backbar)}
                           <div className="border-t border-border px-4 pb-4 pt-3">
                             <h4 className="text-xs font-semibold uppercase tracking-wide text-primary">
@@ -251,7 +307,46 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
 
           <AdminSection title="Movimientos recientes">
             <AdminCard className="overflow-hidden p-0 sm:p-0">
-              <div className="overflow-x-auto">
+              <div className="space-y-3 p-4 md:hidden">
+                {movimientos.map((movimiento) => {
+                  const cantidad = Number(movimiento.cantidad);
+                  return (
+                    <article className="rounded-xl border border-border p-4" key={movimiento.id}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-semibold leading-5 text-foreground">{movimiento.productoNombre}</h3>
+                          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                            {movimiento.sku} · {formatDateTime(movimiento.createdAt, { timeZone })}
+                          </p>
+                        </div>
+                        <StatusBadge tone={cantidad >= 0 ? "success" : "destructive"}>{TIPO_LABEL[movimiento.tipo] ?? movimiento.tipo}</StatusBadge>
+                      </div>
+                      <dl className="mt-3 space-y-1.5">
+                        <div className="flex items-baseline justify-between gap-3 text-sm">
+                          <dt className="shrink-0 text-xs text-muted-foreground">Cantidad</dt>
+                          <dd className="min-w-0 text-right font-medium tabular-nums text-foreground">
+                            {cantidad > 0 ? "+" : ""}{cantidad.toFixed(3)}
+                          </dd>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-3 text-sm">
+                          <dt className="shrink-0 text-xs text-muted-foreground">Stock final</dt>
+                          <dd className="min-w-0 text-right text-xs tabular-nums text-muted-foreground">{Number(movimiento.stockResultante).toFixed(3)}</dd>
+                        </div>
+                        {movimiento.notas ? (
+                          <div className="flex items-baseline justify-between gap-3 text-sm">
+                            <dt className="shrink-0 text-xs text-muted-foreground">Notas</dt>
+                            <dd className="min-w-0 truncate text-right text-xs text-muted-foreground" title={movimiento.notas}>{movimiento.notas}</dd>
+                          </div>
+                        ) : null}
+                      </dl>
+                    </article>
+                  );
+                })}
+                {movimientos.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">Sin movimientos en esta sucursal.</p>
+                ) : null}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[760px] text-left text-sm">
                   <thead className="bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
                     <tr>
@@ -287,7 +382,11 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
           </AdminSection>
         </div>
 
-        <AdminCard
+      </div>
+
+      {params.nuevo === "movimiento" || (Array.isArray(params.nuevo) && params.nuevo.includes("movimiento")) ? (
+        <FormSheet
+          closeHref={buildAdminHref("/inventario", { organizationId, sucursalId: branch.id })}
           description="Entrada suma stock; salida resta; ajuste registra el conteo físico."
           title="Registrar movimiento"
         >
@@ -296,8 +395,8 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
             productos={catalogoProductos}
             sucursalId={sucursalId ?? branch.id}
           />
-        </AdminCard>
-      </div>
+        </FormSheet>
+      ) : null}
     </div>
   );
 }

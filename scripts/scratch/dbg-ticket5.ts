@@ -1,6 +1,6 @@
 import "dotenv/config";
 import puppeteer from "puppeteer";
-import { BASE_URL, E2E_EMAIL, login } from "./lib/e2e";
+import { BASE_URL, E2E_EMAIL, login } from "../lib/e2e";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

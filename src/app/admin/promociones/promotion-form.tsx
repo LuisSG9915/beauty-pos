@@ -28,7 +28,7 @@ export function PromotionForm({ organizationId, initial }: { organizationId: str
   const aplica = (initial?.aplica ?? "ambos") as "producto" | "servicio" | "ambos";
 
   const reglas = (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field>
         <FieldLabel required>Clave</FieldLabel>
         <Input defaultValue={String(value("clave"))} name="clave" placeholder="DESC10" required />
@@ -66,7 +66,7 @@ export function PromotionForm({ organizationId, initial }: { organizationId: str
   );
 
   const vigencia = (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field>
         <FieldLabel required>Vigencia desde</FieldLabel>
         <Input defaultValue={String(value("vigenciaDesde"))} name="vigenciaDesde" required type="date" />

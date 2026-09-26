@@ -60,8 +60,24 @@ function Tabla({
     return <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">{vacio}</p>;
   }
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[28rem] text-sm">
+    <>
+      <div className="space-y-3 md:hidden">
+        {filas.map((celdas, i) => (
+          <div className="rounded-xl border border-border px-4 py-3" key={i}>
+            <p className="text-sm font-semibold text-foreground">{celdas[0]}</p>
+            <dl className="mt-1.5 space-y-1">
+              {encabezados.slice(1).map((encabezado, j) => (
+                <div className="flex items-baseline justify-between gap-3 text-sm" key={encabezado}>
+                  <dt className="shrink-0 text-xs text-muted-foreground">{encabezado}</dt>
+                  <dd className="min-w-0 text-right font-medium text-foreground">{celdas[j + 1]}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ))}
+      </div>
+      <div className="hidden overflow-x-auto md:block" tabIndex={0}>
+        <table className="w-full min-w-[28rem] text-sm">
         <thead>
           <tr className="border-b border-border text-left">
             {encabezados.map((h) => (
@@ -83,7 +99,8 @@ function Tabla({
           ))}
         </tbody>
       </table>
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -269,7 +286,7 @@ export default async function ReportesPage({ searchParams }: Props) {
           <FieldLabel>Hasta</FieldLabel>
           <Input defaultValue={hasta} name="hasta" type="date" />
         </Field>
-        <Button className="rounded-xl" type="submit">Aplicar</Button>
+        <Button className="rounded-xl" data-action-clave="1" data-action-id="reportes.filtro.aplicar" size="lg" type="submit">Aplicar</Button>
         {puedeExportar ? (
           <a
             className="inline-flex h-10 items-center rounded-xl border border-border px-4 text-sm font-medium text-muted-foreground transition hover:bg-muted/60"
@@ -333,7 +350,7 @@ export default async function ReportesPage({ searchParams }: Props) {
 
       {puedeOperativos ? (
         <>
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <Kpi
               hint={etiquetaDelta(deltaKpi(totalCitas, totalCitasAnt))}
               label="Citas en el rango"
@@ -357,7 +374,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             <Kpi label="Profesionales con agenda" value={String(profesionales.length)} />
           </section>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <AdminCard description="Citas activas por estado en el período" title="Citas por estado">
               <Tabla
                 encabezados={["Estado", "Citas"]}
@@ -370,7 +387,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             <AdminCard
               actions={
                 consolidado ? null : (
-                  <Link className="text-sm font-medium text-primary hover:underline" href={`/admin/ventas?${filtrosExport}`}>
+                  <Link className="inline-flex min-h-6 items-center text-sm font-medium text-primary hover:underline" href={`/admin/ventas?${filtrosExport}`}>
                     Ver ventas →
                   </Link>
                 )
@@ -389,7 +406,7 @@ export default async function ReportesPage({ searchParams }: Props) {
           <AdminCard
             actions={
               consolidado ? null : (
-                <Link className="text-sm font-medium text-primary hover:underline" href={`/admin/agenda?${filtrosExport}`}>
+                <Link className="inline-flex min-h-6 items-center text-sm font-medium text-primary hover:underline" href={`/admin/agenda?${filtrosExport}`}>
                   Ver agenda →
                 </Link>
               )
@@ -409,7 +426,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             />
           </AdminCard>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <AdminCard description="De dónde vienen las citas del período" title="Origen de las citas">
               <Tabla
                 encabezados={["Origen", "Citas"]}
@@ -446,7 +463,7 @@ export default async function ReportesPage({ searchParams }: Props) {
 
       {puedeFinancieros ? (
         <>
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <Kpi
               hint={etiquetaDelta(deltaKpi(vendido, vendidoAnt))}
               label="Vendido"
@@ -486,18 +503,18 @@ export default async function ReportesPage({ searchParams }: Props) {
           </section>
 
           {num(productosSinCosto[0]?.unidades) > 0 ? (
-            <p className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
+            <p className="rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning-soft-foreground">
               {productosSinCosto[0]?.productos} producto(s) vendidos en el periodo no tienen costo capturado
               ({productosSinCosto[0]?.unidades} unidad(es)). El «resultado estimado» no descuenta costo de
               insumos — captura el costo en el catálogo para márgenes reales.
             </p>
           ) : null}
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <AdminCard
               actions={
                 consolidado ? null : (
-                  <Link className="text-sm font-medium text-primary hover:underline" href={`/admin/ventas?${filtrosExport}`}>
+                  <Link className="inline-flex min-h-6 items-center text-sm font-medium text-primary hover:underline" href={`/admin/ventas?${filtrosExport}`}>
                     Ver historial →
                   </Link>
                 )
@@ -549,11 +566,11 @@ export default async function ReportesPage({ searchParams }: Props) {
             </AdminCard>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <AdminCard
               actions={
                 consolidado ? null : (
-                  <Link className="text-sm font-medium text-primary hover:underline" href={`/admin/comisiones?${filtrosExport}`}>
+                  <Link className="inline-flex min-h-6 items-center text-sm font-medium text-primary hover:underline" href={`/admin/comisiones?${filtrosExport}`}>
                     Ver detalle →
                   </Link>
                 )
@@ -575,7 +592,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             <AdminCard
               actions={
                 consolidado ? null : (
-                  <Link className="text-sm font-medium text-primary hover:underline" href={`/admin/gastos?${filtrosExport}`}>
+                  <Link className="inline-flex min-h-6 items-center text-sm font-medium text-primary hover:underline" href={`/admin/gastos?${filtrosExport}`}>
                     Ver detalle →
                   </Link>
                 )
@@ -621,7 +638,7 @@ export default async function ReportesPage({ searchParams }: Props) {
         <summary className="cursor-pointer font-semibold text-foreground select-none">
           ¿Cómo se calculan estas cifras?
         </summary>
-        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+        <dl className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {[
             ["Vendido", "Suma del total de ventas cobradas en el rango, por fecha de cobro. Las ventas canceladas no suman."],
             ["Ticket promedio", "Vendido ÷ número de ventas cobradas del rango."],

@@ -31,10 +31,17 @@ const mocks = vi.hoisted(() => {
   return {
     state,
     selectCalls: { count: 0 },
+    executeCalls: { count: 0 },
     db: {
       select: () => {
         mocks.selectCalls.count += 1;
         return chainable(state.results.shift() ?? []);
+      },
+      // El acceso se resuelve en UNA consulta (subselects jsonb): cada
+      // `execute` consume la fila fusionada encolada en `results`.
+      execute: () => {
+        mocks.executeCalls.count += 1;
+        return Promise.resolve({ rows: state.results.shift() ?? [] });
       },
     },
   };
@@ -72,6 +79,7 @@ function accessOf(partial: Partial<ResolvedAccess>): ResolvedAccess {
     membershipId: "mem-1",
     permissions: new Set(),
     branchIds: null,
+    sucursalesActivas: [],
     esPlataforma: false,
     soloLectura: false,
     ...partial,
@@ -81,6 +89,7 @@ function accessOf(partial: Partial<ResolvedAccess>): ResolvedAccess {
 beforeEach(() => {
   mocks.state.results = [];
   mocks.selectCalls.count = 0;
+  mocks.executeCalls.count = 0;
 });
 
 describe("hasPermission", () => {
@@ -123,20 +132,21 @@ describe("resolveAccessSafe", () => {
     expect(access?.esPlataforma).toBe(true);
     expect(access?.branchIds).toBeNull();
     expect(mocks.selectCalls.count).toBe(0);
+    expect(mocks.executeCalls.count).toBe(0);
   });
 
   it("usuario sin membresía activa en la organización → null", async () => {
-    mocks.state.results = [[]]; // sin fila de membresía
+    mocks.state.results = [
+      [{ acceso: { membership_id: null, permisos: [], sucursales: [], suscripcion: null } }],
+    ];
     const access = await resolveAccessSafe(ORG_B, member());
     expect(access).toBeNull();
+    expect(mocks.executeCalls.count).toBe(1);
   });
 
   it("miembro sin roles: permisos vacíos", async () => {
     mocks.state.results = [
-      [{ id: "mem-1" }], // membresía
-      [], // permisos
-      [], // asignaciones de sucursal
-      [], // sin suscripción → vigente (no solo lectura)
+      [{ acceso: { membership_id: "mem-1", permisos: [], sucursales: [], suscripcion: null } }],
     ];
     const access = await resolveAccessSafe(ORG_A, member());
     expect(access).not.toBeNull();
@@ -147,10 +157,16 @@ describe("resolveAccessSafe", () => {
 
   it("miembro con roles: unión de permisos y sucursales asignadas", async () => {
     mocks.state.results = [
-      [{ id: "mem-1" }],
-      [{ clave: "agenda.ver" }, { clave: "ventas.crear" }],
-      [{ sucursalId: SUC_A1 }],
-      [],
+      [
+        {
+          acceso: {
+            membership_id: "mem-1",
+            permisos: ["agenda.ver", "ventas.crear"],
+            sucursales: [SUC_A1],
+            suscripcion: null,
+          },
+        },
+      ],
     ];
     const access = await resolveAccessSafe(ORG_A, member());
     expect(access?.permissions.has("agenda.ver")).toBe(true);
@@ -162,14 +178,18 @@ describe("resolveAccessSafe", () => {
 
   it("trial vencido marca la organización como solo lectura", async () => {
     mocks.state.results = [
-      [{ id: "mem-1" }],
-      [{ clave: "agenda.ver" }, { clave: "ventas.crear" }],
-      [],
       [
         {
-          estado: "trialing",
-          trialTerminaAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-          periodoTerminaAt: null,
+          acceso: {
+            membership_id: "mem-1",
+            permisos: ["agenda.ver", "ventas.crear"],
+            sucursales: [],
+            suscripcion: {
+              estado: "trialing",
+              trial_termina_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+              periodo_termina_at: null,
+            },
+          },
         },
       ],
     ];

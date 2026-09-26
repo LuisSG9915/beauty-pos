@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 
 import { togglePaymentMethod } from "@/app/admin/medios-pago/actions";
 import { PaymentMethodForm } from "@/app/admin/medios-pago/payment-method-form";
+import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -77,22 +79,54 @@ export default async function PaymentMethodsPage({ searchParams }: { searchParam
         ) : null}
       </form>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-        <PaymentMethodForm initial={editing} key={`${editing?.id ?? "nuevo"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} />
-        <AdminCard
-          actions={
-            <Button nativeButton={false} render={<Link href={buildAdminHref("/medios-pago", { organizationId })} />}>
-              Nuevo
-            </Button>
-          }
-          className="self-start"
-          description={`${methods.length} resultado(s)`}
-          title="Medios registrados"
-        >
-          {methods.length === 0 ? (
-            <EmptyState description="Crea medios de pago como efectivo, tarjeta o transferencia para Cobrar." title="No hay medios de pago" />
-          ) : (
-            <div className="overflow-x-auto">
+      <AdminCard
+        actions={
+          <Button
+            data-action-clave="1" size="lg"
+            data-action-id="catalogo.medios_pago.nuevo"
+            nativeButton={false}
+            render={<Link href={buildAdminHref("/medios-pago", { organizationId, extra: { nuevo: "1", categoria: categoriaFilter || null } })} />}
+          >
+            Nuevo
+          </Button>
+        }
+        description={`${methods.length} resultado(s)`}
+        title="Medios registrados"
+      >
+        {methods.length === 0 ? (
+          <EmptyState description="Crea medios de pago como efectivo, tarjeta o transferencia para Cobrar." title="No hay medios de pago" />
+        ) : (
+          <>
+            <RegistroList>
+              {methods.map((method) => (
+                <RegistroCard
+                  acciones={
+                    <div className="flex flex-wrap gap-2">
+                      <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/medios-pago", { organizationId, extra: { edit: method.id, categoria: categoriaFilter || null } })}>Editar</Link>
+                      <form action={togglePaymentMethod}>
+                        <input name="organizacionId" type="hidden" value={organizationId} />
+                        <input name="id" type="hidden" value={method.id} />
+                        <input name="activo" type="hidden" value={String(method.activo)} />
+                        <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">{method.activo ? "Ocultar" : "Activar"}</button>
+                      </form>
+                    </div>
+                  }
+                  badge={<StatusBadge active={method.activo} />}
+                  campos={[{
+                    label: "Categoría",
+                    value: (
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${CATEGORIA_COLOR[method.categoria] ?? CATEGORIA_COLOR.otro}`}>
+                        {CATEGORIA_LABEL[method.categoria] ?? method.categoria}
+                      </span>
+                    ),
+                  }]}
+                  key={method.id}
+                  subtitulo={<span className="font-mono">{method.clave}</span>}
+                  titulo={method.nombre}
+                />
+              ))}
+            </RegistroList>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[520px] text-left text-sm">
                 <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
@@ -116,7 +150,7 @@ export default async function PaymentMethodsPage({ searchParams }: { searchParam
                       <td className="py-3 pr-4"><StatusBadge active={method.activo} /></td>
                       <td className="py-3">
                         <div className="flex flex-wrap gap-2">
-                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/medios-pago", { organizationId, extra: { edit: method.id } })}>Editar</Link>
+                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/medios-pago", { organizationId, extra: { edit: method.id, categoria: categoriaFilter || null } })}>Editar</Link>
                           <form action={togglePaymentMethod}>
                             <input name="organizacionId" type="hidden" value={organizationId} />
                             <input name="id" type="hidden" value={method.id} />
@@ -130,9 +164,18 @@ export default async function PaymentMethodsPage({ searchParams }: { searchParam
                 </tbody>
               </table>
             </div>
-          )}
-        </AdminCard>
-      </div>
+          </>
+        )}
+      </AdminCard>
+      {editing || firstParam(params.nuevo) === "1" ? (
+        <FormSheet
+          closeHref={buildAdminHref("/medios-pago", { organizationId, extra: { categoria: categoriaFilter || null } })}
+          description={editing ? "Ajusta los datos del medio de pago." : "Crea un medio de pago para cobrar en el POS."}
+          title={editing ? "Editar medio de pago" : "Nuevo medio de pago"}
+        >
+          <PaymentMethodForm initial={editing} key={`${editing?.id ?? "nuevo"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} />
+        </FormSheet>
+      ) : null}
     </div>
   );
 }

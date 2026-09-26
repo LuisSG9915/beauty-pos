@@ -49,7 +49,7 @@ export function GastoForm({
           <Input name="concepto" placeholder="Renta del local, insumos, luz…" required />
         </Field>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel required>Fecha del gasto</FieldLabel>
             <Input defaultValue={fechaHoy} name="fechaGasto" type="date" required />
@@ -60,7 +60,7 @@ export function GastoForm({
           </Field>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel required>Medio de pago</FieldLabel>
             <Select name="medioPagoId" required>
@@ -83,7 +83,7 @@ export function GastoForm({
           </Field>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel>Proveedor</FieldLabel>
             <Input name="proveedor" placeholder="Opcional" />
@@ -103,7 +103,7 @@ export function GastoForm({
       <div className="mt-4">
         <ActionFeedback state={state} />
       </div>
-      <Button className="mt-5 rounded-xl" disabled={pending} type="submit">
+      <Button className="mt-5 rounded-xl" data-action-clave="1" size="lg" data-action-id="gastos.gasto.registrar" disabled={pending} type="submit">
         {pending ? "Registrando…" : "Registrar gasto"}
       </Button>
     </form>

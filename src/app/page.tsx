@@ -134,7 +134,7 @@ export default function Home() {
                 <p className="mt-1 font-serif text-xl font-semibold">Casa Magnolia</p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="rounded-full border border-border px-2.5 py-1 text-[10px] font-medium text-muted-foreground">
+                <span className="rounded-full border border-border px-2.5 py-1 text-op-xs font-medium text-muted-foreground">
                   Ejemplo ilustrativo
                 </span>
                 <div className="rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-accent-foreground">Hoy, 8 sep</div>
@@ -170,7 +170,7 @@ export default function Home() {
                       <p className="truncate text-sm font-medium">{name}</p>
                       <p className="truncate text-xs text-muted-foreground">{service}</p>
                     </div>
-                    <span className="rounded-full bg-muted px-2 py-1 text-[10px] text-muted-foreground">{status}</span>
+                    <span className="rounded-full bg-muted px-2 py-1 text-op-xs text-muted-foreground">{status}</span>
                   </div>
                 ))}
               </div>

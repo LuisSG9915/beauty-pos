@@ -67,7 +67,7 @@ export function LiquidarForm({
           <Input name="notas" placeholder="Opcional" />
         </Field>
         <ActionFeedback state={state} />
-        <Button disabled={pending} size="sm" type="submit">
+        <Button data-action-clave="1" data-action-id="comisiones.liquidacion.confirmar" disabled={pending} size="lg" type="submit">
           {pending ? "Liquidando…" : "Confirmar pago de comisiones"}
         </Button>
       </form>

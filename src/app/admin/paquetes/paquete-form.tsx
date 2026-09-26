@@ -39,7 +39,7 @@ export function PaqueteForm({
       <p className="mt-1 text-sm text-muted-foreground">
         Sesiones prepagadas de un servicio: el cliente paga por adelantado y consume una sesión por visita.
       </p>
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel required>Clave</FieldLabel>
           <Input defaultValue={String(value("clave"))} name="clave" placeholder="DEPILA5" required />

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { Calendar, CalendarPlus, ShoppingCart, Users, Wallet, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
@@ -16,9 +16,9 @@ import { billingEventos, planes, suscripciones } from "@/db/schema/billing";
 import { organizaciones, sucursales } from "@/db/schema/core";
 import { ventas } from "@/db/schema/operations";
 import { telemetriaEventos } from "@/db/schema/telemetry";
-import { getAccessibleOrganizations } from "@/lib/admin-context";
-import { requireAuthenticatedUser, requirePlatformAdmin } from "@/lib/auth/access";
-import { resolveAccessSafe } from "@/lib/auth/authorization";
+import { getSessionOrRedirect, requirePlatformAdmin } from "@/lib/auth/access";
+import { redirect } from "next/navigation";
+import { resolveAccessSafe, resolveSessionContext } from "@/lib/auth/authorization";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { cargarAlertas, type AlertaOperativa } from "@/modules/alertas/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
@@ -70,8 +70,8 @@ function MemberDashboard({
             </Button>
           ) : undefined
         }
-        description="Tu acceso fue configurado correctamente. Estas son las sucursales asignadas a tu cuenta."
-        title={`Bienvenido, ${name}`}
+        description="Esto pasa hoy en tu salón. Toca una sucursal para abrir su agenda."
+        title={`Hola, ${name}`}
       />
       {first && checklist ? (
         <GuiaChecklistCard
@@ -123,16 +123,16 @@ function MemberDashboard({
       {access.length === 0 ? (
         <EmptyState description="Tu cuenta todavía no tiene una sucursal asignada. Contacta al administrador." title="Sin sucursal asignada" />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {access.map((item) => (
             <Link
               className="rounded-2xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-accent-foreground/30 focus-visible:outline-2 focus-visible:outline-ring"
               href={buildAdminHref("/agenda", { organizationId: item.organizationId, sucursalId: item.branchId })}
               key={`${item.organizationId}-${item.branchId}`}
             >
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Organización</p>
-              <h2 className="mt-2 text-xl font-semibold text-foreground">{item.organization}</h2>
-              <p className="mt-3 text-sm text-muted-foreground">Sucursal: {item.branch} ({item.branchKey})</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{item.organization}</p>
+              <h2 className="mt-2 text-xl font-semibold text-foreground">{item.branch}</h2>
+              <p className="mt-3 text-sm text-muted-foreground">Toca para abrir la agenda de hoy</p>
             </Link>
           ))}
         </div>
@@ -198,36 +198,46 @@ const ACCIONES_HOY: Array<{
 export default async function AdminPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
   const error = firstParam(params.error);
-  const { session, user } = await requireAuthenticatedUser();
+  const session = await getSessionOrRedirect();
   const db = getDatabase();
 
+  // Usuario + organizaciones en la consulta de contexto única.
+  const contextRow = await resolveSessionContext(session.user.id, null);
+  const user = contextRow.usuario;
+  if (!user) {
+    redirect("/login?error=account-not-configured");
+  }
+
   if (!user.esAdministradorPlataforma) {
-    const organizations = await getAccessibleOrganizations(db, user);
+    const organizations = contextRow.organizaciones;
     const access: Array<{ organization: string; branch: string; branchKey: string; organizationId: string; branchId: string }> = [];
     const permissionsByOrg: Record<string, string[]> = {};
     const alertasByOrg: Record<string, AlertaOperativa[]> = {};
 
-    for (const org of organizations) {
-      const resolved = await resolveAccessSafe(org.id, user);
+    // Todas las organizaciones en paralelo: el acceso ya trae las sucursales
+    // activas embebidas, así que no hace falta consultar `sucursales` otra vez.
+    const porOrganizacion = await Promise.all(
+      organizations.map(async (org) => {
+        const resolved = await resolveAccessSafe(org.id, user);
+        const alertas = resolved
+          ? await cargarAlertas(db, {
+              organizacionId: org.id,
+              sucursalIds: resolved.branchIds ? [...resolved.branchIds] : null,
+              permisos: resolved.permissions,
+            })
+          : [];
+        return { org, resolved, alertas };
+      }),
+    );
+
+    for (const { org, resolved, alertas } of porOrganizacion) {
       permissionsByOrg[org.id] = resolved ? [...resolved.permissions] : [];
-      alertasByOrg[org.id] = resolved
-        ? await cargarAlertas(db, {
-            organizacionId: org.id,
-            sucursalIds: resolved.branchIds ? [...resolved.branchIds] : null,
-            permisos: resolved.permissions,
-          })
-        : [];
-      const branchConditions = [eq(sucursales.organizacionId, org.id), eq(sucursales.activo, true)];
+      alertasByOrg[org.id] = alertas;
       // null = alcance de toda la organización; Set = solo asignadas.
-      if (resolved?.branchIds) {
-        if (resolved.branchIds.size === 0) continue;
-        branchConditions.push(inArray(sucursales.id, [...resolved.branchIds]));
-      }
-      const branchRows = await db
-        .select({ id: sucursales.id, nombre: sucursales.nombre, clave: sucursales.clave })
-        .from(sucursales)
-        .where(and(...branchConditions))
-        .orderBy(asc(sucursales.nombre));
+      if (resolved?.branchIds && resolved.branchIds.size === 0) continue;
+      const branchRows = (resolved?.sucursalesActivas ?? []).filter(
+        (branch) => resolved?.branchIds == null || resolved.branchIds.has(branch.id),
+      );
       for (const branch of branchRows) {
         access.push({
           organization: org.nombre,
@@ -389,10 +399,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         description="Registro → prueba → primer cobro → pago. Sobre datos reales de suscripciones y ventas."
         title="Embudo del piloto"
       >
-        <dl className="grid gap-3 sm:grid-cols-5">
+        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-5">
           {embudo.map((etapa) => (
             <div className="rounded-xl bg-muted/60 px-3 py-2" key={etapa.etiqueta}>
-              <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{etapa.etiqueta}</dt>
+              <dt className="text-op-xs uppercase tracking-wide text-muted-foreground">{etapa.etiqueta}</dt>
               <dd className="mt-0.5 text-lg font-semibold text-foreground">
                 {etapa.valor}
                 {etapa.pct != null ? <span className="ml-1 text-xs font-normal text-muted-foreground">{etapa.pct}%</span> : null}
@@ -410,7 +420,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           const conversion = tot.visitas > 0 ? Math.round((tot.atribuidos / tot.visitas) * 100) : 0;
           return (
             <>
-              <dl className="grid gap-3 sm:grid-cols-4">
+              <dl className="grid grid-cols-1 gap-3 sm:grid-cols-4">
                 {[
                   { etiqueta: "Visitas únicas", valor: tot.visitas },
                   { etiqueta: "Registros", valor: tot.registros },
@@ -418,7 +428,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                   { etiqueta: "Conversión visita→registro", valor: `${conversion}%` },
                 ].map((etapa) => (
                   <div className="rounded-xl bg-muted/60 px-3 py-2" key={etapa.etiqueta}>
-                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{etapa.etiqueta}</dt>
+                    <dt className="text-op-xs uppercase tracking-wide text-muted-foreground">{etapa.etiqueta}</dt>
                     <dd className="mt-0.5 text-lg font-semibold text-foreground">{etapa.valor}</dd>
                   </div>
                 ))}
@@ -433,7 +443,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           );
         })()}
       </AdminCard>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <OrganizationForm />
         <AdminCard description={`${organizations.length} organización(es)`} title="Organizaciones registradas">
           {organizations.length === 0 ? (

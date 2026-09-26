@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowRight, LockKeyhole, Mail } from "lucide-react";
+import Link from "next/link";
 import { FormEvent, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
@@ -82,10 +83,16 @@ export function LoginForm() {
         </p>
       ) : null}
 
-      <Button className="h-11 w-full rounded-xl" disabled={isPending} type="submit">
+      <Button className="h-11 w-full rounded-xl" data-action-clave="1" data-action-id="auth.login.entrar" disabled={isPending} type="submit">
         {isPending ? "Validando acceso..." : "Iniciar sesión"}
         {!isPending ? <ArrowRight className="size-4" /> : null}
       </Button>
+
+      <p className="text-center">
+        <Link className="inline-flex min-h-6 items-center text-sm font-medium text-primary underline-offset-4 hover:underline" href="/recuperar">
+          ¿Olvidaste tu contraseña?
+        </Link>
+      </p>
 
       <p className="text-center text-xs leading-5 text-muted-foreground">
         El acceso se habilita mediante una invitación administrativa.

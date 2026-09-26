@@ -11,6 +11,12 @@
   ],
   "compatibility_date": "2026-09-07",
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  // El Worker hace varias consultas por request a CockroachDB (aws-us-east-2).
+  // Correr junto a la BD convierte cada ronda DFW→Ohio (~80 ms) en ~3 ms; el
+  // usuario solo paga una ida extra. Revertir quitando esta clave + deploy.
+  "placement": {
+    "region": "aws:us-east-2"
+  },
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
@@ -28,6 +34,15 @@
     {
       "binding": "HYPERDRIVE",
       "id": "1e6092cc079c4f5c86a5d4bca6ddc7e4"
+    }
+  ],
+  // Caché de datos fríos (suscripción vigente, catálogo de planes) para
+  // ahorrar rondas a CockroachDB en cada navegación. `src/lib/kv-cache.ts`
+  // degrada a miss cuando el binding no existe (desarrollo local).
+  "kv_namespaces": [
+    {
+      "binding": "CACHE_KV",
+      "id": "0fd2b9c97f8e4819b2c4b9f15e87cb81"
     }
   ],
   "upload_source_maps": true

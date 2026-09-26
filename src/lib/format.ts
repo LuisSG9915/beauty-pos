@@ -9,6 +9,37 @@ export const EMPTY_VALUE = "—";
 
 const DATE_INPUT_RE = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * Formateadores Intl reutilizados por (locale, zona/variante): construirlos es
+ * costoso y la agenda llega a formatear cientos de celdas por render.
+ */
+const numberFormatters = new Map<string, Intl.NumberFormat>();
+const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function currencyFormatter(locale: string, currency: string): Intl.NumberFormat {
+  const key = `${locale}|${currency}`;
+  let formatter = numberFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale, { style: "currency", currency });
+    numberFormatters.set(key, formatter);
+  }
+  return formatter;
+}
+
+function dateTimeFormatter(
+  locale: string,
+  timeZone: string,
+  options: Intl.DateTimeFormatOptions,
+): Intl.DateTimeFormat {
+  const key = `${locale}|${timeZone}|${JSON.stringify(options)}`;
+  let formatter = dateTimeFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, { ...options, timeZone });
+    dateTimeFormatters.set(key, formatter);
+  }
+  return formatter;
+}
+
 export type FormatOptions = {
   locale?: string;
   timeZone?: string;
@@ -58,10 +89,7 @@ export function formatCurrency(
   if (amount === null || amount === undefined || Number.isNaN(amount)) {
     return EMPTY_VALUE;
   }
-  return new Intl.NumberFormat(options.locale ?? DEFAULT_LOCALE, {
-    style: "currency",
-    currency: options.currency ?? "MXN",
-  }).format(amount);
+  return currencyFormatter(options.locale ?? DEFAULT_LOCALE, options.currency ?? "MXN").format(amount);
 }
 
 /**
@@ -73,9 +101,8 @@ export function formatDate(
 ): string {
   const date = toDate(value);
   if (!date) return EMPTY_VALUE;
-  return new Intl.DateTimeFormat(options.locale ?? DEFAULT_LOCALE, {
+  return dateTimeFormatter(options.locale ?? DEFAULT_LOCALE, options.timeZone ?? DEFAULT_TIME_ZONE, {
     dateStyle: "medium",
-    timeZone: options.timeZone ?? DEFAULT_TIME_ZONE,
   }).format(date);
 }
 
@@ -88,10 +115,9 @@ export function formatTime(
 ): string {
   const date = toDate(value);
   if (!date) return EMPTY_VALUE;
-  return new Intl.DateTimeFormat(options.locale ?? DEFAULT_LOCALE, {
+  return dateTimeFormatter(options.locale ?? DEFAULT_LOCALE, options.timeZone ?? DEFAULT_TIME_ZONE, {
     hour: "2-digit",
     minute: "2-digit",
-    timeZone: options.timeZone ?? DEFAULT_TIME_ZONE,
   }).format(date);
 }
 
@@ -104,10 +130,9 @@ export function formatDateTime(
 ): string {
   const date = toDate(value);
   if (!date) return EMPTY_VALUE;
-  return new Intl.DateTimeFormat(options.locale ?? DEFAULT_LOCALE, {
+  return dateTimeFormatter(options.locale ?? DEFAULT_LOCALE, options.timeZone ?? DEFAULT_TIME_ZONE, {
     dateStyle: "medium",
     timeStyle: "short",
-    timeZone: options.timeZone ?? DEFAULT_TIME_ZONE,
   }).format(date);
 }
 

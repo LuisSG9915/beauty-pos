@@ -1,15 +1,19 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { MemberInviteForm } from "@/app/admin/usuarios/member-invite-form";
 import { MemberCard, PendingInvitations, type MemberRow } from "@/app/admin/usuarios/member-card";
-import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { FormSheet } from "@/components/admin/form-sheet";
+import { AdminPageHeader } from "@/components/admin/page-header";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { getDatabase } from "@/db/client";
 import { catRoles, invitacionesUsuarios, relMiembrosRoles } from "@/db/schema/access";
 import { miembrosOrganizaciones, relUsuariosSucursales, sucursales, usuarios } from "@/db/schema/core";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
+import { buildAdminHref, firstParam } from "@/lib/url-context";
 
 export const dynamic = "force-dynamic";
 
@@ -105,10 +109,23 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Sea
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        actions={
+          canInvite ? (
+            <Button
+              data-action-clave="1"
+              data-action-id="usuarios.invitacion.abrir_formulario"
+              nativeButton={false}
+              render={<Link href={buildAdminHref("/usuarios", { organizationId, extra: { nuevo: "invitacion" } })} />}
+              size="lg"
+            >
+              Invitar miembro
+            </Button>
+          ) : undefined
+        }
         description="Miembros de la organización, sus roles y sucursales asignadas."
         title="Equipo"
       />
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <div className="space-y-4">
           {members.length === 0 ? (
             <EmptyState description="Todavía no hay miembros en esta organización." title="Sin miembros" />
@@ -128,15 +145,6 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Sea
           )}
         </div>
         <div className="space-y-4">
-          {canInvite ? (
-            <AdminCard description="El correo recibirá un enlace de acceso." title="Invitar miembro">
-              <MemberInviteForm
-                branches={assignableBranches}
-                organizationId={organizationId}
-                roles={roles.map((r) => ({ id: r.id, nombre: r.nombre }))}
-              />
-            </AdminCard>
-          ) : null}
           <PendingInvitations
             canCancel={canInvite}
             invitations={invitations.map((inv) => ({
@@ -151,6 +159,20 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Sea
           />
         </div>
       </div>
+
+      {canInvite && firstParam(params.nuevo) === "invitacion" ? (
+        <FormSheet
+          closeHref={buildAdminHref("/usuarios", { organizationId })}
+          description="El correo recibirá un enlace de acceso."
+          title="Invitar miembro"
+        >
+          <MemberInviteForm
+            branches={assignableBranches}
+            organizationId={organizationId}
+            roles={roles.map((r) => ({ id: r.id, nombre: r.nombre }))}
+          />
+        </FormSheet>
+      ) : null}
     </div>
   );
 }

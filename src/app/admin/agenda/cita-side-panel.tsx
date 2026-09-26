@@ -24,7 +24,8 @@ import {
   getCitaAnticipos,
   type CitaAnticipo,
 } from "@/app/admin/pos/actions";
-import type { AgendaCita, AgendaRecurso } from "@/app/admin/agenda/agenda-board";
+import type { AgendaCita, AgendaRecurso } from "@/app/admin/agenda/agenda-types";
+import { EstadoVistaBadge } from "@/app/admin/agenda/cita-card";
 import { FichaForm } from "@/app/admin/clientes/ficha-form";
 import { StatusBadge, type StatusTone } from "@/components/status-badge";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
@@ -40,34 +41,7 @@ import {
   canTransitionEstado,
   isCitaEditable,
 } from "@/modules/agenda";
-
-// Etiquetas/tonos de estado compartidos con agenda-board (tarjetas y lista).
-const ESTADO_TONE: Record<string, StatusTone> = {
-  pendiente: "neutral",
-  confirmada: "info",
-  en_proceso: "warning",
-  completada: "success",
-  cancelada: "destructive",
-  no_asistio: "neutral",
-};
-
-const ESTADO_LABEL: Record<string, string> = {
-  pendiente: "Pendiente",
-  confirmada: "Confirmada",
-  en_proceso: "En proceso",
-  completada: "Completada",
-  cancelada: "Cancelada",
-  no_asistio: "No asistió",
-};
-
-const TRANSITION_LABEL: Record<string, string> = {
-  confirmada: "Confirmar",
-  en_proceso: "Cliente llegó",
-  cancelada: "Cancelar cita",
-  no_asistio: "No asistió",
-};
-
-export { ESTADO_LABEL };
+import { ESTADO_BD_LABEL, TRANSICION_LABEL } from "@/modules/agenda/estados";
 
 const HISTORIAL_LABEL: Record<string, string> = {
   creada: "Cita creada",
@@ -88,7 +62,7 @@ const HISTORIAL_LABEL: Record<string, string> = {
 function historialResumen(evento: CitaHistorialEvento): string {
   const detalle = evento.detalle ?? {};
   if (evento.accion === "estado") {
-    return `${ESTADO_LABEL[String(detalle.de)] ?? String(detalle.de)} → ${ESTADO_LABEL[String(detalle.a)] ?? String(detalle.a)}`;
+    return `${ESTADO_BD_LABEL[String(detalle.de)] ?? String(detalle.de)} → ${ESTADO_BD_LABEL[String(detalle.a)] ?? String(detalle.a)}`;
   }
   if ((evento.accion === "movida" || evento.accion === "reagendada") && detalle.fechaHoraA) {
     return `nueva hora: ${formatTime(String(detalle.fechaHoraA))}`;
@@ -438,12 +412,9 @@ function CitaAnticipos({
   );
 }
 
-export function CitaStatusBadge({ estado }: { estado: string }) {
-  return (
-    <StatusBadge tone={ESTADO_TONE[estado] ?? "neutral"}>
-      {ESTADO_LABEL[estado] ?? estado}
-    </StatusBadge>
-  );
+/** Compatibilidad: badge de estado para vistas con solo `estado` (mi-día). */
+export function CitaStatusBadge({ estado, ventaId = null }: { estado: string; ventaId?: string | null }) {
+  return <EstadoVistaBadge cita={{ estado, ventaId }} />;
 }
 
 type AgendaServicio = {
@@ -580,7 +551,7 @@ export function CitaSidePanel({
                 cita.clienteNombre
               )}
             </h2>
-            <CitaStatusBadge estado={cita.estado} />
+            <EstadoVistaBadge cita={cita} />
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {formatDate(cita.fechaHora, { timeZone })} · {formatTime(cita.fechaHora, { timeZone })} ·{" "}
@@ -618,7 +589,7 @@ export function CitaSidePanel({
               size="touch"
               type="button"
             >
-              <UserCheck aria-hidden="true" /> Cliente llegó
+              <UserCheck aria-hidden="true" /> {TRANSICION_LABEL.en_proceso}
             </Button>
           ) : null}
           {puedeCobrar ? (
@@ -771,7 +742,7 @@ export function CitaSidePanel({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-warning">
             Notas del cliente / alergias
           </h3>
-          <p className="mt-2 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm leading-6 text-warning">
+          <p className="mt-2 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm leading-6 text-warning-soft-foreground">
             {cita.clienteNotas}
           </p>
         </section>
@@ -827,7 +798,7 @@ export function CitaSidePanel({
             type="button"
             variant="outline"
           >
-            <RefreshCcw aria-hidden="true" /> Reagendar
+            <RefreshCcw aria-hidden="true" /> Cambiar fecha
           </Button>
         ) : null}
         {puedeConfirmar ? (
@@ -838,7 +809,7 @@ export function CitaSidePanel({
             type="button"
             variant="outline"
           >
-            <Check aria-hidden="true" /> {TRANSITION_LABEL.confirmada}
+            <Check aria-hidden="true" /> {TRANSICION_LABEL.confirmada}
           </Button>
         ) : null}
       </div>
@@ -848,27 +819,27 @@ export function CitaSidePanel({
       <div className="flex flex-wrap gap-2 border-t border-border pt-4">
         {puedeCancelar ? (
           <ConfirmDialog
-            confirmLabel={TRANSITION_LABEL.cancelada}
-            description={`La cita pasará a "${ESTADO_LABEL.cancelada}".`}
+            confirmLabel={TRANSICION_LABEL.cancelada}
+            description={`La cita pasará a "${ESTADO_BD_LABEL.cancelada}".`}
             onConfirm={() => onTransition(cita, "cancelada")}
             title="Cancelar esta cita?"
             trigger={
               <Button className="rounded-xl" disabled={ocupado} type="button" variant="destructive">
-                {TRANSITION_LABEL.cancelada}
+                {TRANSICION_LABEL.cancelada}
               </Button>
             }
           />
         ) : null}
         {puedeNoAsistio ? (
           <ConfirmDialog
-            confirmLabel={TRANSITION_LABEL.no_asistio}
-            description={`La cita pasará a "${ESTADO_LABEL.no_asistio}".`}
+            confirmLabel={TRANSICION_LABEL.no_asistio}
+            description={`La cita pasará a "${ESTADO_BD_LABEL.no_asistio}".`}
             destructive={false}
             onConfirm={() => onTransition(cita, "no_asistio")}
             title="Marcar como no asistió?"
             trigger={
               <Button className="rounded-xl" disabled={ocupado} type="button" variant="outline">
-                {TRANSITION_LABEL.no_asistio}
+                {TRANSICION_LABEL.no_asistio}
               </Button>
             }
           />

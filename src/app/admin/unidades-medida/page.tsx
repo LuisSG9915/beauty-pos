@@ -5,7 +5,9 @@ import { notFound } from "next/navigation";
 import { toggleUnit } from "@/app/admin/unidades-medida/actions";
 import { UnitForm } from "@/app/admin/unidades-medida/unit-form";
 import { CrudRowActions } from "@/components/admin/crud-actions";
+import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -48,22 +50,44 @@ export default async function UnitsPage({ searchParams }: { searchParams: Search
         description="Unidades usadas por productos e insumos en inventario."
         title="Unidades de medida"
       />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-        <UnitForm initial={editing} key={`${editing?.id ?? "nueva"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} />
-        <AdminCard
-          actions={
-            <Button nativeButton={false} render={<Link href={buildAdminHref("/unidades-medida", { organizationId })} />}>
-              Nueva
-            </Button>
-          }
-          className="self-start"
-          description={`${units.length} resultado(s)`}
-          title="Unidades registradas"
-        >
-          {units.length === 0 ? (
-            <EmptyState description="Crea unidades como pieza, litro, gramo o mililitro para el inventario." title="No hay unidades" />
-          ) : (
-            <div className="overflow-x-auto">
+      <AdminCard
+        actions={
+          <Button
+            data-action-clave="1" size="lg"
+            data-action-id="catalogo.unidades_medida.nueva"
+            nativeButton={false}
+            render={<Link href={buildAdminHref("/unidades-medida", { organizationId, extra: { nuevo: "1" } })} />}
+          >
+            Nueva
+          </Button>
+        }
+        description={`${units.length} resultado(s)`}
+        title="Unidades registradas"
+      >
+        {units.length === 0 ? (
+          <EmptyState description="Crea unidades como pieza, litro, gramo o mililitro para el inventario." title="No hay unidades" />
+        ) : (
+          <>
+            <RegistroList>
+              {units.map((unit) => (
+                <RegistroCard
+                  acciones={
+                    <CrudRowActions
+                      activo={unit.activo}
+                      editHref={buildAdminHref("/unidades-medida", { organizationId, extra: { edit: unit.id } })}
+                      id={unit.id}
+                      organizationId={organizationId}
+                      toggleAction={toggleUnit}
+                    />
+                  }
+                  badge={<StatusBadge active={unit.activo} />}
+                  key={unit.id}
+                  subtitulo={<span className="font-mono">{unit.clave}</span>}
+                  titulo={unit.nombre}
+                />
+              ))}
+            </RegistroList>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[440px] text-left text-sm">
                 <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
@@ -93,9 +117,18 @@ export default async function UnitsPage({ searchParams }: { searchParams: Search
                 </tbody>
               </table>
             </div>
-          )}
-        </AdminCard>
-      </div>
+          </>
+        )}
+      </AdminCard>
+      {editing || firstParam(params.nuevo) === "1" ? (
+        <FormSheet
+          closeHref={buildAdminHref("/unidades-medida", { organizationId })}
+          description={editing ? "Ajusta los datos de la unidad." : "Crea una unidad para el inventario."}
+          title={editing ? "Editar unidad" : "Nueva unidad"}
+        >
+          <UnitForm initial={editing} key={`${editing?.id ?? "nueva"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} />
+        </FormSheet>
+      ) : null}
     </div>
   );
 }

@@ -72,7 +72,7 @@ export default async function IncidentesPage({
       />
 
       <AdminCard title="Filtros">
-        <form className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6" method="get">
+        <form className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6" method="get">
           <Field>
             <FieldLabel htmlFor="estado">Estado</FieldLabel>
             <Select defaultValue={filtros.estado} id="estado" name="estado">

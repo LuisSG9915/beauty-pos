@@ -5,6 +5,7 @@ import type { NodePgDatabase, NodePgTransaction } from "drizzle-orm/node-postgre
 
 import { getDatabase } from "@/db/client";
 import { invitacionesUsuarios } from "@/db/schema/access";
+import { kvInvalidate, kvReadThrough } from "@/lib/kv-cache";
 import { planes, suscripciones } from "@/db/schema/billing";
 import { miembrosOrganizaciones, sucursales } from "@/db/schema/core";
 import { CAPACIDADES, type CapacidadClave } from "./capacidades";
@@ -72,14 +73,56 @@ export async function getSuscripcionActual(
   return row ?? null;
 }
 
+// TTL corto + invalidación explícita en cada escritura de `suscripciones`
+// (service.ts, billing-actions.ts, suscripcion/actions.ts). Los campos fecha
+// viajan serializados y se rehidratan al leer.
+const SUSCRIPCION_CACHE_TTL_S = 300;
+const suscripcionCacheKey = (organizacionId: string) => `suscripcion:${organizacionId}`;
+
+/** Invalida el caché KV de la suscripción tras cualquier escritura. */
+export async function invalidarSuscripcionCache(organizacionId: string): Promise<void> {
+  await kvInvalidate(suscripcionCacheKey(organizacionId));
+}
+
+type SuscripcionSerializada = Omit<SuscripcionActual, "trialTerminaAt" | "periodoTerminaAt" | "canceladaAt"> & {
+  trialTerminaAt: string | null;
+  periodoTerminaAt: string | null;
+  canceladaAt: string | null;
+};
+
+function serializarSuscripcion(suscripcion: SuscripcionActual | null): SuscripcionSerializada | null {
+  if (!suscripcion) return null;
+  return {
+    ...suscripcion,
+    trialTerminaAt: suscripcion.trialTerminaAt?.toISOString() ?? null,
+    periodoTerminaAt: suscripcion.periodoTerminaAt?.toISOString() ?? null,
+    canceladaAt: suscripcion.canceladaAt?.toISOString() ?? null,
+  };
+}
+
+function deserializarSuscripcion(row: SuscripcionSerializada | null): SuscripcionActual | null {
+  if (!row) return null;
+  return {
+    ...row,
+    trialTerminaAt: row.trialTerminaAt ? new Date(row.trialTerminaAt) : null,
+    periodoTerminaAt: row.periodoTerminaAt ? new Date(row.periodoTerminaAt) : null,
+    canceladaAt: row.canceladaAt ? new Date(row.canceladaAt) : null,
+  };
+}
+
 /**
- * Versión deduplicada por request (`React.cache`) para lecturas de páginas y
- * layouts. Las server actions deben seguir usando `getSuscripcionActual` con su
- * `db`/transacción explícita: la cache solo aplica a la conexión por defecto.
+ * Versión deduplicada por request (`React.cache`) + caché KV entre requests
+ * para lecturas de páginas y layouts. Las server actions deben seguir usando
+ * `getSuscripcionActual` con su `db`/transacción explícita: la cache solo
+ * aplica a la conexión por defecto.
  */
 export const getSuscripcionActualCache = cache(
   async (organizacionId: string): Promise<SuscripcionActual | null> =>
-    getSuscripcionActual(organizacionId),
+    deserializarSuscripcion(
+      await kvReadThrough(suscripcionCacheKey(organizacionId), SUSCRIPCION_CACHE_TTL_S, async () =>
+        serializarSuscripcion(await getSuscripcionActual(organizacionId)),
+      ),
+    ),
 );
 
 /**
@@ -102,14 +145,45 @@ export async function getPlanPorClave(clave: string) {
   return row ?? null;
 }
 
-/** Planes activos del catálogo para el portal de precios y la suscripción. */
-export async function getPlanesActivos() {
-  const db = getDatabase();
-  return db
-    .select()
-    .from(planes)
-    .where(eq(planes.activo, true))
-    .orderBy(planes.orden, planes.precioMensual);
+const PLANES_CACHE_TTL_S = 3600;
+const PLANES_CACHE_KEY = "planes:activos:v1";
+
+type PlanRow = typeof planes.$inferSelect;
+type PlanSerializado = Omit<PlanRow, "createdAt" | "updatedAt"> & {
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** Invalida el caché KV del catálogo de planes (seed/cambios de planes). */
+export async function invalidarPlanesCache(): Promise<void> {
+  await kvInvalidate(PLANES_CACHE_KEY);
+}
+
+/**
+ * Planes activos del catálogo para el portal de precios y la suscripción.
+ * Catálogo casi estático: read-through en KV con TTL de 1 h; el seed de
+ * planes llama `invalidarPlanesCache` al terminar.
+ */
+export async function getPlanesActivos(): Promise<PlanRow[]> {
+  const rows = await kvReadThrough<PlanSerializado[]>(PLANES_CACHE_KEY, PLANES_CACHE_TTL_S, async () => {
+    const db = getDatabase();
+    const data = await db
+      .select()
+      .from(planes)
+      .where(eq(planes.activo, true))
+      .orderBy(planes.orden, planes.precioMensual);
+    // Las columnas fecha se serializan a ISO en KV; se rehidratan al leer.
+    return data.map((row) => ({
+      ...row,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+    }));
+  });
+  return rows.map((row) => ({
+    ...row,
+    createdAt: new Date(row.createdAt),
+    updatedAt: new Date(row.updatedAt),
+  }));
 }
 
 /**

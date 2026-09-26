@@ -34,6 +34,7 @@ import { Field, FieldLabel, Input } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
 import { initialActionState, type ActionState } from "@/lib/action-state";
 import { formatCurrency } from "@/lib/format";
+import { GLOSARIO } from "@/lib/glosario";
 import { formaPagoDesdeCategoria } from "@/modules/facturacion/sat";
 import type { TicketData } from "@/modules/pos/ticket";
 
@@ -447,7 +448,7 @@ function AjusteMedioPagoForm({
       <input name="organizacionId" type="hidden" value={organizationId} />
       <input name="ventaId" type="hidden" value={ventaId} />
       <input name="pagoId" type="hidden" value={pago.id} />
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
           <span>Nuevo medio</span>
           <select className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal" name="medioPagoId" onChange={(event) => setMedioPagoId(event.target.value)} required value={medioPagoId}>
@@ -583,7 +584,7 @@ export function VentaTicket({
   };
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -592,7 +593,7 @@ export function VentaTicket({
             </h2>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <span>
-                Cliente: {venta.clienteNombre ?? "Walk-in"}
+                Cliente: {venta.clienteNombre ?? GLOSARIO.clienteDePaso}
                 {venta.citaId ? " · desde cita" : ""}
               </span>
               {editable && catalogoClientes.length > 0 ? (
@@ -1464,7 +1465,7 @@ function DevolucionParcialPanel({
             Volver
           </Button>
         </div>
-        <p className="text-[11px] leading-4 text-muted-foreground">
+        <p className="text-op-xs leading-4 text-muted-foreground">
           El descuento del ticket se prorratea en el monto devuelto; el stock de productos vuelve a inventario.
         </p>
       </form>

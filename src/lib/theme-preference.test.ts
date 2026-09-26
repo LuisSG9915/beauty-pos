@@ -49,6 +49,14 @@ describe("theme preference", () => {
     expect(resolveTheme("system", false)).toBe("light");
   });
 
+  it("resolve: en /admin el modo system cae a claro", () => {
+    expect(resolveTheme("system", true, true)).toBe("light");
+    expect(resolveTheme("system", false, true)).toBe("light");
+    // La elección explícita del usuario siempre gana.
+    expect(resolveTheme("dark", true, true)).toBe("dark");
+    expect(resolveTheme("light", true, true)).toBe("light");
+  });
+
   it("serializa la cookie con Path=/, SameSite=Lax y un año", () => {
     const cookie = serializeThemeCookie("dark");
     expect(cookie).toBe(
@@ -96,6 +104,8 @@ describe("theme preference", () => {
     expect(BOOTSTRAP_SCRIPT).toContain('els[j].remove()');
     expect(BOOTSTRAP_SCRIPT).toContain(THEME_COLOR.light);
     expect(BOOTSTRAP_SCRIPT).toContain(THEME_COLOR.dark);
+    // /admin resuelve "system" a claro sin depender del SO.
+    expect(BOOTSTRAP_SCRIPT).toContain('pathname.indexOf("/admin")===0');
     // Sin saltos de línea: seguro para dangerouslySetInnerHTML.
     expect(BOOTSTRAP_SCRIPT).not.toContain("\n");
   });

@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 import { AgendaBoard, type AgendaBloqueo, type AgendaCita, type AgendaHorario } from "@/app/admin/agenda/agenda-board";
 import { AgendaToolbar } from "@/app/admin/agenda/agenda-toolbar";
@@ -11,17 +11,14 @@ import {
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { getDatabase } from "@/db/client";
-import { clientes, miembrosOrganizaciones, relUsuariosSucursales, usuarios } from "@/db/schema/core";
-import { bloqueosAgenda, citaRecursos, citas, detalleCitasServicios, horariosSucursales, recursos, ventas } from "@/db/schema/operations";
-import { servicios } from "@/db/schema/catalogs";
 import { getAdminContext } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { todayDateInput } from "@/lib/format";
 import { firstParam, normalizeDateInput, normalizeView } from "@/lib/url-context";
 import { dayBoundsUtc, shiftDateKey, weekStartDateKey } from "@/modules/agenda";
 import { contextoSuscripcionCache } from "@/modules/billing/queries";
-import { alergiasPorCliente, conAlergias } from "@/modules/expedientes/alergias";
-import { avisosRecientes, type AvisoReciente } from "@/modules/notificaciones/service";
+import { conAlergias } from "@/modules/expedientes/alergias";
+import type { AvisoReciente } from "@/modules/notificaciones/service";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +31,32 @@ type SearchParams = Promise<{
 }>;
 
 const AGENDA_VIEWS = ["dia", "semana", "lista"] as const;
+
+type CitaRow = Omit<AgendaCita, "usuarioNombre" | "clienteNotas" | "fechaHora"> & {
+  fechaHora: string;
+  clienteNombre: string | null;
+  clienteTelefono: string | null;
+  clienteNotas: string | null;
+  alergias: string | null;
+};
+
+type AgendaDatosRow = {
+  staff: Array<{ id: string; nombre: string }>;
+  servicios: Array<{ id: string; nombre: string; categoriaId: string | null; precioBase: string; duracionMinutos: number }>;
+  horarios: HorarioConfig[];
+  bloqueos: Array<{
+    id: string;
+    usuarioId: string | null;
+    iniciaAt: string;
+    terminaAt: string;
+    tipo: string;
+    motivo: string | null;
+    activo: boolean;
+  }>;
+  recursos: RecursoConfig[];
+  citas: CitaRow[];
+  avisos: AvisoReciente[];
+};
 
 export default async function AgendaPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
@@ -94,145 +117,161 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
     );
   }
 
-  const [staffRows, serviceRows, horarioRows, bloqueoRows, recursoRows, citaRows] = await Promise.all([
-    getDatabase()
-      .select({ id: usuarios.id, nombre: usuarios.nombre })
-      .from(relUsuariosSucursales)
-      .innerJoin(usuarios, eq(relUsuariosSucursales.usuarioId, usuarios.id))
-      .innerJoin(
-        miembrosOrganizaciones,
-        and(
-          eq(miembrosOrganizaciones.usuarioId, usuarios.id),
-          eq(miembrosOrganizaciones.organizacionId, organization.id),
-          eq(miembrosOrganizaciones.estado, "activo"),
-        ),
-      )
-      .where(
-        and(
-          eq(relUsuariosSucursales.organizacionId, organization.id),
-          eq(relUsuariosSucursales.sucursalId, branch.id),
-          eq(usuarios.activo, true),
-        ),
-      )
-      .orderBy(asc(usuarios.nombre)),
-    getDatabase()
-      .select({ id: servicios.id, nombre: servicios.nombre, categoriaId: servicios.categoriaId, precioBase: servicios.precioBase, duracionMinutos: servicios.duracionMinutos })
-      .from(servicios)
-      .where(and(eq(servicios.organizacionId, organization.id), eq(servicios.activo, true)))
-      .orderBy(asc(servicios.nombre)),
-    getDatabase()
-      .select({ id: horariosSucursales.id, diaSemana: horariosSucursales.diaSemana, iniciaMinutos: horariosSucursales.iniciaMinutos, terminaMinutos: horariosSucursales.terminaMinutos, activo: horariosSucursales.activo })
-      .from(horariosSucursales)
-      .where(
-        and(
-          eq(horariosSucursales.organizacionId, organization.id),
-          eq(horariosSucursales.sucursalId, branch.id),
-        ),
-      )
-      .orderBy(asc(horariosSucursales.diaSemana), asc(horariosSucursales.iniciaMinutos)),
-    getDatabase()
-      .select({ id: bloqueosAgenda.id, usuarioId: bloqueosAgenda.usuarioId, iniciaAt: bloqueosAgenda.iniciaAt, terminaAt: bloqueosAgenda.terminaAt, tipo: bloqueosAgenda.tipo, motivo: bloqueosAgenda.motivo, activo: bloqueosAgenda.activo })
-      .from(bloqueosAgenda)
-      .where(
-        and(
-          eq(bloqueosAgenda.organizacionId, organization.id),
-          eq(bloqueosAgenda.sucursalId, branch.id),
-          // El panel solo administra bloqueos vigentes/recientes; el historial
-          // remoto no aporta y encarece cada navegación.
-          gte(bloqueosAgenda.terminaAt, new Date(inicioBounds.iniciaAt.getTime() - 30 * 86_400_000)),
-        ),
-      )
-      .orderBy(asc(bloqueosAgenda.iniciaAt)),
-    getDatabase()
-      .select({ id: recursos.id, nombre: recursos.nombre, tipo: recursos.tipo, capacidad: recursos.capacidad, activo: recursos.activo })
-      .from(recursos)
-      .where(and(eq(recursos.organizacionId, organization.id), eq(recursos.sucursalId, branch.id)))
-      .orderBy(asc(recursos.nombre)),
-    getDatabase()
-      .select({
-        id: citas.id,
-        fechaHora: citas.fechaHora,
-        duracionMinutos: citas.duracionMinutos,
-        estado: citas.estado,
-        notas: citas.notas,
-        totalEstimado: citas.totalEstimado,
-        clienteId: citas.clienteId,
-        clienteNombre: clientes.nombre,
-        clienteTelefono: clientes.telefono,
-        clienteNotas: clientes.notasOperativas,
-        sucursalId: citas.sucursalId,
-        usuarioId: citas.usuarioId,
-        version: citas.version,
-        ventaId: ventas.id,
-      })
-      .from(citas)
-      .leftJoin(clientes, eq(citas.clienteId, clientes.id))
-      .leftJoin(ventas, and(eq(ventas.citaId, citas.id), eq(ventas.activo, true)))
-      .where(
-        and(
-          eq(citas.organizacionId, organization.id),
-          eq(citas.sucursalId, branch.id),
-          eq(citas.activo, true),
-          gte(citas.fechaHora, inicioBounds.iniciaAt),
-          lt(citas.fechaHora, finBounds.iniciaAt),
-        ),
-      )
-      .orderBy(asc(citas.fechaHora)),
-  ]);
+  const puedeEditar = hasPermission(context.access, "agenda.editar");
+  const puedeVerAlergias = hasPermission(context.access, "expedientes.alergias_ver");
+  const puedeAlergiaPrivada = hasPermission(context.access, "expedientes.privado");
+  // El panel solo administra bloqueos vigentes/recientes; el historial remoto
+  // no aporta y encarece cada navegación.
+  const bloqueosDesde = new Date(inicioBounds.iniciaAt.getTime() - 30 * 86_400_000);
 
-  const citaIds = citaRows.map((row) => row.id);
-  const clienteIdsVisibles = [...new Set(citaRows.map((row) => row.clienteId).filter((id): id is string => Boolean(id)))];
-  const [detalles, detallesRecursos, alergias] = await Promise.all([
-    citaIds.length > 0
-      ? getDatabase()
-          .select({ citaId: detalleCitasServicios.citaId, servicioId: detalleCitasServicios.servicioId, nombre: servicios.nombre, categoriaId: servicios.categoriaId, precio: detalleCitasServicios.precio })
-          .from(detalleCitasServicios)
-          .innerJoin(servicios, eq(detalleCitasServicios.servicioId, servicios.id))
-          .where(and(inArray(detalleCitasServicios.citaId, citaIds), eq(detalleCitasServicios.activo, true)))
-      : Promise.resolve([] as Array<{ citaId: string; servicioId: string; nombre: string; categoriaId: string | null; precio: string }>),
-    citaIds.length > 0
-      ? getDatabase()
-          .select({ citaId: citaRecursos.citaId, recursoId: citaRecursos.recursoId, nombre: recursos.nombre })
-          .from(citaRecursos)
-          .innerJoin(recursos, eq(citaRecursos.recursoId, recursos.id))
-          .where(and(inArray(citaRecursos.citaId, citaIds), eq(citaRecursos.activo, true)))
-      : Promise.resolve([] as Array<{ citaId: string; recursoId: string; nombre: string }>),
-    alergiasPorCliente(getDatabase(), organization.id, clienteIdsVisibles, context.access),
+  // Toda la página en UNA consulta: cada lista viaja como jsonb. Las consultas
+  // paralelas de antes obligaban a abrir varias conexiones frías por request y
+  // cada ronda a la BD remota cuesta ~50-100 ms. Fechas en ISO UTC para
+  // serializar directo a los componentes.
+  const [datosResult, suscripcion] = await Promise.all([
+    getDatabase().execute<AgendaDatosRow>(sql`
+      select
+        coalesce((
+          select jsonb_agg(jsonb_build_object('id', u.id, 'nombre', u.nombre) order by u.nombre)
+            from rel_usuarios_sucursales rus
+            join usuarios u on rus.usuario_id = u.id
+            join miembros_organizaciones mo on mo.usuario_id = u.id
+              and mo.organizacion_id = ${organization.id} and mo.estado = 'activo'
+           where rus.organizacion_id = ${organization.id}
+             and rus.sucursal_id = ${branch.id}
+             and u.activo
+        ), '[]'::jsonb) as staff,
+        coalesce((
+          select jsonb_agg(jsonb_build_object(
+              'id', s.id, 'nombre', s.nombre, 'categoriaId', s.categoria_id,
+              'precioBase', s.precio_base::text, 'duracionMinutos', s.duracion_minutos
+            ) order by s.nombre)
+            from servicios s
+           where s.organizacion_id = ${organization.id} and s.activo
+        ), '[]'::jsonb) as servicios,
+        coalesce((
+          select jsonb_agg(jsonb_build_object(
+              'id', h.id, 'diaSemana', h.dia_semana, 'iniciaMinutos', h.inicia_minutos,
+              'terminaMinutos', h.termina_minutos, 'activo', h.activo
+            ) order by h.dia_semana, h.inicia_minutos)
+            from horarios_sucursales h
+           where h.organizacion_id = ${organization.id} and h.sucursal_id = ${branch.id}
+        ), '[]'::jsonb) as horarios,
+        coalesce((
+          select jsonb_agg(jsonb_build_object(
+              'id', b.id, 'usuarioId', b.usuario_id,
+              'iniciaAt', to_char(b.inicia_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+              'terminaAt', to_char(b.termina_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+              'tipo', b.tipo, 'motivo', b.motivo, 'activo', b.activo
+            ) order by b.inicia_at)
+            from bloqueos_agenda b
+           where b.organizacion_id = ${organization.id} and b.sucursal_id = ${branch.id}
+             and b.termina_at >= ${bloqueosDesde}
+        ), '[]'::jsonb) as bloqueos,
+        coalesce((
+          select jsonb_agg(jsonb_build_object(
+              'id', r.id, 'nombre', r.nombre, 'tipo', r.tipo,
+              'capacidad', r.capacidad, 'activo', r.activo
+            ) order by r.nombre)
+            from recursos r
+           where r.organizacion_id = ${organization.id} and r.sucursal_id = ${branch.id}
+        ), '[]'::jsonb) as recursos,
+        coalesce((
+          select jsonb_agg(jsonb_build_object(
+              'id', c.id,
+              'fechaHora', to_char(c.fecha_hora at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+              'duracionMinutos', c.duracion_minutos,
+              'estado', c.estado, 'notas', c.notas,
+              'totalEstimado', c.total_estimado::text,
+              'clienteId', c.cliente_id,
+              'clienteNombre', cl.nombre,
+              'clienteTelefono', cl.telefono,
+              'clienteNotas', cl.notas_operativas,
+              'sucursalId', c.sucursal_id,
+              'usuarioId', c.usuario_id,
+              'version', c.version,
+              'ventaId', v.id,
+              'servicios', coalesce((
+                select jsonb_agg(jsonb_build_object(
+                    'id', s2.id, 'nombre', s2.nombre, 'categoriaId', s2.categoria_id,
+                    'precio', d.precio::text))
+                  from detalle_citas_servicios d
+                  join servicios s2 on d.servicio_id = s2.id
+                 where d.cita_id = c.id and d.activo
+              ), '[]'::jsonb),
+              'recursos', coalesce((
+                select jsonb_agg(jsonb_build_object('id', r2.id, 'nombre', r2.nombre))
+                  from cita_recursos cr
+                  join recursos r2 on cr.recurso_id = r2.id
+                 where cr.cita_id = c.id and cr.activo
+              ), '[]'::jsonb),
+              'alergias', case when ${puedeVerAlergias} then (
+                select string_agg(coalesce(f.notas, f.formula), ' · ')
+                  from clientes_fichas_tecnicas f
+                 where f.organizacion_id = ${organization.id} and f.tipo = 'alergia'
+                   and f.activo and f.cliente_id = c.cliente_id
+                   and (not f.privada or ${puedeAlergiaPrivada})
+              ) end
+            ) order by c.fecha_hora)
+            from citas c
+            left join clientes cl on c.cliente_id = cl.id
+            left join ventas v on v.cita_id = c.id and v.activo
+           where c.organizacion_id = ${organization.id} and c.sucursal_id = ${branch.id}
+             and c.activo
+             and c.fecha_hora >= ${inicioBounds.iniciaAt}
+             and c.fecha_hora < ${finBounds.iniciaAt}
+        ), '[]'::jsonb) as citas,
+        case when ${puedeEditar} then coalesce((
+          select jsonb_agg(jsonb_build_object(
+              'id', n.id, 'tipo', n.tipo, 'correoDestino', n.correo_destino,
+              'estado', n.estado, 'intentos', n.intentos,
+              'programadoPara', to_char(n.programado_para at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+              'enviadoAt', case when n.enviado_at is null then null
+                else to_char(n.enviado_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') end,
+              'proveedorId', n.proveedor_id, 'error', n.error,
+              'citaFechaHora', case when cn.fecha_hora is null then null
+                else to_char(cn.fecha_hora at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') end
+            ))
+            from (
+              select * from notificaciones_envios
+               where organizacion_id = ${organization.id}
+               order by created_at desc limit 12
+            ) n
+            left join citas cn on n.cita_id = cn.id
+        ), '[]'::jsonb) else '[]'::jsonb end as avisos
+    `),
+    contextoSuscripcionCache(organization.id),
   ]);
+  const datos = datosResult.rows[0];
+  const staffRows = datos?.staff ?? [];
+  const serviceRows = datos?.servicios ?? [];
+  const horarioRows = datos?.horarios ?? [];
+  const bloqueoRows = datos?.bloqueos ?? [];
+  const recursoRows = datos?.recursos ?? [];
+  const citaRows = datos?.citas ?? [];
+  const avisos: AvisoReciente[] = datos?.avisos ?? [];
 
-  const serviciosPorCita = new Map<string, Array<{ id: string; nombre: string; categoriaId: string | null; precio: string }>>();
-  for (const detalle of detalles) {
-    const list = serviciosPorCita.get(detalle.citaId) ?? [];
-    list.push({ id: detalle.servicioId, nombre: detalle.nombre, categoriaId: detalle.categoriaId, precio: detalle.precio });
-    serviciosPorCita.set(detalle.citaId, list);
-  }
-  const recursosPorCita = new Map<string, Array<{ id: string; nombre: string }>>();
-  for (const detalle of detallesRecursos) {
-    const list = recursosPorCita.get(detalle.citaId) ?? [];
-    list.push({ id: detalle.recursoId, nombre: detalle.nombre });
-    recursosPorCita.set(detalle.citaId, list);
-  }
   const staffPorId = new Map(staffRows.map((staff) => [staff.id, staff.nombre]));
 
   const citasSerializadas: AgendaCita[] = citaRows
     .map((row) => ({
       id: row.id,
-      fechaHora: row.fechaHora.toISOString(),
+      fechaHora: row.fechaHora,
       duracionMinutos: row.duracionMinutos,
       estado: row.estado,
       notas: row.notas,
       totalEstimado: row.totalEstimado,
       clienteId: row.clienteId,
-      clienteNombre: row.clienteNombre ?? "Walk-in",
+      clienteNombre: row.clienteNombre ?? "Cliente de paso",
       clienteTelefono: row.clienteTelefono,
-      clienteNotas: conAlergias(row.clienteNotas, row.clienteId ? alergias.get(row.clienteId) : undefined),
+      clienteNotas: conAlergias(row.clienteNotas, row.alergias ?? undefined),
       sucursalId: row.sucursalId,
       usuarioId: row.usuarioId,
       usuarioNombre: row.usuarioId ? (staffPorId.get(row.usuarioId) ?? "Profesional") : null,
       version: row.version,
       ventaId: row.ventaId,
-      servicios: serviciosPorCita.get(row.id) ?? [],
-      recursos: recursosPorCita.get(row.id) ?? [],
+      servicios: row.servicios,
+      recursos: row.recursos,
     }))
     .filter((cita) => {
       if (!q) return true;
@@ -250,14 +289,14 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
     .filter(
       (row) =>
         row.activo &&
-        row.iniciaAt < finBounds.iniciaAt &&
-        row.terminaAt >= inicioBounds.iniciaAt,
+        new Date(row.iniciaAt) < finBounds.iniciaAt &&
+        new Date(row.terminaAt) >= inicioBounds.iniciaAt,
     )
     .map((row) => ({
       id: row.id,
       usuarioId: row.usuarioId,
-      iniciaAt: row.iniciaAt.toISOString(),
-      terminaAt: row.terminaAt.toISOString(),
+      iniciaAt: row.iniciaAt,
+      terminaAt: row.terminaAt,
       tipo: row.tipo,
       motivo: row.motivo,
     }));
@@ -266,17 +305,12 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
     id: row.id,
     usuarioId: row.usuarioId,
     usuarioNombre: row.usuarioId ? (staffPorId.get(row.usuarioId) ?? "Profesional") : null,
-    iniciaAt: row.iniciaAt.toISOString(),
-    terminaAt: row.terminaAt.toISOString(),
+    iniciaAt: row.iniciaAt,
+    terminaAt: row.terminaAt,
     tipo: row.tipo,
     motivo: row.motivo,
     activo: row.activo,
   }));
-  const puedeEditar = hasPermission(context.access, "agenda.editar");
-  const [suscripcion, avisos] = await Promise.all([
-    contextoSuscripcionCache(organization.id),
-    puedeEditar ? avisosRecientes(organization.id) : Promise.resolve([] as AvisoReciente[]),
-  ]);
   const recursosConfig: RecursoConfig[] = recursoRows;
   const recursosActivos = recursoRows.filter((r) => r.activo);
   const weekDays = vista === "semana"
@@ -285,17 +319,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
-        <div className="min-w-0 flex-1">
-          <AdminPageHeader
-            description={`${branch.nombre} · ${timeZone}`}
-            title="Agenda de citas"
-          />
-        </div>
-        <p className="max-w-xl text-xs leading-5 text-muted-foreground xl:text-right">
-          Un espacio vivo para operar el día: colores por servicio, estados legibles y cobro sin salir de la agenda.
-        </p>
-      </div>
+      <AdminPageHeader description={branch.nombre} title="Agenda" />
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
         <div className="min-w-0 flex-1">
           <AgendaToolbar

@@ -79,7 +79,10 @@ export function getDatabase() {
     if (existing && existing.connectionString === connectionString) {
       return drizzleFor(existing.pool);
     }
-    const pool = new Pool({ connectionString, max: 5 });
+    // max 8: las páginas lanzan lotes de hasta ~7 consultas en paralelo
+    // (agenda, alertas); con 5 la última se encolaba tras una conexión fría.
+    // Hyperdrive limita el origen a 20 y encola el excedente.
+    const pool = new Pool({ connectionString, max: 8 });
     workerPools.set(cloudflare.ctx, { connectionString, pool });
     // `after` corre cuando la respuesta ya se envió: allí es seguro drenar el
     // pool sin cortar consultas en vuelo (pool.end espera a los clientes).

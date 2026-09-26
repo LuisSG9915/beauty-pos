@@ -13,34 +13,35 @@
  *   --category-N-soft        superficie aún más suave (chips/filtros)
  *   --category-N-foreground  texto legible sobre el tinte
  *
- * Paleta de referencia para esa definición global
- * (light conserva la paleta previa; dark deriva del mismo matiz):
+ * Paleta de referencia para esa definición global (viva, saturada):
  *
  *   N  nombre    light: acento / borde / bg / soft / texto
- *   1  coral     #dd9a86 #efc0b4 #ffd9cf #fbe5dc #7a2e20
- *   2  mango     #d3a040 #e7bd66 #ffe3ad #fff1d1 #654300
- *   3  menta     #78b5a9 #9fcfc4 #d4efe9 #e2f5f1 #205a50
- *   4  cielo     #82b2d0 #a9cbe0 #d7ebf7 #e3f1fa #24536b
- *   5  rosa      #cd8aa0 #e2aabb #f8d8e3 #fbe5ed #762c49
- *   6  violeta   #a191ca #beb2de #e6e0f7 #eeeaf9 #4a3d72
- *   7  lima      #a8b36b #c1ca8b #e5edcb #eef2dc #42551e
- *   8  durazno   #dc9d72 #edb894 #fbdcc6 #fce7d7 #6e3819
+ *   1  coral     #f0603f #f6a08e #ffd9cd #ffe9e2 #8a2c15
+ *   2  mango     #e8960f #f0bd5c #ffe3ae #fff0d0 #7a4d00
+ *   3  menta     #0ba88f #5ed4bd #cff3eb #e0f8f3 #075e50
+ *   4  cielo     #2090dd #79bdec #d6eafb #e3f2fd #154f7c
+ *   5  rosa      #e2457f #f09cba #fbd9e5 #fde8ef #8a1d47
+ *   6  violeta   #7e5bef #b3a0f5 #e7dffe #f0ebfe #452a9b
+ *   7  lima      #7fa812 #b8d45c #e6f0c2 #eff6d6 #465f0b
+ *   8  durazno   #e06a1f #f2a56e #fbe0cc #fdecdd #7a3a0c
  *
  *   N  dark: acento / borde / bg / soft / texto
- *   1            #d99a86 #7a4b3f #452720 #39201a #f2c6b6
- *   2            #d5a44a #7a5c22 #433311 #372a0e #f0d08e
- *   3            #7ab8ab #40695f #1f3833 #1a2e2a #a9ddd0
- *   4            #85b5d3 #3f5f77 #1f3342 #1b2b39 #b3d5ec
- *   5            #cf8ea4 #74455a #412030 #371b29 #f0bacd
- *   6            #a496cd #51457a #2c2541 #262038 #ccc1ea
- *   7            #a9b56e #57622c #303718 #2a2f14 #d4dd9e
- *   8            #dd9f74 #765035 #402818 #372215 #f0c6a4
+ *   1            #f2826b #7c3a2c #4a2019 #3d1a15 #f9c0b0
+ *   2            #f5b13d #7c5a17 #45320d #38280b #f6d28a
+ *   3            #3fd0b2 #1c6153 #11342e #0e2b26 #a3ecda
+ *   4            #5cb2ef #2a5a80 #132c40 #102536 #b5dcf9
+ *   5            #f07fae #7c3451 #401a2b #351623 #f7b9d0
+ *   6            #a78bfa #4c3a8c #2a2147 #231c3b #d5c8fc
+ *   7            #a9cc44 #4c5f1c #2b3510 #242c0d #d8ec9a
+ *   8            #f08a3d #7c4417 #40230c #351d0a #f6c99a
  */
 export type CategoryTone = {
   /** Clases para la tarjeta del catálogo (borde + fondo + texto + hover). */
   card: string;
   /** Clases para el chip filtro de categoría (borde + fondo + texto). */
   chip: string;
+  /** Variable CSS del acento sólido (franjas, marcadores, avatar). */
+  accentVar: string;
 };
 
 const TONES: CategoryTone[] = [
@@ -48,47 +49,56 @@ const TONES: CategoryTone[] = [
   {
     card: "border-(--category-1-border) bg-(--category-1-bg) text-(--category-1-foreground) hover:border-(--category-1)",
     chip: "border-(--category-1-border) bg-(--category-1-soft) text-(--category-1-foreground)",
+    accentVar: "var(--category-1)",
   },
   // 2 · Mango
   {
     card: "border-(--category-2-border) bg-(--category-2-bg) text-(--category-2-foreground) hover:border-(--category-2)",
     chip: "border-(--category-2-border) bg-(--category-2-soft) text-(--category-2-foreground)",
+    accentVar: "var(--category-2)",
   },
   // 3 · Menta
   {
     card: "border-(--category-3-border) bg-(--category-3-bg) text-(--category-3-foreground) hover:border-(--category-3)",
     chip: "border-(--category-3-border) bg-(--category-3-soft) text-(--category-3-foreground)",
+    accentVar: "var(--category-3)",
   },
   // 4 · Cielo
   {
     card: "border-(--category-4-border) bg-(--category-4-bg) text-(--category-4-foreground) hover:border-(--category-4)",
     chip: "border-(--category-4-border) bg-(--category-4-soft) text-(--category-4-foreground)",
+    accentVar: "var(--category-4)",
   },
   // 5 · Rosa
   {
     card: "border-(--category-5-border) bg-(--category-5-bg) text-(--category-5-foreground) hover:border-(--category-5)",
     chip: "border-(--category-5-border) bg-(--category-5-soft) text-(--category-5-foreground)",
+    accentVar: "var(--category-5)",
   },
   // 6 · Violeta controlado
   {
     card: "border-(--category-6-border) bg-(--category-6-bg) text-(--category-6-foreground) hover:border-(--category-6)",
     chip: "border-(--category-6-border) bg-(--category-6-soft) text-(--category-6-foreground)",
+    accentVar: "var(--category-6)",
   },
   // 7 · Lima suave
   {
     card: "border-(--category-7-border) bg-(--category-7-bg) text-(--category-7-foreground) hover:border-(--category-7)",
     chip: "border-(--category-7-border) bg-(--category-7-soft) text-(--category-7-foreground)",
+    accentVar: "var(--category-7)",
   },
   // 8 · Durazno
   {
     card: "border-(--category-8-border) bg-(--category-8-bg) text-(--category-8-foreground) hover:border-(--category-8)",
     chip: "border-(--category-8-border) bg-(--category-8-soft) text-(--category-8-foreground)",
+    accentVar: "var(--category-8)",
   },
 ];
 
 const NEUTRAL: CategoryTone = {
   card: "border-border bg-card text-card-foreground hover:border-muted-foreground/40",
   chip: "border-border bg-muted text-muted-foreground",
+  accentVar: "var(--muted-foreground)",
 };
 
 export function categoryTone(categoriaId: string | null): CategoryTone {

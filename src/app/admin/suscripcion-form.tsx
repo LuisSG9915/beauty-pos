@@ -91,7 +91,7 @@ export function SuscripcionAdminRow({
   return (
     <div className="rounded-xl border border-border px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-semibold ${badge.tono}`}>
+        <span className={`inline-flex rounded-full border px-2.5 py-1 text-op-xs font-semibold ${badge.tono}`}>
           {badge.texto}
         </span>
       </div>
@@ -99,7 +99,7 @@ export function SuscripcionAdminRow({
         <summary className="cursor-pointer text-xs font-medium text-primary">
           Registrar pago / activar plan
         </summary>
-        <form action={formAction} className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:items-end">
+        <form action={formAction} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:items-end">
           <input name="organizacionId" type="hidden" value={organizationId} />
           <Field>
             <FieldLabel required>Plan</FieldLabel>
@@ -165,14 +165,14 @@ export function SuscripcionAdminRow({
                 ? `${fmtMonto(cotizacion.monto)} MXN${cotizacion.extras > 0 ? ` (${cotizacion.extras} extra × ${fmtMonto(cotizacion.precioExtraUnitario)})` : ""}`
                 : "—"}
             </p>
-            <p className="mt-1 text-[11px] text-muted-foreground">Se calcula del catálogo al confirmar.</p>
+            <p className="mt-1 text-op-xs text-muted-foreground">Se calcula del catálogo al confirmar.</p>
           </Field>
           <Field>
             <FieldLabel>Referencia</FieldLabel>
             <Input maxLength={160} name="referencia" placeholder="Transferencia, folio…" />
           </Field>
           <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-3">
-            <Button className="rounded-xl" disabled={isPending} size="sm" type="submit">
+            <Button className="rounded-xl" data-action-clave="1" data-action-id="suscripcion.pago.confirmar" disabled={isPending} size="lg" type="submit">
               {isPending ? "Guardando…" : "Confirmar pago y activar"}
             </Button>
             <ActionFeedback state={state} successMessage="Suscripción activada." />

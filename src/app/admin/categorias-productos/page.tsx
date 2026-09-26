@@ -5,7 +5,9 @@ import { notFound } from "next/navigation";
 import { toggleProductCategory } from "@/app/admin/categorias-productos/actions";
 import { ProductCategoryForm } from "@/app/admin/categorias-productos/product-category-form";
 import { CrudRowActions } from "@/components/admin/crud-actions";
+import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -48,22 +50,44 @@ export default async function ProductCategoriesPage({ searchParams }: { searchPa
         description="Agrupa productos e insumos del catálogo."
         title="Categorías de productos"
       />
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-        <ProductCategoryForm initial={editing} key={`${editing?.id ?? "nueva"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} />
-        <AdminCard
-          actions={
-            <Button nativeButton={false} render={<Link href={buildAdminHref("/categorias-productos", { organizationId })} />}>
-              Nueva
-            </Button>
-          }
-          className="self-start"
-          description={`${categories.length} resultado(s)`}
-          title="Categorías registradas"
-        >
-          {categories.length === 0 ? (
-            <EmptyState description="Crea categorías para organizar los productos e insumos del salón." title="No hay categorías" />
-          ) : (
-            <div className="overflow-x-auto">
+      <AdminCard
+        actions={
+          <Button
+            data-action-clave="1" size="lg"
+            data-action-id="catalogo.categorias_productos.nueva"
+            nativeButton={false}
+            render={<Link href={buildAdminHref("/categorias-productos", { organizationId, extra: { nuevo: "1" } })} />}
+          >
+            Nueva
+          </Button>
+        }
+        description={`${categories.length} resultado(s)`}
+        title="Categorías registradas"
+      >
+        {categories.length === 0 ? (
+          <EmptyState description="Crea categorías para organizar los productos e insumos del salón." title="No hay categorías" />
+        ) : (
+          <>
+            <RegistroList>
+              {categories.map((category) => (
+                <RegistroCard
+                  acciones={
+                    <CrudRowActions
+                      activo={category.activo}
+                      editHref={buildAdminHref("/categorias-productos", { organizationId, extra: { edit: category.id } })}
+                      id={category.id}
+                      organizationId={organizationId}
+                      toggleAction={toggleProductCategory}
+                    />
+                  }
+                  badge={<StatusBadge active={category.activo} />}
+                  key={category.id}
+                  subtitulo={<span className="font-mono">{category.clave}</span>}
+                  titulo={category.nombre}
+                />
+              ))}
+            </RegistroList>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[480px] text-left text-sm">
                 <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
@@ -93,9 +117,18 @@ export default async function ProductCategoriesPage({ searchParams }: { searchPa
                 </tbody>
               </table>
             </div>
-          )}
-        </AdminCard>
-      </div>
+          </>
+        )}
+      </AdminCard>
+      {editing || firstParam(params.nuevo) === "1" ? (
+        <FormSheet
+          closeHref={buildAdminHref("/categorias-productos", { organizationId })}
+          description={editing ? "Ajusta los datos de la categoría." : "Crea una categoría para agrupar productos e insumos."}
+          title={editing ? "Editar categoría" : "Nueva categoría"}
+        >
+          <ProductCategoryForm initial={editing} key={`${editing?.id ?? "nueva"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} />
+        </FormSheet>
+      ) : null}
     </div>
   );
 }

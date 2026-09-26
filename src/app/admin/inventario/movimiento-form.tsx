@@ -48,7 +48,7 @@ export function MovimientoForm({
         placeholder="Buscar por SKU o nombre"
         required
       />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel required>Tipo de movimiento</FieldLabel>
           <Select defaultValue="entrada" invalid={Boolean(fieldError(state, "tipo"))} name="tipo" required>
@@ -85,7 +85,7 @@ export function MovimientoForm({
         <FieldDescription>Obligatorias para salidas y ajustes.</FieldDescription>
       </Field>
       <ActionFeedback state={state} />
-      <Button className="w-full rounded-xl" disabled={pending || !sucursalId || productos.length === 0} type="submit">
+      <Button className="w-full rounded-xl" data-action-clave="1" size="lg" data-action-id="inventario.movimiento.registrar" disabled={pending || !sucursalId || productos.length === 0} type="submit">
         {pending ? "Registrando…" : "Registrar movimiento"}
       </Button>
     </form>

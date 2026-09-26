@@ -4,21 +4,23 @@ import { notFound } from "next/navigation";
 
 import { CancelarFacturaForm } from "@/app/admin/facturacion/cancelar-form";
 import { ConfigFiscalForm } from "@/app/admin/facturacion/config-fiscal-form";
+import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
 import { comprobantes, facturacionConfig } from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate } from "@/lib/format";
-import { buildAdminHref } from "@/lib/url-context";
+import { buildAdminHref, firstParam } from "@/lib/url-context";
 
 export const dynamic = "force-dynamic";
 
 type SearchParams = Promise<AdminSearchParams>;
 
 const ESTADO_BADGE: Record<string, { label: string; className: string }> = {
-  borrador: { label: "Borrador", className: "bg-muted/60 text-warning" },
+  borrador: { label: "Borrador", className: "bg-warning-soft text-warning-soft-foreground" },
   timbrada: { label: "Emitida", className: "bg-success/10 text-success" },
   cancelada: { label: "Cancelada", className: "bg-muted/60 text-muted-foreground" },
   error: { label: "Error", className: "bg-destructive/10 text-destructive" },
@@ -59,38 +61,32 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        actions={
+          puedeEditarConfig ? (
+            <Button
+              data-action-clave="1"
+              data-action-id="facturacion.emisor.abrir_formulario"
+              nativeButton={false}
+              render={<Link href={buildAdminHref("/facturacion", { organizationId, extra: { emisor: "1" } })} />}
+              size="lg"
+            >
+              {config ? "Editar emisor" : "Configurar emisor"}
+            </Button>
+          ) : undefined
+        }
         description="Comprobantes internos de las ventas cobradas. No son documentos fiscales: el timbrado CFDI real requiere contratar un PAC."
         title="Comprobantes internos"
       />
 
       {stub ? (
-        <p className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
+        <p className="rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning-soft-foreground">
           Proveedor de timbrado: <strong>sin PAC contratado</strong>. Los comprobantes se generan con un folio
           simulado — son documentos internos del negocio y <strong>no tienen validez fiscal ante el SAT</strong>.
         </p>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        {puedeEditarConfig ? (
-          <ConfigFiscalForm
-            initial={
-              config
-                ? {
-                    rfc: config.rfc,
-                    razonSocial: config.razonSocial,
-                    regimenFiscal: config.regimenFiscal ?? "626",
-                    codigoPostal: config.codigoPostal ?? "",
-                    serie: config.serie,
-                    preciosIncluyenIva: config.preciosIncluyenIva,
-                    tasaIva: config.tasaIva,
-                  }
-                : undefined
-            }
-            key={config?.updatedAt?.getTime() ?? "nuevo"}
-            organizationId={organizationId}
-          />
-        ) : (
-          <AdminCard description="Datos fiscales del emisor" title="Emisor">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <AdminCard description="Datos fiscales del emisor" title="Emisor">
             {config ? (
               <dl className="grid gap-2 text-sm">
                 <div className="flex justify-between gap-3"><dt className="text-muted-foreground">RFC</dt><dd className="font-mono">{config.rfc}</dd></div>
@@ -102,8 +98,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
             ) : (
               <EmptyState description="Un administrador debe capturar los datos del emisor para generar comprobantes." title="Sin configurar" />
             )}
-          </AdminCard>
-        )}
+        </AdminCard>
 
         <AdminCard description={`${comprobanteRows.length} comprobante(s) recientes`} title="Comprobantes">
           {comprobanteRows.length === 0 ? (
@@ -112,7 +107,48 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
               title="Sin comprobantes"
             />
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              <div className="space-y-3 md:hidden">
+                {comprobanteRows.map((c) => {
+                  const badge = ESTADO_BADGE[c.estado] ?? ESTADO_BADGE.borrador;
+                  return (
+                    <article className="rounded-xl border border-border p-4" key={c.id}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="text-sm font-semibold leading-5 text-foreground">{c.receptorNombre}</h3>
+                          <p className="mt-0.5 font-mono text-xs leading-5 text-muted-foreground">
+                            {c.serie}-{c.folio} · {c.receptorRfc}
+                          </p>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${badge.className}`}>{badge.label}</span>
+                      </div>
+                      {c.error ? <p className="mt-2 text-xs text-destructive">{c.error}</p> : null}
+                      <dl className="mt-3 space-y-1.5">
+                        <div className="flex items-baseline justify-between gap-3 text-sm">
+                          <dt className="shrink-0 text-xs text-muted-foreground">Total</dt>
+                          <dd className="min-w-0 text-right font-medium tabular-nums text-foreground">{formatCurrency(c.total, { currency: context.currency })}</dd>
+                        </div>
+                        <div className="flex items-baseline justify-between gap-3 text-sm">
+                          <dt className="shrink-0 text-xs text-muted-foreground">Fecha</dt>
+                          <dd className="min-w-0 text-right text-xs text-muted-foreground">{formatDate(c.timbradoAt ?? c.createdAt)}</dd>
+                        </div>
+                      </dl>
+                      <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
+                        <Link
+                          className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-xs font-medium text-muted-foreground hover:bg-muted/60"
+                          href={buildAdminHref("/pos", { organizationId, extra: { ventaId: c.ventaId } })}
+                        >
+                          Ver venta
+                        </Link>
+                        {c.estado === "timbrada" && puedeCancelar ? (
+                          <CancelarFacturaForm comprobanteId={c.id} compact organizationId={organizationId} />
+                        ) : null}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[640px] text-left text-sm">
                 <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
@@ -161,10 +197,37 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
                   })}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
         </AdminCard>
       </div>
+
+      {puedeEditarConfig && firstParam(params.emisor) === "1" ? (
+        <FormSheet
+          closeHref={buildAdminHref("/facturacion", { organizationId })}
+          description="Identidad fiscal con la que se emiten los CFDI de esta organización."
+          title="Datos del emisor"
+        >
+          <ConfigFiscalForm
+            initial={
+              config
+                ? {
+                    rfc: config.rfc,
+                    razonSocial: config.razonSocial,
+                    regimenFiscal: config.regimenFiscal ?? "626",
+                    codigoPostal: config.codigoPostal ?? "",
+                    serie: config.serie,
+                    preciosIncluyenIva: config.preciosIncluyenIva,
+                    tasaIva: config.tasaIva,
+                  }
+                : undefined
+            }
+            key={config?.updatedAt?.getTime() ?? "nuevo"}
+            organizationId={organizationId}
+          />
+        </FormSheet>
+      ) : null}
     </div>
   );
 }

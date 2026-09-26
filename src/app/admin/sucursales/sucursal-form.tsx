@@ -58,7 +58,7 @@ export function SucursalNuevaForm({ organizationId, deshabilitado }: { organizat
   return (
     <form action={action} className="space-y-4">
       <input name="organizacionId" type="hidden" value={organizationId} />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel required>Nombre</FieldLabel>
           <Input name="nombre" placeholder="Sucursal Centro" required />
@@ -85,7 +85,7 @@ export function SucursalNuevaForm({ organizationId, deshabilitado }: { organizat
         </Field>
       </div>
       <ActionFeedback state={state} />
-      <Button className="rounded-xl" disabled={pending || deshabilitado} type="submit">
+      <Button className="rounded-xl" data-action-clave="1" size="lg" data-action-id="sucursales.sucursal.crear" disabled={pending || deshabilitado} type="submit">
         {pending ? "Creando…" : "Crear sucursal"}
       </Button>
     </form>
@@ -100,7 +100,7 @@ export function SucursalEditarForm({ organizationId, sucursal }: { organizationI
     <form action={action} className="space-y-4">
       <input name="organizacionId" type="hidden" value={organizationId} />
       <input name="sucursalId" type="hidden" value={sucursal.id} />
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel required>Nombre</FieldLabel>
           <Input defaultValue={sucursal.nombre} name="nombre" required />
@@ -145,7 +145,7 @@ export function SucursalEditarForm({ organizationId, sucursal }: { organizationI
           <input defaultChecked={sucursal.reservasAutoConfirmar} name="reservasAutoConfirmar" type="checkbox" />
           Confirmar reservas web automáticamente
         </label>
-        <div className="grid gap-4 pt-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 pt-2 sm:grid-cols-3">
           <Field>
             <FieldLabel>Corte cambios (h)</FieldLabel>
             <Input defaultValue={sucursal.reservasCancelacionHoras} min={0} name="reservasCancelacionHoras" type="number" />

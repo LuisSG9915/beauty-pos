@@ -51,7 +51,7 @@ export function ClientForm({ organizationId, initial }: { organizationId: string
       <input name="id" type="hidden" value={initial?.id ?? ""} />
       <input name="organizacionId" type="hidden" value={organizationId} />
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {PERSONAL_FIELDS.map((field) => (
           <Field key={field.name}>
             <FieldLabel required={field.required}>{field.label}</FieldLabel>
@@ -70,7 +70,7 @@ export function ClientForm({ organizationId, initial }: { organizationId: string
         <summary className="cursor-pointer list-none text-sm font-medium text-muted-foreground hover:text-primary">
           Datos de facturación (solo si el cliente pide factura)
         </summary>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {FISCAL_FIELDS.map((field) => (
             <Field key={field.name}>
               <FieldLabel>{field.label}</FieldLabel>

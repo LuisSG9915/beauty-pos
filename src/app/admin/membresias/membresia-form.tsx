@@ -37,7 +37,7 @@ export function MembresiaForm({
       <p className="mt-1 text-sm text-muted-foreground">
         Beneficio por tiempo: el cliente paga por adelantado y obtiene un descuento mientras la membresía esté vigente.
       </p>
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel required>Clave</FieldLabel>
           <Input defaultValue={String(value("clave"))} name="clave" placeholder="VIP30" required />

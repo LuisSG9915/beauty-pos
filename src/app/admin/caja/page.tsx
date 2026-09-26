@@ -35,71 +35,80 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
 
   const db = getDatabase();
 
-  const [sucursalRow] = await db
-    .select({ exigirCorteParaCobrar: sucursales.exigirCorteParaCobrar })
-    .from(sucursales)
-    .where(eq(sucursales.id, branch.id))
-    .limit(1);
-
-  const [corteAbierto] = await db
-    .select({ id: cortesCaja.id, fondoInicial: cortesCaja.fondoInicial, createdAt: cortesCaja.createdAt, notas: cortesCaja.notas })
-    .from(cortesCaja)
-    .where(and(eq(cortesCaja.sucursalId, branch.id), eq(cortesCaja.estado, "abierto"), eq(cortesCaja.activo, true)))
-    .limit(1);
-
-  const medios = await db
-    .select({ id: catMediosPago.id, nombre: catMediosPago.nombre, categoria: catMediosPago.categoria })
-    .from(catMediosPago)
-    .where(and(eq(catMediosPago.organizacionId, organization.id), eq(catMediosPago.activo, true)))
-    .orderBy(catMediosPago.nombre);
-
-  // En corte abierto solo contamos ventas: mostrar importes rompería el cierre ciego.
-  const [ventasDelCorte] = corteAbierto
-    ? await db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(ventas)
-        .where(and(eq(ventas.corteId, corteAbierto.id), eq(ventas.estado, "completada"), eq(ventas.activo, true)))
-    : [{ count: 0 }];
-
-  // Movimientos del turno: se listan (el cajero los registró) sin sumarlos al
-  // esperado visible — el esperado solo se revela al confirmar el cierre.
-  const movimientosTurno = corteAbierto
-    ? await db
-        .select({
-          id: movimientosCaja.id,
-          tipo: movimientosCaja.tipo,
-          monto: movimientosCaja.monto,
-          notas: movimientosCaja.notas,
-          createdAt: movimientosCaja.createdAt,
-          medioNombre: catMediosPago.nombre,
-          usuarioNombre: usuarios.nombre,
-        })
-        .from(movimientosCaja)
-        .innerJoin(catMediosPago, eq(movimientosCaja.medioPagoId, catMediosPago.id))
-        .innerJoin(usuarios, eq(movimientosCaja.usuarioId, usuarios.id))
-        .where(eq(movimientosCaja.corteId, corteAbierto.id))
-        .orderBy(desc(movimientosCaja.createdAt))
-    : [];
-
-  const historial = await db
-    .select({
-      id: cortesCaja.id,
-      fondoInicial: cortesCaja.fondoInicial,
-      createdAt: cortesCaja.createdAt,
-      cerradoAt: cortesCaja.cerradoAt,
-      notas: cortesCaja.notas,
-      abiertoPor: usuarios.nombre,
-    })
-    .from(cortesCaja)
-    .leftJoin(usuarios, eq(cortesCaja.usuarioId, usuarios.id))
-    .where(and(eq(cortesCaja.sucursalId, branch.id), eq(cortesCaja.estado, "cerrado"), eq(cortesCaja.activo, true)))
-    .orderBy(desc(cortesCaja.cerradoAt))
-    .limit(10);
+  // Independientes entre sí: una sola ronda en paralelo (~1 RT en vez de 4).
+  const [[sucursalRow], [corteAbierto], medios, historial] = await Promise.all([
+    db
+      .select({ exigirCorteParaCobrar: sucursales.exigirCorteParaCobrar })
+      .from(sucursales)
+      .where(eq(sucursales.id, branch.id))
+      .limit(1),
+    db
+      .select({ id: cortesCaja.id, fondoInicial: cortesCaja.fondoInicial, createdAt: cortesCaja.createdAt, notas: cortesCaja.notas })
+      .from(cortesCaja)
+      .where(and(eq(cortesCaja.sucursalId, branch.id), eq(cortesCaja.estado, "abierto"), eq(cortesCaja.activo, true)))
+      .limit(1),
+    db
+      .select({ id: catMediosPago.id, nombre: catMediosPago.nombre, categoria: catMediosPago.categoria })
+      .from(catMediosPago)
+      .where(and(eq(catMediosPago.organizacionId, organization.id), eq(catMediosPago.activo, true)))
+      .orderBy(catMediosPago.nombre),
+    db
+      .select({
+        id: cortesCaja.id,
+        fondoInicial: cortesCaja.fondoInicial,
+        createdAt: cortesCaja.createdAt,
+        cerradoAt: cortesCaja.cerradoAt,
+        notas: cortesCaja.notas,
+        abiertoPor: usuarios.nombre,
+      })
+      .from(cortesCaja)
+      .leftJoin(usuarios, eq(cortesCaja.usuarioId, usuarios.id))
+      .where(and(eq(cortesCaja.sucursalId, branch.id), eq(cortesCaja.estado, "cerrado"), eq(cortesCaja.activo, true)))
+      .orderBy(desc(cortesCaja.cerradoAt))
+      .limit(10),
+  ]);
 
   const corteIds = historial.map((c) => c.id);
-  const [detalles, totalesVentas, totalesComisiones] = corteIds.length > 0
-    ? await Promise.all([
-        db
+  const hayCorteIds = corteIds.length > 0;
+  const emptyDetalles: {
+    corteId: string;
+    medioNombre: string;
+    esperado: string;
+    contado: string;
+    diferencia: string;
+  }[] = [];
+
+  // Segunda ronda: ventas/movimientos del corte abierto y detalles del
+  // historial van juntos en paralelo.
+  // En corte abierto solo contamos ventas: mostrar importes rompería el cierre ciego.
+  // Movimientos del turno: se listan (el cajero los registró) sin sumarlos al
+  // esperado visible — el esperado solo se revela al confirmar el cierre.
+  const [[ventasDelCorte], movimientosTurno, detalles, totalesVentas, totalesComisiones] = await Promise.all([
+    corteAbierto
+      ? db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(ventas)
+          .where(and(eq(ventas.corteId, corteAbierto.id), eq(ventas.estado, "completada"), eq(ventas.activo, true)))
+      : Promise.resolve([{ count: 0 }]),
+    corteAbierto
+      ? db
+          .select({
+            id: movimientosCaja.id,
+            tipo: movimientosCaja.tipo,
+            monto: movimientosCaja.monto,
+            notas: movimientosCaja.notas,
+            createdAt: movimientosCaja.createdAt,
+            medioNombre: catMediosPago.nombre,
+            usuarioNombre: usuarios.nombre,
+          })
+          .from(movimientosCaja)
+          .innerJoin(catMediosPago, eq(movimientosCaja.medioPagoId, catMediosPago.id))
+          .innerJoin(usuarios, eq(movimientosCaja.usuarioId, usuarios.id))
+          .where(eq(movimientosCaja.corteId, corteAbierto.id))
+          .orderBy(desc(movimientosCaja.createdAt))
+      : Promise.resolve([]),
+    hayCorteIds
+      ? db
           .select({
             corteId: detalleCortes.corteId,
             medioNombre: catMediosPago.nombre,
@@ -109,8 +118,10 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
           })
           .from(detalleCortes)
           .innerJoin(catMediosPago, eq(detalleCortes.medioPagoId, catMediosPago.id))
-          .where(inArray(detalleCortes.corteId, corteIds)),
-        db
+          .where(inArray(detalleCortes.corteId, corteIds))
+      : Promise.resolve(emptyDetalles),
+    hayCorteIds
+      ? db
           .select({
             corteId: ventas.corteId,
             ventasCount: sql<number>`count(*)::int`,
@@ -119,15 +130,17 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
           })
           .from(ventas)
           .where(and(inArray(ventas.corteId, corteIds), eq(ventas.estado, "completada"), eq(ventas.activo, true)))
-          .groupBy(ventas.corteId),
-        db
+          .groupBy(ventas.corteId)
+      : Promise.resolve([]),
+    hayCorteIds
+      ? db
           .select({ corteId: ventas.corteId, total: sql<string>`coalesce(sum(${detalleVentasComisiones.monto}), 0)` })
           .from(detalleVentasComisiones)
           .innerJoin(ventas, eq(detalleVentasComisiones.ventaId, ventas.id))
           .where(and(inArray(ventas.corteId, corteIds), eq(detalleVentasComisiones.activo, true)))
-          .groupBy(ventas.corteId),
-      ])
-    : [[], [], []];
+          .groupBy(ventas.corteId)
+      : Promise.resolve([]),
+  ]);
 
   const detallesPorCorte = new Map<string, typeof detalles>();
   for (const d of detalles) {
@@ -152,7 +165,7 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
         />
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         {corteAbierto ? (
           <div className="space-y-6 self-start">
             <AdminCard
@@ -225,7 +238,7 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                       </p>
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                          Math.abs(diferenciaTotal) < 0.005 ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
+                          Math.abs(diferenciaTotal) < 0.005 ? "bg-success-soft text-success-soft-foreground" : "bg-destructive-soft text-destructive-soft-foreground"
                         }`}
                       >
                         {Math.abs(diferenciaTotal) < 0.005 ? "Cuadrado" : `Diferencia ${fmt(diferenciaTotal)}`}

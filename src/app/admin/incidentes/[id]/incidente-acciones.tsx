@@ -50,7 +50,7 @@ export function IncidenteControles({
   const [, accionAsignar, pendingAsignar] = useFormConToast(asignarIncidente);
 
   return (
-    <div className="grid gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       <form action={accionEstado} className="flex items-end gap-2">
         <input name="incidenteId" type="hidden" value={incidenteId} />
         <Field className="flex-1">

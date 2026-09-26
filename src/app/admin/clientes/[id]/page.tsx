@@ -130,7 +130,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
   const fichasPorTipo = (tipos: string[]) => fichaRows.filter((ficha) => tipos.includes(ficha.tipo));
 
   const datosTab = (
-    <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+    <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
       {[
         ["Nombre", [cliente.nombre, cliente.apellidoPaterno, cliente.apellidoMaterno].filter(Boolean).join(" ")],
         ["Teléfono", cliente.telefono],
@@ -232,7 +232,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
     );
 
   const formulasTab = (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h3 className="text-sm font-semibold text-foreground">Registrar fórmula o tratamiento</h3>
         <div className="mt-4">
@@ -244,7 +244,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
   );
 
   const alergiasTab = (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h3 className="text-sm font-semibold text-foreground">Registrar alergia o nota</h3>
         <div className="mt-4">
@@ -256,7 +256,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
   );
 
   const privadoTab = (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h3 className="text-sm font-semibold text-foreground">Registrar nota privada</h3>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -271,7 +271,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
   );
 
   const consentimientosTab = (
-    <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h3 className="text-sm font-semibold text-foreground">Registrar consentimiento informado</h3>
         <p className="mt-1 text-xs text-muted-foreground">

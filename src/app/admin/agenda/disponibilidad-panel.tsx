@@ -338,7 +338,7 @@ export function DisponibilidadPanel({
           <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
             Horario de atención
           </h3>
-          <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
             {DIAS.map(({ dia, nombre }) => {
               const turnos = horarios.filter((horario) => horario.diaSemana === dia);
               return (
@@ -346,7 +346,7 @@ export function DisponibilidadPanel({
                   <p className="text-xs font-semibold text-muted-foreground">{nombre}</p>
                   <div className="mt-2 space-y-1.5">
                     {turnos.length === 0 ? (
-                      <p className="text-[11px] text-muted-foreground">Cerrado</p>
+                      <p className="text-op-xs text-muted-foreground">Cerrado</p>
                     ) : (
                       turnos.map((turno) => (
                         <button
@@ -368,7 +368,7 @@ export function DisponibilidadPanel({
                           type="button"
                         >
                           {minutosATexto(turno.iniciaMinutos)}–{minutosATexto(turno.terminaMinutos)}
-                          <span className="text-[10px]">{turno.activo ? "activo" : "inactivo"}</span>
+                          <span className="text-op-xs">{turno.activo ? "activo" : "inactivo"}</span>
                         </button>
                       ))
                     )}
@@ -463,7 +463,7 @@ export function DisponibilidadPanel({
                     ) : null}
                   </span>
                 </label>
-                <div className="grid gap-3 pl-6 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 pl-6 sm:grid-cols-3">
                   <label className="text-xs font-medium text-muted-foreground">
                     Anticipación mínima (min)
                     <input
@@ -500,7 +500,7 @@ export function DisponibilidadPanel({
                       value={cancelacionHoras}
                     />
                     <span className="mt-0.5 block font-normal text-muted-foreground">
-                      Cancelar/reagendar en línea hasta antes de la cita.
+                      Cancelar o cambiar la fecha en línea hasta antes de la cita.
                     </span>
                   </label>
                 </div>
@@ -639,7 +639,7 @@ export function DisponibilidadPanel({
               Bloqueos de agenda
             </h3>
             <form className="grid gap-2 rounded-xl border border-border bg-muted/60 p-3" onSubmit={guardarBloqueo}>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <Field>
                   <FieldLabel required>Tipo</FieldLabel>
                   <Select
@@ -683,7 +683,7 @@ export function DisponibilidadPanel({
                   <Plus aria-hidden="true" /> Agregar bloqueo
                 </Button>
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-op-xs text-muted-foreground">
                 Las horas se interpretan en {timeZone}. Un bloqueo de toda la sucursal impide cualquier cita en ese rango.
               </p>
             </form>
@@ -734,7 +734,7 @@ export function DisponibilidadPanel({
               Recursos (cabinas, sillas, equipo)
             </h3>
             <form className="grid gap-2 rounded-xl border border-border bg-muted/60 p-3" onSubmit={guardarRecurso}>
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <Field className="sm:col-span-2">
                   <FieldLabel required>Nombre</FieldLabel>
                   <Input name="nombre" placeholder="Cabina 1, Silla de manicura…" required />
@@ -750,7 +750,7 @@ export function DisponibilidadPanel({
                   </Select>
                 </Field>
               </div>
-              <div className="grid gap-2 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 <Field>
                   <FieldLabel required>Capacidad</FieldLabel>
                   <Input defaultValue={1} max={100} min={1} name="capacidad" required type="number" />
@@ -765,7 +765,7 @@ export function DisponibilidadPanel({
                   <Plus aria-hidden="true" /> Agregar recurso
                 </Button>
               </div>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-op-xs text-muted-foreground">
                 Capacidad mayor a 1 registra recursos compartibles (p. ej. 2 sillas iguales). Las citas
                 que reserven el recurso no podrán traslaparse más allá de su capacidad.
               </p>

@@ -193,7 +193,7 @@ function EmitirForm({
           </p>
         </>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field>
             <FieldLabel required>RFC</FieldLabel>
             <Input maxLength={13} name="receptorRfc" placeholder="AAA010101AAA" required />
@@ -219,7 +219,7 @@ function EmitirForm({
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Field>
           <FieldLabel required>Uso de CFDI</FieldLabel>
           <Select defaultValue={receptor?.usoCfdi ?? "S01"} key={receptor?.usoCfdi ?? "S01"} name="usoCfdi">

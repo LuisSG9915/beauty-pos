@@ -104,7 +104,7 @@ function OrganizationSelector({
       <span
         className={
           variant === "sidebar"
-            ? "mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+            ? "mb-1 block text-op-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
             : "hidden text-xs font-medium text-muted-foreground sm:inline"
         }
       >
@@ -414,7 +414,7 @@ export function AdminShell({
               </span>
               <div className="min-w-0 flex-1 leading-tight">
                 <p className="truncate text-sm font-medium">{userName}</p>
-                <p className="truncate text-[11px] text-muted-foreground">{userEmail}</p>
+                <p className="truncate text-op-xs text-muted-foreground">{userEmail}</p>
               </div>
             </div>
             <ThemeModeSelector className="mb-2.5 w-full justify-center" />
@@ -442,8 +442,12 @@ export function AdminShell({
             </div>
           </header>
 
+          {/* overflow-x-clip: red de seguridad — ningún contenido del main
+              puede empujar la página más allá del ancho del teléfono. `clip`
+              no crea contexto de scroll, así que los sticky internos siguen
+              funcionando. */}
           <main
-            className="mx-auto w-full max-w-[1400px] flex-1 px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-8"
+            className="mx-auto w-full max-w-[1400px] flex-1 overflow-x-clip px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-8"
             id="contenido-admin"
           >
             {billingByOrg ? (

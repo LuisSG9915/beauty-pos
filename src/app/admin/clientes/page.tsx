@@ -7,6 +7,7 @@ import { ClientForm } from "@/app/admin/client-form";
 import { ClientImport } from "@/app/admin/client-import";
 import { ClientSheet } from "@/app/admin/clientes/client-sheet";
 import { AdminPageHeader } from "@/components/admin/page-header";
+import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { StatCard, StatCardGrid } from "@/components/admin/stat-card";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
@@ -163,7 +164,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
           <summary className="cursor-pointer list-none text-sm font-medium text-muted-foreground hover:text-primary">
             Cambiar el orden de la lista
           </summary>
-          <div className="mt-3 grid max-w-md gap-3 sm:grid-cols-2">
+          <div className="mt-3 grid grid-cols-1 max-w-md gap-3 sm:grid-cols-2">
             <Field>
               <FieldLabel>Orden</FieldLabel>
               <Select defaultValue={sortParam ?? "nombre"} key={sortParam ?? "nombre"} name="sort">
@@ -204,8 +205,42 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
             />
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
+          <>
+            <RegistroList className="p-3">
+              {clientRows.map((client) => {
+                const nombreCompleto = [client.nombre, client.apellidoPaterno, client.apellidoMaterno].filter(Boolean).join(" ");
+                return (
+                  <RegistroCard
+                    acciones={puedeEditar ? (
+                      <Link
+                        className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60"
+                        href={hrefBase({ edit: client.id, pagina: String(paginaActual) })}
+                        prefetch={false}
+                      >
+                        Editar
+                      </Link>
+                    ) : undefined}
+                    badge={<StatusBadge active={client.activo} />}
+                    campos={[
+                      { label: "Teléfono", value: client.telefono || "—" },
+                      { label: "Correo", value: <span className="break-all">{client.correo || "—"}</span> },
+                    ]}
+                    key={client.id}
+                    titulo={
+                      <Link
+                        className="inline-flex min-h-6 items-center hover:text-primary hover:underline"
+                        href={buildAdminHref(`/clientes/${client.id}`, { organizationId })}
+                        prefetch={false}
+                      >
+                        {nombreCompleto}
+                      </Link>
+                    }
+                  />
+                );
+              })}
+            </RegistroList>
+            <div className="hidden overflow-x-auto md:block">
+              <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-4 py-3 font-medium">Cliente</th>
@@ -235,7 +270,8 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
         {totalPaginas > 1 ? (
           <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm text-muted-foreground">

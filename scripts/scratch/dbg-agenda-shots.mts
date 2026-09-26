@@ -1,5 +1,5 @@
 import puppeteer from "puppeteer";
-import { BASE_URL, login } from "./lib/e2e";
+import { BASE_URL, login } from "../lib/e2e";
 
 const shots: [string, string, number, number][] = [
   ["agenda-semana-1440", "/admin/agenda?vista=semana", 1440, 900],

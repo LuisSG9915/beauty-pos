@@ -65,6 +65,15 @@ export function createAuth({ allowSignUp = false, sendEmails = true }: AuthOptio
         });
       },
     },
+    session: {
+      // Sesión firmada en cookie: getSession no toca la BD durante maxAge
+      // (1 ronda menos por request). La revocación administrativa tarda hasta
+      // 5 min en aplicarse; cerrar sesión sigue siendo inmediato.
+      cookieCache: {
+        enabled: true,
+        maxAge: 300,
+      },
+    },
     emailVerification: {
       sendOnSignUp: sendEmails,
       sendOnSignIn: sendEmails,

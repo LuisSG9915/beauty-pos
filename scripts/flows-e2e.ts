@@ -2,9 +2,10 @@ import "dotenv/config";
 
 import puppeteer, { type Page } from "puppeteer";
 
-import { login } from "./lib/e2e";
+import { withDb } from "./lib/db";
+import { clickByText, sleep } from "./lib/dom";
+import { BASE_URL, E2E_EMAIL, login } from "./lib/e2e";
 
-const BASE_URL = process.env.SMOKE_BASE_URL ?? "http://localhost:3000";
 const OUT_DIR = ".smoke-shots/flows";
 const TIME_ZONE = "America/Mexico_City";
 
@@ -13,7 +14,6 @@ const TIME_ZONE = "America/Mexico_City";
 // ID no corresponden a "Estética Prueba E2E".
 const E2E_ORG_ID = "652c172c-bf32-4b9c-90d1-006eded7ff56";
 const E2E_ORG_NOMBRE = "Estética Prueba E2E";
-const email = process.env.PERF_EMAIL ?? "e2e-salon@test.dev";
 
 const E2E_MARK = "E2E-SMOKE";
 const E2E_NOTAS = `%${E2E_MARK}%`;
@@ -46,21 +46,6 @@ function hora12(slot: string) {
 function citaNeedle(slot: string) {
   const h = Number(slot.split(":")[0]);
   return `${hora12(slot)} ${h < 12 ? "a.m." : "p.m."}`;
-}
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-type PgClient = import("pg").Client;
-
-async function withDb<T>(fn: (client: PgClient) => Promise<T>): Promise<T> {
-  const { Client } = await import("pg");
-  const client = new Client({ connectionString: process.env.DATABASE_URL });
-  await client.connect();
-  try {
-    return await fn(client);
-  } finally {
-    await client.end();
-  }
 }
 
 type E2EContext = { orgId: string; branchId: string; adminId: string; timeZone: string };
@@ -97,12 +82,12 @@ async function resolveContext(): Promise<E2EContext> {
               (select nombre from o) as org_nombre,
               (select id from b) as branch_id,
               coalesce((select tz from b), $3) as tz`,
-      [email, E2E_ORG_ID, TIME_ZONE],
+      [E2E_EMAIL, E2E_ORG_ID, TIME_ZONE],
     );
     const row = rows[0] ?? {};
     if (row.org_id !== E2E_ORG_ID || row.org_nombre !== E2E_ORG_NOMBRE || !row.branch_id || !row.admin_id) {
       throw new Error(
-        `Guarda E2E: se esperaba ${E2E_ORG_NOMBRE} (${E2E_ORG_ID}) con ${email} como miembro activo; se obtuvo ${JSON.stringify(row)}`,
+        `Guarda E2E: se esperaba ${E2E_ORG_NOMBRE} (${E2E_ORG_ID}) con ${E2E_EMAIL} como miembro activo; se obtuvo ${JSON.stringify(row)}`,
       );
     }
     return { orgId: row.org_id, branchId: row.branch_id, adminId: row.admin_id, timeZone: row.tz };
@@ -408,25 +393,6 @@ async function closeDialogs(page: Page, timeout = 30_000) {
     .catch(() => {});
 }
 
-async function clickText(page: Page, selector: string, text: string, scopeSelector?: string) {
-  const clicked = await page.evaluate(
-    (sel, t, scope) => {
-      const root = scope ? document.querySelector(scope) : document;
-      if (!root) return false;
-      const els = Array.from(root.querySelectorAll<HTMLElement>(sel));
-      const target = els.find((el) => el.textContent?.trim() === t) ??
-        els.find((el) => el.textContent?.toLowerCase().includes(t.toLowerCase()));
-      if (!target) return false;
-      target.click();
-      return true;
-    },
-    selector,
-    text,
-    scopeSelector ?? null,
-  );
-  return clicked;
-}
-
 /** Fija el valor de un input (setter nativo + eventos), reintentando si la hidratación lo resetea. */
 async function setNativeInput(page: Page, selector: string, value: string, scopeSelector?: string) {
   for (let i = 0; i < 20; i++) {
@@ -529,20 +495,20 @@ async function main() {
 
     // ── Sesión (cookie directa: el sign-in remoto puede leer el hash viejo
     // desde la caché de Hyperdrive tras un reset de contraseña) ────────────
-    await login(page, email);
+    await login(page, E2E_EMAIL);
     record("Sesión E2E en /admin", page.url().includes("/admin"));
 
     // ── Agenda: crear cita ────────────────────────────────────────────────
     const crearCita = async (hhmm: string, notas: string) => {
-      await clickText(page, "button", "Nueva cita");
+      await clickByText(page, "button", "Nueva cita");
       await page.waitForSelector('[role="dialog"]', { visible: true });
       await setNativeInput(page, '[role="dialog"] input[name="fechaHora"]', `${fecha}T${hhmm}`);
       await setNativeInput(page, '[role="dialog"] textarea[name="notas"]', notas);
-      await clickText(page, '[role="dialog"] [role="tab"]', "Servicios");
+      await clickByText(page, '[role="dialog"] [role="tab"]', "Servicios");
       await sleep(300);
-      const marcado = await clickText(page, '[role="dialog"] label', "CORTE DE DAMA");
+      const marcado = await clickByText(page, '[role="dialog"] label', "CORTE DE DAMA");
       if (!marcado) throw new Error("Servicio CORTE DE DAMA no encontrado en el diálogo");
-      await clickText(page, '[role="dialog"] button[type="submit"]', "Crear cita");
+      await clickByText(page, '[role="dialog"] button[type="submit"]', "Crear cita");
       await page.waitForFunction(
         () => !document.querySelector('[role="dialog"]'),
         { timeout: 30000 },
@@ -554,14 +520,16 @@ async function main() {
 
     await page.goto(`${BASE_URL}/admin/agenda`, { waitUntil: "networkidle0" });
     await crearCita(slots[0], E2E_MARK);
-    await waitForTextReload(page, "Walk-in");
+    await waitForTextReload(page, "Cliente de paso");
     await shot(page, "02-cita-creada");
     record(`Crear cita walk-in a las ${slots[0]}`, true);
 
     // ── Agenda: mover cita sin drag ───────────────────────────────────────
     const abrirDetalle = async (needle: string) => {
       const clicked = await page.evaluate((n) => {
-        const btn = Array.from(document.querySelectorAll<HTMLElement>("button[aria-label]")).find((b) =>
+        const btn = Array.from(
+          document.querySelectorAll<HTMLElement>('[role="button"][aria-label], button[aria-label]'),
+        ).find((b) =>
           (b.getAttribute("aria-label") ?? "").toLowerCase().includes(n.toLowerCase()),
         );
         if (!btn) return false;
@@ -572,7 +540,7 @@ async function main() {
       // El panel lateral es inline (xl, vista día) o Sheet overlay (resto).
       await page.waitForSelector('button[aria-label="Cerrar panel"]', { visible: true, timeout: 15000 });
     };
-    const clickPanel = (texto: string) => clickText(page, "button", texto);
+    const clickPanel = (texto: string) => clickByText(page, "button", texto);
     /** Click en acción del panel que debe abrir un diálogo; reintenta si no abre. */
     const clickPanelDialog = async (texto: string, waitSel: string) => {
       for (let i = 0; i < 3; i++) {
@@ -588,7 +556,9 @@ async function main() {
     const cardAria = (estado: string, extra?: string) =>
       page.evaluate(
         ([e, x]) =>
-          Array.from(document.querySelectorAll("button[aria-label]")).some((b) => {
+          Array.from(
+            document.querySelectorAll('[role="button"][aria-label], button[aria-label]'),
+          ).some((b) => {
             const label = (b.getAttribute("aria-label") ?? "").toLowerCase();
             return label.startsWith(e) && (!x || label.includes(x));
           }),
@@ -609,12 +579,12 @@ async function main() {
     await clickPanelDialog("Mover", '[role="dialog"] input[type="time"]');
     await setNativeInput(page, '[role="dialog"] input[type="time"]', slots[1]);
     await shot(page, "03-mover-cita");
-    await clickText(page, '[role="dialog"] button[type="submit"]', "Mover cita");
+    await clickByText(page, '[role="dialog"] button[type="submit"]', "Mover cita");
     await closeDialogs(page);
     await waitPendingClear().catch(() => {});
     record(
       `Mover cita a las ${slots[1]} (sin drag)`,
-      await pollReload(page, () => cardAria("pendiente", hora12(slots[1]))),
+      await pollReload(page, () => cardAria("agendada", hora12(slots[1]))),
     );
 
     // ── Agenda: transición de estado ──────────────────────────────────────
@@ -627,7 +597,7 @@ async function main() {
       for (let i = 0; i < 30; i++) {
         await page.evaluate(
           (sel, val) => {
-            const el = document.querySelector<HTMLSelectElement>(sel);
+            const el = document.querySelector(sel) as HTMLSelectElement | null;
             if (!el) return;
             el.value = val;
             el.dispatchEvent(new Event("change", { bubbles: true }));
@@ -637,7 +607,7 @@ async function main() {
         );
         await sleep(700);
         const stuck = await page.evaluate(
-          (sel, val) => document.querySelector<HTMLSelectElement>(sel)?.value === val,
+          (sel, val) => (document.querySelector(sel) as HTMLSelectElement | null)?.value === val,
           selector,
           value,
         );
@@ -658,7 +628,7 @@ async function main() {
       // confirman por su botón "Quitar <nombre>".
       const selector = tab === "Paquetes" || tab === "Membresías" ? `[aria-label="Quitar ${nombre}"]` : `[aria-label="Cantidad de ${nombre}"]`;
       for (let intento = 0; intento < 3; intento++) {
-        await clickText(page, '[role="group"][aria-label="Tipo de catálogo"] button', tab);
+        await clickByText(page, '[role="group"][aria-label="Tipo de catálogo"] button', tab);
         await sleep(300);
         const ok = await page.evaluate((n) => {
           const btn = document.querySelector<HTMLButtonElement>(`button[aria-label="Agregar ${n} al ticket"]`);
@@ -698,7 +668,7 @@ async function main() {
         enSheet,
       );
     };
-    const clickCobrar = () => clickText(page, '[role="dialog"] button[type="submit"]', "Cobrar");
+    const clickCobrar = () => clickByText(page, '[role="dialog"] button[type="submit"]', "Cobrar");
 
     await abrirDetalle(citaNeedle(slots[1]));
     await shot(page, "04-detalle-cita");
@@ -718,7 +688,7 @@ async function main() {
     await selectOption('select[name="tipo"]', "ajuste");
     await setNativeInput(page, 'input[name="cantidad"]', "0");
     await setNativeInput(page, 'textarea[name="notas"]', "E2E-SMOKE ajuste a cero");
-    await clickText(page, 'button[type="submit"]', "Registrar movimiento");
+    await clickByText(page, 'button[type="submit"]', "Registrar movimiento");
     await waitPendingClear();
     await page.waitForFunction(
       () =>
@@ -746,7 +716,7 @@ async function main() {
     await pickCombobox(page, "Producto o insumo", "SHAMPOO");
     await setNativeInput(page, 'input[name="cantidad"]', "10");
     await setNativeInput(page, 'textarea[name="notas"]', "E2E-SMOKE reposición");
-    await clickText(page, 'button[type="submit"]', "Registrar movimiento");
+    await clickByText(page, 'button[type="submit"]', "Registrar movimiento");
     await waitPendingClear();
     await waitForText(page, "Movimiento registrado");
     await page.reload({ waitUntil: "networkidle0" });
@@ -760,7 +730,7 @@ async function main() {
     });
     record("Inventario: pestañas Retail/Backbar", tabsInventario);
     if (tabsInventario) {
-      await clickText(page, '[role="tab"]', "Backbar");
+      await clickByText(page, '[role="tab"]', "Backbar");
       await sleep(400);
       const consumoVisible = await page.evaluate(() => {
         const activa = Array.from(document.querySelectorAll('[role="tab"]')).find(
@@ -780,7 +750,7 @@ async function main() {
     await selectOption('select[name="tipo"]', "salida");
     await setNativeInput(page, 'input[name="cantidad"]', "1");
     await setNativeInput(page, 'textarea[name="notas"]', "");
-    await clickText(page, 'button[type="submit"]', "Registrar movimiento");
+    await clickByText(page, 'button[type="submit"]', "Registrar movimiento");
     const notasRequeridas = await page
       .waitForFunction(
         () => document.body.innerText.toLowerCase().includes("motivo"),
@@ -802,21 +772,21 @@ async function main() {
     );
     record("Cobro exitoso cierra el sheet (modo inline)", sheetCerro);
     await page.reload({ waitUntil: "networkidle0" });
-    record("Cita marcada completada tras el cobro", await cardAria("completada"));
+    record("Cita marcada completada tras el cobro", await cardAria("cobrada"));
     await shot(page, "09-cita-completada");
 
     // ── POS walk-in completo ──────────────────────────────────────────────
     await page.goto(`${BASE_URL}/admin/pos`, { waitUntil: "networkidle0" });
     await Promise.all([
       page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
-      clickText(page, 'button[type="submit"]', "Abrir venta"),
+      clickByText(page, 'button[type="submit"]', "Abrir venta"),
     ]);
     record("Abrir venta walk-in crea ticket", page.url().includes("ventaId"));
     const ventaWalkinUrl = page.url();
     await waitForTextReload(page, "Agregar al ticket");
     await agregarAlTicket("Servicios", "CORTE DE DAMA");
     // Propina por atajo: 10% de $300 = $30 → cobro total $330
-    await clickText(page, '[role="group"][aria-label="Propina"] button', "10%");
+    await clickByText(page, '[role="group"][aria-label="Propina"] button', "10%");
     const propinaOk = await page.evaluate(() => document.body.innerText.includes("$330.00"));
     record("Propina 10% actualiza el total del cobro", propinaOk);
     // Medio: elegir EFECTIVO explícitamente (no depende del orden del catálogo
@@ -837,7 +807,7 @@ async function main() {
       { timeout: 8000 },
     ).then(() => true).catch(() => false);
     record("Monto del pago se sincroniza con total + propina", montoSincronizado);
-    await clickText(page, 'button[type="submit"]', "Cobrar");
+    await clickByText(page, 'button[type="submit"]', "Cobrar");
     await esperarResultadoCobro(false);
     await page.goto(`${BASE_URL}/admin/pos`, { waitUntil: "networkidle0" });
     await waitForText(page, "Ventas de hoy");
@@ -848,11 +818,11 @@ async function main() {
     // ── POS: devolución parcial por línea (venta cobrada sigue "completada")
     await page.goto(ventaWalkinUrl, { waitUntil: "networkidle0" });
     await waitForText(page, "Venta cerrada");
-    await clickText(page, "button", "Devolver líneas…");
+    await clickByText(page, "button", "Devolver líneas…");
     await page.waitForSelector('input[aria-label="Cantidad a devolver de CORTE DE DAMA"]', { visible: true });
     await setNativeInput(page, 'input[aria-label="Cantidad a devolver de CORTE DE DAMA"]', "1");
     await setNativeInput(page, 'input[name="motivo"]', "E2E-SMOKE devolución parcial");
-    await clickText(page, 'button[type="submit"]', "Registrar devolución");
+    await clickByText(page, 'button[type="submit"]', "Registrar devolución");
     await waitPendingClear();
     await page.reload({ waitUntil: "networkidle0" });
     const devolucionVisible = await page.evaluate(() => {
@@ -866,12 +836,12 @@ async function main() {
     // ── POS: descuento en ticket ──────────────────────────────────────────
     await Promise.all([
       page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
-      clickText(page, 'button[type="submit"]', "Abrir venta"),
+      clickByText(page, 'button[type="submit"]', "Abrir venta"),
     ]);
     await waitForTextReload(page, "Agregar al ticket");
     await agregarAlTicket("Servicios", "CORTE DE DAMA");
     await setNativeInput(page, 'input[name="descuento"]', "50");
-    await clickText(page, 'button[type="submit"]', "Aplicar");
+    await clickByText(page, 'button[type="submit"]', "Aplicar");
     await waitPendingClear();
     await waitForText(page, "$250.00");
     record("Descuento de $50 reduce el total a $250", true);
@@ -880,11 +850,11 @@ async function main() {
     // ── Agenda: editar cita ───────────────────────────────────────────────
     await page.goto(`${BASE_URL}/admin/agenda`, { waitUntil: "networkidle0" });
     await crearCita(slots[2], `${E2E_MARK} segunda`);
-    await waitForTextReload(page, "Walk-in");
+    await waitForTextReload(page, "Cliente de paso");
     await abrirDetalle(citaNeedle(slots[2]));
     await clickPanelDialog("Editar", '[role="dialog"] textarea[name="notas"]');
     await setNativeInput(page, '[role="dialog"] textarea[name="notas"]', "E2E-SMOKE editada");
-    await clickText(page, '[role="dialog"] button[type="submit"]', "Guardar cambios");
+    await clickByText(page, '[role="dialog"] button[type="submit"]', "Guardar cambios");
     await closeDialogs(page);
     const notaEditada = await pollReload(page, async () => {
       await abrirDetalle(citaNeedle(slots[2])).catch(() => {});
@@ -895,7 +865,7 @@ async function main() {
     // ── Agenda: cancelar y reagendar ──────────────────────────────────────
     await clickPanel("Cancelar cita");
     await page.waitForSelector('[role="alertdialog"]', { visible: true });
-    await clickText(page, '[role="alertdialog"] button', "Cancelar cita");
+    await clickByText(page, '[role="alertdialog"] button', "Cancelar cita");
     await closeDialogs(page);
     await waitPendingClear().catch(() => {});
     record("Cancelar cita cambia el estado", await pollReload(page, () => cardAria("cancelada")));
@@ -904,14 +874,14 @@ async function main() {
       await abrirDetalle(citaNeedle(slots[2])).catch(() => {});
       return page.evaluate(() => Boolean(document.querySelector('button[aria-label="Cerrar panel"]')));
     });
-    await clickPanelDialog("Reagendar", '[role="dialog"] input[type="time"]');
+    await clickPanelDialog("Cambiar fecha", '[role="dialog"] input[type="time"]');
     await setNativeInput(page, '[role="dialog"] input[type="time"]', slots[3]);
-    await clickText(page, '[role="dialog"] button[type="submit"]', "Reagendar");
+    await clickByText(page, '[role="dialog"] button[type="submit"]', "Cambiar fecha");
     await closeDialogs(page);
     await waitPendingClear().catch(() => {});
     record(
       `Reagendar rescata cita cancelada → pendiente ${slots[3]}`,
-      await pollReload(page, () => cardAria("pendiente", hora12(slots[3]))),
+      await pollReload(page, () => cardAria("agendada", hora12(slots[3]))),
     );
     await shot(page, "12-cita-reagendada");
 
@@ -930,7 +900,7 @@ async function main() {
     await sleep(300);
 
     await page.goto(`${BASE_URL}/admin/agenda?vista=lista`, { waitUntil: "networkidle0" });
-    await clickText(page, "button", "Ver");
+    await clickByText(page, "button", "Ver");
     const detalleLista = await page
       .waitForSelector('[role="dialog"]', { visible: true, timeout: 8000 })
       .then(() => true)
@@ -954,7 +924,7 @@ async function main() {
     });
     record("Mi día: resumen de propinas y comisiones", miDiaOk);
     const miDiaCita = await pollReload(page, () =>
-      page.evaluate(() => document.body.innerText.includes("Walk-in")),
+      page.evaluate(() => document.body.innerText.includes("Cliente de paso")),
     );
     record("Mi día lista la cita asignada al usuario", miDiaCita);
     const tabBarOk = await page.evaluate(
@@ -963,14 +933,14 @@ async function main() {
     record("Tab bar móvil presente en el shell", tabBarOk);
     await shot(page, "15-mi-dia");
 
-    await clickText(page, "button", "Cliente en silla");
+    await clickByText(page, "button", "Cliente en silla");
     await waitPendingClear().catch(() => {});
     const checkInOk = await pollReload(page, () =>
-      page.evaluate(() => document.body.innerText.includes("En proceso")),
+      page.evaluate(() => document.body.innerText.includes("En atención")),
     );
     record("Mi día: check-in pasa la cita a en proceso", checkInOk);
 
-    await clickText(page, "button", "Cobrar");
+    await clickByText(page, "button", "Cobrar");
     await page.waitForFunction(
       () => location.pathname === "/admin/pos" && location.search.includes("ventaId"),
       { timeout: 20000 },
@@ -985,7 +955,7 @@ async function main() {
     await shot(page, "16-mi-dia-cobro");
 
     // Retorno exacto: cobrar el ticket en modo página redirige a /admin/mi-dia.
-    await clickText(page, 'button[type="submit"]', "Cobrar");
+    await clickByText(page, 'button[type="submit"]', "Cobrar");
     const retornoExacto = await page
       .waitForFunction(() => location.pathname === "/admin/mi-dia", { timeout: 25000 })
       .then(() => true)
@@ -1017,7 +987,7 @@ async function main() {
     for (const mod of catalogos) {
       await page.goto(`${BASE_URL}/admin/${mod.ruta}`, { waitUntil: "networkidle0" });
       for (const [name, value] of Object.entries(mod.campos)) await fill(name, value);
-      await clickText(page, 'button[type="submit"]', mod.submit);
+      await clickByText(page, 'button[type="submit"]', mod.submit);
       await waitPendingClear();
       await sleep(800);
       await page.goto(`${BASE_URL}/admin/${mod.ruta}`, { waitUntil: "networkidle0" });
@@ -1037,7 +1007,7 @@ async function main() {
     await pickCombobox(page, "Servicio cubierto", "CORTE DE DAMA");
     await fill("sesiones", "3");
     await fill("precio", "800");
-    await clickText(page, 'button[type="submit"]', "Guardar paquete");
+    await clickByText(page, 'button[type="submit"]', "Guardar paquete");
     await waitPendingClear();
     await sleep(800);
     await page.goto(`${BASE_URL}/admin/paquetes`, { waitUntil: "networkidle0" });
@@ -1061,7 +1031,7 @@ async function main() {
       await fill("precio", "500");
       await fill("duracionDias", "30");
       await fill("descuentoPorcentaje", "10");
-      await clickText(page, 'button[type="submit"]', "Guardar membresía");
+      await clickByText(page, 'button[type="submit"]', "Guardar membresía");
       await waitPendingClear();
       await sleep(800);
     }
@@ -1075,13 +1045,13 @@ async function main() {
     // ── Servicios: editar y ocultar ───────────────────────────────────────
     const servicioNombre = `E2E Servicio ${runId}`;
     await page.goto(`${BASE_URL}/admin/servicios?q=${encodeURIComponent(servicioNombre)}`, { waitUntil: "networkidle0" });
-    await clickText(page, "a", "Editar");
+    await clickByText(page, "a", "Editar");
     await page.waitForFunction(
       () => document.body.innerText.includes("Editar servicio"),
       { timeout: 10000 },
     );
     await fill("precioBase", "150");
-    await clickText(page, 'button[type="submit"]', "Guardar servicio");
+    await clickByText(page, 'button[type="submit"]', "Guardar servicio");
     await waitPendingClear();
     await sleep(800);
     await page.goto(`${BASE_URL}/admin/servicios?q=${encodeURIComponent(servicioNombre)}`, { waitUntil: "networkidle0" });
@@ -1114,14 +1084,14 @@ async function main() {
     const clienteTelefono = `55${String(Date.now()).slice(-8)}`;
     await page.goto(`${BASE_URL}/admin/clientes`, { waitUntil: "networkidle0" });
     // El alta vive en un panel lateral: hay que abrirlo antes de llenar.
-    await clickText(page, "a", "Nuevo cliente");
+    await clickByText(page, "a", "Nuevo cliente");
     await page.waitForFunction(
       () => document.body.innerText.includes("Solo el nombre es obligatorio"),
       { timeout: 10000 },
     );
     await fill("nombre", clienteNombre);
     await fill("telefono", clienteTelefono);
-    await clickText(page, 'button[type="submit"]', "Guardar cliente");
+    await clickByText(page, 'button[type="submit"]', "Guardar cliente");
     await waitPendingClear();
     const altaHandle = await page.waitForFunction(
       () => {
@@ -1146,14 +1116,14 @@ async function main() {
     );
     record("Clientes: alta y búsqueda por nombre", clienteListado);
 
-    await clickText(page, "a", "Editar");
+    await clickByText(page, "a", "Editar");
     await page.waitForFunction(
       () => document.body.innerText.includes("Editar cliente"),
       { timeout: 10000 },
     );
     const telefonoNuevo = `56${String(Date.now()).slice(-8)}`;
     await fill("telefono", telefonoNuevo);
-    await clickText(page, 'button[type="submit"]', "Guardar cliente");
+    await clickByText(page, 'button[type="submit"]', "Guardar cliente");
     await waitPendingClear();
     await sleep(800);
     await page.goto(`${BASE_URL}/admin/clientes?q=${clienteNombre}`, { waitUntil: "networkidle0" });
@@ -1165,19 +1135,19 @@ async function main() {
 
     // ── Ficha técnica del cliente ────────────────────────────────────
     await page.goto(`${BASE_URL}/admin/clientes?q=${clienteNombre}`, { waitUntil: "networkidle0" });
-    await clickText(page, "td a", clienteNombre);
+    await clickByText(page, "td a", clienteNombre);
     await page.waitForFunction(
       () => document.body.innerText.includes("Fórmulas") && document.body.innerText.includes("Datos"),
       { timeout: 15000 },
     );
-    await clickText(page, '[role="tab"]', "Fórmulas");
+    await clickByText(page, '[role="tab"]', "Fórmulas");
     await sleep(300);
     const formula = `E2E-${runId} 7.34 + 8.1 (1:1) oxidante 20 vol`;
     // El primer textarea[name=formula] del DOM pertenece a la pestaña Fórmulas
     // (los paneles Base UI quedan montados en orden).
     await setNativeInput(page, 'textarea[name="formula"]', formula);
     await setNativeInput(page, 'input[name="tiempoPoseMinutos"]', "35");
-    await clickText(page, 'button[type="submit"]', "Registrar en ficha");
+    await clickByText(page, 'button[type="submit"]', "Registrar en ficha");
     const fichaOk = await page
       .waitForFunction(
         (f) => document.body.innerText.includes(f) && document.body.innerText.includes("Pose 35 min"),
@@ -1188,7 +1158,7 @@ async function main() {
       .catch(() => false);
     record("Clientes: alta en ficha técnica (fórmula)", fichaOk);
     if (fichaOk) {
-      await clickText(page, 'button[type="submit"]', "Desactivar");
+      await clickByText(page, 'button[type="submit"]', "Desactivar");
       const fichaOff = await page
         .waitForFunction((f) => !document.body.innerText.includes(f), { timeout: 15000 }, formula)
         .then(() => true)
@@ -1196,7 +1166,7 @@ async function main() {
       record("Clientes: desactivar registro de ficha", fichaOff);
     }
     // ── Nota privada del expediente (permiso expedientes.privado) ────
-    await clickText(page, '[role="tab"]', "Privado");
+    await clickByText(page, '[role="tab"]', "Privado");
     await sleep(300);
     const notaPrivada = `E2E-PRIVADA-${runId} observación confidencial`;
     // El formulario de la pestaña Privado es el último con checkbox privada
@@ -1231,7 +1201,7 @@ async function main() {
     record("Clientes: nota privada del expediente", privadaOk);
 
     // ── Consentimiento informado con firma ────────────────────────────
-    await clickText(page, '[role="tab"]', "Consentimientos");
+    await clickByText(page, '[role="tab"]', "Consentimientos");
     await sleep(300);
     const consentTitulo = `E2E Consentimiento ${runId}`;
     const consentScope = 'form:has(input[name="firmadoPor"])';
@@ -1242,7 +1212,7 @@ async function main() {
       `E2E-${runId} declaro que se me informaron riesgos y cuidados del procedimiento.`,
       consentScope,
     );
-    await clickText(page, 'button[type="submit"]', "Registrar consentimiento");
+    await clickByText(page, 'button[type="submit"]', "Registrar consentimiento");
     const consentOk = await page
       .waitForFunction(
         (t) =>
@@ -1262,7 +1232,7 @@ async function main() {
     await page.goto(`${BASE_URL}/admin/caja`, { waitUntil: "networkidle0" });
     await setNativeInput(page, 'input[name="fondoInicial"]', "100");
     await setNativeInput(page, 'textarea[name="notas"]', E2E_MARK);
-    await clickText(page, 'button[type="submit"]', "Abrir caja");
+    await clickByText(page, 'button[type="submit"]', "Abrir caja");
     const cajaAbierta = await page
       .waitForFunction(() => document.body.innerText.includes("conteo del turno"), { timeout: 15000 })
       .then(() => true)
@@ -1292,8 +1262,8 @@ async function main() {
     await shot(page, "17a-anticipo");
 
     // Check-in y cobro: $300 − $100 anticipo → se cobran $200 en efectivo.
-    await clickPanel("Cliente llegó");
-    await page.waitForFunction(() => document.body.innerText.includes("En proceso"), { timeout: 15000 });
+    await clickPanel("Ya llegó");
+    await page.waitForFunction(() => document.body.innerText.includes("En atención"), { timeout: 15000 });
     await abrirCobro();
     const anticipoVisible = await page.evaluate(() =>
       document.body.innerText.includes("Anticipo por aplicar"),
@@ -1312,14 +1282,14 @@ async function main() {
     await page.goto(`${BASE_URL}/admin/pos`, { waitUntil: "networkidle0" });
     await Promise.all([
       page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
-      clickText(page, 'button[type="submit"]', "Abrir venta"),
+      clickByText(page, 'button[type="submit"]', "Abrir venta"),
     ]);
     await waitForTextReload(page, "Agregar al ticket");
     await agregarAlTicket("Servicios", "CORTE DE DAMA");
 
     // Promoción vigente del catálogo (10% sobre todo): $300 → $270.
     await pickCombobox(page, "Promoción vigente", `E2E Promo ${runId}`);
-    await clickText(page, 'button[type="submit"]', "Aplicar promoción");
+    await clickByText(page, 'button[type="submit"]', "Aplicar promoción");
     await waitPendingClear();
     const promoAplicada = await page
       .waitForFunction(() => document.body.innerText.includes("$270.00"), { timeout: 15000 })
@@ -1336,13 +1306,13 @@ async function main() {
       chip?.click();
     });
     await sleep(300);
-    await clickText(page, 'button[type="submit"]', "Cobrar");
+    await clickByText(page, 'button[type="submit"]', "Cobrar");
     await esperarResultadoCobro(false);
 
     // ── Paquete prepagado: compra ($800) a nombre del cliente E2E ────────
     await Promise.all([
       page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
-      clickText(page, 'button[type="submit"]', "Abrir venta"),
+      clickByText(page, 'button[type="submit"]', "Abrir venta"),
     ]);
     await waitForTextReload(page, "Agregar al ticket");
     await pickCombobox(page, "Cliente de la venta", clienteNombre);
@@ -1360,7 +1330,7 @@ async function main() {
       chip?.click();
     });
     await sleep(300);
-    await clickText(page, 'button[type="submit"]', "Cobrar");
+    await clickByText(page, 'button[type="submit"]', "Cobrar");
     await esperarResultadoCobro(false);
     const ventaPaqueteOk = await page.evaluate(
       () => location.pathname === "/admin/pos" && !location.search.includes("ventaId"),
@@ -1370,7 +1340,7 @@ async function main() {
     // Segunda venta del mismo cliente: la sesión de paquete cubre el servicio.
     await Promise.all([
       page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
-      clickText(page, 'button[type="submit"]', "Abrir venta"),
+      clickByText(page, 'button[type="submit"]', "Abrir venta"),
     ]);
     await waitForTextReload(page, "Agregar al ticket");
     await pickCombobox(page, "Cliente de la venta", clienteNombre);
@@ -1399,13 +1369,13 @@ async function main() {
       .catch(() => false);
     record("Paquete: sesión consumida cubre el servicio (total $0)", usoClick && cubiertoPorPaquete);
     await shot(page, "17d-paquete");
-    await clickText(page, 'button[type="submit"]', "Completar venta");
+    await clickByText(page, 'button[type="submit"]', "Completar venta");
     await esperarResultadoCobro(false);
 
     // ── Membresía: compra ($500) a nombre del cliente E2E ──────────────
     await Promise.all([
       page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
-      clickText(page, 'button[type="submit"]', "Abrir venta"),
+      clickByText(page, 'button[type="submit"]', "Abrir venta"),
     ]);
     await waitForTextReload(page, "Agregar al ticket");
     await pickCombobox(page, "Cliente de la venta", clienteNombre);
@@ -1419,7 +1389,7 @@ async function main() {
       chip?.click();
     });
     await sleep(300);
-    await clickText(page, 'button[type="submit"]', "Cobrar");
+    await clickByText(page, 'button[type="submit"]', "Cobrar");
     await esperarResultadoCobro(false);
     const ventaMembresiaOk = await page.evaluate(
       () => location.pathname === "/admin/pos" && !location.search.includes("ventaId"),
@@ -1445,7 +1415,7 @@ async function main() {
     // ── Venta con descuento de membresía: servicio $300 − 10% = $270 ────
     await Promise.all([
       page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
-      clickText(page, 'button[type="submit"]', "Abrir venta"),
+      clickByText(page, 'button[type="submit"]', "Abrir venta"),
     ]);
     await waitForTextReload(page, "Agregar al ticket");
     await pickCombobox(page, "Cliente de la venta", clienteNombre);
@@ -1478,7 +1448,7 @@ async function main() {
       );
       opt?.click();
     }, membresiaNombre);
-    await clickText(page, 'button[type="submit"]', "Aplicar membresía");
+    await clickByText(page, 'button[type="submit"]', "Aplicar membresía");
     const descuentoMembresia = await page
       .waitForFunction(
         () => document.body.innerText.includes("Membresía ·"),
@@ -1496,7 +1466,7 @@ async function main() {
       chip?.click();
     });
     await sleep(300);
-    await clickText(page, 'button[type="submit"]', "Cobrar");
+    await clickByText(page, 'button[type="submit"]', "Cobrar");
     await esperarResultadoCobro(false);
     const ventaConMembresiaOk = await page.evaluate(
       () => location.pathname === "/admin/pos" && !location.search.includes("ventaId"),
@@ -1515,7 +1485,7 @@ async function main() {
         input.dispatchEvent(new Event("input", { bubbles: true }));
       }
     });
-    await clickText(page, 'button[type="submit"]', "Confirmar cierre de caja");
+    await clickByText(page, 'button[type="submit"]', "Confirmar cierre de caja");
     const cierreOk = await page
       .waitForFunction(
         () => document.body.innerText.includes("Cortes recientes") && document.body.innerText.includes("Cuadrado"),
@@ -1557,7 +1527,9 @@ async function main() {
     // ── PWA: manifest, iconos, service worker y fallback offline ──────
     const manifest = await page.evaluate(async () => {
       const res = await fetch("/manifest.webmanifest");
-      return res.ok ? res.json() : null;
+      return res.ok
+        ? ((await res.json()) as { display?: string; start_url?: string; icons?: Array<{ sizes?: string }> })
+        : null;
     });
     const manifestOk = Boolean(
       manifest?.display === "standalone" &&
@@ -1621,16 +1593,16 @@ async function main() {
     record("Offline: ticket sin conexión renderiza catálogo", ticketOfflineOk);
 
     await page.setOfflineMode(true);
-    await clickText(page, "button", `E2E Producto ${runId}`);
+    await clickByText(page, "button", `E2E Producto ${runId}`);
     await page.type('input[aria-label="Nota de la venta"]', `E2E-SMOKE offline ${runId}`);
     const medioEfectivoId = await page.evaluate(() => {
-      const sel = document.querySelector<HTMLSelectElement>('select[aria-label="Medio de pago"]');
+      const sel = document.querySelector('select[aria-label="Medio de pago"]') as HTMLSelectElement | null;
       const opt = sel ? Array.from(sel.options).find((o) => o.text.toLowerCase().includes("efectivo")) : null;
       return opt?.value ?? null;
     });
     if (medioEfectivoId) await page.select('select[aria-label="Medio de pago"]', medioEfectivoId);
     await page.type('input[aria-label="Monto"]', "25");
-    await clickText(page, "button", "Registrar venta");
+    await clickByText(page, "button", "Registrar venta");
     const encoladaOk = await page
       .waitForFunction(() => document.body.innerText.includes("Por sincronizar (1)"), { timeout: 10000 })
       .then(() => true)

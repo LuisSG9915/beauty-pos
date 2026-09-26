@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 
 import { toggleProduct } from "@/app/admin/productos/actions";
 import { ProductForm } from "@/app/admin/productos/product-form";
+import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -159,22 +161,58 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         </div>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-        <ProductForm categories={categories} initial={editingData} key={`${editing?.id ?? "nuevo"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} units={units} />
-        <AdminCard
-          actions={
-            <Button nativeButton={false} render={<Link href={buildAdminHref("/productos", { organizationId })} />}>
-              Nuevo
-            </Button>
-          }
-          className="self-start"
-          description={`${productRows.length} resultado(s)`}
-          title="Productos registrados"
-        >
-          {productRows.length === 0 ? (
-            <EmptyState description="Registra productos que vendes e insumos que consumes en los servicios." title="No hay productos" />
-          ) : (
-            <div className="overflow-x-auto">
+      <AdminCard
+        actions={
+          <Button
+            data-action-clave="1" size="lg"
+            data-action-id="catalogo.productos.nuevo"
+            nativeButton={false}
+            render={<Link href={buildAdminHref("/productos", { organizationId, extra: { ...preserved, nuevo: "1" } })} />}
+          >
+            Nuevo
+          </Button>
+        }
+        description={`${productRows.length} resultado(s)`}
+        title="Productos registrados"
+      >
+        {productRows.length === 0 ? (
+          <EmptyState description="Registra productos que vendes e insumos que consumes en los servicios." title="No hay productos" />
+        ) : (
+          <>
+            <RegistroList>
+              {productRows.map((product) => (
+                <RegistroCard
+                  acciones={
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60"
+                        href={buildAdminHref("/productos", { organizationId, extra: { ...preserved, edit: product.id } })}
+                      >
+                        Editar
+                      </Link>
+                      <form action={toggleProduct}>
+                        <input name="organizacionId" type="hidden" value={organizationId} />
+                        <input name="id" type="hidden" value={product.id} />
+                        <input name="activo" type="hidden" value={String(product.activo)} />
+                        <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">
+                          {product.activo ? "Ocultar" : "Activar"}
+                        </button>
+                      </form>
+                    </div>
+                  }
+                  badge={<StatusBadge active={product.activo} />}
+                  campos={[
+                    { label: "Tipo", value: TIPO_LABEL[product.tipo] ?? product.tipo },
+                    { label: "Costo", value: formatCurrency(product.costo, { currency: context.currency }) },
+                    { label: "Precio", value: formatCurrency(product.precioVenta, { currency: context.currency }) },
+                  ]}
+                  key={product.id}
+                  subtitulo={<span className="font-mono">{product.sku}</span>}
+                  titulo={product.nombre}
+                />
+              ))}
+            </RegistroList>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[640px] text-left text-sm">
                 <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
@@ -221,9 +259,19 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
                 </tbody>
               </table>
             </div>
-          )}
-        </AdminCard>
-      </div>
+          </>
+        )}
+      </AdminCard>
+      {editing || firstParam(params.nuevo) === "1" ? (
+        <FormSheet
+          closeHref={buildAdminHref("/productos", { organizationId, extra: preserved })}
+          description={editing ? "Ajusta los datos del producto o insumo." : "Registra un producto vendible o un insumo."}
+          title={editing ? "Editar producto" : "Nuevo producto"}
+          wide
+        >
+          <ProductForm categories={categories} initial={editingData} key={`${editing?.id ?? "nuevo"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} units={units} />
+        </FormSheet>
+      ) : null}
     </div>
   );
 }

@@ -29,7 +29,7 @@ export function StatCard({ label, value, hint, icon: Icon, className }: StatCard
         {Icon ? <Icon aria-hidden="true" className="size-4 text-muted-foreground" strokeWidth={1.8} /> : null}
       </div>
       <p className="mt-1.5 text-2xl font-semibold tracking-tight text-foreground">{value}</p>
-      {hint ? <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-op-xs leading-4 text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }

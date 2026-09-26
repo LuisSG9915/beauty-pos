@@ -27,7 +27,7 @@ export function PaymentMethodForm({ organizationId, initial }: { organizationId:
       <h2 className="text-xl font-semibold">{initial ? "Editar medio de pago" : "Nuevo medio de pago"}</h2>
       <p className="mt-1 text-sm text-muted-foreground">Define cómo se puede pagar en Cobrar: efectivo, tarjeta, transferencia, etc.</p>
       <div className="mt-5 space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel required>Clave</FieldLabel>
             <Input className="uppercase" defaultValue={initial?.clave} name="clave" placeholder="EFECTIVO" required />

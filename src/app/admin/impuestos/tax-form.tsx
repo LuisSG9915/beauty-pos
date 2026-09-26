@@ -21,7 +21,7 @@ export function TaxForm({ organizationId, initial }: { organizationId: string; i
       <h2 className="text-xl font-semibold">{initial ? "Editar impuesto" : "Nuevo impuesto"}</h2>
       <p className="mt-1 text-sm text-muted-foreground">Configura IVA, IEPS u otros impuestos aplicables en el POS.</p>
       <div className="mt-5 space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel required>Clave</FieldLabel>
             <Input className="uppercase" defaultValue={initial?.clave} name="clave" placeholder="IVA" required />
@@ -31,7 +31,7 @@ export function TaxForm({ organizationId, initial }: { organizationId: string; i
             <Input defaultValue={initial?.nombre} name="nombre" placeholder="IVA (16%)" required />
           </Field>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel required>Tasa (%)</FieldLabel>
             <Input defaultValue={String(initial?.tasa ?? "16")} min="0" name="tasa" placeholder="16" required step="0.0001" type="number" />

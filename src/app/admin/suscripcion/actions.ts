@@ -10,7 +10,7 @@ import { sucursales } from "@/db/schema/core";
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
 import { auditEvent } from "@/lib/audit";
 import { checkPermission } from "@/lib/auth/authorization";
-import { getSuscripcionActual } from "@/modules/billing/queries";
+import { getSuscripcionActual, invalidarSuscripcionCache } from "@/modules/billing/queries";
 
 const cambioPlanSchema = z.object({
   organizacionId: z.string().uuid(),
@@ -141,6 +141,10 @@ export async function solicitarCancelacion(_previousState: ActionState, formData
       detalle: { motivo: input.motivo },
     });
   });
+
+  // Invalida el caché KV de la suscripción para que el siguiente request vea
+  // la cancelación registrada.
+  await invalidarSuscripcionCache(input.organizacionId);
 
   revalidatePath("/admin/suscripcion");
   return actionSuccess("Cancelación registrada. Conservas el acceso hasta el fin del periodo ya cubierto; no habrá más cobros.");

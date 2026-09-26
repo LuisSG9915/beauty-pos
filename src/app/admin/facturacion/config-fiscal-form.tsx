@@ -35,7 +35,7 @@ export function ConfigFiscalForm({
       <p className="mt-1 text-sm text-muted-foreground">
         Identidad fiscal con la que se emiten los CFDI de esta organización. Es requisito para facturar.
       </p>
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel required>RFC</FieldLabel>
           <Input defaultValue={initial?.rfc ?? ""} maxLength={13} name="rfc" placeholder="AAA010101AAA" required />
@@ -78,7 +78,7 @@ export function ConfigFiscalForm({
       <div className="mt-4">
         <ActionFeedback state={state} successMessage="Datos del emisor guardados." />
       </div>
-      <Button className="mt-6 rounded-xl" disabled={pending} type="submit">
+      <Button className="mt-6 rounded-xl" data-action-clave="1" size="lg" data-action-id="facturacion.emisor.guardar" disabled={pending} type="submit">
         {pending ? "Guardando…" : "Guardar emisor"}
       </Button>
     </form>

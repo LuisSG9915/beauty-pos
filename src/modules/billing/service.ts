@@ -15,6 +15,7 @@ import { horariosSucursales } from "@/db/schema/operations";
 import { auditEvent } from "@/lib/audit";
 import { defaultPermissions, defaultRoles } from "@/lib/auth/defaults";
 import { PLANES_CATALOGO } from "./capacidades";
+import { invalidarPlanesCache } from "./queries";
 
 /** Medios de pago mínimos para que el POS funcione desde el primer día. */
 const mediosPagoBase = [
@@ -85,6 +86,10 @@ export async function sincronizarCatalogoPlanes(tx: Tx) {
     .update(planes)
     .set({ activo: false, capacidades: capacidadesLegado })
     .where(notInArray(planes.clave, PLANES_CATALOGO.map((p) => p.clave)));
+
+  // El catálogo de planes está cacheado en KV (`getPlanesActivos`): invalidar
+  // tras el upsert. Si la transacción revierte, solo se provoca un refetch.
+  await invalidarPlanesCache();
 }
 
 /** Plan del registro (Crecimiento); garantiza que el catálogo exista. */

@@ -1,9 +1,12 @@
 import { and, asc, eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 
+import Link from "next/link";
+
 import { CategoriaGastoForm } from "@/app/admin/gastos/categoria-form";
 import { GastoForm } from "@/app/admin/gastos/gasto-form";
 import { RevertirGastoForm } from "@/app/admin/gastos/revertir-gasto-form";
+import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { PlanUpgradeNotice } from "@/components/plan-gate";
@@ -94,6 +97,19 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        actions={
+          puedeEditar ? (
+            <Button
+              data-action-clave="1"
+              data-action-id="gastos.gasto.abrir_formulario"
+              nativeButton={false}
+              render={<Link href={buildAdminHref("/gastos", { organizationId, sucursalId, extra: { nuevo: "gasto" } })} />}
+              size="lg"
+            >
+              Nuevo gasto
+            </Button>
+          ) : undefined
+        }
         description={`${branch.nombre} · ${desde} → ${hasta}. Los gastos en efectivo descuentan del corte abierto; los demás medios no tocan el cajón.`}
         title="Gastos"
       />
@@ -129,7 +145,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
         <Button className="rounded-xl" type="submit">Filtrar</Button>
       </form>
 
-      <section className="grid gap-3 sm:grid-cols-2">
+      <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gastos confirmados</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{fmt(resumen.totalConfirmado)}</p>
@@ -140,25 +156,75 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        {puedeEditar ? (
-          <div className="space-y-6 self-start">
-            <GastoForm
-              categorias={categorias}
-              fechaHoy={hoy}
-              medios={medios}
-              organizationId={organizationId}
-              sucursalId={sucursalId}
-            />
-            <CategoriaGastoForm organizationId={organizationId} />
-          </div>
-        ) : null}
-
-        <AdminCard className="self-start" description={`${listado.rows.length} gasto(s) en esta página`} title="Gastos del periodo">
+      <div>
+        <AdminCard
+          actions={
+            puedeEditar ? (
+              <Button
+                nativeButton={false}
+                render={<Link href={buildAdminHref("/gastos", { organizationId, sucursalId, extra: { nuevo: "categoria" } })} />}
+                size="sm"
+                variant="outline"
+              >
+                Nueva categoría
+              </Button>
+            ) : undefined
+          }
+          className="self-start"
+          description={`${listado.rows.length} gasto(s) en esta página`}
+          title="Gastos del periodo"
+        >
           {listado.rows.length === 0 ? (
             <EmptyState description="Prueba otro rango o registra el primer gasto del negocio." title="Sin gastos" />
           ) : (
-            <div className="overflow-x-auto">
+            <>
+              <div className="space-y-3 md:hidden">
+                {listado.rows.map((gasto) => (
+                  <article className="rounded-xl border border-border p-4" key={gasto.id}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-semibold leading-5 text-foreground">{gasto.concepto}</h3>
+                        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                          {gasto.fechaGasto} · {gasto.categoria ?? "Sin categoría"}
+                        </p>
+                      </div>
+                      <StatusBadge tone={gasto.estado === "confirmado" ? "success" : "neutral"}>
+                        {ESTADO_LABEL[gasto.estado] ?? gasto.estado}
+                      </StatusBadge>
+                    </div>
+                    {[gasto.proveedor, gasto.referencia, gasto.registradoPor].filter(Boolean).length > 0 ? (
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        {[gasto.proveedor, gasto.referencia, gasto.registradoPor].filter(Boolean).join(" · ")}
+                      </p>
+                    ) : null}
+                    {gasto.motivoReversion ? (
+                      <p className="mt-0.5 text-xs text-destructive">Reversión: {gasto.motivoReversion}</p>
+                    ) : null}
+                    <dl className="mt-3 space-y-1.5">
+                      <div className="flex items-baseline justify-between gap-3 text-sm">
+                        <dt className="shrink-0 text-xs text-muted-foreground">Importe</dt>
+                        <dd className="min-w-0 text-right font-semibold tabular-nums text-foreground">{fmt(gasto.importe)}</dd>
+                      </div>
+                      <div className="flex items-baseline justify-between gap-3 text-sm">
+                        <dt className="shrink-0 text-xs text-muted-foreground">Medio</dt>
+                        <dd className="min-w-0 text-right text-xs text-muted-foreground">
+                          {gasto.medio}{gasto.cajaVinculada ? " · caja" : ""}
+                        </dd>
+                      </div>
+                    </dl>
+                    {puedeEditar && gasto.estado === "confirmado" ? (
+                      <div className="mt-3 border-t border-border pt-3">
+                        <RevertirGastoForm
+                          concepto={gasto.concepto}
+                          gastoId={gasto.id}
+                          organizationId={organizationId}
+                        />
+                      </div>
+                    ) : null}
+                  </article>
+                ))}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[640px] text-left text-sm">
                 <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
@@ -212,20 +278,46 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
                   ))}
                 </tbody>
               </table>
-            </div>
+              </div>
+            </>
           )}
           {page > 1 || listado.hasMore ? (
             <div className="mt-4 flex items-center justify-between text-sm">
               {page > 1 ? (
-                <a className="font-medium text-primary hover:underline" href={pageHref(page - 1)}>← Anterior</a>
+                <a className="inline-flex min-h-6 items-center font-medium text-primary hover:underline" href={pageHref(page - 1)}>← Anterior</a>
               ) : <span />}
               {listado.hasMore ? (
-                <a className="font-medium text-primary hover:underline" href={pageHref(page + 1)}>Siguiente →</a>
+                <a className="inline-flex min-h-6 items-center font-medium text-primary hover:underline" href={pageHref(page + 1)}>Siguiente →</a>
               ) : <span />}
             </div>
           ) : null}
         </AdminCard>
       </div>
+
+      {puedeEditar && firstParam(params.nuevo) === "gasto" ? (
+        <FormSheet
+          closeHref={buildAdminHref("/gastos", { organizationId, sucursalId })}
+          description="En efectivo descuenta del corte abierto; los demás medios no tocan el cajón."
+          title="Registrar gasto"
+        >
+          <GastoForm
+            categorias={categorias}
+            fechaHoy={hoy}
+            medios={medios}
+            organizationId={organizationId}
+            sucursalId={sucursalId}
+          />
+        </FormSheet>
+      ) : null}
+      {puedeEditar && firstParam(params.nuevo) === "categoria" ? (
+        <FormSheet
+          closeHref={buildAdminHref("/gastos", { organizationId, sucursalId })}
+          description="Renta, insumos, sueldos, mantenimiento…"
+          title="Nueva categoría de gasto"
+        >
+          <CategoriaGastoForm organizationId={organizationId} />
+        </FormSheet>
+      ) : null}
     </div>
   );
 }

@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 
 import { togglePromotion } from "@/app/admin/promociones/actions";
 import { PromotionForm } from "@/app/admin/promociones/promotion-form";
+import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -118,22 +120,55 @@ export default async function PromotionsPage({ searchParams }: { searchParams: S
         ) : null}
       </form>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
-        <PromotionForm initial={editingData} key={`${editing?.id ?? "nueva"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} />
-        <AdminCard
-          actions={
-            <Button nativeButton={false} render={<Link href={buildAdminHref("/promociones", { organizationId })} />}>
-              Nueva
-            </Button>
-          }
-          className="self-start"
-          description={`${promotionRows.length} resultado(s)`}
-          title="Promociones registradas"
-        >
-          {promotionRows.length === 0 ? (
-            <EmptyState description="Crea descuentos, promociones 2x1 o paquetes para tus productos y servicios." title="No hay promociones" />
-          ) : (
-            <div className="overflow-x-auto">
+      <AdminCard
+        actions={
+          <Button
+            data-action-clave="1" size="lg"
+            data-action-id="catalogo.promociones.nueva"
+            nativeButton={false}
+            render={<Link href={buildAdminHref("/promociones", { organizationId, extra: { ...preserved, nuevo: "1" } })} />}
+          >
+            Nueva
+          </Button>
+        }
+        description={`${promotionRows.length} resultado(s)`}
+        title="Promociones registradas"
+      >
+        {promotionRows.length === 0 ? (
+          <EmptyState description="Crea descuentos, promociones 2x1 o paquetes para tus productos y servicios." title="No hay promociones" />
+        ) : (
+          <>
+            <RegistroList>
+              {promotionRows.map((promo) => (
+                <RegistroCard
+                  acciones={
+                    <div className="flex flex-wrap gap-2">
+                      <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/promociones", { organizationId, extra: { ...preserved, edit: promo.id } })}>Editar</Link>
+                      <form action={togglePromotion}>
+                        <input name="organizacionId" type="hidden" value={organizationId} />
+                        <input name="id" type="hidden" value={promo.id} />
+                        <input name="activo" type="hidden" value={String(promo.activo)} />
+                        <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">{promo.activo ? "Ocultar" : "Activar"}</button>
+                      </form>
+                    </div>
+                  }
+                  badge={<StatusBadge active={promo.activo} />}
+                  campos={[
+                    { label: "Tipo", value: TIPO_LABEL[promo.tipo] ?? promo.tipo },
+                    {
+                      label: "Valor",
+                      value: promo.tipo === "porcentaje" ? `${promo.valor}%` : promo.tipo === "2x1" ? "—" : formatCurrency(promo.valor, { currency: context.currency }),
+                    },
+                    { label: "Aplica", value: APLICA_LABEL[promo.aplica] ?? promo.aplica },
+                    { label: "Vigencia", value: `${promo.vigenciaDesde}${promo.vigenciaHasta ? ` → ${promo.vigenciaHasta}` : " → ∞"}` },
+                  ]}
+                  key={promo.id}
+                  subtitulo={<span className="font-mono">{promo.clave}</span>}
+                  titulo={promo.nombre}
+                />
+              ))}
+            </RegistroList>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[680px] text-left text-sm">
                 <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
@@ -175,9 +210,19 @@ export default async function PromotionsPage({ searchParams }: { searchParams: S
                 </tbody>
               </table>
             </div>
-          )}
-        </AdminCard>
-      </div>
+          </>
+        )}
+      </AdminCard>
+      {editing || firstParam(params.nuevo) === "1" ? (
+        <FormSheet
+          closeHref={buildAdminHref("/promociones", { organizationId, extra: preserved })}
+          description={editing ? "Ajusta los datos de la promoción." : "Crea un descuento o promoción."}
+          title={editing ? "Editar promoción" : "Nueva promoción"}
+          wide
+        >
+          <PromotionForm initial={editingData} key={`${editing?.id ?? "nueva"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} />
+        </FormSheet>
+      ) : null}
     </div>
   );
 }

@@ -139,7 +139,7 @@ export async function sendAvisoCita(tipo: string, input: AvisoCitaInput): Promis
             ${
               gestion
                 ? `<p style="margin: 20px 0"><a href="${gestion}" style="background: ${EMAIL.primary}; color: ${EMAIL.primaryForeground}; padding: 10px 20px; border-radius: 8px; text-decoration: none; display: inline-block; font-weight: 600">Consultar o modificar mi cita</a></p>
-                   <p style="color: ${EMAIL.muted}; font-size: 12px">Guarda este enlace: con él puedes consultar el estado de tu cita, reagendarla o cancelarla según la política del negocio.</p>`
+                   <p style="color: ${EMAIL.muted}; font-size: 12px">Guarda este enlace: con él puedes consultar el estado de tu cita, cambiarla de fecha o cancelarla según la política del negocio.</p>`
                 : `<p>Si necesitas cambiar o cancelar tu cita, comunícate con el negocio.</p>`
             }
             <p style="color: ${EMAIL.muted}; font-size: 12px; margin-bottom: 0">Enviado por ${escapeHtml(BRAND.name)} a nombre de ${escapeHtml(input.nombreNegocio)}.</p>
