@@ -215,6 +215,66 @@ export async function desactivarPiso(formData: FormData): Promise<ToggleActivoRe
   }
 }
 
+/**
+ * Intercambia el `orden` del piso con su vecino activo de la misma sucursal
+ * (`izquierda` = orden anterior, `derecha` = siguiente). No-op en los extremos.
+ */
+export async function reordenarPiso(formData: FormData): Promise<PlanoMutationResult> {
+  const parsed = z
+    .object({
+      organizacionId: z.string().uuid(),
+      pisoId: z.string().uuid(),
+      direccion: z.enum(["izquierda", "derecha"]),
+    })
+    .safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return { success: false, error: "Datos inválidos." };
+  const input = parsed.data;
+  const access = await checkPermission(input.organizacionId, "sucursales.editar");
+  if (!access) return { success: false, error: "No tienes permiso para editar el plano." };
+  const db = getDatabase();
+  const piso = await getPiso(db, input.organizacionId, input.pisoId);
+  if (!piso || !piso.activo) return { success: false, error: "El piso no existe o está inactivo." };
+  if (!(await assertBranchScope(access, piso.sucursalId))) {
+    return { success: false, error: "No tienes acceso a esta sucursal." };
+  }
+  try {
+    const movio = await db.transaction(async (tx) => {
+      // Vecino activo inmediato en la dirección pedida (empates por id).
+      const { rows: vecinos } = await tx.execute<{ id: string; orden: number }>(
+        input.direccion === "izquierda"
+          ? sql`select ${pisos.id} as id, ${pisos.orden} as orden from ${pisos}
+                 where ${pisos.sucursalId} = ${piso.sucursalId} and ${pisos.activo}
+                   and (${pisos.orden} < ${piso.orden} or (${pisos.orden} = ${piso.orden} and ${pisos.id} < ${piso.id}))
+                 order by ${pisos.orden} desc, ${pisos.id} desc limit 1`
+          : sql`select ${pisos.id} as id, ${pisos.orden} as orden from ${pisos}
+                 where ${pisos.sucursalId} = ${piso.sucursalId} and ${pisos.activo}
+                   and (${pisos.orden} > ${piso.orden} or (${pisos.orden} = ${piso.orden} and ${pisos.id} > ${piso.id}))
+                 order by ${pisos.orden} asc, ${pisos.id} asc limit 1`,
+      );
+      const vecino = vecinos[0];
+      if (!vecino) return false;
+      await tx.update(pisos).set({ orden: vecino.orden, updatedBy: access.user.id }).where(eq(pisos.id, piso.id));
+      await tx.update(pisos).set({ orden: piso.orden, updatedBy: access.user.id }).where(eq(pisos.id, vecino.id));
+      await auditEvent(tx, {
+        organizacionId: input.organizacionId,
+        sucursalId: piso.sucursalId,
+        usuarioId: access.user.id,
+        accion: "plano.piso_reordenado",
+        entidad: "piso",
+        entidadId: piso.id,
+        detalle: { nombre: piso.nombre, direccion: input.direccion },
+      });
+      return true;
+    });
+    if (!movio) return { success: false, error: "Ya está en ese extremo." };
+    revalidatePath("/admin/plano");
+    return { success: true, message: "Piso reordenado." };
+  } catch (error) {
+    console.error("reordenarPiso", error);
+    return { success: false, error: "No se pudo reordenar el piso." };
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Ubicaciones (dónde se guarda la mercancía)                          */
 /* ------------------------------------------------------------------ */

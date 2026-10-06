@@ -46,6 +46,8 @@ export type SoltarPlano = {
   id: string;
   tipo: TipoElementoPlano;
   rect: PlanoRect;
+  /** Rectángulo de origen (para el "Deshacer" del toast tras mover). */
+  origen: PlanoRect;
   /** true solo si el rectángulo cambió respecto al de origen y es válido. */
   cambio: boolean;
 };
@@ -305,6 +307,7 @@ export function useArrastrePlano({
         id: estado.id,
         tipo: estado.tipo,
         rect: estado.rect,
+        origen: g.origen,
         cambio: true,
       });
     },

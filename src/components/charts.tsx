@@ -39,7 +39,7 @@ export function BarChart({
   const mostrarEtiquetaCada = Math.ceil(puntos.length / 8);
 
   return (
-    <div className="overflow-x-auto">
+    <div aria-label="Gráfica de barras" className="overflow-x-auto" role="region" tabIndex={0}>
       <svg
         aria-label="Gráfica de barras"
         className="h-auto"
@@ -113,7 +113,7 @@ export function HBarChart({
     const max = Math.max(1, ...puntos.map((p) => Math.max(p.valor, p.marca ?? 0)));
     const alto = puntos.length * ALTO_FILA;
     return (
-      <div className="overflow-x-auto">
+      <div aria-label={etiquetaAccesible} className="overflow-x-auto" role="region" tabIndex={0}>
         <svg
           aria-label={etiquetaAccesible}
           className="h-auto w-full min-w-[420px]"

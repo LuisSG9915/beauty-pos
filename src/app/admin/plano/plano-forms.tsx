@@ -125,28 +125,45 @@ export function PisoForm({ organizationId, sucursalId, piso, onGuardado }: FormP
   );
 }
 
-/** Edición de nombre/tipo de una ubicación (la posición se arrastra en el plano). */
+/**
+ * Alta (ubicación ausente) y edición (nombre/tipo) de ubicación. En el alta se
+ * elige el piso y la figura cae en la primera celda libre 2×1; la posición fina
+ * se acomoda arrastrando en el plano.
+ */
 export function UbicacionForm({
   organizationId,
+  pisos,
+  pisoInicial,
   sucursalId,
   ubicacion,
   onGuardado,
-}: FormProps & { ubicacion: PlanoUbicacion }) {
+}: FormProps & {
+  /** Lista de pisos activos para el alta. */
+  pisos?: PlanoPiso[];
+  /** Piso preseleccionado en el alta (el piso visible en el lienzo). */
+  pisoInicial?: string;
+  ubicacion?: PlanoUbicacion;
+}) {
   const [state, action, pending] = useActionState(guardarUbicacion, initialActionState);
   useCerrarAlGuardar(state.success, onGuardado);
   return (
     <form action={action} className="space-y-4">
       <input name="organizacionId" type="hidden" value={organizationId} />
       <input name="sucursalId" type="hidden" value={sucursalId} />
-      <input name="ubicacionId" type="hidden" value={ubicacion.id} />
-      <input name="pisoId" type="hidden" value={ubicacion.pisoId} />
+      {ubicacion ? (
+        <>
+          <input name="ubicacionId" type="hidden" value={ubicacion.id} />
+          <input name="pisoId" type="hidden" value={ubicacion.pisoId} />
+        </>
+      ) : null}
 
       <Field>
         <FieldLabel required>Nombre</FieldLabel>
         <Input
-          defaultValue={ubicacion.nombre}
+          defaultValue={ubicacion?.nombre ?? ""}
           invalid={Boolean(state.fieldErrors?.nombre)}
           name="nombre"
+          placeholder="Vitrina entrada, Estante pasillo…"
           required
         />
         <FieldError error={state.fieldErrors?.nombre?.[0]} />
@@ -154,7 +171,7 @@ export function UbicacionForm({
 
       <Field>
         <FieldLabel required>Tipo</FieldLabel>
-        <Select defaultValue={ubicacion.tipo} name="tipo">
+        <Select defaultValue={ubicacion?.tipo ?? "estante"} name="tipo">
           {UBICACION_TIPOS.map((tipo) => (
             <option key={tipo} value={tipo}>
               {UBICACION_TIPO_LABEL[tipo]}
@@ -164,10 +181,27 @@ export function UbicacionForm({
         <FieldError error={state.fieldErrors?.tipo?.[0]} />
       </Field>
 
+      {!ubicacion && pisos?.length ? (
+        <Field>
+          <FieldLabel required>Piso del plano</FieldLabel>
+          <Select defaultValue={pisoInicial ?? pisos[0]?.id ?? ""} name="pisoId">
+            {pisos.map((piso) => (
+              <option key={piso.id} value={piso.id}>
+                {piso.nombre}
+              </option>
+            ))}
+          </Select>
+          <FieldDescription>
+            Se coloca en la primera celda libre; luego la arrastras a su lugar.
+          </FieldDescription>
+          <FieldError error={state.fieldErrors?.pisoId?.[0]} />
+        </Field>
+      ) : null}
+
       <ActionFeedback state={state} />
       <div className="flex justify-end">
         <Button data-action-id="plano.ubicacion.guardar" disabled={pending} type="submit">
-          {pending ? "Guardando…" : "Guardar ubicación"}
+          {pending ? "Guardando…" : ubicacion ? "Guardar ubicación" : "Agregar ubicación"}
         </Button>
       </div>
     </form>
@@ -183,6 +217,7 @@ export function UbicacionForm({
 export function MobiliarioForm({
   organizationId,
   pisos,
+  pisoInicial,
   recursos,
   sucursalId,
   mueble,
@@ -190,6 +225,8 @@ export function MobiliarioForm({
   onGuardado,
 }: FormProps & {
   pisos: PlanoPiso[];
+  /** Piso preseleccionado en el alta (el piso visible en el lienzo). */
+  pisoInicial?: string;
   recursos: PlanoRecurso[];
   mueble?: PlanoMobiliario | null;
   /** Tipo pre-elegido desde la paleta del editor. */
@@ -245,7 +282,7 @@ export function MobiliarioForm({
 
       <Field>
         <FieldLabel>Piso del plano</FieldLabel>
-        <Select defaultValue={mueble?.pisoId ?? ""} name="pisoId">
+        <Select defaultValue={mueble?.pisoId ?? pisoInicial ?? ""} name="pisoId">
           <option value="">Sin colocar (no aparece en el mapa)</option>
           {pisos.map((piso) => (
             <option key={piso.id} value={piso.id}>

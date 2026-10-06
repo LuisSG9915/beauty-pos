@@ -330,6 +330,7 @@ export function ReabastecerPanel({
                     <input
                       aria-label={`Seleccionar ${fila.nombre}`}
                       checked={estado.marcada}
+                      className="size-6 cursor-pointer align-middle"
                       data-action-id="reabastecer.fila.seleccionar"
                       onChange={(event) => actualizar(fila.productoId, { marcada: event.target.checked })}
                       type="checkbox"

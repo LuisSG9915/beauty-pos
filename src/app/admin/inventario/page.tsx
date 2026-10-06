@@ -234,7 +234,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
                   })()}
                   {" · "}
                   <Link
-                    className="font-medium text-primary hover:underline"
+                    className="inline-flex min-h-6 items-center font-medium text-primary hover:underline"
                     data-action-id="inventario.producto.ver_en_mapa"
                     href={hrefMapa(producto.id)}
                   >
@@ -314,7 +314,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
                 : `${nombres.slice(0, 2).join(", ")}${nombres.length > 2 ? ` +${nombres.length - 2}` : ""}`}
             </span>
             <Link
-              className="text-xs font-medium text-primary hover:underline"
+              className="inline-flex min-h-6 items-center text-xs font-medium text-primary hover:underline"
               data-action-id="inventario.producto.ver_en_mapa"
               href={href}
             >

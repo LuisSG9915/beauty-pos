@@ -2,19 +2,24 @@
 
 import {
   Armchair,
+  ArrowLeft,
+  ArrowRight,
   BedDouble,
   CircleAlert,
   Droplets,
   Layers,
   Map as MapIcon,
+  Maximize,
   Package,
   Plus,
   RectangleHorizontal,
   Search,
+  Settings,
   ShoppingCart,
-  SlidersHorizontal,
   Sparkles,
   Table,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
@@ -27,13 +32,12 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 
-import { useMediaQuery } from "@/app/admin/agenda/agenda-hooks";
 import {
   desactivarMobiliario,
   desactivarPiso,
   desactivarUbicacion,
-  guardarUbicacion,
   moverElemento,
+  reordenarPiso,
 } from "@/app/admin/plano/actions";
 import { useArrastrePlano, type SoltarPlano, type TipoElementoPlano } from "@/app/admin/plano/plano-drag";
 import {
@@ -48,7 +52,6 @@ import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
-import { Select } from "@/components/ui/field";
 import {
   Sheet,
   SheetContent,
@@ -58,12 +61,9 @@ import {
 } from "@/components/ui/sheet";
 import { useToast } from "@/components/ui/toast";
 import {
-  MOBILIARIO_TIPOS,
-  UBICACION_TIPOS,
   type MobiliarioTipo,
   type UbicacionTipo,
 } from "@/db/schema/plano";
-import { initialActionState } from "@/lib/action-state";
 import { formatQuantity } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
@@ -81,12 +81,16 @@ import {
 
 /** 1 celda = 32 px en el viewBox (regla del plan). */
 const CELDA = 32;
+/** Niveles de zoom del lienzo (escala el ancho/alto del svg; el viewBox no cambia). */
+const NIVELES_ZOOM = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+const ZOOM_MIN = 0.3;
+const ZOOM_MAX = 2;
 
 type FiltroPlano = "todo" | "mercancia" | "muebles";
 type Seleccion = { tipo: TipoElementoPlano; id: string } | null;
 type FormAbierto =
   | { tipo: "piso"; piso?: PlanoPiso }
-  | { tipo: "ubicacion"; ubicacion: PlanoUbicacion }
+  | { tipo: "ubicacion"; ubicacion?: PlanoUbicacion }
   | { tipo: "mobiliario"; mueble?: PlanoMobiliario; tipoInicial?: MobiliarioTipo }
   | null;
 
@@ -112,8 +116,9 @@ type RectMap = Record<string, PlanoRect>;
 
 /**
  * Tablero del plano: barra de herramientas (pisos, búsqueda de producto,
- * filtros, edición), lienzo SVG con arrastre y panel lateral por elemento.
- * En pantallas < md el plano es solo lectura (el arrastre se deshabilita).
+ * filtros, zoom y altas), lienzo SVG con arrastre (mouse y pulsación larga
+ * táctil) y panel lateral por elemento. Con `sucursales.editar` el plano es
+ * editable siempre; sin él queda solo de consulta.
  */
 export function PlanoBoard({
   datos,
@@ -136,18 +141,13 @@ export function PlanoBoard({
   const toast = useToast();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const isMd = useMediaQuery("(min-width: 48rem)");
 
   const [pisoActivoId, setPisoActivoId] = useState<string | null>(datos.pisos[0]?.id ?? null);
   const [filtro, setFiltro] = useState<FiltroPlano>("todo");
   const [productoId, setProductoId] = useState<string | null>(productoInicial ?? null);
-  const [editando, setEditando] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const [seleccion, setSeleccion] = useState<Seleccion>(null);
   const [formAbierto, setFormAbierto] = useState<FormAbierto>(null);
-
-  // La edición solo existe en pantallas ≥ md: `editandoActivo` lo deriva sin
-  // efectos (si la ventana se estrecha y vuelve, el modo se conserva).
-  const editandoActivo = editando && isMd && puedeEditarPlano;
 
   // Si el piso activo desaparece (otro usuario lo quitó), se cae al primero.
   const piso = useMemo(
@@ -193,22 +193,50 @@ export function PlanoBoard({
   const svgRef = useRef<SVGSVGElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  const onSoltar = (soltado: SoltarPlano) => {
+  /** FormData de un rectángulo para `moverElemento` (mover y deshacer). */
+  const dataDeRect = (id: string, tipo: string, rect: PlanoRect) => {
     const data = new FormData();
     data.set("organizacionId", organizationId);
-    data.set("tipo", soltado.tipo);
-    data.set("id", soltado.id);
-    data.set("x", String(soltado.rect.x));
-    data.set("y", String(soltado.rect.y));
-    data.set("ancho", String(soltado.rect.ancho));
-    data.set("alto", String(soltado.rect.alto));
+    data.set("tipo", tipo);
+    data.set("id", id);
+    data.set("x", String(rect.x));
+    data.set("y", String(rect.y));
+    data.set("ancho", String(rect.ancho));
+    data.set("alto", String(rect.alto));
+    return data;
+  };
+
+  const onSoltar = (soltado: SoltarPlano) => {
     const clave = `${soltado.tipo === "ubicacion" ? "u" : "m"}:${soltado.id}`;
     startTransition(async () => {
       aplicarRect({ clave, rect: soltado.rect });
-      const result = await moverElemento(data);
+      const result = await moverElemento(dataDeRect(soltado.id, soltado.tipo, soltado.rect));
       if (!result.success) {
         toast.error("No se pudo mover el elemento.", result.error);
+        aplicarRect({ clave, rect: soltado.origen });
+        return;
       }
+      // Deshacer: regresa la figura a su rectángulo de origen.
+      let toastId = "";
+      toastId = toast.show({
+        title: "Elemento movido.",
+        type: "success",
+        timeout: 5000,
+        actionProps: {
+          children: "Deshacer",
+          onClick: () => {
+            toast.close(toastId);
+            startTransition(async () => {
+              aplicarRect({ clave, rect: soltado.origen });
+              const reverso = await moverElemento(dataDeRect(soltado.id, soltado.tipo, soltado.origen));
+              if (!reverso.success) {
+                toast.error("No se pudo deshacer el movimiento.", reverso.error);
+                aplicarRect({ clave, rect: soltado.rect });
+              }
+            });
+          },
+        },
+      });
     });
   };
 
@@ -218,7 +246,7 @@ export function PlanoBoard({
     columnas: piso?.columnas ?? 0,
     filas: piso?.filas ?? 0,
     elementos: elementosPiso,
-    disabled: !editandoActivo,
+    disabled: !puedeEditarPlano,
     onSoltar,
   });
 
@@ -234,24 +262,18 @@ export function PlanoBoard({
   }, [datos.ubicaciones, productoId]);
   const sinUbicar = productoSel ? Number(productoSel.stock) - Number(productoSel.ubicado) : null;
 
-  /* ---- Alta rápida de ubicación desde la paleta ---- */
-  const agregarUbicacionRapida = (tipo: UbicacionTipo) => {
-    if (!piso) return;
+  /* ---- Reordenar pisos (botones ← → del sheet de piso) ---- */
+  const reordenar = (pisoId: string, direccion: "izquierda" | "derecha") => {
     const data = new FormData();
     data.set("organizacionId", organizationId);
-    data.set("sucursalId", sucursalId);
-    data.set("pisoId", piso.id);
-    data.set("tipo", tipo);
-    const cuenta = datos.ubicaciones.filter((u) => u.tipo === tipo).length;
-    data.set("nombre", `${UBICACION_TIPO_LABEL[tipo]}${cuenta > 0 ? ` ${cuenta + 1}` : ""}`);
-    const accion = guardarUbicacion.bind(null, initialActionState);
+    data.set("pisoId", pisoId);
+    data.set("direccion", direccion);
     startTransition(async () => {
-      const result = await accion(data);
+      const result = await reordenarPiso(data);
       if (!result.success) {
-        toast.error("No se pudo agregar la ubicación.", result.error);
+        toast.error("No se pudo reordenar el piso.", result.error);
         return;
       }
-      toast.success(result.message ?? "Ubicación agregada.");
       router.refresh();
     });
   };
@@ -266,7 +288,7 @@ export function PlanoBoard({
       setSeleccion({ tipo: elemento.tipo, id: elemento.id });
       return;
     }
-    if (!editandoActivo || (event.key !== "Delete" && event.key !== "Backspace")) return;
+    if (!puedeEditarPlano || (event.key !== "Delete" && event.key !== "Backspace")) return;
     event.preventDefault();
     const data = new FormData();
     data.set("organizacionId", organizationId);
@@ -323,7 +345,7 @@ export function PlanoBoard({
           iniciarGesto(event, { id: u.id, tipo: "ubicacion", x: u.x, y: u.y, ancho: u.ancho, alto: u.alto }, "mover")
         }
         role="button"
-        style={editandoActivo ? { touchAction: "none", cursor: "grab" } : { cursor: "pointer" }}
+        style={puedeEditarPlano ? { touchAction: "pan-x pan-y", cursor: "grab" } : { cursor: "pointer" }}
         tabIndex={0}
         transform={`translate(${rect.x * CELDA} ${rect.y * CELDA})`}
       >
@@ -363,10 +385,10 @@ export function PlanoBoard({
             {formatQuantity(piezas)} pzas
           </text>
         ) : null}
-        {editandoActivo ? (
+        {puedeEditarPlano ? (
           <rect
             aria-label={`Cambiar tamaño de ${u.nombre}`}
-            height={14}
+            height={18}
             onPointerDown={(event) =>
               iniciarGesto(
                 event,
@@ -374,11 +396,11 @@ export function PlanoBoard({
                 "redimensionar",
               )
             }
-            rx={3}
+            rx={4}
             style={{ fill: "var(--primary)", cursor: "nwse-resize", touchAction: "none" }}
-            width={14}
-            x={rect.ancho * CELDA - 20}
-            y={rect.alto * CELDA - 20}
+            width={18}
+            x={rect.ancho * CELDA - 22}
+            y={rect.alto * CELDA - 22}
           />
         ) : null}
       </g>
@@ -405,7 +427,7 @@ export function PlanoBoard({
           iniciarGesto(event, { id: m.id, tipo: "mobiliario", x: m.x, y: m.y, ancho: m.ancho, alto: m.alto }, "mover")
         }
         role="button"
-        style={editandoActivo ? { touchAction: "none", cursor: "grab" } : { cursor: "pointer" }}
+        style={puedeEditarPlano ? { touchAction: "pan-x pan-y", cursor: "grab" } : { cursor: "pointer" }}
         tabIndex={0}
         transform={`translate(${rect.x * CELDA} ${rect.y * CELDA})`}
       >
@@ -442,10 +464,10 @@ export function PlanoBoard({
         >
           {nombreVisible}
         </text>
-        {editandoActivo ? (
+        {puedeEditarPlano ? (
           <rect
             aria-label={`Cambiar tamaño de ${m.nombre}`}
-            height={14}
+            height={18}
             onPointerDown={(event) =>
               iniciarGesto(
                 event,
@@ -453,11 +475,11 @@ export function PlanoBoard({
                 "redimensionar",
               )
             }
-            rx={3}
+            rx={4}
             style={{ fill: "var(--primary)", cursor: "nwse-resize", touchAction: "none" }}
-            width={14}
-            x={rect.ancho * CELDA - 20}
-            y={rect.alto * CELDA - 20}
+            width={18}
+            x={rect.ancho * CELDA - 22}
+            y={rect.alto * CELDA - 22}
           />
         ) : null}
       </g>
@@ -499,6 +521,8 @@ export function PlanoBoard({
     if (!formAbierto) return null;
     const cerrar = () => setFormAbierto(null);
     if (formAbierto.tipo === "piso") {
+      const pisoEdit = formAbierto.piso ?? null;
+      const idx = datos.pisos.findIndex((item) => item.id === pisoEdit?.id);
       return (
         <Sheet onOpenChange={(open) => !open && cerrar()} open>
           <SheetContent>
@@ -514,16 +538,43 @@ export function PlanoBoard({
               piso={formAbierto.piso}
               sucursalId={sucursalId}
             />
-            {formAbierto.piso ? (
-              <div className="mt-4 border-t border-border pt-4">
+            {pisoEdit ? (
+              <div className="mt-4 space-y-4 border-t border-border pt-4">
+                {datos.pisos.length > 1 ? (
+                  <div>
+                    <p className="mb-2 text-xs font-medium text-muted-foreground">Orden en las pestañas</p>
+                    <div className="flex gap-2">
+                      <Button
+                        data-action-id="plano.piso.reordenar.izquierda"
+                        disabled={pending || idx <= 0}
+                        onClick={() => reordenar(pisoEdit.id, "izquierda")}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <ArrowLeft aria-hidden="true" className="size-3.5" /> Mover antes
+                      </Button>
+                      <Button
+                        data-action-id="plano.piso.reordenar.derecha"
+                        disabled={pending || idx < 0 || idx >= datos.pisos.length - 1}
+                        onClick={() => reordenar(pisoEdit.id, "derecha")}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        Mover después <ArrowRight aria-hidden="true" className="size-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
                 <ToggleActivo
                   action={desactivarPiso}
                   activo
                   confirmHint="No puede quitarse un piso que todavía tiene ubicaciones o muebles encima."
                   entidad="piso"
-                  id={formAbierto.piso.id}
+                  id={pisoEdit.id}
                   labels={{ baja: "Quitar piso", alta: "Reactivar", articulo: "el", participioBaja: "quitado", participioAlta: "reactivado" }}
-                  nombre={formAbierto.piso.nombre}
+                  nombre={pisoEdit.nombre}
                   organizationId={organizationId}
                   telemetryBase="plano.piso"
                 />
@@ -538,12 +589,18 @@ export function PlanoBoard({
         <Sheet onOpenChange={(open) => !open && cerrar()} open>
           <SheetContent>
             <SheetHeader>
-              <SheetTitle>Editar ubicación</SheetTitle>
-              <SheetDescription>Nombre y tipo; la posición se arrastra en el plano.</SheetDescription>
+              <SheetTitle>{formAbierto.ubicacion ? "Editar ubicación" : "Agregar ubicación"}</SheetTitle>
+              <SheetDescription>
+                {formAbierto.ubicacion
+                  ? "Nombre y tipo; la posición se arrastra en el plano."
+                  : "Aparece en la primera celda libre del piso; luego la arrastras a su lugar."}
+              </SheetDescription>
             </SheetHeader>
             <UbicacionForm
               onGuardado={cerrar}
               organizationId={organizationId}
+              pisos={datos.pisos}
+              pisoInicial={piso?.id}
               sucursalId={sucursalId}
               ubicacion={formAbierto.ubicacion}
             />
@@ -565,6 +622,7 @@ export function PlanoBoard({
             onGuardado={cerrar}
             organizationId={organizationId}
             pisos={datos.pisos}
+            pisoInicial={piso?.id}
             recursos={datos.recursos}
             sucursalId={sucursalId}
             tipoInicial={formAbierto.tipoInicial}
@@ -598,15 +656,28 @@ export function PlanoBoard({
             </button>
           ))}
           {puedeEditarPlano ? (
-            <button
-              aria-label="Agregar piso"
-              className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2.5 text-sm font-medium text-primary transition-colors hover:bg-accent/60"
-              data-action-id="plano.piso.abrir_formulario"
-              onClick={() => setFormAbierto({ tipo: "piso" })}
-              type="button"
-            >
-              <Plus aria-hidden="true" className="size-3.5" /> Piso
-            </button>
+            <>
+              <button
+                aria-label="Agregar piso"
+                className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2.5 text-sm font-medium text-primary transition-colors hover:bg-accent/60"
+                data-action-id="plano.piso.abrir_formulario"
+                onClick={() => setFormAbierto({ tipo: "piso" })}
+                type="button"
+              >
+                <Plus aria-hidden="true" className="size-3.5" /> Piso
+              </button>
+              {piso ? (
+                <button
+                  aria-label={`Editar piso ${piso.nombre}`}
+                  className="inline-flex min-h-9 items-center rounded-lg px-2 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+                  data-action-id="plano.piso.editar"
+                  onClick={() => setFormAbierto({ tipo: "piso", piso })}
+                  type="button"
+                >
+                  <Settings aria-hidden="true" className="size-4" />
+                </button>
+              ) : null}
+            </>
           ) : null}
         </div>
 
@@ -646,26 +717,88 @@ export function PlanoBoard({
           ))}
         </div>
 
-        {puedeEditarPlano ? (
-          <Button
-            className="hidden md:inline-flex"
-            data-action-clave="1"
-            data-action-id="plano.editar.toggle"
-            onClick={() => setEditando((v) => !v)}
-            variant={editando ? "default" : "outline"}
+        <div aria-label="Zoom del plano" className="flex items-center gap-1 rounded-xl border border-border bg-card p-1" role="group">
+          <button
+            aria-label="Alejar"
+            className="inline-flex min-h-9 items-center rounded-lg px-2 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
+            data-action-id="plano.zoom.menos"
+            disabled={Boolean(arrastre) || zoom <= ZOOM_MIN}
+            onClick={() => setZoom((z) => Math.max(ZOOM_MIN, NIVELES_ZOOM.filter((n) => n < z - 0.001).pop() ?? ZOOM_MIN))}
+            type="button"
           >
-            <SlidersHorizontal aria-hidden="true" className="size-4" />
-            {editando ? "Terminar edición" : "Editar plano"}
-          </Button>
+            <ZoomOut aria-hidden="true" className="size-4" />
+          </button>
+          <button
+            aria-label="Restablecer zoom al 100%"
+            className="inline-flex min-h-9 min-w-12 items-center justify-center rounded-lg px-1 text-xs font-medium tabular-nums text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            data-action-id="plano.zoom.restablecer"
+            onClick={() => setZoom(1)}
+            type="button"
+          >
+            {Math.round(zoom * 100)}%
+          </button>
+          <button
+            aria-label="Acercar"
+            className="inline-flex min-h-9 items-center rounded-lg px-2 text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
+            data-action-id="plano.zoom.mas"
+            disabled={Boolean(arrastre) || zoom >= ZOOM_MAX}
+            onClick={() => setZoom((z) => Math.min(ZOOM_MAX, NIVELES_ZOOM.find((n) => n > z + 0.001) ?? ZOOM_MAX))}
+            type="button"
+          >
+            <ZoomIn aria-hidden="true" className="size-4" />
+          </button>
+          <button
+            aria-label="Ajustar el piso completo en pantalla"
+            className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
+            data-action-id="plano.zoom.ajustar"
+            disabled={Boolean(arrastre) || !piso}
+            onClick={() => {
+              const contenedor = scrollRef.current;
+              if (!contenedor || !piso) return;
+              const ajuste = (contenedor.clientWidth - 24) / (piso.columnas * CELDA);
+              setZoom(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, ajuste)));
+            }}
+            type="button"
+          >
+            <Maximize aria-hidden="true" className="size-3.5" /> Ajustar
+          </button>
+        </div>
+
+        {puedeEditarPlano ? (
+          <div className="flex items-center gap-2" role="group" aria-label="Agregar al plano">
+            <Button
+              data-action-clave="1"
+              data-action-id="plano.ubicacion.abrir_formulario"
+              disabled={pending || !piso}
+              onClick={() => setFormAbierto({ tipo: "ubicacion" })}
+              size="sm"
+            >
+              <Plus aria-hidden="true" className="size-3.5" /> Ubicación
+            </Button>
+            <Button
+              data-action-id="plano.mobiliario.abrir_formulario"
+              disabled={pending}
+              onClick={() => setFormAbierto({ tipo: "mobiliario" })}
+              size="sm"
+              variant="outline"
+            >
+              <Plus aria-hidden="true" className="size-3.5" /> Mueble
+            </Button>
+          </div>
         ) : null}
       </div>
 
-      {/* Aviso de solo lectura en pantallas chicas (regla del plan). */}
+      {/* Guía de gestos: táctil con pulsación larga; escritorio arrastra directo. */}
       {puedeEditarPlano ? (
-        <p className="rounded-xl border border-border bg-muted/50 px-4 py-2.5 text-xs text-muted-foreground md:hidden">
-          Edita el plano desde una tablet o computadora
+        <p className="rounded-xl border border-border bg-muted/50 px-4 py-2.5 text-xs text-muted-foreground">
+          <span className="md:hidden">Mantén presionado un elemento para moverlo; toca uno para ver sus opciones.</span>
+          <span className="hidden md:inline">Arrastra los elementos para moverlos, tira de la esquina azul para cambiar el tamaño; con Supr sobre un elemento seleccionado lo quitas.</span>
         </p>
-      ) : null}
+      ) : (
+        <p className="rounded-xl border border-border bg-muted/50 px-4 py-2.5 text-xs text-muted-foreground">
+          Puedes ver el plano y consultar cada elemento; para modificarlo se necesita permiso de Sucursales.
+        </p>
+      )}
 
       {/* Resumen del producto buscado: stock real, ubicado y sin ubicar. */}
       {productoSel && sinUbicar !== null ? (
@@ -689,70 +822,21 @@ export function PlanoBoard({
         </div>
       ) : null}
 
-      {/* ----------------------- paleta de edición ---------------------- */}
-      {editandoActivo ? (
-        <div className="anim-entrada flex flex-wrap items-center gap-2 rounded-xl border border-dashed border-primary/40 bg-accent/30 px-4 py-3">
-          <span className="text-xs font-semibold uppercase tracking-wide text-primary">Agregar:</span>
-          {UBICACION_TIPOS.map((tipo) => (
-            <Button
-              data-action-id={`plano.ubicacion.crear.${tipo}`}
-              disabled={pending}
-              key={tipo}
-              onClick={() => agregarUbicacionRapida(tipo)}
-              size="sm"
-              type="button"
-              variant="outline"
-            >
-              <Plus aria-hidden="true" className="size-3.5" /> {UBICACION_TIPO_LABEL[tipo]}
-            </Button>
-          ))}
-          <Select
-            aria-label="Agregar mueble"
-            className="h-8 w-auto min-w-40 text-xs"
-            disabled={pending}
-            onChange={(event) => {
-              const tipo = event.target.value as MobiliarioTipo | "";
-              if (tipo) setFormAbierto({ tipo: "mobiliario", tipoInicial: tipo });
-              event.target.value = "";
-            }}
-            value=""
-          >
-            <option value="">Mueble…</option>
-            {MOBILIARIO_TIPOS.map((tipo) => (
-              <option key={tipo} value={tipo}>
-                {MOBILIARIO_TIPO_LABEL[tipo]}
-              </option>
-            ))}
-          </Select>
-          {piso ? (
-            <Button
-              data-action-id="plano.piso.editar"
-              onClick={() => setFormAbierto({ tipo: "piso", piso })}
-              size="sm"
-              type="button"
-              variant="ghost"
-            >
-              Editar piso
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
-
       {/* ---------------------------- lienzo ---------------------------- */}
       {piso ? (
         <div
-          className="overflow-auto rounded-2xl border border-border bg-card"
+          className="relative overflow-auto rounded-2xl border border-border bg-card"
           ref={scrollRef}
           style={{ maxHeight: "min(72vh, 42rem)" }}
         >
           <svg
             aria-label={`Plano de ${piso.nombre}: ${piso.columnas} por ${piso.filas} celdas`}
             className="block"
-            height={piso.filas * CELDA}
+            height={piso.filas * CELDA * zoom}
             ref={svgRef}
             role="img"
             viewBox={`0 0 ${piso.columnas * CELDA} ${piso.filas * CELDA}`}
-            width={piso.columnas * CELDA}
+            width={piso.columnas * CELDA * zoom}
           >
             <defs>
               <pattern height={CELDA} id="plano-cuadricula" patternUnits="userSpaceOnUse" width={CELDA}>
@@ -760,7 +844,7 @@ export function PlanoBoard({
                   d={`M ${CELDA} 0 L 0 0 0 ${CELDA}`}
                   fill="none"
                   style={{ stroke: "var(--border)" }}
-                  strokeOpacity={0.55}
+                  strokeOpacity={arrastre ? 0.85 : 0.55}
                   strokeWidth={1}
                 />
               </pattern>
@@ -770,9 +854,7 @@ export function PlanoBoard({
               style={{ fill: "var(--card)" }}
               width={piso.columnas * CELDA}
             />
-            {editandoActivo ? (
-              <rect fill="url(#plano-cuadricula)" height={piso.filas * CELDA} width={piso.columnas * CELDA} />
-            ) : null}
+            <rect fill="url(#plano-cuadricula)" height={piso.filas * CELDA} width={piso.columnas * CELDA} />
             {verUbicaciones ? ubicacionesPiso.map(figuraUbicacion) : null}
             {verMuebles ? mobiliarioPiso.map(figuraMueble) : null}
             {/* Fantasma de validez sobre el origen mientras se arrastra. */}
@@ -794,6 +876,39 @@ export function PlanoBoard({
               />
             ) : null}
           </svg>
+          {/* Guía cuando el piso no tiene elementos: el lienzo se veía "roto". */}
+          {ubicacionesPiso.length === 0 && mobiliarioPiso.length === 0 ? (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="pointer-events-auto mx-4 max-w-xs rounded-2xl border border-border bg-card/95 px-5 py-4 text-center shadow-sm">
+                <MapIcon aria-hidden="true" className="mx-auto size-5 text-muted-foreground" />
+                <p className="mt-2 text-sm font-medium text-foreground">Este piso está vacío</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {puedeEditarPlano
+                    ? "Agrega una ubicación para tu mercancía o un mueble, y acomódalo arrastrándolo."
+                    : "Todavía no hay ubicaciones ni muebles en este piso."}
+                </p>
+                {puedeEditarPlano ? (
+                  <div className="mt-3 flex justify-center gap-2">
+                    <Button
+                      data-action-id="plano.ubicacion.abrir_formulario.vacio"
+                      onClick={() => setFormAbierto({ tipo: "ubicacion" })}
+                      size="sm"
+                    >
+                      <Plus aria-hidden="true" className="size-3.5" /> Ubicación
+                    </Button>
+                    <Button
+                      data-action-id="plano.mobiliario.abrir_formulario.vacio"
+                      onClick={() => setFormAbierto({ tipo: "mobiliario" })}
+                      size="sm"
+                      variant="outline"
+                    >
+                      <Plus aria-hidden="true" className="size-3.5" /> Mueble
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -805,7 +920,7 @@ export function PlanoBoard({
         >
           <ul className="flex flex-wrap gap-2">
             {mueblesSinColocar.map((mueble) => (
-              <li key={mueble.id}>
+              <li className="flex items-center gap-1" key={mueble.id}>
                 <button
                   className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted/60"
                   data-action-id="plano.mobiliario.ver"
@@ -815,6 +930,18 @@ export function PlanoBoard({
                   <Package aria-hidden="true" className="size-3.5 text-muted-foreground" />
                   {mueble.nombre}
                 </button>
+                {puedeEditarPlano ? (
+                  <ToggleActivo
+                    action={desactivarMobiliario}
+                    activo
+                    entidad="mueble"
+                    id={mueble.id}
+                    labels={{ baja: "Quitar", alta: "Reactivar", articulo: "el", participioBaja: "quitado", participioAlta: "reactivado" }}
+                    nombre={mueble.nombre}
+                    organizationId={organizationId}
+                    telemetryBase="plano.mobiliario"
+                  />
+                ) : null}
               </li>
             ))}
           </ul>
@@ -835,7 +962,7 @@ export function PlanoBoard({
               ) : (
                 <ul className="mt-2 space-y-1.5">
                   {ubicacionesPiso.map((u) => (
-                    <li key={u.id}>
+                    <li className="flex items-start gap-1.5" key={u.id}>
                       <button
                         className="w-full rounded-xl border border-border px-3 py-2 text-left transition-colors hover:bg-muted/60"
                         data-action-id="plano.ubicacion.ver"
@@ -857,6 +984,19 @@ export function PlanoBoard({
                           </span>
                         </span>
                       </button>
+                      {puedeEditarPlano ? (
+                        <ToggleActivo
+                          action={desactivarUbicacion}
+                          activo
+                          confirmHint="Si todavía tiene mercancía asignada, habrá que pasarla a otra ubicación primero."
+                          entidad="ubicación"
+                          id={u.id}
+                          labels={{ baja: "Quitar", alta: "Reactivar", articulo: "la", participioBaja: "quitada", participioAlta: "reactivada" }}
+                          nombre={u.nombre}
+                          organizationId={organizationId}
+                          telemetryBase="plano.ubicacion"
+                        />
+                      ) : null}
                     </li>
                   ))}
                 </ul>
@@ -869,7 +1009,7 @@ export function PlanoBoard({
               ) : (
                 <ul className="mt-2 space-y-1.5">
                   {mobiliarioPiso.map((m) => (
-                    <li key={m.id}>
+                    <li className="flex items-start gap-1.5" key={m.id}>
                       <button
                         className="w-full rounded-xl border border-border px-3 py-2 text-left transition-colors hover:bg-muted/60"
                         data-action-id="plano.mobiliario.ver"
@@ -891,6 +1031,19 @@ export function PlanoBoard({
                           </StatusBadge>
                         </span>
                       </button>
+                      {puedeEditarPlano ? (
+                        <ToggleActivo
+                          action={desactivarMobiliario}
+                          activo
+                          confirmHint="Dejará de verse en el plano; su recurso de agenda ligado no se toca."
+                          entidad="mueble"
+                          id={m.id}
+                          labels={{ baja: "Quitar", alta: "Reactivar", articulo: "el", participioBaja: "quitado", participioAlta: "reactivado" }}
+                          nombre={m.nombre}
+                          organizationId={organizationId}
+                          telemetryBase="plano.mobiliario"
+                        />
+                      ) : null}
                     </li>
                   ))}
                 </ul>
