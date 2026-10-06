@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
 
@@ -60,7 +60,11 @@ export async function cargarPanelInventario(
   params: { organizacionId: string; sucursalIds: readonly string[]; topN?: number },
 ): Promise<InventarioPanel> {
   const { organizacionId, sucursalIds, topN = 8 } = params;
-  const ids = [...sucursalIds];
+  // `in (...)` con parámetros sueltos: `any($array)` se rompe cuando el
+  // alcance tiene una sola sucursal (drizzle aplana el array a escalar y pg
+  // devuelve 22P02 "array must be enclosed in { and }").
+  const enSucursales = (columna: SQL) =>
+    sql`${columna} in (${sql.join(sucursalIds.map((id) => sql`${id}`), sql`, `)})`;
 
   const { rows } = await db.execute<InventarioPanelRow>(sql`
     with scope as (
@@ -68,7 +72,7 @@ export async function cargarPanelInventario(
         from inventario_stock i
         join sucursales su on su.id = i.sucursal_id
        where i.organizacion_id = ${organizacionId}
-         and i.sucursal_id = any(${ids})
+         and ${enSucursales(sql`i.sucursal_id`)}
     ),
     por_producto as (
       select p.id, p.nombre,
@@ -118,7 +122,7 @@ export async function cargarPanelInventario(
          from movimientos_inventario mi
          join productos p on p.id = mi.producto_id
         where mi.organizacion_id = ${organizacionId}
-          and mi.sucursal_id = any(${ids})
+          and ${enSucursales(sql`mi.sucursal_id`)}
           and mi.created_at >= now() - interval '30 days') as valor_movimiento_30d
   `);
 

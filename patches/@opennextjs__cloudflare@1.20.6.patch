@@ -1,0 +1,61 @@
+diff --git a/dist/cli/build/bundle-server.js b/dist/cli/build/bundle-server.js
+index f59e677181f1d0007993e36e05901f1f012689f9..17dd2f0c08ea67ff8a0bd5924922f4fab8609df8 100644
+--- a/dist/cli/build/bundle-server.js
++++ b/dist/cli/build/bundle-server.js
+@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
+ import { getPackagePath } from "@opennextjs/aws/build/helper.js";
+ import * as buildHelper from "@opennextjs/aws/build/helper.js";
+ import { ContentUpdater } from "@opennextjs/aws/plugins/content-updater.js";
++import { getCrossPlatformPathRegex } from "@opennextjs/aws/utils/regex.js";
+ import { build } from "esbuild";
+ import { getOpenNextConfig } from "../../api/config.js";
+ import { normalizePath } from "../utils/normalize-path.js";
+@@ -59,6 +60,20 @@ export async function bundleServer(buildOpts, projectOpts) {
+     const openNextServer = path.join(outputPath, packagePath, `index.mjs`);
+     const openNextServerBundle = path.join(outputPath, packagePath, `handler.mjs`);
+     const updater = new ContentUpdater(buildOpts);
++    // beauty-pos patch: `getMiddlewareManifest` en next-server.js hace
++    // `require(this.middlewareManifestPath)` — require dinámico por variable que
++    // ni inlineLoadManifest ni workerd cubren (rompe cada render con 500).
++    // Se inlinea el JSON del manifest (existe en .next/server tras el build).
++    updater.updateContent("inline-middleware-manifest", [
++        {
++            filter: getCrossPlatformPathRegex(String.raw `/next/dist/server/next-server\.js$`, { escape: false }),
++            contentFilter: /getMiddlewareManifest\(\)/,
++            callback: ({ contents }) => contents.replace(
++                "const manifest = require(this.middlewareManifestPath);",
++                `const manifest = ${fs.readFileSync(path.join(dotNextPath, "server/middleware-manifest.json"), "utf-8")};`,
++            ),
++        },
++    ]);
+     const result = await build({
+         entryPoints: [openNextServer],
+         bundle: true,
+@@ -82,6 +97,16 @@ export async function bundleServer(buildOpts, projectOpts) {
+         // - ESBuild `node` platform: https://esbuild.github.io/api/#platform
+         conditions: getOpenNextConfig(buildOpts).cloudflare?.useWorkerdCondition === false ? [] : ["workerd"],
+         plugins: [
++            // beauty-pos patch (Windows): esbuild no puede resolver los builtin de
++            // workerd (`cloudflare:sockets` en pg-cloudflare) — el `:` vuelve la ruta
++            // invalid en Windows y aborta el bundle. Se marcan external; workerd los
++            // provee en runtime.
++            {
++                name: "workerd-builtins-external",
++                setup(build) {
++                    build.onResolve({ filter: /^cloudflare:/ }, ({ path }) => ({ path, external: true }));
++                },
++            },
+             shimRequireHook(buildOpts),
+             shimReact(buildOpts),
+             inlineDynamicRequires(updater, buildOpts),
+@@ -102,6 +127,10 @@ export async function bundleServer(buildOpts, projectOpts) {
+         ],
+         external: ["./middleware/handler.mjs"],
+         alias: {
++            // beauty-pos patch (Windows): `sharp` llega transitivo de next/@opennextjs/aws
++            // y sus binarios `.node` no tienen loader. La app no usa `next/image`
++            // (imagenes via /api/medios con sesion), asi que se aliasa al shim "throw".
++            "sharp": path.join(buildOpts.outputDir, "cloudflare-templates/shims/throw.js"),
+             // When @vercel/og is not used, alias the edge entry to a throwing shim so the
+             // dynamic `import("next/dist/compiled/@vercel/og/index.edge.js")` call site
+             // emitted by Next.js does not drag the library (~800 KiB) and its

@@ -55,8 +55,13 @@ export async function cargarAlertas(
   const en24h = new Date(ahora.getTime() + 24 * 60 * 60_000);
   const hace7d = new Date(ahora.getTime() - 7 * 24 * 60 * 60_000);
 
+  // IN con parámetros sueltos en vez de `any($array)`: drizzle aplana arrays
+  // de un elemento y pg los manda como escalar, lo que rompe con "array must
+  // be enclosed in { and }" (22P02) en cuentas con una sola sucursal.
   const enSucursales = (columna: SQL) =>
-    sucursalIds ? sql`and ${columna} = any(${sucursalIds})` : sql``;
+    sucursalIds
+      ? sql`and ${columna} in (${sql.join(sucursalIds.map((id) => sql`${id}`), sql`, `)})`
+      : sql``;
 
   const columnas: SQL[] = [];
   if (permisos.has("agenda.ver")) {

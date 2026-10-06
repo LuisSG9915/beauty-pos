@@ -669,6 +669,14 @@ async function main() {
       );
     };
     const clickCobrar = () => clickByText(page, '[role="dialog"] button[type="submit"]', "Cobrar");
+    /** El alta de movimientos vive en un sheet (?nuevo=movimiento): hay que
+     * abrirlo antes de usar el combobox "Producto o insumo". */
+    const abrirMovimiento = async () => {
+      if (!page.url().includes("nuevo=movimiento")) {
+        await page.goto(`${BASE_URL}/admin/inventario?nuevo=movimiento`, { waitUntil: "networkidle0" });
+      }
+      await page.waitForSelector('[role="dialog"] label', { visible: true, timeout: 15000 });
+    };
 
     await abrirDetalle(citaNeedle(slots[1]));
     await shot(page, "04-detalle-cita");
@@ -683,7 +691,7 @@ async function main() {
     record("Agregar producto y servicio al ticket", true);
 
     // Estado determinista: ajustar el stock de SHAMPOO a 0 para probar la guarda
-    await page.goto(`${BASE_URL}/admin/inventario`, { waitUntil: "networkidle0" });
+    await abrirMovimiento();
     await pickCombobox(page, "Producto o insumo", "SHAMPOO");
     await selectOption('select[name="tipo"]', "ajuste");
     await setNativeInput(page, 'input[name="cantidad"]', "0");
@@ -712,7 +720,7 @@ async function main() {
     await shot(page, "07-cobro-bloqueado");
 
     // ── Inventario: entrada para reponer stock ────────────────────────────
-    await page.goto(`${BASE_URL}/admin/inventario`, { waitUntil: "networkidle0" });
+    await abrirMovimiento();
     await pickCombobox(page, "Producto o insumo", "SHAMPOO");
     await setNativeInput(page, 'input[name="cantidad"]', "10");
     await setNativeInput(page, 'textarea[name="notas"]', "E2E-SMOKE reposición");
@@ -746,6 +754,7 @@ async function main() {
     await shot(page, "08-inventario-entrada");
 
     // Salida sin notas debe fallar
+    await abrirMovimiento();
     await pickCombobox(page, "Producto o insumo", "SHAMPOO");
     await selectOption('select[name="tipo"]', "salida");
     await setNativeInput(page, 'input[name="cantidad"]', "1");
@@ -987,7 +996,9 @@ async function main() {
     ];
 
     for (const mod of catalogos) {
-      await page.goto(`${BASE_URL}/admin/${mod.ruta}`, { waitUntil: "networkidle0" });
+      // Desde el plan 03 el alta vive en un sheet lateral (?nuevo=1).
+      await page.goto(`${BASE_URL}/admin/${mod.ruta}?nuevo=1`, { waitUntil: "networkidle0" });
+      await page.waitForSelector('form [name="nombre"]', { visible: true, timeout: 15000 });
       for (const [name, value] of Object.entries(mod.campos)) await fill(name, value);
       await clickByText(page, 'button[type="submit"]', mod.submit);
       await waitPendingClear();
@@ -1003,7 +1014,8 @@ async function main() {
 
     // ── Paquetes: alta en catálogo (combobox de servicio aparte) ─────────
     const paqueteNombre = `E2E Paquete ${runId}`;
-    await page.goto(`${BASE_URL}/admin/paquetes`, { waitUntil: "networkidle0" });
+    await page.goto(`${BASE_URL}/admin/paquetes?nuevo=1`, { waitUntil: "networkidle0" });
+    await page.waitForSelector('form [name="nombre"]', { visible: true, timeout: 15000 });
     await fill("nombre", paqueteNombre);
     await pickCombobox(page, "Servicio cubierto", "CORTE DE DAMA");
     await fill("sesiones", "3");
@@ -1023,7 +1035,8 @@ async function main() {
     const membresiaNombre = `E2E Membresía ${runId}`;
     const membresiaVencidaNombre = `E2E Membresía Vencida ${runId}`;
     for (const nombre of [membresiaNombre, membresiaVencidaNombre]) {
-      await page.goto(`${BASE_URL}/admin/membresias`, { waitUntil: "networkidle0" });
+      await page.goto(`${BASE_URL}/admin/membresias?nuevo=1`, { waitUntil: "networkidle0" });
+      await page.waitForSelector('form [name="nombre"]', { visible: true, timeout: 15000 });
       await fill("nombre", nombre);
       await fill("precio", "500");
       await fill("duracionDias", "30");
@@ -1057,7 +1070,8 @@ async function main() {
 
     const ocultado = await page.evaluate((n) => {
       const row = Array.from(document.querySelectorAll("tr")).find((tr) => tr.textContent?.includes(n));
-      const btn = row?.querySelector<HTMLElement>('button[type="submit"]');
+      // Plan 03: la baja es un botón cliente (type=button) con toast "Deshacer".
+      const btn = row?.querySelector<HTMLElement>('button[data-action-id$=".ocultar"]');
       if (!btn || !btn.textContent?.includes("Ocultar")) return false;
       btn.click();
       return true;

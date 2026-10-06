@@ -35,7 +35,7 @@ CREATE TABLE "mobiliario" (
 	"updated_by" uuid,
 	CONSTRAINT "mobiliario_tipo_chk" CHECK ("mobiliario"."tipo" in ('asiento','mesa','tocador','lavacabezas','camilla','carrito','espejo','otro')),
 	CONSTRAINT "mobiliario_estado_chk" CHECK ("mobiliario"."estado" in ('bueno','mantenimiento','baja')),
-	CONSTRAINT "mobiliario_pos_chk" CHECK ("mobiliario"."x" >= 0 and "mobiliario"."y" >= 0 and "mobiliario"."ancho" between 1 and $1 and "mobiliario"."alto" between 1 and $2)
+	CONSTRAINT "mobiliario_pos_chk" CHECK ("mobiliario"."x" >= 0 and "mobiliario"."y" >= 0 and "mobiliario"."ancho" between 1 and 20 and "mobiliario"."alto" between 1 and 20)
 );
 --> statement-breakpoint
 CREATE TABLE "pisos" (
@@ -51,7 +51,7 @@ CREATE TABLE "pisos" (
 	"created_by" uuid,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_by" uuid,
-	CONSTRAINT "pisos_tamano_chk" CHECK ("pisos"."columnas" between $1 and $2 and "pisos"."filas" between $3 and $4)
+	CONSTRAINT "pisos_tamano_chk" CHECK ("pisos"."columnas" between 8 and 60 and "pisos"."filas" between 8 and 40)
 );
 --> statement-breakpoint
 CREATE TABLE "ubicaciones" (
@@ -71,7 +71,7 @@ CREATE TABLE "ubicaciones" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_by" uuid,
 	CONSTRAINT "ubicaciones_tipo_chk" CHECK ("ubicaciones"."tipo" in ('vitrina','estante','bodega','mostrador','otro')),
-	CONSTRAINT "ubicaciones_pos_chk" CHECK ("ubicaciones"."x" >= 0 and "ubicaciones"."y" >= 0 and "ubicaciones"."ancho" between 1 and $1 and "ubicaciones"."alto" between 1 and $2)
+	CONSTRAINT "ubicaciones_pos_chk" CHECK ("ubicaciones"."x" >= 0 and "ubicaciones"."y" >= 0 and "ubicaciones"."ancho" between 1 and 20 and "ubicaciones"."alto" between 1 and 20)
 );
 --> statement-breakpoint
 ALTER TABLE "medios" DROP CONSTRAINT "medios_entidad_chk";--> statement-breakpoint

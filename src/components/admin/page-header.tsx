@@ -29,7 +29,10 @@ export function AdminBreadcrumbs({
                 <ChevronRight aria-hidden="true" className="size-3 text-border" />
               ) : null}
               {item.href && !isLast ? (
-                <Link className="font-medium text-primary hover:underline" href={item.href}>
+                <Link
+                  className="inline-flex min-h-6 items-center font-medium text-primary hover:underline"
+                  href={item.href}
+                >
                   {item.label}
                 </Link>
               ) : (

@@ -32,33 +32,39 @@ export function SubscriptionBanner({
 
   if (badge.estado === "vencida") {
     return (
-      <div className="mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+      <div className="mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-soft-foreground">
         <LockKeyhole aria-hidden="true" className="size-4 shrink-0" />
         <p>
           Tu suscripción está en pausa: puedes consultar tu información, pero no
           registrar cambios. Reactiva tu plan para volver a operar — tus datos
-          están a salvo.{" "}
-          <Link className="font-semibold underline underline-offset-2" href="/precios">
-            Ver planes
-          </Link>
+          están a salvo.
         </p>
+        <Link
+          className="ml-auto inline-flex min-h-6 shrink-0 items-center rounded-full border border-destructive-soft-foreground/40 px-3 text-xs font-semibold"
+          href="/precios"
+        >
+          Ver planes
+        </Link>
       </div>
     );
   }
 
   return (
-    <div className="mb-4 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning">
+    <div className="mb-4 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-soft-foreground">
       <Clock3 aria-hidden="true" className="size-4 shrink-0" />
       <p>
         Estás en tu periodo de prueba
         {badge.diasRestantes !== null
           ? ` — te ${badge.diasRestantes === 1 ? "queda 1 día" : `quedan ${badge.diasRestantes} días`}`
           : ""}
-        . Todo lo que registres se conserva al contratar.{" "}
-        <Link className="font-semibold underline underline-offset-2" href="/precios">
-          Ver planes
-        </Link>
+        . Todo lo que registres se conserva al contratar.
       </p>
+      <Link
+        className="ml-auto inline-flex min-h-6 shrink-0 items-center rounded-full border border-warning-soft-foreground/40 px-3 text-xs font-semibold"
+        href="/precios"
+      >
+        Ver planes
+      </Link>
     </div>
   );
 }

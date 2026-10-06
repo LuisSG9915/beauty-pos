@@ -298,7 +298,6 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
             <EmptyState
               action={puedeEditar ? (
                 <Button
-                  data-action-clave="1"
                   data-action-id="clientes.nuevo"
                   nativeButton={false}
                   render={<Link href={hrefBase({ nuevo: "1" })} prefetch={false} />}

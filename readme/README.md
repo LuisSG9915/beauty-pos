@@ -2,8 +2,8 @@
 
 Índice del plan de trabajo, respuestas a las preguntas del encargo y orden de ejecución
 para SWE-2 MAX. Fecha del diagnóstico: 2026-10-05. Repo: `LuisSG9915/beauty-pos`
-(marca del producto: **Melena**; el proyecto aparece como "lecta" en el encargo —
-se conserva el remoto actual, no se renombra nada).
+(marca del producto: **Melena**). Nota: "lecta" en el encargo se refiere a otro repo
+del dueño (`LuisSG9915/lecta`, lector EPUB); este es `beauty-pos`, no se renombra nada.
 
 ## Respuestas a las preguntas
 

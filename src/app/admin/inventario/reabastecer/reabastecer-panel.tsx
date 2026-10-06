@@ -165,11 +165,17 @@ export function ReabastecerPanel({
     }
   };
 
-  const acciones = (
-    <div className="flex flex-wrap items-center gap-2">
+  const acciones = (primaria: boolean) => (
+    <div
+      className={`flex flex-wrap items-center gap-2 ${
+        primaria
+          ? "max-lg:fixed max-lg:inset-x-0 max-lg:bottom-0 max-lg:z-40 max-lg:border-t max-lg:border-border max-lg:bg-card max-lg:px-4 max-lg:py-3 max-lg:shadow-[0_-4px_12px_rgba(0,0,0,0.08)]"
+          : ""
+      }`}
+    >
       {puedeCrearCompra ? (
         <Button
-          data-action-clave="1"
+          {...(primaria ? { "data-action-clave": "1" } : {})}
           data-action-id="reabastecer.compra.crear"
           disabled={pending || seleccionadas.length === 0}
           onClick={crearCompra}
@@ -181,7 +187,7 @@ export function ReabastecerPanel({
         </Button>
       ) : (
         <Button
-          data-action-clave="1"
+          {...(primaria ? { "data-action-clave": "1" } : {})}
           data-action-id="reabastecer.lista.copiar"
           disabled={seleccionadas.length === 0}
           onClick={copiarLista}
@@ -205,14 +211,14 @@ export function ReabastecerPanel({
         <p className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
           Todo cubierto: nada que comprar con el objetivo de {dias} días.
         </p>
-        {acciones}
+        {acciones(true)}
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
-      {acciones}
+      {acciones(true)}
 
       {/* Móvil: tarjetas */}
       <div className="space-y-3 md:hidden">
@@ -380,11 +386,13 @@ export function ReabastecerPanel({
         </table>
       </div>
 
-      {acciones}
+      {acciones(false)}
       <p className="text-xs text-muted-foreground">
         Cantidades redondeadas hacia arriba. El costo usa el último costo del catálogo; la compra se
         crea como borrador y no mueve el inventario hasta que la recibas en Compras.
       </p>
+      {/* En móvil la barra de acciones queda fija abajo: espacio para no tapar el pie. */}
+      <div aria-hidden="true" className="h-16 lg:hidden" />
     </div>
   );
 }

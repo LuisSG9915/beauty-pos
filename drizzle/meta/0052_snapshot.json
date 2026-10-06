@@ -14555,7 +14555,7 @@
         },
         "mobiliario_pos_chk": {
           "name": "mobiliario_pos_chk",
-          "value": "\"mobiliario\".\"x\" >= 0 and \"mobiliario\".\"y\" >= 0 and \"mobiliario\".\"ancho\" between 1 and $1 and \"mobiliario\".\"alto\" between 1 and $2"
+          "value": "\"mobiliario\".\"x\" >= 0 and \"mobiliario\".\"y\" >= 0 and \"mobiliario\".\"ancho\" between 1 and 20 and \"mobiliario\".\"alto\" between 1 and 20"
         }
       },
       "isRLSEnabled": false
@@ -14710,7 +14710,7 @@
       "checkConstraints": {
         "pisos_tamano_chk": {
           "name": "pisos_tamano_chk",
-          "value": "\"pisos\".\"columnas\" between $1 and $2 and \"pisos\".\"filas\" between $3 and $4"
+          "value": "\"pisos\".\"columnas\" between 8 and 60 and \"pisos\".\"filas\" between 8 and 40"
         }
       },
       "isRLSEnabled": false
@@ -14902,7 +14902,7 @@
         },
         "ubicaciones_pos_chk": {
           "name": "ubicaciones_pos_chk",
-          "value": "\"ubicaciones\".\"x\" >= 0 and \"ubicaciones\".\"y\" >= 0 and \"ubicaciones\".\"ancho\" between 1 and $1 and \"ubicaciones\".\"alto\" between 1 and $2"
+          "value": "\"ubicaciones\".\"x\" >= 0 and \"ubicaciones\".\"y\" >= 0 and \"ubicaciones\".\"ancho\" between 1 and 20 and \"ubicaciones\".\"alto\" between 1 and 20"
         }
       },
       "isRLSEnabled": false

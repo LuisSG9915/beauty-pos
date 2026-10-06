@@ -80,7 +80,7 @@ export const pisos = pgTable(
     index("pisos_organizacion_idx").on(table.organizacionId),
     check(
       "pisos_tamano_chk",
-      sql`${table.columnas} between ${PISO_MIN_COLUMNAS} and ${PISO_MAX_COLUMNAS} and ${table.filas} between ${PISO_MIN_FILAS} and ${PISO_MAX_FILAS}`,
+      sql`${table.columnas} between ${sql.raw(String(PISO_MIN_COLUMNAS))} and ${sql.raw(String(PISO_MAX_COLUMNAS))} and ${table.filas} between ${sql.raw(String(PISO_MIN_FILAS))} and ${sql.raw(String(PISO_MAX_FILAS))}`,
     ),
   ],
 );
@@ -119,7 +119,7 @@ export const ubicaciones = pgTable(
     ),
     check(
       "ubicaciones_pos_chk",
-      sql`${table.x} >= 0 and ${table.y} >= 0 and ${table.ancho} between 1 and ${ELEMENTO_MAX_CELDAS} and ${table.alto} between 1 and ${ELEMENTO_MAX_CELDAS}`,
+      sql`${table.x} >= 0 and ${table.y} >= 0 and ${table.ancho} between 1 and ${sql.raw(String(ELEMENTO_MAX_CELDAS))} and ${table.alto} between 1 and ${sql.raw(String(ELEMENTO_MAX_CELDAS))}`,
     ),
   ],
 );
@@ -196,7 +196,7 @@ export const mobiliario = pgTable(
     check("mobiliario_estado_chk", sql`${table.estado} in ('bueno','mantenimiento','baja')`),
     check(
       "mobiliario_pos_chk",
-      sql`${table.x} >= 0 and ${table.y} >= 0 and ${table.ancho} between 1 and ${ELEMENTO_MAX_CELDAS} and ${table.alto} between 1 and ${ELEMENTO_MAX_CELDAS}`,
+      sql`${table.x} >= 0 and ${table.y} >= 0 and ${table.ancho} between 1 and ${sql.raw(String(ELEMENTO_MAX_CELDAS))} and ${table.alto} between 1 and ${sql.raw(String(ELEMENTO_MAX_CELDAS))}`,
     ),
   ],
 );

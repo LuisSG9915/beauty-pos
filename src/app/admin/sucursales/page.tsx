@@ -153,6 +153,7 @@ export default async function SucursalesPage({ searchParams }: Props) {
             </Button>
           ) : puedeEditar && ctx.plan ? (
             <Button
+              data-action-clave="1"
               data-action-id="sucursales.plan.ampliar"
               nativeButton={false}
               render={<Link href={suscripcionHref} />}
@@ -240,7 +241,10 @@ export default async function SucursalesPage({ searchParams }: Props) {
           Usas {activas} de {maxSucursales ?? "—"} sucursal(es) de tu plan
           {ctx.plan?.nombre ? ` (${ctx.plan.nombre})` : ""}
           {cubiertas != null ? ` · ${cubiertas} cubierta(s) por tu suscripción` : ""}.{" "}
-          <Link className="font-medium text-primary hover:underline" href={suscripcionHref}>
+          <Link
+            className="inline-flex min-h-6 items-center font-medium text-primary hover:underline"
+            href={suscripcionHref}
+          >
             Ver suscripción
           </Link>
         </p>
@@ -262,7 +266,10 @@ export default async function SucursalesPage({ searchParams }: Props) {
         {maxSucursales != null && activas >= maxSucursales && ctx.efectivo === "vigente" ? (
           <p className="mt-2 rounded-lg bg-muted/60 px-3 py-2 text-sm">
             {motivoBloqueoSucursal(capacidad)}{" "}
-            <Link className="font-medium text-primary hover:underline" href={suscripcionHref}>
+            <Link
+              className="inline-flex min-h-6 items-center font-medium text-primary hover:underline"
+              href={suscripcionHref}
+            >
               Cambia de plan
             </Link>{" "}
             para más sucursales y reportes consolidados.
@@ -272,7 +279,10 @@ export default async function SucursalesPage({ searchParams }: Props) {
           <p className="mt-2 rounded-lg bg-warning-soft px-3 py-2 text-sm text-warning-soft-foreground">
             Ya usas las {cubiertas} sucursal(es) cubiertas por tu suscripción. Para activar o crear otra,
             solicita ampliar la cobertura en{" "}
-            <Link className="font-medium text-primary hover:underline" href={suscripcionHref}>
+            <Link
+              className="inline-flex min-h-6 items-center font-medium text-primary hover:underline"
+              href={suscripcionHref}
+            >
               Suscripción
             </Link>
             .
