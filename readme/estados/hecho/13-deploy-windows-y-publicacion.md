@@ -1,6 +1,6 @@
 # 13 — Desbloquear deploy en Windows y publicar planes 01–12
 
-**Fecha:** 2026-10-05 · **Implementa:** SWE-2 MAX (parche + verificación + deploy) · **Estado:** en progreso
+**Fecha:** 2026-10-05 → 2026-10-06 · **Implementa:** SWE-2 MAX (parche + verificación + deploy) · **Estado:** hecho
 
 ## Contexto
 
@@ -87,4 +87,54 @@ deploy al Worker.
 
 ## Desviaciones
 
-(Pendiente — SWE-2 MAX anota aquí cada diferencia con lo previsto, o `BLOQUEO:`.)
+### Parche extendido (segunda pieza)
+
+Además del empaquetado, `opennextjs-cloudflare deploy` llamaba
+`getEnvFromPlatformProxy` (`dist/cli/commands/utils/helpers.js`), que levanta un
+`getPlatformProxy` de wrangler para leer `vars`. El binding `AI` (Workers AI no
+tiene simulador local — `remote` obligatorio) obliga a abrir una sesión de
+preview remota contra `beauty-pos.luis-sg9915.workers.dev`, y ese hostname está
+protegido por una app de Cloudflare Access (`lucky-mouse-5479`). Sin service
+token y en contexto no-interactivo, el deploy abortaba con:
+
+```
+Failed to start the remote proxy session. ... The domain "beauty-pos.
+luis-sg9915.workers.dev" is behind Cloudflare Access
+```
+
+El parche envuelve el `getPlatformProxy` en `try/catch`: si falla, se continúa
+con `process.env` + `.env*` (los `vars` de wrangler.jsonc están comentados de
+todos modos, así que no se pierde nada). No se puede poner `remote: false` en el
+binding `ai` — wrangler lo rechaza para bindings sin simulador local.
+
+### Migración 0052 en CockroachDB
+
+Los `CREATE TABLE` de `mobiliario`, `pisos` y `ubicaciones` llevaban literales
+numéricos interpolados por el template `sql` de Drizzle → llegaban como
+parámetros `$1` y CockroachDB rechazaba los CHECK ("expected immutable
+expression"). Se reescribieron como constantes literales en
+`drizzle/0052_brief_firebrand.sql` + snapshot, se limpiaron las tablas parciales
+y se re-aplicó: 53/53 en `lecta_dev` (local) y en `defaultdb` (producción vía
+Hyperdrive).
+
+### Access cubre todos los hostnames
+
+`melena.app`, `www.melena.app` y `beauty-pos.luis-sg9915.workers.dev` responden
+302 → `lucky-mouse-5479.cloudflareaccess.com`. La verificación HTTP externa
+(`/api/health`, `/login`) no puede pasar sin credenciales de Access: el deploy se
+verificó por `wrangler deployments list` (versión `0121f4a4-c789-4755-b39a-
+02ec6cc5506e`, 100%, bindings completos). Si esa puerta es intencional, todo
+bien; si no, revisar la app Access que cubre los dos dominios.
+
+## Resultado
+
+- `pnpm build:worker` ✅ en Windows (con parche).
+- Preview local ✅ (`/api/health`, `/login`, `/`, `/offline` → 200; `/admin` → 307
+  a `/login`; sin errores `cloudflare:sockets`/sharp).
+- Deploy ✅: versión `0121f4a4-c789-4755-b39a-02ec6cc5506e`, bindings
+  HYPERDRIVE + CACHE_KV + MEDIA + AI + ASSETS, dominios melena.app +
+  www.melena.app + workers.dev.
+- Migraciones ✅ 53/53 en producción; `access:seed` ✅; `plans:seed` ✅;
+  bucket `melena-media` ✅ existente.
+- Verificación funcional ✅ completa en local: 502 tests, usability 0/0, smoke
+  OK, perf OK, flows E2E 72/72.

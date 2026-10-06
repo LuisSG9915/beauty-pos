@@ -59,3 +59,48 @@ index f59e677181f1d0007993e36e05901f1f012689f9..17dd2f0c08ea67ff8a0bd5924922f4fa
              // When @vercel/og is not used, alias the edge entry to a throwing shim so the
              // dynamic `import("next/dist/compiled/@vercel/og/index.edge.js")` call site
              // emitted by Next.js does not drag the library (~800 KiB) and its
+diff --git a/dist/cli/commands/utils/helpers.js b/dist/cli/commands/utils/helpers.js
+index 5848c703300216b08587e94a8b3adb6ab2b5d54c..d1cd14f815dfa0be3879f1171bebd594c57f91db 100644
+--- a/dist/cli/commands/utils/helpers.js
++++ b/dist/cli/commands/utils/helpers.js
+@@ -33,19 +33,27 @@ export async function getEnvFromPlatformProxy(options, buildOpts) {
+     // 1. Start from `process.env`
+     const envVars = process.env;
+     // 2. Apply vars from workers `env`
+-    const proxy = await getPlatformProxy({
+-        ...options,
+-        // Next.js uses a different mechanism to load `.env*` files from wrangler.
+-        // We prevent wrangler for loading the files and handle that in `getEnvFromPlatformProxy`.
+-        envFiles: [],
+-    });
+-    Object.entries(proxy.env).forEach(([key, value]) => {
+-        if (typeof value === "string") {
+-            // filter out bindings by only considering string values
+-            envVars[key] = value;
+-        }
+-    });
+-    await proxy.dispose();
++    try {
++        const proxy = await getPlatformProxy({
++            ...options,
++            // Next.js uses a different mechanism to load `.env*` files from wrangler.
++            // We prevent wrangler for loading the files and handle that in `getEnvFromPlatformProxy`.
++            envFiles: [],
++        });
++        Object.entries(proxy.env).forEach(([key, value]) => {
++            if (typeof value === "string") {
++                // filter out bindings by only considering string values
++                envVars[key] = value;
++            }
++        });
++        await proxy.dispose();
++    }
++    catch {
++        // Remote bindings (e.g. Workers AI) need a preview session on
++        // workers.dev; when that hostname sits behind Cloudflare Access the
++        // session fails in non-interactive deploys. Only `vars` strings are
++        // lost — they are also provided via process.env / `.env*` below.
++    }
+     // 3. Apply new vars from `.env*` files
+     let mode = "production";
+     if (envVars.NEXTJS_ENV === "development") {
