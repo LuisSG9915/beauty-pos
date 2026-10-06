@@ -47,8 +47,8 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
           title="Mi día"
         />
         <EmptyState
-          description="Tu usuario no tiene una organización activa asignada."
-          title="Sin organización"
+          description="Tu cuenta no tiene un negocio activo asignado."
+          title="Sin negocio"
         />
       </div>
     );

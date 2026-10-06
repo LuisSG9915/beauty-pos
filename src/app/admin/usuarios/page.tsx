@@ -29,12 +29,15 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Sea
 
   const canInvite = hasPermission(context.access, "usuarios.invitar");
   const canEdit = hasPermission(context.access, "usuarios.editar");
+  // El control de sucursales comparte `setUsuarioSucursalesAction`, protegida
+  // por `sucursales.editar`.
+  const canEditBranches =
+    hasPermission(context.access, "sucursales.editar") && !context.access.soloLectura;
   // El editor solo puede otorgar sucursales dentro de su propio alcance;
   // `context.branches` ya viene filtrado por `access.branchIds`.
   const assignableBranches = context.branches.map((branch) => ({
     id: branch.id,
     nombre: branch.nombre,
-    clave: branch.clave,
   }));
 
   const memberRows = await db
@@ -84,15 +87,16 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Sea
       .orderBy(asc(invitacionesUsuarios.correo)),
   ]);
 
-  const branchNames = new Map(assignableBranches.map((b) => [b.id, `${b.nombre} (${b.clave})`]));
+  const branchNames = new Map(assignableBranches.map((b) => [b.id, b.nombre]));
   // Nombres de sucursales aunque estén fuera del alcance del editor (solo lectura).
-  const allBranchNames = new Map(
-    (await db
-      .select({ id: sucursales.id, nombre: sucursales.nombre, clave: sucursales.clave })
-      .from(sucursales)
-      .where(eq(sucursales.organizacionId, organizationId))
-    ).map((b) => [b.id, `${b.nombre} (${b.clave})`]),
-  );
+  const allBranches = await db
+    .select({ id: sucursales.id, nombre: sucursales.nombre, activo: sucursales.activo })
+    .from(sucursales)
+    .where(eq(sucursales.organizacionId, organizationId));
+  const allBranchNames = new Map(allBranches.map((b) => [b.id, b.nombre]));
+  // Las asignaciones a sucursales inactivas no cuentan para el acceso:
+  // la persona sin asignaciones activas ve todas las sucursales.
+  const activeBranchIds = new Set(allBranches.filter((b) => b.activo).map((b) => b.id));
   for (const [id, nombre] of branchNames) allBranchNames.set(id, nombre);
   const roleNames = new Map(roles.map((r) => [r.id, r.nombre]));
 
@@ -103,7 +107,9 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Sea
     nombre: m.nombre,
     correo: m.correo,
     rolIds: memberRoles.filter((r) => r.miembroId === m.miembroId).map((r) => r.rolId),
-    sucursalIds: memberBranches.filter((b) => b.usuarioId === m.usuarioId).map((b) => b.sucursalId),
+    sucursalIds: memberBranches
+      .filter((b) => b.usuarioId === m.usuarioId && activeBranchIds.has(b.sucursalId))
+      .map((b) => b.sucursalId),
   }));
 
   return (
@@ -122,24 +128,26 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Sea
             </Button>
           ) : undefined
         }
-        description="Miembros de la organización, sus roles y sucursales asignadas."
+        description="Miembros del negocio, sus roles y las sucursales donde trabajan."
         title="Equipo"
       />
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <div className="space-y-4">
           {members.length === 0 ? (
-            <EmptyState description="Todavía no hay miembros en esta organización." title="Sin miembros" />
+            <EmptyState description="Todavía no hay miembros en este negocio." title="Sin miembros" />
           ) : (
             members.map((member) => (
               <MemberCard
                 allBranchNames={Object.fromEntries(allBranchNames)}
                 assignableBranches={assignableBranches}
                 canEdit={canEdit && member.usuarioId !== context.user.id}
+                canEditBranches={canEditBranches && member.usuarioId !== context.user.id}
                 isSelf={member.usuarioId === context.user.id}
                 key={member.miembroId}
                 member={member}
                 organizationId={organizationId}
                 roles={roles}
+                sucursalActualId={context.sucursalId}
               />
             ))
           )}

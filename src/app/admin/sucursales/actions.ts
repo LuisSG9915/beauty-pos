@@ -9,8 +9,12 @@ import { miembrosOrganizaciones, relUsuariosSucursales, sucursales, usuarios } f
 import { horariosSucursales } from "@/db/schema/operations";
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
 import { auditEvent } from "@/lib/audit";
-import { checkPermission } from "@/lib/auth/authorization";
+import type { ToggleActivoResult } from "@/components/admin/toggle-activo";
+import { requireAuthenticatedUser } from "@/lib/auth/access";
+import { canAccessBranch, checkPermission, resolveAccessSafe } from "@/lib/auth/authorization";
 import { revalidateCatalogos } from "@/lib/catalogo-cache";
+import { claveDisponible } from "@/lib/clave";
+import { escribirNombreSucursalOmitida } from "@/lib/sucursal-cookie";
 import { isValidTimeZone } from "@/modules/agenda/timezone";
 import { getSuscripcionActual, validarLimiteSucursales, type BillingDb } from "@/modules/billing/queries";
 
@@ -22,7 +26,9 @@ const sucursalSchema = z.object({
     .trim()
     .min(2)
     .max(40)
-    .regex(/^[a-z0-9-]+$/i, "La clave solo admite letras, números y guiones."),
+    .regex(/^[a-z0-9-]+$/i, "La clave solo admite letras, números y guiones.")
+    .optional()
+    .or(z.literal("")),
   direccion: z.string().trim().max(300).optional().or(z.literal("")),
   telefono: z.string().trim().max(30).optional().or(z.literal("")),
   correo: z.string().trim().toLowerCase().email().max(254).optional().or(z.literal("")),
@@ -32,7 +38,6 @@ const sucursalSchema = z.object({
 function limpiar(input: z.infer<typeof sucursalSchema>) {
   return {
     nombre: input.nombre,
-    clave: input.clave.toLowerCase(),
     direccion: input.direccion || null,
     telefono: input.telefono || null,
     correo: input.correo || null,
@@ -92,9 +97,31 @@ export async function crearSucursalAction(
       const cobertura = await validarCoberturaFacturada(input.organizacionId, tx);
       if (!cobertura.ok) throw new Error(cobertura.error);
 
+      // La clave llega explícita (opcional) o se genera del nombre; el
+      // FOR UPDATE de arriba serializa la generación entre altas y el
+      // único (org, clave) cubre también filas inactivas.
+      const claveManual = input.clave ? input.clave.toLowerCase() : undefined;
+      let clave: string;
+      if (claveManual) {
+        const [duplicada] = await tx
+          .select({ id: sucursales.id })
+          .from(sucursales)
+          .where(
+            and(
+              eq(sucursales.organizacionId, input.organizacionId),
+              eq(sql`lower(${sucursales.clave})`, claveManual),
+            ),
+          )
+          .limit(1);
+        if (duplicada) throw new Error("Ya existe una sucursal con esa clave.");
+        clave = claveManual;
+      } else {
+        clave = await claveDisponible(tx, sucursales, input.organizacionId, input.nombre, 40);
+      }
+
       const [creada] = await tx
         .insert(sucursales)
-        .values({ organizacionId: input.organizacionId, ...limpiar(input), createdBy: user.id })
+        .values({ organizacionId: input.organizacionId, ...limpiar(input), clave, createdBy: user.id })
         .returning({ id: sucursales.id });
 
       // Si el creador tiene alcance restringido (asignaciones explícitas),
@@ -152,7 +179,7 @@ export async function crearSucursalAction(
         accion: "sucursal.creada",
         entidad: "sucursal",
         entidadId: creada.id,
-        detalle: { nombre: input.nombre, clave: input.clave },
+        detalle: { nombre: input.nombre, clave },
       });
     });
   } catch (error) {
@@ -204,10 +231,29 @@ export async function actualizarSucursalAction(
   if (!isValidTimeZone(input.zonaHoraria)) return actionError("La zona horaria no es válida.");
 
   const db = getDatabase();
+  // Clave opcional en edición: vacía conserva la actual; explícita se
+  // verifica contra el único (org, clave), que no filtra por activo.
+  const claveManual = input.clave ? input.clave.toLowerCase() : undefined;
+  if (claveManual) {
+    const [duplicada] = await db
+      .select({ id: sucursales.id })
+      .from(sucursales)
+      .where(
+        and(
+          eq(sucursales.organizacionId, input.organizacionId),
+          eq(sql`lower(${sucursales.clave})`, claveManual),
+          ne(sucursales.id, input.sucursalId),
+        ),
+      )
+      .limit(1);
+    if (duplicada) return actionError("Ya existe una sucursal con esa clave.");
+  }
+
   const [actualizada] = await db
     .update(sucursales)
     .set({
       ...limpiar(input),
+      ...(claveManual ? { clave: claveManual } : {}),
       capacidadSinAsignar: input.capacidadSinAsignar,
       exigirCorteParaCobrar: input.exigirCorteParaCobrar,
       reservasOnline: input.reservasOnline,
@@ -219,7 +265,7 @@ export async function actualizarSucursalAction(
     })
     .where(and(eq(sucursales.id, input.sucursalId), eq(sucursales.organizacionId, input.organizacionId)))
     .returning({ id: sucursales.id });
-  if (!actualizada) return actionError("La sucursal no pertenece a la organización.");
+  if (!actualizada) return actionError("La sucursal no pertenece al negocio.");
 
   await auditEvent(db, {
     organizacionId: input.organizacionId,
@@ -235,46 +281,40 @@ export async function actualizarSucursalAction(
   return actionSuccess("Sucursal actualizada.");
 }
 
-const toggleSchema = z.object({
+const estadoSucursalSchema = z.object({
   organizacionId: z.string().uuid(),
-  sucursalId: z.string().uuid(),
-  // OJO: z.coerce.boolean() convierte "false" → true (string no vacío).
-  activo: z.enum(["true", "false"]).transform((v) => v === "true"),
+  id: z.string().uuid(),
+  activar: z.enum(["true", "false"]),
+  confirmado: z.string().optional(),
 });
 
 /**
- * Activa/desactiva una sucursal. Desactivar jamás borra historia — solo sale
- * de los selectores operativos. Activar valida el plan (capacidad
- * `multisucursal`, `max_sucursales`) y la cobertura facturada.
+ * Activa/desactiva una sucursal — firma directa para `ToggleActivo`
+ * (`organizacionId` + `id` + `activar`), que ya ofrece "Deshacer" en el
+ * toast de baja. Desactivar jamás borra historia — solo sale de los
+ * selectores operativos. Activar valida el plan (capacidad `multisucursal`,
+ * `max_sucursales`) y la cobertura facturada.
  */
-export async function toggleSucursalAction(
-  _previousState: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const parsed = parseWithSchema(toggleSchema, {
-    organizacionId: formData.get("organizacionId"),
-    sucursalId: formData.get("sucursalId"),
-    activo: formData.get("activo"),
-  });
-  if (!parsed.success) return parsed.state;
+export async function setSucursalActivaAction(formData: FormData): Promise<ToggleActivoResult> {
+  const parsed = estadoSucursalSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!parsed.success) return { error: "Solicitud inválida." };
   const input = parsed.data;
 
   const access = await checkPermission(input.organizacionId, "sucursales.editar");
-  if (!access) return actionError("No tienes permiso para gestionar sucursales.");
+  if (!access) return { error: "No tienes permiso para gestionar sucursales." };
   const { user } = access;
+  const activar = input.activar === "true";
 
   const db = getDatabase();
   const [sucursal] = await db
     .select({ id: sucursales.id, activo: sucursales.activo, nombre: sucursales.nombre })
     .from(sucursales)
-    .where(and(eq(sucursales.id, input.sucursalId), eq(sucursales.organizacionId, input.organizacionId)))
+    .where(and(eq(sucursales.id, input.id), eq(sucursales.organizacionId, input.organizacionId)))
     .limit(1);
-  if (!sucursal) return actionError("La sucursal no pertenece a la organización.");
-  if (sucursal.activo === input.activo) {
-    return actionSuccess(input.activo ? "La sucursal ya estaba activa." : "La sucursal ya estaba inactiva.");
-  }
+  if (!sucursal) return { error: "La sucursal no pertenece al negocio." };
+  if (sucursal.activo === activar) return { success: true };
 
-  if (input.activo) {
+  if (activar) {
     try {
       await db.transaction(async (tx) => {
         await tx.execute(sql`select id from organizaciones where id = ${input.organizacionId} for update`);
@@ -284,7 +324,7 @@ export async function toggleSucursalAction(
         if (!cobertura.ok) throw new Error(cobertura.error);
       });
     } catch (error) {
-      return actionError(error instanceof Error ? error.message : "No se pudo activar la sucursal.");
+      return { error: error instanceof Error ? error.message : "No se pudo activar la sucursal." };
     }
   } else {
     // No permitir desactivar la última sucursal activa: dejaría la operación
@@ -294,48 +334,47 @@ export async function toggleSucursalAction(
       .from(sucursales)
       .where(and(eq(sucursales.organizacionId, input.organizacionId), eq(sucursales.activo, true)));
     if (activas <= 1) {
-      return actionError("No puedes desactivar la única sucursal activa del negocio.");
+      return { error: "No puedes desactivar la única sucursal activa del negocio." };
     }
   }
 
   await db
     .update(sucursales)
-    .set({ activo: input.activo, updatedBy: user.id })
-    .where(eq(sucursales.id, input.sucursalId));
+    .set({ activo: activar, updatedBy: user.id })
+    .where(eq(sucursales.id, input.id));
   await auditEvent(db, {
     organizacionId: input.organizacionId,
-    sucursalId: input.sucursalId,
+    sucursalId: input.id,
     usuarioId: user.id,
-    accion: input.activo ? "sucursal.activada" : "sucursal.desactivada",
+    accion: activar ? "sucursal.activada" : "sucursal.desactivada",
     entidad: "sucursal",
-    entidadId: input.sucursalId,
+    entidadId: input.id,
     detalle: { nombre: sucursal.nombre },
   });
   revalidatePath("/admin/sucursales");
   revalidateCatalogos(input.organizacionId);
-  return actionSuccess(input.activo ? "Sucursal activada." : "Sucursal desactivada. Su historial se conserva.");
+  return { success: true };
 }
 
-const asignacionSchema = z.object({
+const renombrarSchema = z.object({
   organizacionId: z.string().uuid(),
   sucursalId: z.string().uuid(),
-  usuarioIds: z.array(z.string().uuid()).max(200),
+  nombre: z.string().trim().min(2, "Escribe el nombre de la sucursal.").max(160),
 });
 
 /**
- * Define qué miembros ven la sucursal (`sucursales.editar` + alcance propio).
- * OJO con la semántica del acceso: un miembro SIN asignaciones ve TODAS las
- * sucursales — quitar la última asignación amplía su alcance, no lo reduce.
+ * Renombra solo el nombre visible de la sucursal (`sucursales.editar`). Lo
+ * usa la tarjeta "¿Cómo se llama tu salón?" del inicio para que el nombre
+ * genérico "Sucursal principal" se cambie en un paso.
  */
-export async function setSucursalUsuariosAction(
+export async function renombrarSucursalAction(
   _previousState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const usuarioIds = [...new Set(formData.getAll("usuarioIds").map(String).filter(Boolean))];
-  const parsed = parseWithSchema(asignacionSchema, {
+  const parsed = parseWithSchema(renombrarSchema, {
     organizacionId: formData.get("organizacionId"),
     sucursalId: formData.get("sucursalId"),
-    usuarioIds,
+    nombre: formData.get("nombre"),
   });
   if (!parsed.success) return parsed.state;
   const input = parsed.data;
@@ -344,66 +383,179 @@ export async function setSucursalUsuariosAction(
   if (!access) return actionError("No tienes permiso para gestionar sucursales.");
 
   const db = getDatabase();
+  const [actualizada] = await db
+    .update(sucursales)
+    .set({ nombre: input.nombre, updatedBy: access.user.id })
+    .where(and(eq(sucursales.id, input.sucursalId), eq(sucursales.organizacionId, input.organizacionId)))
+    .returning({ id: sucursales.id });
+  if (!actualizada) return actionError("La sucursal no pertenece al negocio.");
+
+  await auditEvent(db, {
+    organizacionId: input.organizacionId,
+    sucursalId: input.sucursalId,
+    usuarioId: access.user.id,
+    accion: "sucursal.renombrada",
+    entidad: "sucursal",
+    entidadId: input.sucursalId,
+    detalle: { nombre: input.nombre },
+  });
+  revalidatePath("/admin");
+  revalidatePath("/admin/sucursales");
+  revalidateCatalogos(input.organizacionId);
+  return actionSuccess("Nombre guardado.");
+}
+
+const omitirNombreSchema = z.object({
+  organizacionId: z.string().uuid(),
+  sucursalId: z.string().uuid(),
+});
+
+/**
+ * Descarta la tarjeta "¿Cómo se llama tu salón?" sin renombrar: escribe la
+ * cookie de descarte para que el inicio no la vuelva a mostrar. Basta ser
+ * miembro activo de la organización; no toca datos.
+ */
+export async function omitirNombreSucursalAction(formData: FormData): Promise<void> {
+  const parsed = omitirNombreSchema.safeParse({
+    organizacionId: formData.get("organizacionId"),
+    sucursalId: formData.get("sucursalId"),
+  });
+  if (!parsed.success) return;
+  const input = parsed.data;
+
+  const { user } = await requireAuthenticatedUser();
+  const access = await resolveAccessSafe(input.organizacionId, user);
+  if (!access) return;
+  // La sucursal debe existir en la organización para que el descarte
+  // corresponda a una tarjeta real.
+  const db = getDatabase();
+  const [existe] = await db
+    .select({ id: sucursales.id })
+    .from(sucursales)
+    .where(and(eq(sucursales.id, input.sucursalId), eq(sucursales.organizacionId, input.organizacionId)))
+    .limit(1);
+  if (!existe) return;
+
+  await escribirNombreSucursalOmitida(input.sucursalId);
+  revalidatePath("/admin");
+}
+
+const usuarioSucursalesSchema = z.object({
+  organizacionId: z.string().uuid(),
+  usuarioId: z.string().uuid(),
+  sucursalIds: z.array(z.string().uuid()).max(50),
+});
+
+/**
+ * Reemplaza las sucursales asignadas a UN miembro (`sucursales.editar` +
+ * alcance propio). Es la acción compartida del control "Todas las
+ * sucursales": se usa igual en la ficha de la persona (Equipo) y en la
+ * tarjeta de la sucursal.
+ *
+ * OJO con la semántica del acceso: un miembro SIN asignaciones ve TODAS las
+ * sucursales — una lista vacía amplía su alcance, no lo reduce. Solo se
+ * borran las asignaciones dentro del alcance del editor; las sucursales
+ * fuera de su alcance se conservan (no puede revocarlas ni verlas).
+ */
+export async function setUsuarioSucursalesAction(
+  _previousState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const sucursalIds = [...new Set(formData.getAll("sucursalIds").map(String).filter(Boolean))];
+  const parsed = parseWithSchema(usuarioSucursalesSchema, {
+    organizacionId: formData.get("organizacionId"),
+    usuarioId: formData.get("usuarioId"),
+    sucursalIds,
+  });
+  if (!parsed.success) return parsed.state;
+  const input = parsed.data;
+
+  const access = await checkPermission(input.organizacionId, "sucursales.editar");
+  if (!access) return actionError("No tienes permiso para gestionar sucursales.");
+  if (input.usuarioId === access.user.id) {
+    return actionError("No puedes modificar tus propias sucursales.");
+  }
+
+  const db = getDatabase();
   try {
     await db.transaction(async (tx) => {
-      const [sucursal] = await tx
-        .select({ id: sucursales.id })
-        .from(sucursales)
-        .where(and(eq(sucursales.id, input.sucursalId), eq(sucursales.organizacionId, input.organizacionId)))
+      // Solo miembros activos del negocio pueden recibir asignaciones.
+      const [miembro] = await tx
+        .select({ usuarioId: miembrosOrganizaciones.usuarioId })
+        .from(miembrosOrganizaciones)
+        .innerJoin(usuarios, eq(miembrosOrganizaciones.usuarioId, usuarios.id))
+        .where(
+          and(
+            eq(miembrosOrganizaciones.organizacionId, input.organizacionId),
+            eq(miembrosOrganizaciones.usuarioId, input.usuarioId),
+            eq(miembrosOrganizaciones.estado, "activo"),
+          ),
+        )
         .limit(1);
-      if (!sucursal) throw new Error("La sucursal no pertenece a la organización.");
+      if (!miembro) throw new Error("El miembro no pertenece al negocio o está suspendido.");
 
-      // Solo miembros activos de la organización pueden asignarse.
-      if (input.usuarioIds.length > 0) {
-        const validos = await tx
-          .select({ usuarioId: miembrosOrganizaciones.usuarioId })
-          .from(miembrosOrganizaciones)
-          .innerJoin(usuarios, eq(miembrosOrganizaciones.usuarioId, usuarios.id))
+      // Las sucursales elegidas deben estar activas y dentro del alcance
+      // del editor (equivale a `assertBranchScope` por cada una).
+      if (input.sucursalIds.length > 0) {
+        const validas = await tx
+          .select({ id: sucursales.id })
+          .from(sucursales)
           .where(
             and(
-              inArray(miembrosOrganizaciones.usuarioId, input.usuarioIds),
-              eq(miembrosOrganizaciones.organizacionId, input.organizacionId),
-              eq(miembrosOrganizaciones.estado, "activo"),
+              inArray(sucursales.id, input.sucursalIds),
+              eq(sucursales.organizacionId, input.organizacionId),
+              eq(sucursales.activo, true),
             ),
           );
-        if (validos.length !== input.usuarioIds.length) {
-          throw new Error("Uno o más usuarios no son miembros activos.");
+        if (validas.length !== input.sucursalIds.length) {
+          throw new Error("Una o más sucursales no son válidas.");
+        }
+        for (const sucursalId of input.sucursalIds) {
+          if (!canAccessBranch(access, sucursalId)) {
+            throw new Error("No puedes asignar sucursales fuera de tu alcance.");
+          }
         }
       }
 
-      await tx
-        .delete(relUsuariosSucursales)
-        .where(
-          and(
-            eq(relUsuariosSucursales.organizacionId, input.organizacionId),
-            eq(relUsuariosSucursales.sucursalId, input.sucursalId),
-          ),
-        );
-      if (input.usuarioIds.length > 0) {
+      // Alcance del editor: null = todas las sucursales; Set = solo esas. Se
+      // borran únicamente las asignaciones que entran en su alcance.
+      const borrables = access.branchIds === null ? null : [...access.branchIds];
+      if (borrables === null || borrables.length > 0) {
+        await tx
+          .delete(relUsuariosSucursales)
+          .where(
+            and(
+              eq(relUsuariosSucursales.organizacionId, input.organizacionId),
+              eq(relUsuariosSucursales.usuarioId, input.usuarioId),
+              ...(borrables ? [inArray(relUsuariosSucursales.sucursalId, borrables)] : []),
+            ),
+          );
+      }
+      if (input.sucursalIds.length > 0) {
         await tx.insert(relUsuariosSucursales).values(
-          input.usuarioIds.map((usuarioId) => ({
+          input.sucursalIds.map((sucursalId) => ({
             organizacionId: input.organizacionId,
-            usuarioId,
-            sucursalId: input.sucursalId,
+            usuarioId: input.usuarioId,
+            sucursalId,
             createdBy: access.user.id,
           })),
         );
       }
       await auditEvent(tx, {
         organizacionId: input.organizacionId,
-        sucursalId: input.sucursalId,
         usuarioId: access.user.id,
-        accion: "sucursal.usuarios",
-        entidad: "sucursal",
-        entidadId: input.sucursalId,
-        detalle: { usuarioIds: input.usuarioIds },
+        accion: "miembro.sucursales",
+        entidad: "miembro",
+        entidadId: input.usuarioId,
+        detalle: { sucursalIds: input.sucursalIds },
       });
     });
   } catch (error) {
-    return actionError(error instanceof Error ? error.message : "No se pudo actualizar la asignación.");
+    return actionError(error instanceof Error ? error.message : "No se pudieron actualizar las sucursales.");
   }
 
   revalidatePath("/admin/sucursales");
+  revalidatePath("/admin/usuarios");
   revalidateCatalogos(input.organizacionId);
-  return actionSuccess("Asignación actualizada.");
+  return actionSuccess("Sucursales actualizadas.");
 }

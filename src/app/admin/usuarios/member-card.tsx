@@ -3,9 +3,9 @@
 import { ShieldCheck, Store, UserRound } from "lucide-react";
 import { useActionState } from "react";
 
+import { MiembroSucursalesForm } from "@/app/admin/sucursales/asignacion-form";
 import {
   cancelInvitation,
-  setMemberBranches,
   setMemberRoles,
   toggleMember,
 } from "@/app/admin/usuarios/actions";
@@ -68,18 +68,23 @@ export function MemberCard({
   allBranchNames,
   organizationId,
   canEdit,
+  canEditBranches,
   isSelf,
+  sucursalActualId,
 }: {
   member: MemberRow;
   roles: Array<{ id: string; nombre: string; esSistema: boolean }>;
-  assignableBranches: Array<{ id: string; nombre: string; clave: string }>;
+  assignableBranches: Array<{ id: string; nombre: string }>;
   allBranchNames: Record<string, string>;
   organizationId: string;
   canEdit: boolean;
+  /** `sucursales.editar` — el control de sucursales comparte esa acción. */
+  canEditBranches: boolean;
   isSelf: boolean;
+  /** Sucursal actual del contexto: se pre-marca al apagar "Todas". */
+  sucursalActualId?: string;
 }) {
   const [rolesState, rolesAction, rolesPending] = useActionState(setMemberRoles, {});
-  const [branchesState, branchesAction, branchesPending] = useActionState(setMemberBranches, {});
   const [toggleState, toggleAction, togglePending] = useActionState(toggleMember, {});
   const suspendido = member.estado !== "activo";
 
@@ -149,35 +154,25 @@ export function MemberCard({
           ) : null}
         </form>
 
-        <form action={branchesAction} className="space-y-2">
-          <input name="organizacionId" type="hidden" value={organizationId} />
-          <input name="miembroId" type="hidden" value={member.miembroId} />
+        <section className="space-y-2" aria-label={`Sucursales de ${member.nombre}`}>
           <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-primary">
             <Store aria-hidden="true" className="size-3.5" /> Sucursales
           </p>
-          <CheckboxList
-            checked={new Set(member.sucursalIds.filter((id) => assignableBranches.some((b) => b.id === id)))}
-            disabled={!canEdit}
-            items={assignableBranches.map((branch) => ({
-              id: branch.id,
-              label: `${branch.nombre} (${branch.clave})`,
-            }))}
-            name="sucursalIds"
+          <MiembroSucursalesForm
+            disabled={!canEditBranches || isSelf}
+            miembro={{
+              usuarioId: member.usuarioId,
+              nombre: member.nombre,
+              correo: member.correo,
+              sucursalIds: member.sucursalIds,
+              fueraDeAlcance: fueraDeAlcance.map((id) => allBranchNames[id] ?? "—"),
+            }}
+            mostrarIdentidad={false}
+            organizationId={organizationId}
+            sucursalActualId={sucursalActualId}
+            sucursales={assignableBranches}
           />
-          {fueraDeAlcance.length > 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Fuera de tu alcance: {fueraDeAlcance.map((id) => allBranchNames[id] ?? "—").join(", ")}
-            </p>
-          ) : null}
-          {canEdit ? (
-            <div className="flex items-center gap-3">
-              <Button disabled={branchesPending} size="sm" type="submit" variant="outline">
-                {branchesPending ? "Guardando…" : "Guardar sucursales"}
-              </Button>
-              <ActionFeedback state={branchesState} />
-            </div>
-          ) : null}
-        </form>
+        </section>
         <ActionFeedback state={toggleState} />
       </div>
     </section>

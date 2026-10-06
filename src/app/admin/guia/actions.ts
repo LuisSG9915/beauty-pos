@@ -34,7 +34,7 @@ export async function actualizarGuia(formData: FormData): Promise<ActionState> {
 
   const { user } = await requireAuthenticatedUser();
   const access = await resolveAccessSafe(input.organizacionId, user);
-  if (!access) return actionError("No tienes acceso a esta organización.");
+  if (!access) return actionError("No tienes acceso a este negocio.");
 
   const db = getDatabase();
   let pasoActual = 0;

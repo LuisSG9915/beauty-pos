@@ -27,6 +27,7 @@ import {
 import type { AgendaCita, AgendaRecurso } from "@/app/admin/agenda/agenda-types";
 import { EstadoVistaBadge } from "@/app/admin/agenda/cita-card";
 import { FichaForm } from "@/app/admin/clientes/ficha-form";
+import { MediaThumb } from "@/components/media-thumb";
 import { StatusBadge, type StatusTone } from "@/components/status-badge";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -47,6 +48,7 @@ const HISTORIAL_LABEL: Record<string, string> = {
   creada: "Cita creada",
   editada: "Datos editados",
   movida: "Movida de horario",
+  duracion: "Duración ajustada",
   reagendada: "Reagendada a pendiente",
   estado: "Cambio de estado",
   servicio_agregado: "Servicio agregado",
@@ -66,6 +68,9 @@ function historialResumen(evento: CitaHistorialEvento): string {
   }
   if ((evento.accion === "movida" || evento.accion === "reagendada") && detalle.fechaHoraA) {
     return `nueva hora: ${formatTime(String(detalle.fechaHoraA))}`;
+  }
+  if (evento.accion === "duracion") {
+    return `${Number(detalle.de) || 0} → ${Number(detalle.a) || 0} min`;
   }
   if ((evento.accion === "recurso_agregado" || evento.accion === "recurso_quitado") && detalle.nombre) {
     return String(detalle.nombre);
@@ -123,7 +128,7 @@ function CitaHistorial({
                 <span className="font-medium text-foreground">
                   {HISTORIAL_LABEL[evento.accion] ?? evento.accion}
                 </span>
-                {["estado", "movida", "reagendada", "recurso_agregado", "recurso_quitado"].includes(evento.accion)
+                {["estado", "movida", "duracion", "reagendada", "recurso_agregado", "recurso_quitado"].includes(evento.accion)
                   ? ` — ${historialResumen(evento)}`
                   : ""}
                 {evento.usuarioNombre ? ` · ${evento.usuarioNombre}` : ""}
@@ -422,6 +427,8 @@ type AgendaServicio = {
   nombre: string;
   precioBase: string;
   duracionMinutos: number;
+  /** Llave R2 de la foto del servicio; null → inicial en la miniatura. */
+  imagenClaveR2?: string | null;
 };
 
 /**
@@ -626,6 +633,7 @@ export function CitaSidePanel({
                 className="flex min-h-11 items-center gap-3 rounded-xl border border-border px-4 py-2 text-sm"
                 key={servicio.id}
               >
+                <MediaThumb claveR2={servicio.imagenClaveR2} className="size-8" nombre={servicio.nombre} />
                 <span className="min-w-0 flex-1 truncate font-medium">{servicio.nombre}</span>
                 <span className="text-xs tabular-nums text-muted-foreground">
                   {formatCurrency(servicio.precio, { currency })}
@@ -655,6 +663,9 @@ export function CitaSidePanel({
               value: servicio.id,
               label: servicio.nombre,
               description: `${formatCurrency(servicio.precioBase, { currency })} · ${servicio.duracionMinutos} min`,
+              imageUrl: servicio.imagenClaveR2
+                ? `/api/medios/${encodeURI(servicio.imagenClaveR2)}`
+                : undefined,
             }))}
             onValueChange={(value) => {
               if (value) toggleServicio(value, true);

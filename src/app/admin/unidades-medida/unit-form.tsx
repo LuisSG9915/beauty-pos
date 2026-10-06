@@ -4,7 +4,7 @@ import { useActionState } from "react";
 
 import { saveUnit, type UnitActionState } from "@/app/admin/unidades-medida/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input } from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel, Input } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
 
 export function UnitForm({ organizationId, initial }: { organizationId: string; initial?: { id: string; clave: string; nombre: string } }) {
@@ -17,13 +17,21 @@ export function UnitForm({ organizationId, initial }: { organizationId: string; 
       <p className="mt-1 text-sm text-muted-foreground">Define cómo se cuenta el inventario: pieza, litro, gramo, mililitro, etc.</p>
       <div className="mt-5 space-y-4">
         <Field>
-          <FieldLabel required>Clave</FieldLabel>
-          <Input className="uppercase" defaultValue={initial?.clave} name="clave" placeholder="PZA" required />
-        </Field>
-        <Field>
           <FieldLabel required>Nombre</FieldLabel>
           <Input defaultValue={initial?.nombre} name="nombre" placeholder="Pieza" required />
         </Field>
+        {initial ? (
+          <details className="rounded-xl border border-border bg-muted/60 px-4 py-3">
+            <summary className="cursor-pointer list-none text-sm font-medium text-muted-foreground hover:text-primary">
+              Opciones avanzadas
+            </summary>
+            <Field className="mt-3">
+              <FieldLabel>Clave</FieldLabel>
+              <Input name="clave" placeholder={initial.clave} />
+              <FieldDescription>Déjala vacía para conservar la clave actual.</FieldDescription>
+            </Field>
+          </details>
+        ) : null}
       </div>
       <div className="mt-4">
         <ActionFeedback state={state} successMessage="Unidad guardada." />

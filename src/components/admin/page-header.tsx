@@ -138,6 +138,8 @@ type AdminCardProps = ComponentProps<"section"> & {
   title?: string;
   description?: string;
   actions?: ReactNode;
+  /** Entrada animada al montar la tarjeta (plan de animaciones). */
+  animate?: boolean;
 };
 
 /**
@@ -147,6 +149,7 @@ export function AdminCard({
   title,
   description,
   actions,
+  animate = false,
   className,
   children,
   ...props
@@ -155,6 +158,7 @@ export function AdminCard({
     <section
       className={cn(
         "rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6",
+        animate && "anim-entrada",
         className,
       )}
       {...props}

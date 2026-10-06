@@ -22,7 +22,7 @@ export function InsumosManager({ organizationId, servicioId, insumos, disponible
           <table className="w-full text-left text-sm">
             <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
               <tr>
-                <th className="py-2 pr-4 font-medium">SKU</th>
+                <th className="py-2 pr-4 font-medium">Clave</th>
                 <th className="py-2 pr-4 font-medium">Producto</th>
                 <th className="py-2 pr-4 font-medium">Cantidad</th>
                 <th className="py-2 pr-4 font-medium">Unidad</th>

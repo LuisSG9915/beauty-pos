@@ -17,6 +17,11 @@ const secciones = [
       "Usamos tus datos exclusivamente para proporcionar el servicio: autenticación, operación del negocio, recordatorios de citas por correo y soporte. No vendemos ni compartimos información con fines publicitarios.",
   },
   {
+    titulo: "Inteligencia artificial",
+    cuerpo:
+      "Las fotos para llenar productos se procesan con IA dentro de la infraestructura de Cloudflare y no se usan para entrenar modelos. La imagen viaja directo al modelo: no queda almacenada como parte de la captura.",
+  },
+  {
     titulo: "Datos de tus clientes",
     cuerpo:
       "Como titular de la cuenta, tú eres responsable de los datos de tus clientes que registres en el sistema. Nosotros actuamos como encargados del tratamiento y los protegemos con las mismas medidas que aplicamos a tus datos de cuenta.",

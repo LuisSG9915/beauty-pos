@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, or } from "drizzle-orm";
+import { and, asc, desc, eq, getTableColumns, ilike, or, sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -6,9 +6,11 @@ import { toggleService } from "@/app/admin/servicios/actions";
 import { ComisionesManager } from "@/app/admin/servicios/comisiones-manager";
 import { InsumosManager } from "@/app/admin/servicios/insumos-manager";
 import { ServiceForm } from "@/app/admin/servicios/service-form";
+import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
+import { ToggleActivo } from "@/components/admin/toggle-activo";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +25,8 @@ import {
   relServiciosInsumos,
   servicios,
 } from "@/db/schema/catalogs";
+import { medios } from "@/db/schema/media";
+import { detalleVentasServicios, ventas } from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/format";
@@ -55,11 +59,26 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
         id: servicios.id,
         clave: servicios.clave,
         nombre: servicios.nombre,
+        categoriaNombre: catCategoriasServicios.nombre,
         duracionMinutos: servicios.duracionMinutos,
         precioBase: servicios.precioBase,
         activo: servicios.activo,
+        // Veces vendido en los últimos 30 días (líneas de servicio de ventas
+        // completadas) como subselect escalar: mismo round-trip, sin N+1.
+        vecesVendido: sql<number>`(
+          select coalesce(sum(${detalleVentasServicios.cantidad}), 0)::int
+            from ${detalleVentasServicios}
+            join ${ventas} on ${ventas.id} = ${detalleVentasServicios.ventaId}
+           where ${detalleVentasServicios.servicioId} = ${servicios.id}
+             and ${detalleVentasServicios.activo}
+             and ${ventas.activo}
+             and ${ventas.estado} = 'completada'
+             and ${ventas.organizacionId} = ${organizationId}
+             and coalesce(${ventas.cobradaAt}, ${ventas.createdAt}) >= now() - interval '30 days'
+        )`,
       })
       .from(servicios)
+      .leftJoin(catCategoriasServicios, eq(servicios.categoriaId, catCategoriasServicios.id))
       .where(and(...filters))
       .orderBy(desc(servicios.createdAt))
       .limit(100),
@@ -72,7 +91,12 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
 
   const editId = firstParam(params.edit);
   const editing = editId
-    ? (await db.select().from(servicios).where(and(eq(servicios.id, editId), eq(servicios.organizacionId, organizationId))).limit(1))[0]
+    ? (await db
+        .select({ ...getTableColumns(servicios), imagenClaveR2: medios.claveR2 })
+        .from(servicios)
+        .leftJoin(medios, eq(servicios.imagenPrincipalId, medios.id))
+        .where(and(eq(servicios.id, editId), eq(servicios.organizacionId, organizationId)))
+        .limit(1))[0]
     : undefined;
 
   let insumosData: Array<{ id: string; productoId: string; productoNombre: string; productoSku: string; cantidad: string; unidadNombre: string | null }> = [];
@@ -107,6 +131,67 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
         .where(and(eq(comisiones.servicioId, editing.id), eq(comisiones.activo, true))),
     ]);
   }
+
+  type ServiceRow = (typeof serviceRows)[number];
+  const columns: Array<DataTableColumn<ServiceRow>> = [
+    {
+      id: "clave",
+      header: "Clave",
+      cell: (service) => <span className="font-mono text-xs">{service.clave}</span>,
+    },
+    { id: "nombre", header: "Nombre", cell: (service) => <span className="font-medium">{service.nombre}</span> },
+    {
+      id: "categoria",
+      header: "Categoría",
+      cell: (service) => service.categoriaNombre ?? <span className="text-muted-foreground">—</span>,
+      hideBelow: "xl",
+    },
+    {
+      id: "duracion",
+      header: "Duración",
+      cell: (service) => <span className="text-muted-foreground">{service.duracionMinutos} min</span>,
+    },
+    {
+      id: "precio",
+      header: "Precio",
+      cell: (service) => <span className="tabular-nums">{formatCurrency(service.precioBase, { currency: context.currency })}</span>,
+      align: "right",
+    },
+    {
+      id: "vendidos",
+      header: "Vendidos (30 días)",
+      cell: (service) => <span className="tabular-nums">{service.vecesVendido}</span>,
+      align: "right",
+      hideBelow: "lg",
+    },
+    { id: "estado", header: "Estado", cell: (service) => <StatusBadge active={service.activo} /> },
+    {
+      id: "acciones",
+      header: "Acciones",
+      cell: (service) => (
+        <div className="flex flex-wrap justify-end gap-2">
+          <Link
+            className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60"
+            href={buildAdminHref("/servicios", { organizationId, extra: { edit: service.id, q: query || null } })}
+          >
+            Editar
+          </Link>
+          <ToggleActivo
+            action={toggleService}
+            activo={service.activo}
+            confirmHint="Dejará de aparecer en la agenda y en el punto de venta."
+            entidad="servicio"
+            id={service.id}
+            nombre={service.nombre}
+            organizationId={organizationId}
+            telemetryBase="catalogo.servicios"
+          />
+        </div>
+      ),
+      align: "right",
+      stickyEnd: true,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -158,20 +243,24 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
                       >
                         Editar
                       </Link>
-                      <form action={toggleService}>
-                        <input name="organizacionId" type="hidden" value={organizationId} />
-                        <input name="id" type="hidden" value={service.id} />
-                        <input name="activo" type="hidden" value={String(service.activo)} />
-                        <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">
-                          {service.activo ? "Ocultar" : "Activar"}
-                        </button>
-                      </form>
+                      <ToggleActivo
+                        action={toggleService}
+                        activo={service.activo}
+                        confirmHint="Dejará de aparecer en la agenda y en el punto de venta."
+                        entidad="servicio"
+                        id={service.id}
+                        nombre={service.nombre}
+                        organizationId={organizationId}
+                        telemetryBase="catalogo.servicios"
+                      />
                     </div>
                   }
                   badge={<StatusBadge active={service.activo} />}
                   campos={[
+                    ...(service.categoriaNombre ? [{ label: "Categoría", value: service.categoriaNombre }] : []),
                     { label: "Duración", value: `${service.duracionMinutos} min` },
                     { label: "Precio", value: formatCurrency(service.precioBase, { currency: context.currency }) },
+                    { label: "Vendidos (30 días)", value: String(service.vecesVendido) },
                   ]}
                   key={service.id}
                   subtitulo={<span className="font-mono">{service.clave}</span>}
@@ -179,49 +268,13 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
                 />
               ))}
             </RegistroList>
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[560px] text-left text-sm">
-                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
-                  <tr>
-                    <th className="py-2 pr-4 font-medium">Clave</th>
-                    <th className="py-2 pr-4 font-medium">Nombre</th>
-                    <th className="py-2 pr-4 font-medium">Duración</th>
-                    <th className="py-2 pr-4 font-medium">Precio</th>
-                    <th className="py-2 pr-4 font-medium">Estado</th>
-                    <th className="py-2 font-medium">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {serviceRows.map((service) => (
-                    <tr className="border-b border-border" key={service.id}>
-                      <td className="py-3 pr-4 font-mono text-xs">{service.clave}</td>
-                      <td className="py-3 pr-4 font-medium">{service.nombre}</td>
-                      <td className="py-3 pr-4 text-xs text-muted-foreground">{service.duracionMinutos} min</td>
-                      <td className="py-3 pr-4 tabular-nums">{formatCurrency(service.precioBase, { currency: context.currency })}</td>
-                      <td className="py-3 pr-4"><StatusBadge active={service.activo} /></td>
-                      <td className="py-3">
-                        <div className="flex flex-wrap gap-2">
-                          <Link
-                            className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60"
-                            href={buildAdminHref("/servicios", { organizationId, extra: { edit: service.id, q: query || null } })}
-                          >
-                            Editar
-                          </Link>
-                          <form action={toggleService}>
-                            <input name="organizacionId" type="hidden" value={organizationId} />
-                            <input name="id" type="hidden" value={service.id} />
-                            <input name="activo" type="hidden" value={String(service.activo)} />
-                            <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">
-                              {service.activo ? "Ocultar" : "Activar"}
-                            </button>
-                          </form>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              className="hidden md:block"
+              columns={columns}
+              minWidth="760px"
+              rowKey={(service) => service.id}
+              rows={serviceRows}
+            />
           </>
         )}
       </AdminCard>

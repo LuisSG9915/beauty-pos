@@ -45,7 +45,7 @@ export function MovimientoForm({
         }))}
         label="Producto o insumo"
         name="productoId"
-        placeholder="Buscar por SKU o nombre"
+        placeholder="Buscar por clave o nombre"
         required
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

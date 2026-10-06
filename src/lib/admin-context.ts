@@ -8,10 +8,12 @@ import {
   accessFromContextRow,
   resolveAccess,
   resolveSessionContext,
+  sucursalesActivasDelAcceso,
   type OrganizacionAcceso,
   type ResolvedAccess,
   type UsuarioSesion,
 } from "@/lib/auth/authorization";
+import { leerSucursalCookie } from "@/lib/sucursal-cookie";
 import { firstParam } from "@/lib/url-context";
 import { DEFAULT_TIME_ZONE, resolveTimeZone } from "@/modules/agenda/timezone";
 
@@ -110,17 +112,10 @@ export async function getAdminContext(
 
   let branches: AdminBranch[] = [];
   if (options.loadBranches ?? true) {
-    if (!(options.includeInactiveBranches ?? false) && !access.esPlataforma) {
-      // Sin ronda extra: las sucursales activas ya vienen en el acceso; solo
-      // falta acotarlas al alcance del usuario.
-      branches = access.sucursalesActivas.filter(
-        (branch) => access.branchIds === null || access.branchIds.has(branch.id),
-      );
+    if (!(options.includeInactiveBranches ?? false)) {
+      branches = await sucursalesActivasDelAcceso(access);
     } else {
       const conditions = [eq(sucursales.organizacionId, organization.id)];
-      if (!(options.includeInactiveBranches ?? false)) {
-        conditions.push(eq(sucursales.activo, true));
-      }
       // Usuarios con asignaciones explícitas solo ven sus sucursales.
       if (access.branchIds !== null) {
         conditions.push(inArray(sucursales.id, [...access.branchIds]));
@@ -146,11 +141,23 @@ export async function getAdminContext(
     }
   }
 
+  // Sucursal efectiva: `?sucursalId` válida → cookie preferida válida →
+  // primera del alcance. "Válida" = presente en `branches`, que ya están
+  // acotadas al alcance del usuario (la cookie nunca se confía sola).
   const requestedSucursalId = firstParam(params.sucursalId);
-  const branch =
+  let branch: AdminBranch | null =
     (requestedSucursalId
       ? branches.find((item) => item.id === requestedSucursalId)
-      : undefined) ?? branches[0] ?? null;
+      : undefined) ?? null;
+  if (!branch && branches.length > 0) {
+    const preferidaId = await leerSucursalCookie(organization.id);
+    branch =
+      (preferidaId
+        ? branches.find((item) => item.id === preferidaId)
+        : undefined) ??
+      branches[0] ??
+      null;
+  }
 
   return {
     user,

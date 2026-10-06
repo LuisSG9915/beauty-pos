@@ -968,20 +968,22 @@ async function main() {
     const fill = (name: string, value: string) =>
       setNativeInput(page, `form [name="${name}"]`, value);
 
+    // Desde el plan 02 la clave/sku ya no se pide en el alta: el servidor la
+    // genera del nombre. El flujo llena solo campos visibles.
     const catalogos: Array<{
       ruta: string;
       campos: Record<string, string>;
       submit: string;
       nombreVisible: string;
     }> = [
-      { ruta: "categorias-servicios", campos: { clave: `E2ECS${runId}`, nombre: `E2E CatServ ${runId}` }, submit: "Guardar categoría", nombreVisible: `E2E CatServ ${runId}` },
-      { ruta: "categorias-productos", campos: { clave: `E2ECP${runId}`, nombre: `E2E CatProd ${runId}` }, submit: "Guardar categoría", nombreVisible: `E2E CatProd ${runId}` },
-      { ruta: "unidades-medida", campos: { clave: `E2EUM${runId}`, nombre: `E2E Unidad ${runId}` }, submit: "Guardar unidad", nombreVisible: `E2E Unidad ${runId}` },
-      { ruta: "impuestos", campos: { clave: `E2EIMP${runId}`, nombre: `E2E Impuesto ${runId}`, tasa: "5" }, submit: "Guardar impuesto", nombreVisible: `E2E Impuesto ${runId}` },
-      { ruta: "medios-pago", campos: { clave: `E2EMP${runId}`, nombre: `E2E Pago ${runId}` }, submit: "Guardar medio de pago", nombreVisible: `E2E Pago ${runId}` },
-      { ruta: "promociones", campos: { clave: `E2EPRO${runId}`, nombre: `E2E Promo ${runId}`, valor: "10", vigenciaDesde: fecha }, submit: "Guardar promoción", nombreVisible: `E2E Promo ${runId}` },
-      { ruta: "servicios", campos: { clave: `E2ESRV${runId}`, nombre: `E2E Servicio ${runId}`, duracionMinutos: "45", precioBase: "120" }, submit: "Guardar servicio", nombreVisible: `E2E Servicio ${runId}` },
-      { ruta: "productos", campos: { sku: `E2EPRD${runId}`, nombre: `E2E Producto ${runId}`, costo: "10", precioVenta: "25", stockMinimo: "1" }, submit: "Guardar producto", nombreVisible: `E2E Producto ${runId}` },
+      { ruta: "categorias-servicios", campos: { nombre: `E2E CatServ ${runId}` }, submit: "Guardar categoría", nombreVisible: `E2E CatServ ${runId}` },
+      { ruta: "categorias-productos", campos: { nombre: `E2E CatProd ${runId}` }, submit: "Guardar categoría", nombreVisible: `E2E CatProd ${runId}` },
+      { ruta: "unidades-medida", campos: { nombre: `E2E Unidad ${runId}` }, submit: "Guardar unidad", nombreVisible: `E2E Unidad ${runId}` },
+      { ruta: "impuestos", campos: { nombre: `E2E Impuesto ${runId}`, tasa: "5" }, submit: "Guardar impuesto", nombreVisible: `E2E Impuesto ${runId}` },
+      { ruta: "medios-pago", campos: { nombre: `E2E Pago ${runId}` }, submit: "Guardar medio de pago", nombreVisible: `E2E Pago ${runId}` },
+      { ruta: "promociones", campos: { nombre: `E2E Promo ${runId}`, valor: "10", vigenciaDesde: fecha }, submit: "Guardar promoción", nombreVisible: `E2E Promo ${runId}` },
+      { ruta: "servicios", campos: { nombre: `E2E Servicio ${runId}`, duracionMinutos: "45", precioBase: "120" }, submit: "Guardar servicio", nombreVisible: `E2E Servicio ${runId}` },
+      { ruta: "productos", campos: { nombre: `E2E Producto ${runId}`, costo: "10", precioVenta: "25", stockMinimo: "1" }, submit: "Guardar producto", nombreVisible: `E2E Producto ${runId}` },
     ];
 
     for (const mod of catalogos) {
@@ -1002,7 +1004,6 @@ async function main() {
     // ── Paquetes: alta en catálogo (combobox de servicio aparte) ─────────
     const paqueteNombre = `E2E Paquete ${runId}`;
     await page.goto(`${BASE_URL}/admin/paquetes`, { waitUntil: "networkidle0" });
-    await fill("clave", `E2EPAQ${runId}`);
     await fill("nombre", paqueteNombre);
     await pickCombobox(page, "Servicio cubierto", "CORTE DE DAMA");
     await fill("sesiones", "3");
@@ -1021,12 +1022,8 @@ async function main() {
     // vigencia: se le inserta un saldo vencido directo en base) ─────────
     const membresiaNombre = `E2E Membresía ${runId}`;
     const membresiaVencidaNombre = `E2E Membresía Vencida ${runId}`;
-    for (const [clave, nombre] of [
-      [`E2EMEM${runId}`, membresiaNombre],
-      [`E2EMEMV${runId}`, membresiaVencidaNombre],
-    ] as const) {
+    for (const nombre of [membresiaNombre, membresiaVencidaNombre]) {
       await page.goto(`${BASE_URL}/admin/membresias`, { waitUntil: "networkidle0" });
-      await fill("clave", clave);
       await fill("nombre", nombre);
       await fill("precio", "500");
       await fill("duracionDias", "30");

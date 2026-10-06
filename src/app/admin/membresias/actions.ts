@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -8,12 +8,13 @@ import { getDatabase } from "@/db/client";
 import { membresias } from "@/db/schema/catalogs";
 import { checkPermission } from "@/lib/auth/authorization";
 import { revalidateCatalogos } from "@/lib/catalogo-cache";
+import { claveDisponible } from "@/lib/clave";
 import { requiereCapacidad } from "@/modules/billing/queries";
 
 const membresiaSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
   organizacionId: z.string().uuid(),
-  clave: z.string().trim().toUpperCase().min(2).max(60).regex(/^[A-Z0-9_-]+$/, "Usa letras, números, guion o guion bajo."),
+  clave: z.string().trim().toUpperCase().min(2).max(60).regex(/^[A-Z0-9_-]+$/, "Usa letras, números, guion o guion bajo.").optional().or(z.literal("")),
   nombre: z.string().trim().min(2).max(120),
   descripcion: z.string().trim().max(4000).optional().or(z.literal("")),
   duracionDias: z.coerce.number().int("Duración inválida.").min(1, "Mínimo 1 día.").max(3650),
@@ -35,14 +36,18 @@ export async function saveMembresia(_previousState: MembresiaActionState, formDa
   const { user } = access;
   const db = getDatabase();
 
-  const conditions = [eq(membresias.organizacionId, input.organizacionId), eq(membresias.clave, input.clave)];
-  if (input.id) conditions.push(ne(membresias.id, input.id));
-  const duplicate = await db.select({ id: membresias.id }).from(membresias).where(and(...conditions)).limit(1);
-  if (duplicate.length > 0) return { error: "Ya existe una membresía con esa clave." };
+  // Clave manual (opcional): el único (org, clave) no filtra por activo —
+  // el chequeo cubre inactivas e ignora mayúsculas (claves históricas).
+  const claveManual = input.clave || undefined;
+  if (claveManual) {
+    const conditions = [eq(membresias.organizacionId, input.organizacionId), eq(sql`lower(${membresias.clave})`, claveManual.toLowerCase())];
+    if (input.id) conditions.push(ne(membresias.id, input.id));
+    const duplicate = await db.select({ id: membresias.id }).from(membresias).where(and(...conditions)).limit(1);
+    if (duplicate.length > 0) return { error: "Ya existe una membresía con esa clave." };
+  }
 
   const values = {
     organizacionId: input.organizacionId,
-    clave: input.clave,
     nombre: input.nombre,
     descripcion: input.descripcion || null,
     duracionDias: input.duracionDias,
@@ -52,8 +57,12 @@ export async function saveMembresia(_previousState: MembresiaActionState, formDa
     updatedBy: user.id,
   };
 
-  if (input.id) await db.update(membresias).set(values).where(and(eq(membresias.id, input.id), eq(membresias.organizacionId, input.organizacionId)));
-  else await db.insert(membresias).values({ ...values, createdBy: user.id });
+  if (input.id) {
+    await db.update(membresias).set(claveManual ? { ...values, clave: claveManual } : values).where(and(eq(membresias.id, input.id), eq(membresias.organizacionId, input.organizacionId)));
+  } else {
+    const clave = claveManual ?? (await claveDisponible(db, membresias, input.organizacionId, input.nombre, 60));
+    await db.insert(membresias).values({ ...values, clave, createdBy: user.id });
+  }
 
   revalidatePath("/admin/membresias");
   revalidatePath("/admin/pos");

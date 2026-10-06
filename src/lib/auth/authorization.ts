@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { cache } from "react";
-import { and, eq, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, sql, type SQL } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
 import { sucursales } from "@/db/schema/core";
@@ -88,6 +88,12 @@ export type AccesoRow = {
   } | null;
 };
 
+/** Sucursal resumida tal como viaja embebida en la organización (jsonb). */
+export type SucursalResumen = {
+  id: string;
+  nombre: string;
+};
+
 /** Organización tal como la devuelve la consulta de contexto (jsonb). */
 export type OrganizacionAcceso = {
   id: string;
@@ -104,6 +110,12 @@ export type OrganizacionAcceso = {
    * necesite una consulta por organización.
    */
   permisos: string[] | null;
+  /**
+   * Sucursales activas visibles para el usuario en esta organización, ya
+   * acotadas a sus asignaciones (admin de plataforma: todas). Alimenta el
+   * selector de sucursal del shell en la misma consulta de contexto.
+   */
+  sucursales: SucursalResumen[];
 };
 
 /** Usuario interno embebido en la consulta de contexto. */
@@ -290,7 +302,12 @@ export const resolveSessionContext = cache(async function resolveSessionContext(
                 'moneda', o.moneda,
                 'recordatoriosActivos', o.recordatorios_activos,
                 'recordatoriosHorasAntes', o.recordatorios_horas_antes,
-                'permisos', null
+                'permisos', null,
+                'sucursales', coalesce((
+                  select jsonb_agg(jsonb_build_object('id', s.id, 'nombre', s.nombre) order by s.nombre)
+                    from sucursales s
+                   where s.organizacion_id = o.id and s.activo
+                ), '[]'::jsonb)
               ) order by o.nombre)
               from organizaciones o
           ), '[]'::jsonb)
@@ -311,6 +328,30 @@ export const resolveSessionContext = cache(async function resolveSessionContext(
                    where mo2.organizacion_id = o.id
                      and mo2.usuario_id = (select id from u)
                      and mo2.estado = 'activo'
+                ), '[]'::jsonb),
+                'sucursales', coalesce((
+                  select jsonb_agg(jsonb_build_object('id', s.id, 'nombre', s.nombre) order by s.nombre)
+                    from sucursales s
+                   where s.organizacion_id = o.id
+                     and s.activo
+                     and (
+                       -- Mismo alcance que acceso.sucursales: sin asignaciones
+                       -- a sucursales activas -> todas; con asignaciones -> solo esas.
+                       not exists (
+                         select 1
+                           from rel_usuarios_sucursales rus
+                           join sucursales sa on sa.id = rus.sucursal_id and sa.activo
+                          where rus.organizacion_id = o.id
+                            and rus.usuario_id = (select id from u)
+                       )
+                       or s.id in (
+                         select rus.sucursal_id
+                           from rel_usuarios_sucursales rus
+                           join sucursales sa on sa.id = rus.sucursal_id and sa.activo
+                          where rus.organizacion_id = o.id
+                            and rus.usuario_id = (select id from u)
+                       )
+                     )
                 ), '[]'::jsonb)
               ) order by o.nombre)
               from miembros_organizaciones mo
@@ -407,4 +448,48 @@ export async function assertBranchScope(
     )
     .limit(1);
   return Boolean(branch);
+}
+
+/**
+ * Sucursales activas de la organización del acceso, acotadas al alcance del
+ * usuario (`access.branchIds`). Miembros: llegan embebidas en el acceso, sin
+ * ronda extra. Admin de plataforma: se consultan aquí porque su acceso
+ * sintético no las trae.
+ *
+ * Es la misma lista que usa `getAdminContext` para la resolución de sucursal:
+ * comprobar `branches.some(b => b.id === x)` equivale a `assertBranchScope`
+ * (pertenece a la org, está activa y cae en el alcance) sin otra consulta.
+ */
+export async function sucursalesActivasDelAcceso(
+  access: ResolvedAccess,
+): Promise<SucursalAcceso[]> {
+  if (!access.esPlataforma) {
+    return access.sucursalesActivas.filter(
+      (branch) => access.branchIds === null || access.branchIds.has(branch.id),
+    );
+  }
+  const db = getDatabase();
+  return db
+    .select({
+      id: sucursales.id,
+      organizacionId: sucursales.organizacionId,
+      nombre: sucursales.nombre,
+      clave: sucursales.clave,
+      activo: sucursales.activo,
+      zonaHoraria: sucursales.zonaHoraria,
+      capacidadSinAsignar: sucursales.capacidadSinAsignar,
+      reservasOnline: sucursales.reservasOnline,
+      reservasAutoConfirmar: sucursales.reservasAutoConfirmar,
+      reservasCancelacionHoras: sucursales.reservasCancelacionHoras,
+      reservasAnticipacionMinutos: sucursales.reservasAnticipacionMinutos,
+      reservasHorizonteDias: sucursales.reservasHorizonteDias,
+    })
+    .from(sucursales)
+    .where(
+      and(
+        eq(sucursales.organizacionId, access.organizationId),
+        eq(sucursales.activo, true),
+      ),
+    )
+    .orderBy(asc(sucursales.nombre));
 }

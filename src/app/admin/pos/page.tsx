@@ -9,7 +9,6 @@ import { VentaTicket } from "@/app/admin/pos/venta-ticket";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
 import { clientes } from "@/db/schema/core";
 import { ventas } from "@/db/schema/operations";
@@ -173,18 +172,19 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
       />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <AdminCard description="Cobro al momento: productos y servicios sin cita agendada." title="Venta sin cita">
+          {/* La sucursal se cambia desde el selector global del shell; aquí
+              solo se muestra la activa para que el cobro quede claro. */}
+          {context.branch ? (
+            <div className="mb-4">
+              <StatusBadge tone="neutral">Vendiendo en {context.branch.nombre}</StatusBadge>
+            </div>
+          ) : null}
           <form action={crearVentaDirecta} className="flex flex-wrap items-end gap-3">
             <input name="organizacionId" type="hidden" value={organizationId} />
-            <Field className="min-w-56 flex-1">
-              <FieldLabel required>Sucursal</FieldLabel>
-              <Select defaultValue={sucursalId ?? ""} name="sucursalId" required>
-                {branches.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.nombre}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            {/* El servidor vuelve a validar la sucursal contra el alcance del
+                usuario (contexto + cookie + primera activa); el input solo
+                propaga la resolución ya hecha por la página. */}
+            <input name="sucursalId" type="hidden" value={sucursalId ?? ""} />
             <VentaDirectaSubmit disabled={branches.length === 0} />
           </form>
           {branches.length === 0 ? (
@@ -193,24 +193,6 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
         </AdminCard>
 
         <AdminCard
-          actions={
-            <form className="flex items-center gap-2" method="get">
-              <input name="organizationId" type="hidden" value={organizationId} />
-              <Field>
-                <FieldLabel className="sr-only">Cambiar sucursal</FieldLabel>
-                <Select defaultValue={sucursalId ?? ""} name="sucursalId">
-                  {branches.map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.nombre}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Button className="rounded-xl" type="submit" variant="outline">
-                Cambiar
-              </Button>
-            </form>
-          }
           description={branches.find((branch) => branch.id === sucursalId)?.nombre ?? "Sin sucursal"}
           title="Ventas de hoy"
         >

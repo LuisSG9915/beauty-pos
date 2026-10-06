@@ -12,6 +12,7 @@ import {
   type ReactNode,
 } from "react";
 
+import { guardarSucursalPreferida } from "@/app/admin/actions";
 import { AdminSidebarNav, AdminTabBar, SignOutButton } from "@/components/admin-nav";
 import {
   SubscriptionBanner,
@@ -23,12 +24,23 @@ import { ToastProvider } from "@/components/ui/toast";
 import { trackPerformance } from "@/lib/telemetry/cliente";
 import { buildAdminHref, buildHref, firstParam } from "@/lib/url-context";
 
+/** Sucursal visible para el selector global del shell. */
+export type AdminShellBranch = {
+  id: string;
+  nombre: string;
+};
+
 /** Organización accesible por el usuario, para el selector del shell. */
 export type AdminShellOrganization = {
   id: string;
   nombre: string;
   slug: string;
   activo?: boolean;
+  /**
+   * Sucursales activas visibles para el usuario en esta organización (ya
+   * acotadas a su alcance por la consulta de contexto).
+   */
+  sucursales?: AdminShellBranch[];
 };
 
 export type AdminShellProps = {
@@ -42,14 +54,36 @@ export type AdminShellProps = {
   billingByOrg?: Record<string, BillingBadge>;
   /** Capacidades ausentes del plan vigente por organización (ocultan accesos). */
   capacidadesFaltantesByOrg?: Record<string, string[]> | null;
+  /**
+   * Preferencia de sucursal por organización (cookies httpOnly
+   * `melena_sucursal_*`). El shell la usa solo para mostrar la misma sucursal
+   * que el servidor resuelve; la validación de alcance es siempre del servidor.
+   */
+  sucursalPreferidaPorOrg?: Record<string, string>;
   children: ReactNode;
 };
 
 /**
- * Selector de organización del shell. Lee `organizationId` de la URL (o la
- * primera organización disponible) y navega conservando los demás
- * parámetros; `sucursalId` se descarta porque depende de la organización.
- * `variant="sidebar"` lo rinde como bloque de ancho completo.
+ * Organización efectiva del shell: la de `?organizationId` cuando es accesible
+ * o la primera disponible. Replica la resolución que hace el servidor para
+ * que los selectores coincidan con el contexto de la página.
+ */
+function useEffectiveOrganization(organizations: AdminShellOrganization[]) {
+  const searchParams = useSearchParams();
+  const urlOrganizationId = firstParam(searchParams.get("organizationId"));
+  return (
+    (urlOrganizationId
+      ? organizations.find((organization) => organization.id === urlOrganizationId)
+      : undefined) ?? organizations[0]
+  );
+}
+
+/**
+ * Selector de negocio del shell. Lee `organizationId` de la URL (o la primera
+ * organización disponible) y navega conservando los demás parámetros;
+ * `sucursalId` se descarta porque depende de la organización.
+ * `variant="sidebar"` lo rinde como bloque de ancho completo con la etiqueta
+ * "Tu negocio" — en la UI cotidiana se dice "negocio", no "organización".
  */
 function OrganizationSelector({
   organizations,
@@ -62,24 +96,26 @@ function OrganizationSelector({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const selectId = useId();
-  const urlOrganizationId = firstParam(searchParams.get("organizationId"));
-  const currentId =
-    urlOrganizationId &&
-    organizations.some((organization) => organization.id === urlOrganizationId)
-      ? urlOrganizationId
-      : (organizations[0]?.id ?? "");
+  const organization = useEffectiveOrganization(organizations);
+  const currentId = organization?.id ?? "";
+  const sidebarLabel =
+    variant === "sidebar" ? (
+      <span className="mb-1 block text-op-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        Tu negocio
+      </span>
+    ) : null;
 
   if (organizations.length === 0) {
     return (
       <span className="rounded-full border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground">
-        Sin organización asignada
+        Sin negocio asignado
       </span>
     );
   }
 
   if (organizations.length === 1) {
     const [organization] = organizations;
-    return (
+    const nombre = (
       <span
         className={
           variant === "sidebar"
@@ -89,6 +125,14 @@ function OrganizationSelector({
       >
         {organization.nombre}
       </span>
+    );
+    return variant === "sidebar" ? (
+      <span className="block min-w-0">
+        {sidebarLabel}
+        {nombre}
+      </span>
+    ) : (
+      nombre
     );
   }
 
@@ -101,17 +145,13 @@ function OrganizationSelector({
       }
       htmlFor={selectId}
     >
-      <span
-        className={
-          variant === "sidebar"
-            ? "mb-1 block text-op-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
-            : "hidden text-xs font-medium text-muted-foreground sm:inline"
-        }
-      >
-        Organización
-      </span>
+      {sidebarLabel ?? (
+        <span className="hidden text-xs font-medium text-muted-foreground sm:inline">
+          Tu negocio
+        </span>
+      )}
       <select
-        aria-label="Organización activa"
+        aria-label="Negocio activo"
         className={
           variant === "sidebar"
             ? "h-10 w-full min-w-0 rounded-xl border border-input bg-card px-2.5 text-xs font-medium text-foreground"
@@ -140,6 +180,128 @@ function OrganizationSelector({
   );
 }
 
+/**
+ * Selector global de sucursal, debajo del de organización. Replica en cliente
+ * el orden de resolución del contexto de servidor: `?sucursalId` válida →
+ * cookie preferida válida → primera del alcance (las `sucursales` ya vienen
+ * acotadas por la consulta de contexto). Al cambiar envía
+ * `guardarSucursalPreferida`, que escribe la cookie httpOnly y redirige a la
+ * misma ruta con el parámetro actualizado; `defaultValue` + `key` re-monta el
+ * control cuando el servidor confirma el cambio.
+ * Con una sola sucursal solo muestra su nombre; sin sucursales no se pinta.
+ */
+function BranchSelector({
+  organizations,
+  sucursalPreferidaPorOrg,
+  variant = "compact",
+}: {
+  organizations: AdminShellOrganization[];
+  sucursalPreferidaPorOrg: Record<string, string>;
+  variant?: "compact" | "sidebar";
+}) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const selectId = useId();
+  const organization = useEffectiveOrganization(organizations);
+  const branches = organization?.sucursales ?? [];
+
+  if (!organization || branches.length === 0) return null;
+
+  if (branches.length === 1) {
+    const [branch] = branches;
+    return (
+      <span className="block truncate text-xs text-muted-foreground">
+        {branch.nombre}
+      </span>
+    );
+  }
+
+  const urlSucursalId = firstParam(searchParams.get("sucursalId"));
+  const preferidaId = sucursalPreferidaPorOrg[organization.id];
+  const currentId =
+    (urlSucursalId && branches.some((branch) => branch.id === urlSucursalId)
+      ? urlSucursalId
+      : undefined) ??
+    (preferidaId && branches.some((branch) => branch.id === preferidaId)
+      ? preferidaId
+      : undefined) ??
+    branches[0]?.id ??
+    "";
+
+  return (
+    <form
+      action={guardarSucursalPreferida}
+      className={variant === "sidebar" ? "block min-w-0" : "flex min-w-0 items-center"}
+    >
+      <input name="organizacionId" type="hidden" value={organization.id} />
+      <input
+        name="returnTo"
+        type="hidden"
+        value={`${pathname}${searchParams.size > 0 ? `?${searchParams.toString()}` : ""}`}
+      />
+      <label
+        className={
+          variant === "sidebar" ? "block min-w-0" : "flex min-w-0 items-center gap-2"
+        }
+        htmlFor={selectId}
+      >
+        <span
+          className={
+            variant === "sidebar"
+              ? "mb-1 block text-op-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+              : "sr-only"
+          }
+        >
+          Sucursal
+        </span>
+        <select
+          aria-label="Sucursal activa"
+          className={
+            variant === "sidebar"
+              ? "h-10 w-full min-w-0 rounded-xl border border-input bg-card px-2.5 text-xs font-medium text-foreground"
+              : "h-10 min-w-0 max-w-40 rounded-xl border border-input bg-card px-2.5 text-xs font-medium text-foreground"
+          }
+          data-action-id="shell.sucursal.cambiar"
+          defaultValue={currentId}
+          id={selectId}
+          key={`${organization.id}:${currentId}`}
+          name="sucursalId"
+          onChange={(event) => event.currentTarget.form?.requestSubmit()}
+        >
+          {branches.map((branch) => (
+            <option key={branch.id} value={branch.id}>
+              {branch.nombre}
+            </option>
+          ))}
+        </select>
+      </label>
+    </form>
+  );
+}
+
+/**
+ * Segunda fila del header móvil con la sucursal activa; no se pinta cuando la
+ * organización no tiene sucursales visibles.
+ */
+function MobileBranchRow({
+  organizations,
+  sucursalPreferidaPorOrg,
+}: {
+  organizations: AdminShellOrganization[];
+  sucursalPreferidaPorOrg: Record<string, string>;
+}) {
+  const organization = useEffectiveOrganization(organizations);
+  if (!organization || (organization.sucursales ?? []).length === 0) return null;
+  return (
+    <div className="border-t border-sidebar-border px-4 py-2">
+      <BranchSelector
+        organizations={organizations}
+        sucursalPreferidaPorOrg={sucursalPreferidaPorOrg}
+      />
+    </div>
+  );
+}
+
 type NavWiring = {
   organizations: AdminShellOrganization[];
   platformAdmin: boolean;
@@ -157,9 +319,7 @@ function useNavWiring({
   permissionsByOrg,
   capacidadesFaltantesByOrg,
 }: NavWiring) {
-  const searchParams = useSearchParams();
-  const organizationId =
-    firstParam(searchParams.get("organizationId")) ?? organizations[0]?.id;
+  const organizationId = useEffectiveOrganization(organizations)?.id;
   const permissions =
     platformAdmin || permissionsByOrg == null
       ? null
@@ -362,6 +522,7 @@ export function AdminShell({
   permissionsByOrg,
   billingByOrg,
   capacidadesFaltantesByOrg,
+  sucursalPreferidaPorOrg = {},
   children,
 }: AdminShellProps) {
   const wiring: NavWiring = {
@@ -390,13 +551,20 @@ export function AdminShell({
               <SidebarHome organizations={organizations} />
             </Suspense>
           </div>
-          <div className="px-4 pb-4">
+          <div className="space-y-2.5 px-4 pb-4">
             <Suspense
               fallback={
                 <span className="block h-10 animate-pulse rounded-xl bg-muted" />
               }
             >
               <OrganizationSelector organizations={organizations} variant="sidebar" />
+            </Suspense>
+            <Suspense fallback={null}>
+              <BranchSelector
+                organizations={organizations}
+                sucursalPreferidaPorOrg={sucursalPreferidaPorOrg}
+                variant="sidebar"
+              />
             </Suspense>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
@@ -440,6 +608,12 @@ export function AdminShell({
                 </Suspense>
               </div>
             </div>
+            <Suspense fallback={null}>
+              <MobileBranchRow
+                organizations={organizations}
+                sucursalPreferidaPorOrg={sucursalPreferidaPorOrg}
+              />
+            </Suspense>
           </header>
 
           {/* overflow-x-clip: red de seguridad — ningún contenido del main
@@ -472,8 +646,6 @@ export function AdminShell({
 
 /** Logo → /admin conservando la organización activa. */
 function SidebarHome({ organizations }: { organizations: AdminShellOrganization[] }) {
-  const searchParams = useSearchParams();
-  const organizationId =
-    firstParam(searchParams.get("organizationId")) ?? organizations[0]?.id;
+  const organizationId = useEffectiveOrganization(organizations)?.id;
   return <HomeLink organizationId={organizationId} />;
 }

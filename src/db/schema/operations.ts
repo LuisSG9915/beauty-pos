@@ -17,6 +17,7 @@ import {
 
 import { clientes, organizaciones, sucursales, usuarios } from "@/db/schema/core";
 import { catMediosPago, comisiones, membresias, paquetes, productos, promociones, servicios } from "@/db/schema/catalogs";
+import { compras } from "@/db/schema/compras";
 
 const opAuditColumns = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -367,6 +368,8 @@ export const movimientosInventario = pgTable(
     sucursalId: uuid("sucursal_id").notNull().references(() => sucursales.id),
     productoId: uuid("producto_id").notNull().references(() => productos.id),
     ventaId: uuid("venta_id").references(() => ventas.id),
+    // Trazabilidad de la entrada por compra (plan 10); null en el resto.
+    compraId: uuid("compra_id").references(() => compras.id),
     tipo: varchar("tipo", { length: 20 }).notNull(),
     cantidad: numeric("cantidad", { precision: 12, scale: 3 }).notNull(),
     stockResultante: numeric("stock_resultante", { precision: 12, scale: 3 }).notNull(),
@@ -377,6 +380,7 @@ export const movimientosInventario = pgTable(
     index("movimientos_inventario_organizacion_idx").on(table.organizacionId),
     index("movimientos_inventario_sucursal_producto_idx").on(table.sucursalId, table.productoId),
     index("movimientos_inventario_venta_idx").on(table.ventaId),
+    index("movimientos_inventario_compra_idx").on(table.compraId),
   ],
 );
 

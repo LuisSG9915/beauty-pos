@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useRef, useState, useTransition, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type MouseEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { buildHref } from "@/lib/url-context";
@@ -30,6 +30,16 @@ const fechaEtiqueta = new Intl.DateTimeFormat("es-MX", {
   weekday: "short",
   day: "numeric",
   month: "short",
+  timeZone: "UTC",
+});
+
+const tiraDiaSemana = new Intl.DateTimeFormat("es-MX", {
+  weekday: "short",
+  timeZone: "UTC",
+});
+
+const tiraNumero = new Intl.DateTimeFormat("es-MX", {
+  day: "numeric",
   timeZone: "UTC",
 });
 
@@ -64,25 +74,24 @@ function ViewPendingIndicator({ label }: { label: string }) {
   );
 }
 
-type PendingControl = "fecha" | "sucursal" | "buscar";
+type PendingControl = "fecha" | "buscar";
 
 const PENDING_LABEL: Record<PendingControl, string> = {
   fecha: "Actualizando fecha…",
-  sucursal: "Cambiando sucursal…",
   buscar: "Buscando citas…",
 };
 
-/** Controles de contexto de Agenda: sucursal, fecha, vista y búsqueda. */
+/**
+ * Controles de contexto de Agenda: fecha, vista y búsqueda. La sucursal se
+ * cambia desde el selector global del shell (`BranchSelector`), que además
+ * la conserva como preferida; aquí no se duplica.
+ */
 export function AgendaToolbar({
-  branches,
-  sucursalId,
   fecha,
   vista,
   q,
   hoy,
 }: {
-  branches: Array<{ id: string; nombre: string; clave: string }>;
-  sucursalId: string;
   fecha: string;
   vista: AgendaVista;
   q: string;
@@ -127,7 +136,20 @@ export function AgendaToolbar({
       extra,
     });
 
+  // Tira de 14 días alrededor de `fecha` (vista día): el día activo queda
+  // centrado en el scroll horizontal y hoy se marca con un punto.
+  const diasTira = useMemo(
+    () => Array.from({ length: 15 }, (_, index) => shiftDateKey(fecha, index - 7) ?? fecha),
+    [fecha],
+  );
+  const tiraRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const activo = tiraRef.current?.querySelector("[aria-current='page']");
+    activo?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [fecha]);
+
   return (
+    <div className="flex flex-col gap-2">
     <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-2.5 shadow-sm sm:gap-3 sm:p-3 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex min-w-0 flex-wrap items-center gap-2">
         <div className="flex items-center gap-1">
@@ -186,24 +208,6 @@ export function AgendaToolbar({
             value={fecha}
           />
         </div>
-        {branches.length > 1 ? (
-          <label className="min-w-44 flex-1 sm:flex-none">
-            <span className="sr-only">Sucursal de la agenda</span>
-            <select
-              aria-label="Sucursal de la agenda"
-              className="h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30 disabled:opacity-60"
-              disabled={activePending === "sucursal"}
-              onChange={(event) => navigate("sucursal", hrefFor({ sucursalId: event.target.value }))}
-              value={sucursalId}
-            >
-              {branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.nombre}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
         <span
           aria-live="polite"
           className={cn(
@@ -253,6 +257,51 @@ export function AgendaToolbar({
           ))}
         </div>
       </div>
+    </div>
+    {vista === "dia" ? (
+      <nav
+        aria-label="Elegir día"
+        className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1.5 shadow-sm"
+        ref={tiraRef}
+      >
+        {diasTira.map((dia) => {
+          const activo = dia === fecha;
+          return (
+            <Link
+              aria-current={activo ? "page" : undefined}
+              className={cn(
+                "relative flex min-w-11 shrink-0 flex-col items-center justify-center rounded-xl px-2 py-1.5 text-center transition-colors",
+                activo
+                  ? "bg-primary font-semibold text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              )}
+              data-action-id="agenda.fecha.tira_dia"
+              href={hrefFor({ fecha: dia })}
+              key={dia}
+              onClick={guardRepeatedTap}
+              title={fechaEtiqueta.format(new Date(`${dia}T12:00:00Z`))}
+            >
+              <span className="text-op-xs capitalize leading-none">
+                {tiraDiaSemana.format(new Date(`${dia}T12:00:00Z`))}
+              </span>
+              <span className="text-base font-bold leading-tight tabular-nums">
+                {tiraNumero.format(new Date(`${dia}T12:00:00Z`))}
+              </span>
+              {dia === hoy ? (
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "absolute bottom-0.5 size-1 rounded-full",
+                    activo ? "bg-primary-foreground" : "bg-primary",
+                  )}
+                />
+              ) : null}
+              {activo ? <ViewPendingIndicator label="día" /> : null}
+            </Link>
+          );
+        })}
+      </nav>
+    ) : null}
     </div>
   );
 }

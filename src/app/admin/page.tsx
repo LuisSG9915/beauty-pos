@@ -5,6 +5,7 @@ import Link from "next/link";
 import { GuiaChecklistCard } from "@/app/admin/guia/checklist-card";
 import { InvitationForm } from "@/app/admin/invitation-form";
 import { OrganizationForm } from "@/app/admin/organization-form";
+import { RenombrarSucursalCard } from "@/app/admin/renombrar-sucursal-card";
 import { SuscripcionAdminRow, type EstadoSuscripcionAdmin } from "@/app/admin/suscripcion-form";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
@@ -18,7 +19,8 @@ import { ventas } from "@/db/schema/operations";
 import { telemetriaEventos } from "@/db/schema/telemetry";
 import { getSessionOrRedirect, requirePlatformAdmin } from "@/lib/auth/access";
 import { redirect } from "next/navigation";
-import { resolveAccessSafe, resolveSessionContext } from "@/lib/auth/authorization";
+import { canAccessBranch, hasPermission, resolveAccessSafe, resolveSessionContext } from "@/lib/auth/authorization";
+import { leerNombreSucursalOmitida } from "@/lib/sucursal-cookie";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { cargarAlertas, type AlertaOperativa } from "@/modules/alertas/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
@@ -30,7 +32,7 @@ export const dynamic = "force-dynamic";
 
 const ERROR_MESSAGES: Record<string, string> = {
   "permiso-denegado": "No tienes permiso para acceder a esa sección.",
-  "organization-access-denied": "No tienes acceso a esa organización.",
+  "organization-access-denied": "No tienes acceso a ese negocio.",
 };
 
 function AccessError({ error }: { error?: string }) {
@@ -50,6 +52,7 @@ function MemberDashboard({
   error,
   permissionsByOrg,
   checklist,
+  renombrar,
 }: {
   name: string;
   access: Array<{ organization: string; branch: string; branchKey: string; organizationId: string; branchId: string }>;
@@ -57,6 +60,8 @@ function MemberDashboard({
   error?: string;
   permissionsByOrg: Record<string, string[]>;
   checklist: ResumenGuia | null;
+  /** Tarjeta "¿Cómo se llama tu salón?" para la sucursal genérica única. */
+  renombrar: { organizationId: string; sucursalId: string; nombreSugerido: string } | null;
 }) {
   const first = access[0];
   return (
@@ -73,6 +78,13 @@ function MemberDashboard({
         description="Esto pasa hoy en tu salón. Toca una sucursal para abrir su agenda."
         title={`Hola, ${name}`}
       />
+      {renombrar ? (
+        <RenombrarSucursalCard
+          nombreSugerido={renombrar.nombreSugerido}
+          organizationId={renombrar.organizationId}
+          sucursalId={renombrar.sucursalId}
+        />
+      ) : null}
       {first && checklist ? (
         <GuiaChecklistCard
           organizationId={first.organizationId}
@@ -267,7 +279,21 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       }
     }
 
-    return <MemberDashboard access={access} alertasByOrg={alertasByOrg} checklist={checklist} error={error} name={session.user.name} permissionsByOrg={permissionsByOrg} />;
+    // Tarjeta "¿Cómo se llama tu salón?": la primera organización con una
+    // única sucursal activa que aún se llame "Sucursal principal", si el
+    // usuario puede editarla y no la descartó (cookie por sucursal).
+    let renombrar: { organizationId: string; sucursalId: string; nombreSugerido: string } | null = null;
+    for (const { org, resolved } of porOrganizacion) {
+      if (renombrar) break;
+      if (!resolved || resolved.sucursalesActivas.length !== 1) continue;
+      const unica = resolved.sucursalesActivas[0];
+      if (!unica || unica.nombre !== "Sucursal principal") continue;
+      if (!hasPermission(resolved, "sucursales.editar") || !canAccessBranch(resolved, unica.id)) continue;
+      if (await leerNombreSucursalOmitida(unica.id)) continue;
+      renombrar = { organizationId: org.id, sucursalId: unica.id, nombreSugerido: org.nombre };
+    }
+
+    return <MemberDashboard access={access} alertasByOrg={alertasByOrg} checklist={checklist} error={error} name={session.user.name} permissionsByOrg={permissionsByOrg} renombrar={renombrar} />;
   }
 
   const { session: platformSession } = await requirePlatformAdmin();

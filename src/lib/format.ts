@@ -93,6 +93,30 @@ export function formatCurrency(
 }
 
 /**
+ * Formatea una cantidad de inventario/catálogo (stock, consumo): números con
+ * hasta 3 decimales, sin ceros de relleno ("12", "0.5"). Devuelve "—" para
+ * valores vacíos o no numéricos.
+ */
+export function formatQuantity(
+  value: number | string | null | undefined,
+  options: { locale?: string; maximumFractionDigits?: number } = {},
+): string {
+  const amount = typeof value === "string" ? Number(value) : value;
+  if (amount === null || amount === undefined || Number.isNaN(amount)) {
+    return EMPTY_VALUE;
+  }
+  const locale = options.locale ?? DEFAULT_LOCALE;
+  const digits = options.maximumFractionDigits ?? 3;
+  const key = `qty|${locale}|${digits}`;
+  let formatter = numberFormatters.get(key);
+  if (!formatter) {
+    formatter = new Intl.NumberFormat(locale, { maximumFractionDigits: digits });
+    numberFormatters.set(key, formatter);
+  }
+  return formatter.format(amount);
+}
+
+/**
  * Formatea una fecha sin hora (p. ej. "15 ene 2025").
  */
 export function formatDate(

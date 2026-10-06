@@ -6,9 +6,32 @@
 import { getZonedParts } from "@/modules/agenda";
 
 import type { AgendaCita } from "./agenda-types";
+import { PX_PER_MIN } from "./agenda-types";
 
 export function pad2(value: number) {
   return String(value).padStart(2, "0");
+}
+
+/** "HH:MM" a partir de minutos desde medianoche local. */
+export function etiquetaMinuto(minutos: number) {
+  return `${pad2(Math.floor(minutos / 60))}:${pad2(minutos % 60)}`;
+}
+
+/**
+ * Minuto del día bajo el puntero dentro de una columna de la rejilla:
+ * `startMin + (clientY - rectTop) / PX_PER_MIN`, redondeado a 15 min y
+ * acotado a `[startMin, endMin - duracion]` para que la cita quepa entera.
+ * `clientY` puede ajustarse (restar el agarre) antes de llamarla.
+ */
+export function minutoDesdeY(
+  clientY: number,
+  rectTop: number,
+  startMin: number,
+  endMin: number,
+  duracion: number,
+): number {
+  const raw = startMin + (clientY - rectTop) / PX_PER_MIN;
+  return Math.min(Math.max(Math.round(raw / 15) * 15, startMin), endMin - duracion);
 }
 
 export function dateTimeInputValue(iso: string, timeZone: string) {

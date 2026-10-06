@@ -18,6 +18,7 @@ import {
   promociones,
   servicios,
 } from "@/db/schema/catalogs";
+import { medios } from "@/db/schema/media";
 import {
   clientes,
   miembrosOrganizaciones,
@@ -128,6 +129,8 @@ export type TicketData = {
     duracionMinutos: number;
     categoriaId: string | null;
     categoriaNombre: string | null;
+    /** Llave R2 de la foto principal; null → el selector muestra la inicial. */
+    imagenClaveR2: string | null;
   }>;
   catalogoProductos: Array<{
     id: string;
@@ -136,6 +139,7 @@ export type TicketData = {
     precio: string;
     categoriaId: string | null;
     categoriaNombre: string | null;
+    imagenClaveR2: string | null;
   }>;
   mediosPago: Array<{ id: string; nombre: string; categoria: string }>;
   pagos: Array<{
@@ -269,9 +273,11 @@ async function loadCatalogosTicket(organizacionId: string, sucursalId: string): 
         duracionMinutos: servicios.duracionMinutos,
         categoriaId: servicios.categoriaId,
         categoriaNombre: catCategoriasServicios.nombre,
+        imagenClaveR2: medios.claveR2,
       })
       .from(servicios)
       .leftJoin(catCategoriasServicios, eq(servicios.categoriaId, catCategoriasServicios.id))
+      .leftJoin(medios, eq(servicios.imagenPrincipalId, medios.id))
       .where(and(eq(servicios.organizacionId, organizacionId), eq(servicios.activo, true)))
       .orderBy(asc(servicios.nombre)),
     db
@@ -282,9 +288,11 @@ async function loadCatalogosTicket(organizacionId: string, sucursalId: string): 
         precio: productos.precioVenta,
         categoriaId: productos.categoriaId,
         categoriaNombre: catCategoriasProductos.nombre,
+        imagenClaveR2: medios.claveR2,
       })
       .from(productos)
       .leftJoin(catCategoriasProductos, eq(productos.categoriaId, catCategoriasProductos.id))
+      .leftJoin(medios, eq(productos.imagenPrincipalId, medios.id))
       .where(
         and(
           eq(productos.organizacionId, organizacionId),

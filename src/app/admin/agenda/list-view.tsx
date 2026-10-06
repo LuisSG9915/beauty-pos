@@ -23,7 +23,7 @@ export function ListView({
   onSelectCita: (id: string) => void;
 }) {
   return (
-    <AdminCard className="overflow-hidden p-0 sm:p-0">
+    <AdminCard animate className="overflow-hidden p-0 sm:p-0">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
@@ -38,8 +38,12 @@ export function ListView({
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {citas.map((cita) => (
-              <tr className="hover:bg-muted/50" key={cita.id}>
+            {citas.map((cita, index) => (
+              <tr
+                className="anim-entrada hover:bg-muted/50"
+                key={cita.id}
+                style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
+              >
                 <td className="whitespace-nowrap px-4 py-3">
                   {formatDate(cita.fechaHora, { timeZone })}
                   <span className="ml-2 text-xs text-muted-foreground">

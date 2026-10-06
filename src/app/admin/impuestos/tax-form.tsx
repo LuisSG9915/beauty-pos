@@ -4,7 +4,7 @@ import { useActionState } from "react";
 
 import { saveTax, type TaxActionState } from "@/app/admin/impuestos/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel, Input, Select } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
 
 type TaxData = { id: string; clave: string; nombre: string; tasa: string; tipo: string };
@@ -22,10 +22,6 @@ export function TaxForm({ organizationId, initial }: { organizationId: string; i
       <p className="mt-1 text-sm text-muted-foreground">Configura IVA, IEPS u otros impuestos aplicables en el POS.</p>
       <div className="mt-5 space-y-4">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field>
-            <FieldLabel required>Clave</FieldLabel>
-            <Input className="uppercase" defaultValue={initial?.clave} name="clave" placeholder="IVA" required />
-          </Field>
           <Field>
             <FieldLabel required>Nombre</FieldLabel>
             <Input defaultValue={initial?.nombre} name="nombre" placeholder="IVA (16%)" required />
@@ -48,6 +44,18 @@ export function TaxForm({ organizationId, initial }: { organizationId: string; i
         <p className="rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">
           {TIPO_LABEL[tipo]}: {tipo === "agregado" ? "el impuesto se suma al precio base en el ticket." : tipo === "incluido" ? "el precio ya contiene el impuesto y se desglosa en el ticket." : "no se aplica impuesto."}
         </p>
+        {initial ? (
+          <details className="rounded-xl border border-border bg-muted/60 px-4 py-3">
+            <summary className="cursor-pointer list-none text-sm font-medium text-muted-foreground hover:text-primary">
+              Opciones avanzadas
+            </summary>
+            <Field className="mt-3">
+              <FieldLabel>Clave</FieldLabel>
+              <Input name="clave" placeholder={initial.clave} />
+              <FieldDescription>Déjala vacía para conservar la clave actual.</FieldDescription>
+            </Field>
+          </details>
+        ) : null}
       </div>
       <div className="mt-4">
         <ActionFeedback state={state} successMessage="Impuesto guardado." />

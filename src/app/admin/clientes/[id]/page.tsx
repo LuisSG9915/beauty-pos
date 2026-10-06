@@ -94,6 +94,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
         tiempoPoseMinutos: clientesFichasTecnicas.tiempoPoseMinutos,
         notas: clientesFichasTecnicas.notas,
         privada: clientesFichasTecnicas.privada,
+        fotos: clientesFichasTecnicas.fotos,
         createdAt: clientesFichasTecnicas.createdAt,
         servicioNombre: servicios.nombre,
         autorNombre: usuarios.nombre,
@@ -226,6 +227,20 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
               <p className="mt-2 rounded-lg bg-muted/60 px-3 py-2 font-mono text-sm text-foreground">{ficha.formula}</p>
             ) : null}
             {ficha.notas ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{ficha.notas}</p> : null}
+            {ficha.fotos.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {ficha.fotos.map((clave) => (
+                  // eslint-disable-next-line @next/next/no-img-element -- la ruta exige sesión; next/image no reenvía cookies
+                  <img
+                    alt="Foto de la ficha"
+                    className="size-16 rounded-lg border border-border object-cover"
+                    key={clave}
+                    loading="lazy"
+                    src={`/api/medios/${encodeURI(clave)}`}
+                  />
+                ))}
+              </div>
+            ) : null}
           </li>
         ))}
       </ul>

@@ -36,11 +36,12 @@ import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@
 import { auditEvent } from "@/lib/audit";
 import { todayDateInput } from "@/lib/format";
 import {
-  assertBranchScope,
   canAccessBranch,
   checkPermission,
   hasPermission,
+  sucursalesActivasDelAcceso,
 } from "@/lib/auth/authorization";
+import { leerSucursalCookie } from "@/lib/sucursal-cookie";
 import { canTransitionEstado } from "@/modules/agenda";
 import { contextoSuscripcion, requiereCapacidad, tieneCapacidad } from "@/modules/billing/queries";
 import { applyInventoryMovement, type InventoryDb } from "@/modules/inventory";
@@ -1289,23 +1290,41 @@ export async function quitarPromocionVenta(_previousState: ActionState, formData
 
 export async function crearVentaDirecta(formData: FormData) {
   const parsed = parseWithSchema(
-    z.object({ organizacionId: z.string().uuid(), sucursalId: z.string().uuid() }),
-    { organizacionId: formData.get("organizacionId"), sucursalId: formData.get("sucursalId") },
+    z.object({
+      organizacionId: z.string().uuid(),
+      sucursalId: z.string().uuid().optional(),
+    }),
+    {
+      organizacionId: formData.get("organizacionId"),
+      sucursalId: formData.get("sucursalId") || undefined,
+    },
   );
   if (!parsed.success) redirect("/admin/pos");
   const input = parsed.data;
   const access = await checkPermission(input.organizacionId, "ventas.crear");
   if (!access) redirect(`/admin/pos?organizationId=${input.organizacionId}`);
   const { user } = access;
-  const db = getDatabase();
-  const sucursalValida = await assertBranchScope(access, input.sucursalId);
-  if (!sucursalValida) redirect(`/admin/pos?organizationId=${input.organizacionId}`);
 
+  // La sucursal se resuelve en servidor con el mismo orden que el contexto de
+  // página: el valor que trae el formulario (la página lo fijó con
+  // `context.sucursalId`) solo cuenta si cae dentro del alcance; después la
+  // cookie preferida y al final la primera activa. Verificar pertenencia a
+  // `branches` equivale a `assertBranchScope` (org + activa + alcance) sin una
+  // ronda extra a la base.
+  const branches = await sucursalesActivasDelAcceso(access);
+  const preferidaId = await leerSucursalCookie(input.organizacionId);
+  const branch =
+    (input.sucursalId ? branches.find((item) => item.id === input.sucursalId) : undefined) ??
+    (preferidaId ? branches.find((item) => item.id === preferidaId) : undefined) ??
+    branches[0];
+  if (!branch) redirect(`/admin/pos?organizationId=${input.organizacionId}`);
+
+  const db = getDatabase();
   const [venta] = await db
     .insert(ventas)
-    .values({ organizacionId: input.organizacionId, sucursalId: input.sucursalId, estado: "en_proceso", createdBy: user.id })
+    .values({ organizacionId: input.organizacionId, sucursalId: branch.id, estado: "en_proceso", createdBy: user.id })
     .returning({ id: ventas.id });
-  redirect(`/admin/pos?organizationId=${input.organizacionId}&sucursalId=${input.sucursalId}&ventaId=${venta.id}`);
+  redirect(`/admin/pos?organizationId=${input.organizacionId}&sucursalId=${branch.id}&ventaId=${venta.id}`);
 }
 
 const cancelarVentaSchema = z.object({

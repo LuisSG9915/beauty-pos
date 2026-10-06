@@ -13,6 +13,16 @@ import type {
  */
 export const PASOS_GUIA: readonly PasoGuia[] = [
   {
+    clave: "nombre_sucursal",
+    titulo: "Ponle nombre a tu sucursal",
+    descripcion: "Opcional: el nombre con que la conoce tu equipo, en vez de \"Sucursal principal\".",
+    href: "/sucursales",
+    permisos: ["sucursales.editar"],
+    opcional: true,
+    completado: (estado) =>
+      estado.sucursalNombre != null && estado.sucursalNombre !== "Sucursal principal",
+  },
+  {
     clave: "servicios",
     titulo: "Crea tu primer servicio",
     descripcion: "Nombre, duración y precio: es lo que aparecerá al agendar y cobrar.",

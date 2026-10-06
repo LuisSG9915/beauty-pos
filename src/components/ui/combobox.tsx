@@ -13,6 +13,8 @@ export type ComboboxItem = {
   description?: string;
   /** Términos extra que también filtran el item. */
   keywords?: string[];
+  /** Miniatura opcional (p. ej. foto del servicio desde /api/medios). */
+  imageUrl?: string;
   disabled?: boolean;
 };
 
@@ -172,6 +174,15 @@ export function Combobox({
                     <ComboboxPrimitive.ItemIndicator className="mt-0.5 flex size-4 shrink-0 items-center justify-center">
                       <Check className="size-3.5" aria-hidden="true" />
                     </ComboboxPrimitive.ItemIndicator>
+                    {item.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element -- la ruta exige sesión; next/image no reenvía cookies
+                      <img
+                        alt=""
+                        className="mt-0.5 size-8 shrink-0 rounded-lg border border-border object-cover"
+                        loading="lazy"
+                        src={item.imageUrl}
+                      />
+                    ) : null}
                     <span className="min-w-0">
                       <span className="block truncate font-medium">
                         {item.label}

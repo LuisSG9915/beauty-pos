@@ -28,6 +28,7 @@ type AlertasRow = {
   corte_sin_cerrar: number | null;
   diferencias_caja: number | null;
   stock_bajo: number | null;
+  por_agotarse: number | null;
 };
 
 /**
@@ -100,6 +101,24 @@ export async function cargarAlertas(
         where i.organizacion_id = ${organizacionId} and p.activo
           and p.stock_minimo > 0 and i.stock_actual <= p.stock_minimo
           ${enSucursales(sql`i.sucursal_id`)}) as stock_bajo`,
+      // Plan 12: queda menos de una semana de stock al ritmo de salidas netas
+      // (venta+consumo−devolución) de los últimos 7 días. Las salidas se
+      // agregan una sola vez y se emparejan por producto+sucursal.
+      sql`(select count(*)::int from inventario_stock i
+        join productos p on i.producto_id = p.id
+        join (
+          select m.producto_id, m.sucursal_id,
+                 greatest(0, -coalesce(sum(m.cantidad::numeric), 0)) as salidas7
+            from movimientos_inventario m
+           where m.organizacion_id = ${organizacionId}
+             and m.tipo in ('venta','consumo','devolucion')
+             and m.created_at >= ${hace7d}
+             ${enSucursales(sql`m.sucursal_id`)}
+           group by m.producto_id, m.sucursal_id
+        ) s on s.producto_id = i.producto_id and s.sucursal_id = i.sucursal_id
+        where i.organizacion_id = ${organizacionId} and p.activo
+          and i.stock_actual > 0 and i.stock_actual < s.salidas7
+          ${enSucursales(sql`i.sucursal_id`)}) as por_agotarse`,
     );
   }
 
@@ -149,6 +168,12 @@ export async function cargarAlertas(
     clave: "stock_bajo",
     titulo: "Productos bajo el mínimo",
     href: "/inventario",
+    tono: "advertencia",
+  });
+  empujar(row.por_agotarse, {
+    clave: "por_agotarse",
+    titulo: "Productos por agotarse esta semana",
+    href: "/inventario/reabastecer",
     tono: "advertencia",
   });
 

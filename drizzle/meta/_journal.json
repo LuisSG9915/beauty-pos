@@ -344,6 +344,34 @@
       "when": 1790213636398,
       "tag": "0048_complete_franklin_richards",
       "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1791238634645,
+      "tag": "0049_medios-imagenes",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1791239766143,
+      "tag": "0050_uso-ia",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1791243082919,
+      "tag": "0051_ambiguous_argent",
+      "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1791247803325,
+      "tag": "0052_brief_firebrand",
+      "breakpoints": true
     }
   ]
 }

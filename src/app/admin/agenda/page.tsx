@@ -42,7 +42,7 @@ type CitaRow = Omit<AgendaCita, "usuarioNombre" | "clienteNotas" | "fechaHora"> 
 
 type AgendaDatosRow = {
   staff: Array<{ id: string; nombre: string }>;
-  servicios: Array<{ id: string; nombre: string; categoriaId: string | null; precioBase: string; duracionMinutos: number }>;
+  servicios: Array<{ id: string; nombre: string; categoriaId: string | null; precioBase: string; duracionMinutos: number; imagenClaveR2: string | null }>;
   horarios: HorarioConfig[];
   bloqueos: Array<{
     id: string;
@@ -61,7 +61,7 @@ type AgendaDatosRow = {
 export default async function AgendaPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const context = await getAdminContext(params);
-  const { organization, branch, branches, organizationId, sucursalId, timeZone, currency } = context;
+  const { organization, branch, organizationId, timeZone, currency } = context;
 
   if (!organization) {
     return (
@@ -71,8 +71,8 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
           title="Agenda de citas"
         />
         <EmptyState
-          description="Tu usuario no tiene una organización activa asignada."
-          title="Sin organización"
+          description="Tu cuenta no tiene un negocio activo asignado."
+          title="Sin negocio"
         />
       </div>
     );
@@ -144,9 +144,11 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
         coalesce((
           select jsonb_agg(jsonb_build_object(
               'id', s.id, 'nombre', s.nombre, 'categoriaId', s.categoria_id,
-              'precioBase', s.precio_base::text, 'duracionMinutos', s.duracion_minutos
+              'precioBase', s.precio_base::text, 'duracionMinutos', s.duracion_minutos,
+              'imagenClaveR2', m.clave_r2
             ) order by s.nombre)
             from servicios s
+            left join medios m on m.id = s.imagen_principal_id
            where s.organizacion_id = ${organization.id} and s.activo
         ), '[]'::jsonb) as servicios,
         coalesce((
@@ -171,7 +173,10 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
         coalesce((
           select jsonb_agg(jsonb_build_object(
               'id', r.id, 'nombre', r.nombre, 'tipo', r.tipo,
-              'capacidad', r.capacidad, 'activo', r.activo
+              'capacidad', r.capacidad, 'activo', r.activo,
+              -- Mueble del plano enlazado a este recurso (plan 11); null si no hay.
+              'muebleNombre', (select m.nombre from mobiliario m
+                 where m.recurso_id = r.id and m.activo limit 1)
             ) order by r.nombre)
             from recursos r
            where r.organizacion_id = ${organization.id} and r.sucursal_id = ${branch.id}
@@ -194,9 +199,10 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
               'servicios', coalesce((
                 select jsonb_agg(jsonb_build_object(
                     'id', s2.id, 'nombre', s2.nombre, 'categoriaId', s2.categoria_id,
-                    'precio', d.precio::text))
+                    'precio', d.precio::text, 'imagenClaveR2', m2.clave_r2))
                   from detalle_citas_servicios d
                   join servicios s2 on d.servicio_id = s2.id
+                  left join medios m2 on m2.id = s2.imagen_principal_id
                  where d.cita_id = c.id and d.activo
               ), '[]'::jsonb),
               'recursos', coalesce((
@@ -323,11 +329,9 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
         <div className="min-w-0 flex-1">
           <AgendaToolbar
-            branches={branches.map((item) => ({ id: item.id, nombre: item.nombre, clave: item.clave }))}
             fecha={fecha}
             hoy={todayDateInput(timeZone)}
             q={q}
-            sucursalId={sucursalId ?? branch.id}
             vista={vista}
           />
         </div>
@@ -362,6 +366,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
         currency={currency}
         fecha={fecha}
         horarios={horarios}
+        hoy={todayDateInput(timeZone)}
         organizationId={organizationId ?? organization.id}
         recursos={recursosActivos}
         servicios={serviceRows}

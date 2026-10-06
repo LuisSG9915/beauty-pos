@@ -1,12 +1,13 @@
 "use server";
 
-import { and, eq, ne, or } from "drizzle-orm";
+import { and, eq, inArray, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { clientes } from "@/db/schema/core";
 import { clientesConsentimientos, clientesFichasTecnicas, citas, FICHA_TIPOS } from "@/db/schema/operations";
+import { medios } from "@/db/schema/media";
 import { servicios } from "@/db/schema/catalogs";
 import { auditEvent } from "@/lib/audit";
 import { checkPermission, hasPermission } from "@/lib/auth/authorization";
@@ -85,7 +86,12 @@ export async function saveClient(_previousState: ClientActionState, formData: Fo
   return { success: true };
 }
 
+const MAX_FOTOS_FICHA = 6;
+
 const fichaSchema = z.object({
+  // El formulario genera el id para enlazar las fotos subidas a R2 antes de
+  // que la fila exista (medios.entidadId ya apunta a este uuid).
+  id: z.string().uuid().optional().or(z.literal("")),
   organizacionId: z.string().uuid(),
   clienteId: z.string().uuid(),
   citaId: z.string().uuid().optional().or(z.literal("")),
@@ -94,6 +100,9 @@ const fichaSchema = z.object({
   formula: z.string().trim().max(4000).optional().or(z.literal("")),
   tiempoPoseMinutos: z.coerce.number().int().min(0).max(1440).optional().or(z.literal("")),
   notas: z.string().trim().max(4000).optional().or(z.literal("")),
+  // Llaves R2 en JSON (string[]) — se verifican contra `medios` antes de
+  // guardarlas en el jsonb `fotos`.
+  fotos: z.string().trim().max(4000).optional().or(z.literal("")),
   privada: z.literal("true").optional(),
 });
 
@@ -143,7 +152,44 @@ export async function saveFichaTecnica(
     if (!servicio) return { error: "El servicio asociado no existe." };
   }
 
+  // Las llaves R2 deben existir en `medios` de la org, ligadas a la ficha que
+  // se está creando (entidad 'ficha' + el uuid generado por el formulario).
+  let clavesFotos: string[] = [];
+  if (input.fotos) {
+    try {
+      const parsed = JSON.parse(input.fotos) as unknown;
+      if (
+        !Array.isArray(parsed) ||
+        parsed.length > MAX_FOTOS_FICHA ||
+        parsed.some((clave) => typeof clave !== "string" || clave.length > 500)
+      ) {
+        return { error: "Las fotos adjuntas no son válidas." };
+      }
+      clavesFotos = [...new Set(parsed as string[])];
+    } catch {
+      return { error: "Las fotos adjuntas no son válidas." };
+    }
+  }
+  if (clavesFotos.length > 0) {
+    if (!input.id) return { error: "Las fotos no se pudieron asociar a la ficha." };
+    const existentes = await db
+      .select({ claveR2: medios.claveR2 })
+      .from(medios)
+      .where(
+        and(
+          eq(medios.organizacionId, input.organizacionId),
+          eq(medios.entidad, "ficha"),
+          eq(medios.entidadId, input.id),
+          inArray(medios.claveR2, clavesFotos),
+        ),
+      );
+    if (existentes.length !== clavesFotos.length) {
+      return { error: "Alguna foto ya no está disponible. Vuelve a subirla." };
+    }
+  }
+
   await db.insert(clientesFichasTecnicas).values({
+    ...(input.id ? { id: input.id } : {}),
     organizacionId: input.organizacionId,
     clienteId: input.clienteId,
     citaId: input.citaId || null,
@@ -154,6 +200,7 @@ export async function saveFichaTecnica(
     tiempoPoseMinutos: input.tiempoPoseMinutos === "" || input.tiempoPoseMinutos == null ? null : input.tiempoPoseMinutos,
     notas: input.notas || null,
     privada: esPrivada,
+    fotos: clavesFotos,
     createdBy: user.id,
   });
   // Las alergias/notas privadas son dato sensible: se audita el tipo sin el contenido.

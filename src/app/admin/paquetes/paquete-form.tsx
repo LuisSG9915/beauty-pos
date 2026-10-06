@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import { savePaquete, type PaqueteActionState } from "@/app/admin/paquetes/actions";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
-import { Field, FieldLabel, Input, Textarea } from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel, Input, Textarea } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
 
 export type PaqueteData = {
@@ -40,11 +40,7 @@ export function PaqueteForm({
         Sesiones prepagadas de un servicio: el cliente paga por adelantado y consume una sesión por visita.
       </p>
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field>
-          <FieldLabel required>Clave</FieldLabel>
-          <Input defaultValue={String(value("clave"))} name="clave" placeholder="DEPILA5" required />
-        </Field>
-        <Field>
+        <Field className="sm:col-span-2">
           <FieldLabel required>Nombre</FieldLabel>
           <Input defaultValue={String(value("nombre"))} name="nombre" placeholder="Paquete 5 depilaciones" required />
         </Field>
@@ -74,6 +70,18 @@ export function PaqueteForm({
           <FieldLabel>Descripción</FieldLabel>
           <Textarea defaultValue={String(value("descripcion"))} name="descripcion" />
         </Field>
+        {initial ? (
+          <details className="rounded-xl border border-border bg-muted/60 px-4 py-3 sm:col-span-2">
+            <summary className="cursor-pointer list-none text-sm font-medium text-muted-foreground hover:text-primary">
+              Opciones avanzadas
+            </summary>
+            <Field className="mt-3">
+              <FieldLabel>Clave</FieldLabel>
+              <Input name="clave" placeholder={initial.clave} />
+              <FieldDescription>Déjala vacía para conservar la clave actual.</FieldDescription>
+            </Field>
+          </details>
+        ) : null}
       </div>
       <div className="mt-4">
         <ActionFeedback state={state} successMessage="Paquete guardado correctamente." />

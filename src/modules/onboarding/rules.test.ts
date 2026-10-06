@@ -9,6 +9,7 @@ const negocioVacio: EstadoNegocio = {
   miembrosActivos: 1,
   citasRegistradas: 0,
   ventasCobradas: 0,
+  sucursalNombre: "Sucursal principal",
 };
 
 const negocioOperando: EstadoNegocio = {
@@ -17,6 +18,7 @@ const negocioOperando: EstadoNegocio = {
   miembrosActivos: 1,
   citasRegistradas: 2,
   ventasCobradas: 1,
+  sucursalNombre: "Salón Roma Norte",
 };
 
 describe("pasosParaPermisos", () => {
@@ -38,6 +40,7 @@ describe("pasosParaPermisos", () => {
     expect(claves).not.toContain("equipo");
     expect(claves).not.toContain("primer_cobro");
     expect(claves).not.toContain("resultado");
+    expect(claves).not.toContain("nombre_sucursal");
   });
 
   it("sin permisos relevantes la guía queda vacía", () => {

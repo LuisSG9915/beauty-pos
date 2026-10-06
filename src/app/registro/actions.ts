@@ -106,10 +106,13 @@ export async function registrarNegocio(
   }
 
   const slug = await slugDisponible(input.data.negocio);
+  // La primera sucursal nace con el nombre del negocio (no el genérico
+  // "Sucursal principal"): en el alta por invitación no hay paso para
+  // nombrarla y el nombre del salón ya identifica el lugar.
   const provision = await provisionarOrganizacionTrial({
     nombreNegocio: input.data.negocio,
     slug,
-    sucursalNombre: "Sucursal principal",
+    sucursalNombre: input.data.negocio,
     authUsuarioId: result.user.id,
     usuarioNombre: input.data.nombre,
     correo: input.data.correo,

@@ -37,6 +37,8 @@ const PAGES = [
   "/admin/servicios",
   "/admin/productos",
   "/admin/inventario",
+  "/admin/inventario/reabastecer",
+  "/admin/compras",
   "/admin/facturacion",
   "/admin/categorias-servicios",
   "/admin/categorias-productos",

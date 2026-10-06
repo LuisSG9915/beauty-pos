@@ -19,6 +19,7 @@ import {
   Landmark,
   LifeBuoy,
   LogOut,
+  Map,
   Menu,
   Package,
   PackageCheck,
@@ -31,6 +32,7 @@ import {
   ShoppingBag,
   ShoppingCart,
   Tags,
+  Truck,
   Users,
   Wallet,
   type LucideIcon,
@@ -84,6 +86,8 @@ const CLIENTES_CATALOGO: AdminNavItem[] = [
   { path: "/admin/servicios", label: "Servicios", description: "Catálogo de servicios del salón", icon: Scissors, permiso: "catalogos.ver" },
   { path: "/admin/productos", label: "Productos", description: "Venta, consumo e inventario", icon: ShoppingBag, permiso: "catalogos.ver" },
   { path: "/admin/inventario", label: "Inventario", description: "Stock, entradas, salidas y consumos", icon: Package, permiso: "inventario.ver" },
+  { path: "/admin/plano", label: "Plano del salón", description: "Ubicaciones de mercancía y muebles por piso", icon: Map, permiso: "inventario.ver" },
+  { path: "/admin/compras", label: "Compras", description: "Tickets de proveedores y recepción de mercancía", icon: Truck, permiso: "compras.ver" },
   { path: "/admin/facturacion", label: "Comprobantes", description: "Comprobantes internos de ventas", icon: FileText, permiso: "facturacion.ver" },
 ];
 

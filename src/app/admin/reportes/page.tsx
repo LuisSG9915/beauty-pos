@@ -269,7 +269,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             <Select defaultValue={sucursalParam} name="sucursalId">
               {context.branches.map((b) => (
                 <option key={b.id} value={b.id}>
-                  {b.nombre} · {b.clave}
+                  {b.nombre}
                 </option>
               ))}
               {multisucursal ? <option value="todas">Todas las sucursales</option> : null}

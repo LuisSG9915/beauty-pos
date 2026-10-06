@@ -185,7 +185,7 @@ export function CatalogoSelector({
             className="h-10 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
             id="pos-catalogo-buscar"
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={tab === "servicios" ? "Buscar servicio" : tab === "paquetes" ? "Buscar paquete" : tab === "membresias" ? "Buscar membresía" : "Buscar por SKU o nombre"}
+            placeholder={tab === "servicios" ? "Buscar servicio" : tab === "paquetes" ? "Buscar paquete" : tab === "membresias" ? "Buscar membresía" : "Buscar por clave o nombre"}
             type="search"
             value={query}
           />
@@ -234,37 +234,59 @@ export function CatalogoSelector({
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-          {filtrados.map((item) => (
-            <button
-              aria-label={`Agregar ${item.nombre} al ticket`}
-              className={cn(
-                "flex min-h-14 flex-col justify-between gap-1.5 rounded-xl border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                categoryTone("categoriaId" in item ? item.categoriaId : null).card,
-              )}
-              disabled={pending}
-              key={item.id}
-              onClick={() => agregar(item)}
-              type="button"
-            >
-              <span className="line-clamp-2 text-sm font-medium leading-5 text-foreground">
-                {item.nombre}
-              </span>
-              <span className="flex items-baseline justify-between gap-2">
-                <span className="text-sm font-semibold tabular-nums text-primary">
-                  {formatCurrency(item.precio, { currency })}
+          {filtrados.map((item) => {
+            const tone = categoryTone("categoriaId" in item ? item.categoriaId : null);
+            const imagenClave = "imagenClaveR2" in item ? item.imagenClaveR2 : null;
+            return (
+              <button
+                aria-label={`Agregar ${item.nombre} al ticket`}
+                className={cn(
+                  "flex min-h-14 flex-col gap-1.5 rounded-xl border p-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                  tone.card,
+                )}
+                disabled={pending}
+                key={item.id}
+                onClick={() => agregar(item)}
+                type="button"
+              >
+                <span
+                  className={cn(
+                    "flex h-14 w-full shrink-0 items-center justify-center overflow-hidden rounded-lg text-lg font-semibold",
+                    tone.chip,
+                  )}
+                >
+                  {imagenClave ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- la ruta exige sesión; next/image no reenvía cookies
+                    <img
+                      alt=""
+                      className="size-full object-cover"
+                      loading="lazy"
+                      src={`/api/medios/${encodeURI(imagenClave)}`}
+                    />
+                  ) : (
+                    item.nombre.trim().charAt(0).toUpperCase()
+                  )}
                 </span>
-                <span className="truncate text-xs tabular-nums text-muted-foreground">
-                  {"duracionMinutos" in item
-                    ? `${item.duracionMinutos} min`
-                    : "sesiones" in item
-                      ? `${item.sesiones} sesiones · ${item.servicioNombre ?? ""}`
-                      : "duracionDias" in item
-                        ? `${Number(item.descuentoPorcentaje)}% · ${item.duracionDias} días`
-                        : item.sku}
+                <span className="line-clamp-2 px-1 text-sm font-medium leading-5 text-foreground">
+                  {item.nombre}
                 </span>
-              </span>
-            </button>
-          ))}
+                <span className="mt-auto flex items-baseline justify-between gap-2 px-1">
+                  <span className="text-sm font-semibold tabular-nums text-primary">
+                    {formatCurrency(item.precio, { currency })}
+                  </span>
+                  <span className="truncate text-xs tabular-nums text-muted-foreground">
+                    {"duracionMinutos" in item
+                      ? `${item.duracionMinutos} min`
+                      : "sesiones" in item
+                        ? `${item.sesiones} sesiones · ${item.servicioNombre ?? ""}`
+                        : "duracionDias" in item
+                          ? `${Number(item.descuentoPorcentaje)}% · ${item.duracionDias} días`
+                          : item.sku}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

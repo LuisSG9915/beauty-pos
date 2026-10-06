@@ -21,6 +21,7 @@ import { dateTimeInputValue } from "./agenda-utils";
 export function MoveCitaDialog({
   cita,
   mode,
+  initial,
   pending,
   staff,
   timeZone,
@@ -29,16 +30,21 @@ export function MoveCitaDialog({
 }: {
   cita: AgendaCita | null;
   mode: MoveMode | null;
+  /** Horario/profesional intentados (p. ej. soltar sobre un bloqueo). */
+  initial?: { fechaHora: string; usuarioId: string | null } | null;
   pending: boolean;
   staff: Array<{ id: string; nombre: string }>;
   timeZone: string;
   onClose: () => void;
   onSubmit: (fechaHora: string, usuarioId: string | null) => Promise<CitaMutationResult>;
 }) {
-  const initial = cita ? dateTimeInputValue(cita.fechaHora, timeZone) : "";
-  const [fecha, setFecha] = useState(initial.slice(0, 10));
-  const [hora, setHora] = useState(initial.slice(11, 16));
-  const [usuarioId, setUsuarioId] = useState(cita?.usuarioId ?? "");
+  const inicialCita = cita ? dateTimeInputValue(cita.fechaHora, timeZone) : "";
+  const fechaHoraInicial = initial?.fechaHora ?? inicialCita;
+  const [fecha, setFecha] = useState(fechaHoraInicial.slice(0, 10));
+  const [hora, setHora] = useState(fechaHoraInicial.slice(11, 16));
+  const [usuarioId, setUsuarioId] = useState(
+    initial ? (initial.usuarioId ?? "") : (cita?.usuarioId ?? ""),
+  );
   const [sugerencias, setSugerencias] = useState<string[]>([]);
 
   if (!cita || !mode) return null;

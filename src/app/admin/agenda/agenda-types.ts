@@ -20,7 +20,14 @@ export type AgendaCita = {
   /** Concurrencia optimista: se envía en cada mutación. */
   version: number;
   ventaId: string | null;
-  servicios: Array<{ id: string; nombre: string; categoriaId: string | null; precio: string }>;
+  servicios: Array<{
+    id: string;
+    nombre: string;
+    categoriaId: string | null;
+    precio: string;
+    /** Llave R2 de la foto del servicio; null → inicial en la miniatura. */
+    imagenClaveR2: string | null;
+  }>;
   recursos: Array<{ id: string; nombre: string }>;
 };
 

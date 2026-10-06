@@ -45,5 +45,23 @@
       "id": "0fd2b9c97f8e4819b2c4b9f15e87cb81"
     }
   ],
+  // Imágenes de catálogo y fichas (plan 07): `src/lib/media.ts` degrada a
+  // "sin imagen" cuando el binding no existe (desarrollo local sin wrangler).
+  // El bucket se crea manualmente: `npx wrangler r2 bucket create melena-media`.
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "melena-media"
+    }
+  ],
+  // Workers AI para la captura de productos desde foto (plan 08):
+  // `src/lib/ia/cliente.ts` degrada a "no disponible" cuando el binding no
+  // existe (desarrollo local con `pnpm dev`, sin wrangler).
+  "ai": { "binding": "AI" },
+  // AI Gateway `melena-ia` se crea a mano en el dashboard (ver "Pasos
+  // manuales" del plan 08). Descomentar la var SOLO cuando el gateway exista:
+  // si se apunta a un id inexistente, todas las llamadas a AI.run fallan.
+  // Sin la var, las llamadas van directas al binding (path válido).
+  // "vars": { "AI_GATEWAY_ID": "melena-ia" },
   "upload_source_maps": true
 }

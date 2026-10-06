@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import { saveFichaTecnica, type FichaActionState } from "@/app/admin/client-actions";
+import { FichaFotosField } from "@/components/media-image-field";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
@@ -46,17 +47,24 @@ export function FichaForm({
   const [state, formAction, pending] = useActionState(saveFichaTecnica, initialState);
   const formRef = useRef<HTMLFormElement>(null);
   const handled = useRef<FichaActionState | null>(null);
+  // El id de la ficha se genera en cliente para que las fotos suban a R2 con
+  // `entidadId` definitivo antes de que la fila exista; la acción lo reutiliza
+  // como PK y valida que las llaves pertenecen a ese id. Se regenera tras
+  // cada guardado (el remount del campo limpia las miniaturas).
+  const [fichaId, setFichaId] = useState(() => crypto.randomUUID());
 
   useEffect(() => {
     if (!state.success || handled.current === state) return;
     handled.current = state;
     toast.success(state.message ?? "Registro guardado.");
     formRef.current?.reset();
+    setFichaId(crypto.randomUUID());
     onSaved?.();
   }, [onSaved, state, toast]);
 
   return (
     <form action={formAction} className={cn("space-y-3", compact && "space-y-2.5")} ref={formRef}>
+      <input name="id" type="hidden" value={fichaId} />
       <input name="organizacionId" type="hidden" value={organizationId} />
       <input name="clienteId" type="hidden" value={clienteId} />
       {citaId ? <input name="citaId" type="hidden" value={citaId} /> : null}
@@ -93,6 +101,10 @@ export function FichaForm({
           <Textarea name="notas" placeholder="Reacciones, preferencias, observaciones" rows={2} />
         </Field>
       ) : null}
+      <Field>
+        <FieldLabel>Fotos (antes / después)</FieldLabel>
+        <FichaFotosField entidadId={fichaId} key={fichaId} organizacionId={organizationId} />
+      </Field>
       {puedePrivada ? (
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
           <input className="size-4 accent-primary" name="privada" type="checkbox" value="true" />

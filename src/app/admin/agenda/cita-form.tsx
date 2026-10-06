@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useActionState } from "react";
 
 import { saveCita, type CitaActionState } from "@/app/admin/agenda/actions";
+import { MediaThumb } from "@/components/media-thumb";
 import { Button } from "@/components/ui/button";
 import { RemoteCombobox } from "@/components/ui/remote-combobox";
 import {
@@ -64,7 +65,7 @@ export function CitaForm({
   organizationId: string;
   sucursal: { id: string; nombre: string; clave: string };
   staff: Array<{ id: string; nombre: string }>;
-  servicios: Array<{ id: string; nombre: string; precioBase: string; duracionMinutos: number }>;
+  servicios: Array<{ id: string; nombre: string; precioBase: string; duracionMinutos: number; imagenClaveR2?: string | null }>;
   recursos?: Array<{ id: string; nombre: string; tipo: string; capacidad: number }>;
   currency?: string;
   timeZone: string;
@@ -173,6 +174,7 @@ export function CitaForm({
                   type="checkbox"
                   value={servicio.id}
                 />
+                <MediaThumb claveR2={servicio.imagenClaveR2} nombre={servicio.nombre} />
                 <span className="flex-1 font-medium">{servicio.nombre}</span>
                 <span className="text-xs tabular-nums text-muted-foreground">
                   {formatCurrency(servicio.precioBase, { currency })} · {servicio.duracionMinutos} min

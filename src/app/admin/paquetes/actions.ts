@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -8,12 +8,13 @@ import { getDatabase } from "@/db/client";
 import { paquetes, servicios } from "@/db/schema/catalogs";
 import { checkPermission } from "@/lib/auth/authorization";
 import { revalidateCatalogos } from "@/lib/catalogo-cache";
+import { claveDisponible } from "@/lib/clave";
 import { requiereCapacidad } from "@/modules/billing/queries";
 
 const paqueteSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
   organizacionId: z.string().uuid(),
-  clave: z.string().trim().toUpperCase().min(2).max(60).regex(/^[A-Z0-9_-]+$/, "Usa letras, números, guion o guion bajo."),
+  clave: z.string().trim().toUpperCase().min(2).max(60).regex(/^[A-Z0-9_-]+$/, "Usa letras, números, guion o guion bajo.").optional().or(z.literal("")),
   nombre: z.string().trim().min(2).max(120),
   descripcion: z.string().trim().max(4000).optional().or(z.literal("")),
   servicioId: z.string().uuid("Selecciona el servicio que cubre el paquete."),
@@ -41,14 +42,18 @@ export async function savePaquete(_previousState: PaqueteActionState, formData: 
     .limit(1);
   if (!servicio) return { error: "El servicio seleccionado no existe o está oculto." };
 
-  const conditions = [eq(paquetes.organizacionId, input.organizacionId), eq(paquetes.clave, input.clave)];
-  if (input.id) conditions.push(ne(paquetes.id, input.id));
-  const duplicate = await db.select({ id: paquetes.id }).from(paquetes).where(and(...conditions)).limit(1);
-  if (duplicate.length > 0) return { error: "Ya existe un paquete con esa clave." };
+  // Clave manual (opcional): el único (org, clave) no filtra por activo —
+  // el chequeo cubre inactivas e ignora mayúsculas (claves históricas).
+  const claveManual = input.clave || undefined;
+  if (claveManual) {
+    const conditions = [eq(paquetes.organizacionId, input.organizacionId), eq(sql`lower(${paquetes.clave})`, claveManual.toLowerCase())];
+    if (input.id) conditions.push(ne(paquetes.id, input.id));
+    const duplicate = await db.select({ id: paquetes.id }).from(paquetes).where(and(...conditions)).limit(1);
+    if (duplicate.length > 0) return { error: "Ya existe un paquete con esa clave." };
+  }
 
   const values = {
     organizacionId: input.organizacionId,
-    clave: input.clave,
     nombre: input.nombre,
     descripcion: input.descripcion || null,
     servicioId: input.servicioId,
@@ -57,8 +62,12 @@ export async function savePaquete(_previousState: PaqueteActionState, formData: 
     updatedBy: user.id,
   };
 
-  if (input.id) await db.update(paquetes).set(values).where(and(eq(paquetes.id, input.id), eq(paquetes.organizacionId, input.organizacionId)));
-  else await db.insert(paquetes).values({ ...values, createdBy: user.id });
+  if (input.id) {
+    await db.update(paquetes).set(claveManual ? { ...values, clave: claveManual } : values).where(and(eq(paquetes.id, input.id), eq(paquetes.organizacionId, input.organizacionId)));
+  } else {
+    const clave = claveManual ?? (await claveDisponible(db, paquetes, input.organizacionId, input.nombre, 60));
+    await db.insert(paquetes).values({ ...values, clave, createdBy: user.id });
+  }
 
   revalidatePath("/admin/paquetes");
   revalidatePath("/admin/pos");

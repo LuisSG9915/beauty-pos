@@ -18,6 +18,8 @@ export type InventoryMovementInput = {
   sucursalId: string;
   productoId: string;
   ventaId?: string | null;
+  /** Compra origen de la entrada (plan 10); traza el movimiento en el ticket. */
+  compraId?: string | null;
   tipo: "entrada" | "salida" | "ajuste" | "venta" | "consumo" | "devolucion";
   /**
    * Entrada/salida/venta/consumo/devolución: cantidad positiva del movimiento
@@ -144,6 +146,7 @@ export async function applyInventoryMovement(
     sucursalId: input.sucursalId,
     productoId: input.productoId,
     ventaId: input.ventaId ?? null,
+    compraId: input.compraId ?? null,
     tipo: input.tipo,
     cantidad: delta.toFixed(3),
     stockResultante: stockResultante.toFixed(3),

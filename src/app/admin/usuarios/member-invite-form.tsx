@@ -15,7 +15,7 @@ export function MemberInviteForm({
 }: {
   organizationId: string;
   roles: Array<{ id: string; nombre: string }>;
-  branches: Array<{ id: string; nombre: string; clave: string }>;
+  branches: Array<{ id: string; nombre: string }>;
 }) {
   const [state, formAction, isPending] = useActionState(inviteMember, {});
   const invitationUrl = state.data?.invitationUrl;
@@ -51,7 +51,7 @@ export function MemberInviteForm({
             <option value="">Selecciona una sucursal</option>
             {branches.map((branch) => (
               <option key={branch.id} value={branch.id}>
-                {branch.nombre} ({branch.clave})
+                {branch.nombre}
               </option>
             ))}
           </Select>

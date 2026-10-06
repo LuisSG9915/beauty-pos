@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -8,11 +8,12 @@ import { getDatabase } from "@/db/client";
 import { catMediosPago } from "@/db/schema/catalogs";
 import { checkPermission } from "@/lib/auth/authorization";
 import { revalidateCatalogos } from "@/lib/catalogo-cache";
+import { claveDisponible } from "@/lib/clave";
 
 const paymentMethodSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
   organizacionId: z.string().uuid(),
-  clave: z.string().trim().toUpperCase().min(1).max(40).regex(/^[A-Z0-9_-]+$/, "Usa letras, números, guion o guion bajo."),
+  clave: z.string().trim().toUpperCase().min(1).max(40).regex(/^[A-Z0-9_-]+$/, "Usa letras, números, guion o guion bajo.").optional().or(z.literal("")),
   nombre: z.string().trim().min(2).max(80),
   categoria: z.enum(["efectivo", "tarjeta", "transferencia", "wallet", "otro"]),
 });
@@ -27,21 +28,29 @@ export async function savePaymentMethod(_previousState: PaymentMethodActionState
   if (!access) return { error: "No tienes permiso para editar catálogos." };
   const { user } = access;
   const db = getDatabase();
-  const conditions = [eq(catMediosPago.organizacionId, input.organizacionId), eq(catMediosPago.clave, input.clave)];
-  if (input.id) conditions.push(ne(catMediosPago.id, input.id));
-  const duplicate = await db.select({ id: catMediosPago.id }).from(catMediosPago).where(and(...conditions)).limit(1);
-  if (duplicate.length > 0) return { error: "Ya existe un medio de pago con esa clave." };
+  // Clave manual (opcional): el único (org, clave) no filtra por activo —
+  // el chequeo cubre inactivas e ignora mayúsculas (claves históricas).
+  const claveManual = input.clave || undefined;
+  if (claveManual) {
+    const conditions = [eq(catMediosPago.organizacionId, input.organizacionId), eq(sql`lower(${catMediosPago.clave})`, claveManual.toLowerCase())];
+    if (input.id) conditions.push(ne(catMediosPago.id, input.id));
+    const duplicate = await db.select({ id: catMediosPago.id }).from(catMediosPago).where(and(...conditions)).limit(1);
+    if (duplicate.length > 0) return { error: "Ya existe un medio de pago con esa clave." };
+  }
 
   const values = {
     organizacionId: input.organizacionId,
-    clave: input.clave,
     nombre: input.nombre,
     categoria: input.categoria,
     updatedBy: user.id,
   };
 
-  if (input.id) await db.update(catMediosPago).set(values).where(and(eq(catMediosPago.id, input.id), eq(catMediosPago.organizacionId, input.organizacionId)));
-  else await db.insert(catMediosPago).values({ ...values, createdBy: user.id });
+  if (input.id) {
+    await db.update(catMediosPago).set(claveManual ? { ...values, clave: claveManual } : values).where(and(eq(catMediosPago.id, input.id), eq(catMediosPago.organizacionId, input.organizacionId)));
+  } else {
+    const clave = claveManual ?? (await claveDisponible(db, catMediosPago, input.organizacionId, input.nombre, 40));
+    await db.insert(catMediosPago).values({ ...values, clave, createdBy: user.id });
+  }
 
   revalidatePath("/admin/medios-pago");
   revalidateCatalogos(input.organizacionId);

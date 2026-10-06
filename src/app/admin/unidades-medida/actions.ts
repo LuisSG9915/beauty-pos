@@ -1,17 +1,18 @@
 "use server";
 
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { catUnidadesMedida } from "@/db/schema/catalogs";
 import { checkPermission } from "@/lib/auth/authorization";
+import { claveDisponible } from "@/lib/clave";
 
 const unitSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
   organizacionId: z.string().uuid(),
-  clave: z.string().trim().toUpperCase().min(1).max(20).regex(/^[A-Z0-9_-]+$/, "Usa letras, números, guion o guion bajo."),
+  clave: z.string().trim().toUpperCase().min(1).max(20).regex(/^[A-Z0-9_-]+$/, "Usa letras, números, guion o guion bajo.").optional().or(z.literal("")),
   nombre: z.string().trim().min(2).max(80),
 });
 
@@ -25,14 +26,23 @@ export async function saveUnit(_previousState: UnitActionState, formData: FormDa
   if (!access) return { error: "No tienes permiso para editar catálogos." };
   const { user } = access;
   const db = getDatabase();
-  const conditions = [eq(catUnidadesMedida.organizacionId, input.organizacionId), eq(catUnidadesMedida.clave, input.clave)];
-  if (input.id) conditions.push(ne(catUnidadesMedida.id, input.id));
-  const duplicate = await db.select({ id: catUnidadesMedida.id }).from(catUnidadesMedida).where(and(...conditions)).limit(1);
-  if (duplicate.length > 0) return { error: "Ya existe una unidad con esa clave." };
+  // Clave manual (opcional): el único (org, clave) no filtra por activo —
+  // el chequeo cubre inactivas e ignora mayúsculas (claves históricas).
+  const claveManual = input.clave || undefined;
+  if (claveManual) {
+    const conditions = [eq(catUnidadesMedida.organizacionId, input.organizacionId), eq(sql`lower(${catUnidadesMedida.clave})`, claveManual.toLowerCase())];
+    if (input.id) conditions.push(ne(catUnidadesMedida.id, input.id));
+    const duplicate = await db.select({ id: catUnidadesMedida.id }).from(catUnidadesMedida).where(and(...conditions)).limit(1);
+    if (duplicate.length > 0) return { error: "Ya existe una unidad con esa clave." };
+  }
 
-  const values = { organizacionId: input.organizacionId, clave: input.clave, nombre: input.nombre, updatedBy: user.id };
-  if (input.id) await db.update(catUnidadesMedida).set(values).where(and(eq(catUnidadesMedida.id, input.id), eq(catUnidadesMedida.organizacionId, input.organizacionId)));
-  else await db.insert(catUnidadesMedida).values({ ...values, createdBy: user.id });
+  const values = { organizacionId: input.organizacionId, nombre: input.nombre, updatedBy: user.id };
+  if (input.id) {
+    await db.update(catUnidadesMedida).set(claveManual ? { ...values, clave: claveManual } : values).where(and(eq(catUnidadesMedida.id, input.id), eq(catUnidadesMedida.organizacionId, input.organizacionId)));
+  } else {
+    const clave = claveManual ?? (await claveDisponible(db, catUnidadesMedida, input.organizacionId, input.nombre, 20));
+    await db.insert(catUnidadesMedida).values({ ...values, clave, createdBy: user.id });
+  }
   revalidatePath("/admin/unidades-medida");
   revalidatePath("/admin/productos");
   return { success: true };

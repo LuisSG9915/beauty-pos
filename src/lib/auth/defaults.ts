@@ -34,6 +34,9 @@ export const defaultPermissions = [
   { clave: "catalogos.editar", nombre: "Editar catálogos", modulo: "catalogos" },
   { clave: "inventario.ver", nombre: "Ver inventario", modulo: "inventario" },
   { clave: "inventario.editar", nombre: "Editar inventario", modulo: "inventario" },
+  { clave: "compras.ver", nombre: "Ver compras", modulo: "compras" },
+  { clave: "compras.editar", nombre: "Capturar y editar compras", modulo: "compras" },
+  { clave: "compras.recibir", nombre: "Recibir compras y dar entrada a inventario", modulo: "compras" },
   { clave: "gastos.ver", nombre: "Ver gastos", modulo: "gastos" },
   { clave: "gastos.editar", nombre: "Registrar y revertir gastos", modulo: "gastos" },
   { clave: "comisiones.ver", nombre: "Ver comisiones y liquidaciones", modulo: "comisiones" },
@@ -80,6 +83,9 @@ export const defaultRoles = [
       "ventas.crear",
       "facturacion.ver",
       "facturacion.emitir",
+      "compras.ver",
+      "compras.editar",
+      "compras.recibir",
     ],
   },
   {
@@ -116,6 +122,13 @@ export const defaultRoles = [
   {
     clave: "almacen",
     nombre: "Almacén",
-    permissions: ["catalogos.ver", "inventario.ver", "inventario.editar"],
+    permissions: [
+      "catalogos.ver",
+      "inventario.ver",
+      "inventario.editar",
+      "compras.ver",
+      "compras.editar",
+      "compras.recibir",
+    ],
   },
 ] as const;

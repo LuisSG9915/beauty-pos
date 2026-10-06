@@ -52,6 +52,32 @@ export const requireAuthenticatedUser = cache(async () => {
   return { session, user };
 });
 
+// Sesión para route handlers: devuelve el usuario interno o `null` sin
+// redirigir (el endpoint decide el status: 401/403/404). A diferencia de
+// `requireAuthenticatedUser`, pensada para respuestas no-HTML (JSON, blobs)
+// donde un redirect a /login sería incorrecto.
+export const getApiSessionUser = cache(async () => {
+  const session = await createAuth().api.getSession({
+    headers: await headers(),
+  });
+  if (!session) return null;
+
+  const db = getDatabase();
+  const [user] = await db
+    .select({
+      id: usuarios.id,
+      authUsuarioId: usuarios.authUsuarioId,
+      nombre: usuarios.nombre,
+      correo: usuarios.correo,
+      esAdministradorPlataforma: usuarios.esAdministradorPlataforma,
+    })
+    .from(usuarios)
+    .where(eq(usuarios.authUsuarioId, session.user.id))
+    .limit(1);
+
+  return user ?? null;
+});
+
 // Membresía activa (org, usuario) → id; compartida por request entre el guard
 // y la resolución de acceso para no repetir la consulta.
 export const getMembershipId = cache(

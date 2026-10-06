@@ -2,7 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
 import { servicios } from "@/db/schema/catalogs";
-import { miembrosOrganizaciones } from "@/db/schema/core";
+import { miembrosOrganizaciones, sucursales } from "@/db/schema/core";
 import { citas, horariosSucursales, ventas } from "@/db/schema/operations";
 import { progresoGuias } from "@/db/schema/onboarding";
 import type { EstadoGuia, EstadoNegocio } from "./types";
@@ -17,7 +17,7 @@ async function contar(db: Db, query: Promise<{ total: number }[]>): Promise<numb
 
 /**
  * Señales reales del negocio para evaluar el checklist de la guía.
- * Las cinco consultas son independientes y se lanzan en paralelo.
+ * Las consultas son independientes y se lanzan en paralelo.
  */
 export async function cargarEstadoNegocio(
   db: Db,
@@ -25,7 +25,7 @@ export async function cargarEstadoNegocio(
   sucursalId: string,
 ): Promise<EstadoNegocio> {
   const conteo = sql<number>`count(*)::int`;
-  const [serviciosActivos, horariosActivos, miembrosActivos, citasRegistradas, ventasCobradas] =
+  const [serviciosActivos, horariosActivos, miembrosActivos, citasRegistradas, ventasCobradas, sucursalRow] =
     await Promise.all([
       contar(
         db,
@@ -86,8 +86,23 @@ export async function cargarEstadoNegocio(
             ),
           ),
       ),
+      // Nombre de la sucursal del contexto: el paso "nombre_sucursal" se
+      // completa cuando deja de ser el genérico "Sucursal principal".
+      db
+        .select({ nombre: sucursales.nombre })
+        .from(sucursales)
+        .where(eq(sucursales.id, sucursalId))
+        .limit(1)
+        .then((rows) => rows[0] ?? null),
     ]);
-  return { serviciosActivos, horariosActivos, miembrosActivos, citasRegistradas, ventasCobradas };
+  return {
+    serviciosActivos,
+    horariosActivos,
+    miembrosActivos,
+    citasRegistradas,
+    ventasCobradas,
+    sucursalNombre: sucursalRow?.nombre ?? null,
+  };
 }
 
 export type ProgresoGuiaRow = {

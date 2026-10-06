@@ -6,6 +6,7 @@ import { notFound } from "next/navigation";
 import { ClientForm } from "@/app/admin/client-form";
 import { ClientImport } from "@/app/admin/client-import";
 import { ClientSheet } from "@/app/admin/clientes/client-sheet";
+import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { StatCard, StatCardGrid } from "@/components/admin/stat-card";
@@ -15,8 +16,10 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
 import { clientes } from "@/db/schema/core";
+import { citas, ventas } from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
+import { formatCurrency, formatDate } from "@/lib/format";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 
 export const dynamic = "force-dynamic";
@@ -66,7 +69,40 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
       .from(clientes)
       .where(and(...filters)),
     db
-      .select({ id: clientes.id, nombre: clientes.nombre, apellidoPaterno: clientes.apellidoPaterno, apellidoMaterno: clientes.apellidoMaterno, telefono: clientes.telefono, correo: clientes.correo, activo: clientes.activo })
+      .select({
+        id: clientes.id,
+        nombre: clientes.nombre,
+        apellidoPaterno: clientes.apellidoPaterno,
+        apellidoMaterno: clientes.apellidoMaterno,
+        telefono: clientes.telefono,
+        correo: clientes.correo,
+        activo: clientes.activo,
+        // Enriquecimiento de la fila como subselects escalares en la misma
+        // consulta (regla del proyecto: fusionar, no consultas en paralelo).
+        ultimaVisita: sql<Date | null>`(
+          select max(c.fecha_hora) from ${citas} c
+           where c.cliente_id = ${clientes.id}
+             and c.organizacion_id = ${organizationId}
+             and c.activo
+             and c.estado not in ('cancelada', 'no_asistio')
+             and c.fecha_hora < now()
+        )`,
+        totalGastado: sql<string | null>`(
+          select sum(v.total + v.propina) from ${ventas} v
+           where v.cliente_id = ${clientes.id}
+             and v.organizacion_id = ${organizationId}
+             and v.activo
+             and v.estado = 'completada'
+        )`,
+        citasProximas: sql<number>`(
+          select count(*)::int from ${citas} c
+           where c.cliente_id = ${clientes.id}
+             and c.organizacion_id = ${organizationId}
+             and c.activo
+             and c.estado in ('pendiente', 'confirmada', 'en_proceso')
+             and c.fecha_hora >= now()
+        )`,
+      })
       .from(clientes)
       .where(and(...filters))
       .orderBy(direction)
@@ -92,6 +128,79 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
       extra: { q: query || null, sort: sortParam ?? null, direction: directionParam ?? null, ...extra },
     });
   const hrefCerrar = hrefBase({ nuevo: null, edit: null, importar: null, pagina: paginaActual > 1 ? String(paginaActual) : null });
+
+  type ClientRow = (typeof clientRows)[number];
+  const nombreCompletoDe = (client: ClientRow) =>
+    [client.nombre, client.apellidoPaterno, client.apellidoMaterno].filter(Boolean).join(" ");
+  const columns: Array<DataTableColumn<ClientRow>> = [
+    {
+      id: "cliente",
+      header: "Cliente",
+      cell: (client) => (
+        <Link
+          className="inline-flex min-h-6 items-center font-medium hover:text-primary hover:underline"
+          href={buildAdminHref(`/clientes/${client.id}`, { organizationId })}
+          prefetch={false}
+        >
+          {nombreCompletoDe(client)}
+        </Link>
+      ),
+    },
+    {
+      id: "telefono",
+      header: "Teléfono",
+      cell: (client) => <span className="text-muted-foreground">{client.telefono || "—"}</span>,
+    },
+    {
+      id: "correo",
+      header: "Correo",
+      cell: (client) => <span className="block max-w-56 truncate text-muted-foreground">{client.correo || "—"}</span>,
+      hideBelow: "lg",
+    },
+    {
+      id: "ultimaVisita",
+      header: "Última visita",
+      cell: (client) =>
+        client.ultimaVisita ? (
+          <span className="whitespace-nowrap text-muted-foreground">{formatDate(client.ultimaVisita, { timeZone: context.timeZone })}</span>
+        ) : (
+          <span className="text-muted-foreground">—</span>
+        ),
+    },
+    {
+      id: "totalGastado",
+      header: "Total gastado",
+      cell: (client) => <span className="tabular-nums">{formatCurrency(client.totalGastado, { currency: context.currency })}</span>,
+      align: "right",
+    },
+    {
+      id: "proximas",
+      header: "Próximas citas",
+      cell: (client) => <span className="tabular-nums">{client.citasProximas}</span>,
+      align: "right",
+      hideBelow: "lg",
+    },
+    { id: "estado", header: "Estado", cell: (client) => <StatusBadge active={client.activo} /> },
+    ...(puedeEditar
+      ? [
+          {
+            id: "acciones",
+            header: "Acciones",
+            cell: (client: ClientRow) => (
+              <Link
+                className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs font-medium text-primary hover:bg-muted/60"
+                href={hrefBase({ edit: client.id, pagina: String(paginaActual) })}
+                prefetch={false}
+              >
+                Editar
+              </Link>
+            ),
+            align: "right",
+            stickyEnd: true,
+          } satisfies DataTableColumn<ClientRow>,
+        ]
+      : []),
+  ];
 
   return (
     <div className="space-y-6">
@@ -207,70 +316,49 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
         ) : (
           <>
             <RegistroList className="p-3">
-              {clientRows.map((client) => {
-                const nombreCompleto = [client.nombre, client.apellidoPaterno, client.apellidoMaterno].filter(Boolean).join(" ");
-                return (
-                  <RegistroCard
-                    acciones={puedeEditar ? (
-                      <Link
-                        className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60"
-                        href={hrefBase({ edit: client.id, pagina: String(paginaActual) })}
-                        prefetch={false}
-                      >
-                        Editar
-                      </Link>
-                    ) : undefined}
-                    badge={<StatusBadge active={client.activo} />}
-                    campos={[
-                      { label: "Teléfono", value: client.telefono || "—" },
-                      { label: "Correo", value: <span className="break-all">{client.correo || "—"}</span> },
-                    ]}
-                    key={client.id}
-                    titulo={
-                      <Link
-                        className="inline-flex min-h-6 items-center hover:text-primary hover:underline"
-                        href={buildAdminHref(`/clientes/${client.id}`, { organizationId })}
-                        prefetch={false}
-                      >
-                        {nombreCompleto}
-                      </Link>
-                    }
-                  />
-                );
-              })}
+              {clientRows.map((client) => (
+                <RegistroCard
+                  acciones={puedeEditar ? (
+                    <Link
+                      className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60"
+                      href={hrefBase({ edit: client.id, pagina: String(paginaActual) })}
+                      prefetch={false}
+                    >
+                      Editar
+                    </Link>
+                  ) : undefined}
+                  badge={<StatusBadge active={client.activo} />}
+                  campos={[
+                    { label: "Teléfono", value: client.telefono || "—" },
+                    { label: "Correo", value: <span className="break-all">{client.correo || "—"}</span> },
+                    ...(client.ultimaVisita
+                      ? [{ label: "Última visita", value: formatDate(client.ultimaVisita, { timeZone: context.timeZone }) }]
+                      : []),
+                    ...(client.totalGastado !== null
+                      ? [{ label: "Total gastado", value: formatCurrency(client.totalGastado, { currency: context.currency }) }]
+                      : []),
+                    { label: "Próximas citas", value: String(client.citasProximas) },
+                  ]}
+                  key={client.id}
+                  titulo={
+                    <Link
+                      className="inline-flex min-h-6 items-center hover:text-primary hover:underline"
+                      href={buildAdminHref(`/clientes/${client.id}`, { organizationId })}
+                      prefetch={false}
+                    >
+                      {nombreCompletoDe(client)}
+                    </Link>
+                  }
+                />
+              ))}
             </RegistroList>
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Cliente</th>
-                  <th className="px-4 py-3 font-medium">Teléfono</th>
-                  <th className="px-4 py-3 font-medium">Correo</th>
-                  <th className="px-4 py-3 font-medium">Estado</th>
-                  <th className="px-4 py-3 text-right font-medium">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clientRows.map((client) => (
-                  <tr className="border-b border-border transition-colors last:border-0 hover:bg-muted/60" key={client.id}>
-                    <td className="px-4 py-3.5 font-medium">
-                      <Link className="inline-flex min-h-6 items-center hover:text-primary hover:underline" href={buildAdminHref(`/clientes/${client.id}`, { organizationId })} prefetch={false}>
-                        {[client.nombre, client.apellidoPaterno, client.apellidoMaterno].filter(Boolean).join(" ")}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3.5 text-muted-foreground">{client.telefono || "—"}</td>
-                    <td className="max-w-56 truncate px-4 py-3.5 text-muted-foreground">{client.correo || "—"}</td>
-                    <td className="px-4 py-3.5"><StatusBadge active={client.activo} /></td>
-                    <td className="px-4 py-3.5 text-right">
-                      <Link className="inline-flex min-h-9 items-center font-medium text-primary hover:underline" href={hrefBase({ edit: client.id, pagina: String(paginaActual) })} prefetch={false}>
-                        Editar
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
+            <DataTable
+              className="hidden md:block"
+              columns={columns}
+              minWidth="880px"
+              rowKey={(client) => client.id}
+              rows={clientRows}
+            />
           </>
         )}
         {totalPaginas > 1 ? (

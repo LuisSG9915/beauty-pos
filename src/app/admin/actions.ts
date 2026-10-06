@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
@@ -8,8 +9,11 @@ import { inArray } from "drizzle-orm";
 import { catPermisos, catRoles, relRolesPermisos } from "@/db/schema/access";
 import { organizaciones, sucursales } from "@/db/schema/core";
 import { defaultPermissions, defaultRoles } from "@/lib/auth/defaults";
-import { requirePlatformAdmin } from "@/lib/auth/access";
+import { requireAuthenticatedUser, requirePlatformAdmin } from "@/lib/auth/access";
+import { assertBranchScope, resolveAccessSafe } from "@/lib/auth/authorization";
+import { claveDisponible } from "@/lib/clave";
 import { issueInvitation } from "@/lib/invitations";
+import { escribirSucursalCookie } from "@/lib/sucursal-cookie";
 
 const organizationSchema = z.object({
   nombre: z.string().trim().min(2).max(160),
@@ -27,7 +31,9 @@ const organizationSchema = z.object({
     .toUpperCase()
     .min(1)
     .max(40)
-    .regex(/^[A-Z0-9_-]+$/, "Usa letras, números, guion o guion bajo."),
+    .regex(/^[A-Z0-9_-]+$/, "Usa letras, números, guion o guion bajo.")
+    .optional()
+    .or(z.literal("")),
 });
 
 export type OrganizationActionState = {
@@ -70,10 +76,15 @@ export async function createOrganization(
         throw new Error("No se pudo crear la organización.");
       }
 
+      // Clave opcional: vacía se genera del nombre de la sucursal (org
+      // recién creada, siempre hay hueco; el único la respalda).
+      const clave =
+        result.data.sucursalClave ||
+        (await claveDisponible(tx, sucursales, organization.id, result.data.sucursalNombre, 40));
       await tx.insert(sucursales).values({
         organizacionId: organization.id,
         nombre: result.data.sucursalNombre,
-        clave: result.data.sucursalClave,
+        clave,
         createdBy: user.id,
         updatedBy: user.id,
       });
@@ -164,4 +175,61 @@ export async function createInvitation(
   } catch {
     return { error: "No se pudo enviar la invitación. Verifica la configuración de correo." };
   }
+}
+
+const sucursalPreferidaSchema = z.object({
+  organizacionId: z.string().uuid(),
+  sucursalId: z.string().uuid(),
+  returnTo: z.string().trim().max(600).optional(),
+});
+
+/**
+ * Conserva solo rutas internas del panel ("/admin" o "/admin/...", con query
+ * opcional); cualquier otra cosa cae al inicio del panel.
+ */
+function safeAdminReturnTo(value: string | undefined): string {
+  const raw = value?.trim() ?? "";
+  const path = raw.split("?")[0]?.split("#")[0] ?? "";
+  if (path === "/admin" || path.startsWith("/admin/")) return raw;
+  return "/admin";
+}
+
+/**
+ * Persiste la sucursal preferida del usuario en la cookie httpOnly
+ * `melena_sucursal_{organizacionId}` y redirige a la misma pantalla con
+ * `?sucursalId` actualizado, para que el contexto se resuelva de inmediato.
+ *
+ * La cookie solo se escribe cuando la sucursal existe, está activa y cae
+ * dentro del alcance del usuario (`assertBranchScope`): el formData nunca se
+ * confía. Si la validación falla se redirige sin el parámetro y la resolución
+ * normal del contexto (cookie → primera del alcance) toma el control.
+ */
+export async function guardarSucursalPreferida(formData: FormData): Promise<void> {
+  const parsed = sucursalPreferidaSchema.safeParse({
+    organizacionId: formData.get("organizacionId"),
+    sucursalId: formData.get("sucursalId"),
+    returnTo: formData.get("returnTo") ?? undefined,
+  });
+  if (!parsed.success) redirect("/admin");
+  const input = parsed.data;
+  const returnTo = safeAdminReturnTo(input.returnTo);
+
+  const { user } = await requireAuthenticatedUser();
+  const access = await resolveAccessSafe(input.organizacionId, user);
+  const valida = access ? await assertBranchScope(access, input.sucursalId) : false;
+  if (valida) {
+    await escribirSucursalCookie(input.organizacionId, input.sucursalId);
+  }
+
+  const qIndex = returnTo.indexOf("?");
+  const path = qIndex === -1 ? returnTo : returnTo.slice(0, qIndex);
+  const search = new URLSearchParams(qIndex === -1 ? "" : returnTo.slice(qIndex + 1));
+  search.set("organizationId", input.organizacionId);
+  if (valida) {
+    search.set("sucursalId", input.sucursalId);
+  } else {
+    search.delete("sucursalId");
+  }
+  const query = search.toString();
+  redirect(`${path}${query ? `?${query}` : ""}`);
 }

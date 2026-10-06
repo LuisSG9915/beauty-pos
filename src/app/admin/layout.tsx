@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { getSessionOrRedirect } from "@/lib/auth/access";
 import { resolveSessionContext } from "@/lib/auth/authorization";
+import { leerSucursalesCookieMap } from "@/lib/sucursal-cookie";
 import { CAPACIDADES } from "@/modules/billing/capacidades";
 import { getSuscripcionActualCache } from "@/modules/billing/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
@@ -60,6 +61,11 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
     }
   }
 
+  // Preferencias de sucursal (cookies httpOnly `melena_sucursal_*`): el shell
+  // las usa solo para MOSTRAR la misma sucursal que el servidor resuelve; la
+  // validación de alcance siempre ocurre del lado del servidor.
+  const sucursalPreferidaPorOrg = await leerSucursalesCookieMap();
+
   return (
     <AdminShell
       billingByOrg={billingByOrg}
@@ -67,6 +73,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
       isPlatformAdmin={user.esAdministradorPlataforma}
       organizations={organizations}
       permissionsByOrg={permissionsByOrg}
+      sucursalPreferidaPorOrg={sucursalPreferidaPorOrg}
       userEmail={session.user.email}
       userName={session.user.name}
     >

@@ -19,9 +19,12 @@ export type EstadoNegocio = {
   miembrosActivos: number;
   citasRegistradas: number;
   ventasCobradas: number;
+  /** Nombre de la sucursal del contexto; detecta el genérico "Sucursal principal". */
+  sucursalNombre: string | null;
 };
 
 export type PasoClave =
+  | "nombre_sucursal"
   | "servicios"
   | "horario"
   | "equipo"

@@ -1,15 +1,17 @@
 "use client";
 
 import { Plus, UserRound } from "lucide-react";
-import { useEffect, useMemo, useRef, type DragEvent, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 
 import { categoryTone } from "@/lib/category-color";
+import { trackAction } from "@/lib/telemetry/cliente";
 import { cn } from "@/lib/utils";
-import { getZonedParts } from "@/modules/agenda";
+import { getZonedParts, isCitaEditable } from "@/modules/agenda";
 
+import { useArrastreCita, type SoltarDuracion, type SoltarMover } from "./agenda-drag";
 import type { AgendaBloqueo, AgendaCita, AgendaHorario } from "./agenda-types";
 import { COLUMN_HEADER_PX, HOUR_PX, PX_PER_MIN, BLOQUEO_LABEL } from "./agenda-types";
-import { citaInterval, iniciales, layoutCitas, pad2 } from "./agenda-utils";
+import { citaInterval, etiquetaMinuto, iniciales, layoutCitas, minutoDesdeY, pad2 } from "./agenda-utils";
 import { CitaCard } from "./cita-card";
 
 type Columna = { id: string; nombre: string };
@@ -30,10 +32,21 @@ export type DayGridData = {
   fecha: string;
 };
 
+/** Clic sobre el fondo o sus pistas (nunca sobre tarjetas/bloqueos/controles). */
+function esHueco(target: HTMLElement) {
+  return !target.closest(
+    "[data-cita-card], [data-bloqueo], button, a, input, select, textarea",
+  );
+}
+
 /**
  * Rejilla del día: columnas por profesional, horas a la izquierda, bloqueos y
  * tarjetas posicionadas. El color dominante de cada tarjeta es el estado de la
  * cita; el clic en un hueco abre "Nueva cita" con el horario precargado.
+ *
+ * El arrastre (Pointer Events, ver agenda-drag.ts) muestra un fantasma con la
+ * hora destino; el asa inferior de cada tarjeta cambia la duración. Citas
+ * traslapadas se reparten carriles (`layoutCitas`) y llevan `pattern-conflicto`.
  */
 export function DayGrid({
   data,
@@ -41,36 +54,30 @@ export function DayGrid({
   currency,
   timeZone,
   pending,
-  dragId,
-  dropTarget,
   columnaMovil,
   onColumnaMovil,
   onClickHueco,
-  onDropEnColumna,
-  onDragOverColumna,
-  onDragLeaveColumna,
   onSelectCita,
   onCobrarCita,
-  onDragStartCita,
-  onDragEndCita,
+  onSoltarMover,
+  onSoltarDuracion,
+  ultimaCitaTocada,
 }: {
   data: DayGridData;
   sucursalNombre: string;
   currency: string;
   timeZone: string;
   pending: boolean;
-  dragId: string | null;
-  dropTarget: string | null;
   columnaMovil: string;
   onColumnaMovil: (id: string) => void;
-  onClickHueco: (event: MouseEvent<HTMLDivElement>, usuarioId: string) => void;
-  onDropEnColumna: (event: DragEvent<HTMLDivElement>, usuarioId: string) => void;
-  onDragOverColumna: (event: DragEvent<HTMLDivElement>, usuarioId: string) => void;
-  onDragLeaveColumna: (usuarioId: string) => void;
+  /** Minuto del día bajo el puntero (snap 15) + profesional de la columna. */
+  onClickHueco: (minutos: number, usuarioId: string) => void;
   onSelectCita: (id: string) => void;
   onCobrarCita: (cita: AgendaCita) => void;
-  onDragStartCita: (event: DragEvent<HTMLDivElement>, cita: AgendaCita) => void;
-  onDragEndCita: () => void;
+  onSoltarMover: (resultado: SoltarMover) => void;
+  onSoltarDuracion: (resultado: SoltarDuracion) => void;
+  /** Pulso de confirmación en la tarjeta recién movida/ajustada. */
+  ultimaCitaTocada: string | null;
 }) {
   const {
     columns,
@@ -89,6 +96,19 @@ export function DayGrid({
 
   const cardRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [hoverHueco, setHoverHueco] = useState<{ columnaId: string; minuto: number } | null>(null);
+
+  // En móvil hay un solo carril visible: "mover" queda fijado a ese profesional.
+  const { arrastre, consumirClick, iniciarGesto } = useArrastreCita({
+    gridRef: scrollRef,
+    startMin,
+    endMin,
+    timeZone,
+    columnaUnica: isMd ? undefined : columnaMovil,
+    disabled: pending,
+    onSoltarMover,
+    onSoltarDuracion,
+  });
 
   // Primer minuto con cita entre las columnas visibles (en móvil solo hay
   // una): es el destino de scroll cuando el día aún no empieza o es otro día.
@@ -131,10 +151,34 @@ export function DayGrid({
 
   const fondoLineas = `repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR_PX - 1}px, color-mix(in srgb, var(--border) 80%, transparent) ${HOUR_PX - 1}px, color-mix(in srgb, var(--border) 80%, transparent) ${HOUR_PX}px), repeating-linear-gradient(to bottom, transparent 0, transparent ${HOUR_PX / 4 - 1}px, color-mix(in srgb, var(--border) 45%, transparent) ${HOUR_PX / 4 - 1}px, color-mix(in srgb, var(--border) 45%, transparent) ${HOUR_PX / 4}px)`;
 
-  const minutoLabel =
-    minutoActual !== null
-      ? `${pad2(Math.floor(minutoActual / 60))}:${pad2(minutoActual % 60)}`
-      : null;
+  const minutoLabel = minutoActual !== null ? etiquetaMinuto(minutoActual) : null;
+
+  const clickEnHueco = (event: MouseEvent<HTMLDivElement>, columnaId: string) => {
+    const objetivo = event.target as HTMLElement;
+    if (!esHueco(objetivo)) return;
+    if (consumirClick()) return; // clic residual tras un arrastre.
+    const rect = event.currentTarget.getBoundingClientRect();
+    const minuto = minutoDesdeY(event.clientY, rect.top, startMin, endMin, 15);
+    trackAction("agenda.vacio.crear");
+    onClickHueco(minuto, columnaId);
+  };
+
+  const moverEnHueco = (event: MouseEvent<HTMLDivElement>, columnaId: string) => {
+    if (arrastre) {
+      if (hoverHueco) setHoverHueco(null);
+      return;
+    }
+    const objetivo = event.target as HTMLElement;
+    if (!esHueco(objetivo)) {
+      if (hoverHueco) setHoverHueco(null);
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const minuto = minutoDesdeY(event.clientY, rect.top, startMin, endMin, 15);
+    setHoverHueco((prev) =>
+      prev?.columnaId === columnaId && prev.minuto === minuto ? prev : { columnaId, minuto },
+    );
+  };
 
   return (
     // Scroll interno en ambos ejes: permite que los encabezados de columna
@@ -210,7 +254,7 @@ export function DayGrid({
                 className={cn(
                   "min-w-0 flex-1 transition-colors md:min-w-[150px]",
                   index > 0 && "border-l border-border",
-                  dropTarget === column.id && "bg-accent/50",
+                  arrastre?.columnaId === column.id && arrastre.modo === "mover" && "bg-accent/40",
                 )}
                 key={column.id || "sin-asignar"}
               >
@@ -231,10 +275,10 @@ export function DayGrid({
                 </h3>
                 <div
                   className="group relative cursor-cell bg-background"
-                  onClick={(event) => onClickHueco(event, column.id)}
-                  onDragLeave={() => onDragLeaveColumna(column.id)}
-                  onDragOver={(event) => onDragOverColumna(event, column.id)}
-                  onDrop={(event) => onDropEnColumna(event, column.id)}
+                  data-columna-id={column.id}
+                  onClick={(event) => clickEnHueco(event, column.id)}
+                  onMouseLeave={() => setHoverHueco((prev) => (prev?.columnaId === column.id ? null : prev))}
+                  onMouseMove={(event) => moverEnHueco(event, column.id)}
                   style={{ height: (endMin - startMin) * PX_PER_MIN, backgroundImage: fondoLineas }}
                   title="Toca un horario libre para agendar"
                 >
@@ -243,14 +287,16 @@ export function DayGrid({
                       Sin horario configurado
                     </div>
                   ) : null}
-                  {/* Pista de creación: "+" sigue al puntero sobre huecos. */}
-                  {turnosDia.length > 0 ? (
+                  {/* Pista de creación: "Crear cita HH:mm" sigue al puntero sobre huecos. */}
+                  {turnosDia.length > 0 && hoverHueco?.columnaId === column.id && !arrastre ? (
                     <div
                       aria-hidden="true"
-                      className="pointer-events-none absolute inset-x-2 top-2 z-[1] hidden justify-center opacity-0 transition-opacity group-hover:opacity-100"
+                      className="pointer-events-none absolute inset-x-2 z-[4] flex justify-center"
+                      style={{ top: (hoverHueco.minuto - startMin) * PX_PER_MIN }}
                     >
-                      <span className="flex size-7 items-center justify-center rounded-full border border-dashed border-primary/50 bg-primary/5 text-primary">
-                        <Plus className="size-4" />
+                      <span className="flex -translate-y-1/2 items-center gap-1.5 whitespace-nowrap rounded-full border border-dashed border-primary/60 bg-card/95 px-2.5 py-1 text-op-xs font-semibold text-primary shadow-sm">
+                        <Plus className="size-3.5" />
+                        Crear cita {etiquetaMinuto(hoverHueco.minuto)}
                       </span>
                     </div>
                   ) : null}
@@ -289,6 +335,7 @@ export function DayGrid({
                     return (
                       <div
                         className="absolute inset-x-1 z-[1] rounded-lg border border-dashed border-muted-foreground/40 bg-muted/80 px-2 py-1 text-op-xs font-medium text-muted-foreground"
+                        data-bloqueo
                         key={bloqueo.id}
                         style={{ top, height }}
                         title={bloqueo.motivo ?? BLOQUEO_LABEL[bloqueo.tipo] ?? "Bloqueo"}
@@ -297,27 +344,58 @@ export function DayGrid({
                       </div>
                     );
                   })}
-                  {columnCitas.map((cita) => {
+                  {/* Fantasma del arrastre: horario destino con snap de 15 min. */}
+                  {arrastre && arrastre.columnaId === column.id ? (
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute inset-x-1 z-[5] rounded-lg border-2 border-dashed border-primary bg-primary/10"
+                      style={{
+                        top: (arrastre.minutoInicio - startMin) * PX_PER_MIN,
+                        height: Math.max(arrastre.duracion * PX_PER_MIN, 20),
+                      }}
+                    >
+                      <span className="absolute left-1 top-1 rounded-md bg-primary px-1.5 py-0.5 text-op-xs font-bold text-primary-foreground shadow-sm">
+                        {etiquetaMinuto(arrastre.minutoInicio)}–{etiquetaMinuto(arrastre.minutoInicio + arrastre.duracion)}
+                      </span>
+                    </div>
+                  ) : null}
+                  {columnCitas.map((cita, citaIndex) => {
                     const interval = citaInterval(cita);
                     const top = (getZonedParts(new Date(cita.fechaHora), timeZone).minutosDelDia - startMin) * PX_PER_MIN;
                     const height = Math.max((interval.terminaAtMs - interval.iniciaAtMs) / 60_000 * PX_PER_MIN, 34);
                     const pos = layout.get(cita.id) ?? { lane: 0, lanes: 1 };
+                    const editable = isCitaEditable(cita.estado);
+                    const enArrastre = arrastre?.citaId === cita.id;
                     return (
                       <CitaCard
+                        arrastrable={editable && !pending}
                         cita={cita}
-                        className={cn("absolute z-[2]", dragId === cita.id && "opacity-50")}
+                        className={cn(
+                          "absolute z-[2]",
+                          pos.lanes > 1 && "pattern-conflicto",
+                          enArrastre && "opacity-40",
+                          ultimaCitaTocada === cita.id && "anim-pulso",
+                        )}
                         currency={currency}
-                        draggable={!pending}
                         key={cita.id}
-                        onClick={() => onSelectCita(cita.id)}
+                        onClick={() => {
+                          if (consumirClick()) return;
+                          onSelectCita(cita.id);
+                        }}
                         onCobrar={onCobrarCita}
-                        onDragEnd={onDragEndCita}
-                        onDragStart={(event) => onDragStartCita(event, cita)}
+                        onPointerDown={
+                          editable ? (event) => iniciarGesto(event, cita, "mover") : undefined
+                        }
+                        onPointerDownResize={
+                          editable ? (event) => iniciarGesto(event, cita, "duracion") : undefined
+                        }
+                        resizeHandle={editable}
                         style={{
                           top,
                           height,
                           left: `calc(${(pos.lane * 100) / pos.lanes}% + 2px)`,
                           width: `calc(${100 / pos.lanes}% - 4px)`,
+                          animationDelay: `${Math.min(citaIndex, 8) * 30}ms`,
                         }}
                         timeZone={timeZone}
                       />

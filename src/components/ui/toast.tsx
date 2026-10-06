@@ -2,7 +2,7 @@
 
 import { Toast as ToastPrimitive } from "@base-ui/react/toast";
 import { CheckCircle2, CircleAlert, Info, TriangleAlert, X } from "lucide-react";
-import { useMemo, type ComponentProps, type ReactNode } from "react";
+import { useMemo, type ComponentProps, type ComponentPropsWithoutRef, type ReactNode } from "react";
 
 import type { ActionState } from "@/lib/action-state";
 import { cn } from "@/lib/utils";
@@ -52,6 +52,9 @@ function ToastList() {
           <ToastPrimitive.Title className="text-sm font-semibold" />
           <ToastPrimitive.Description className="text-sm leading-5 text-muted-foreground" />
         </ToastPrimitive.Content>
+        {toast.actionProps ? (
+          <ToastPrimitive.Action className="shrink-0 self-center rounded-lg px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-muted" />
+        ) : null}
         <ToastPrimitive.Close
           aria-label="Cerrar aviso"
           className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -85,6 +88,8 @@ type ToastInput = {
   description?: ReactNode;
   type?: ToastType;
   timeout?: number;
+  /** Botón de acción dentro del aviso (p. ej. "Deshacer"). */
+  actionProps?: ComponentPropsWithoutRef<"button">;
 };
 
 /** Hook para disparar toasts desde client components. */

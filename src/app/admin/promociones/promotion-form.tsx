@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import { savePromotion, type PromotionActionState } from "@/app/admin/promociones/actions";
 import { FormTabs } from "@/components/form-tabs";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
 
 type PromotionData = {
@@ -29,11 +29,7 @@ export function PromotionForm({ organizationId, initial }: { organizationId: str
 
   const reglas = (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <Field>
-        <FieldLabel required>Clave</FieldLabel>
-        <Input defaultValue={String(value("clave"))} name="clave" placeholder="DESC10" required />
-      </Field>
-      <Field>
+      <Field className="sm:col-span-2">
         <FieldLabel required>Nombre</FieldLabel>
         <Input defaultValue={String(value("nombre"))} name="nombre" placeholder="Descuento del 10%" required />
       </Field>
@@ -62,6 +58,18 @@ export function PromotionForm({ organizationId, initial }: { organizationId: str
           <option value="servicio">Solo servicios</option>
         </Select>
       </Field>
+      {initial ? (
+        <details className="rounded-xl border border-border bg-muted/60 px-4 py-3 sm:col-span-2">
+          <summary className="cursor-pointer list-none text-sm font-medium text-muted-foreground hover:text-primary">
+            Opciones avanzadas
+          </summary>
+          <Field className="mt-3">
+            <FieldLabel>Clave</FieldLabel>
+            <Input name="clave" placeholder={initial.clave} />
+            <FieldDescription>Déjala vacía para conservar la clave actual.</FieldDescription>
+          </Field>
+        </details>
+      ) : null}
     </div>
   );
 

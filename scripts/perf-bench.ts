@@ -24,6 +24,7 @@ const ROUTES = [
   "/admin/pos",
   "/admin/caja",
   "/admin/clientes",
+  "/admin/inventario/reabastecer",
   "/admin/reportes",
   "/admin/sucursales",
 ];

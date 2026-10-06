@@ -16,6 +16,7 @@ import {
 
 import { organizaciones, sucursales } from "@/db/schema/core";
 import { catRoles } from "@/db/schema/access";
+import { medios } from "@/db/schema/media";
 
 const catalogAuditColumns = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -56,6 +57,8 @@ export const servicios = pgTable(
     descripcion: text("descripcion"),
     duracionMinutos: integer("duracion_minutos").default(60).notNull(),
     precioBase: numeric("precio_base", { precision: 12, scale: 2 }).notNull(),
+    // Foto principal del servicio (medios.entidad='servicio'); nullable.
+    imagenPrincipalId: uuid("imagen_principal_id").references(() => medios.id),
     visibleAgenda: boolean("visible_agenda").default(true).notNull(),
     requiereCabina: boolean("requiere_cabina").default(false).notNull(),
     activo: boolean("activo").default(true).notNull(),
@@ -151,6 +154,8 @@ export const productos = pgTable(
     costo: numeric("costo", { precision: 12, scale: 2 }).default("0").notNull(),
     precioVenta: numeric("precio_venta", { precision: 12, scale: 2 }).default("0").notNull(),
     stockMinimo: numeric("stock_minimo", { precision: 12, scale: 3 }).default("0").notNull(),
+    // Foto principal del producto/insumo (medios.entidad='producto'); nullable.
+    imagenPrincipalId: uuid("imagen_principal_id").references(() => medios.id),
     visiblePos: boolean("visible_pos").default(true).notNull(),
     activo: boolean("activo").default(true).notNull(),
     ...catalogAuditColumns,

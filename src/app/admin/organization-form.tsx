@@ -33,12 +33,12 @@ export function OrganizationForm() {
           <Input name="slug" placeholder="casa-magnolia" required />
         </Field>
         <Field>
-          <FieldLabel required>Nombre de sucursal</FieldLabel>
-          <Input name="sucursalNombre" placeholder="Sucursal principal" required />
+          <FieldLabel required>Nombre de la primera sucursal</FieldLabel>
+          <Input name="sucursalNombre" placeholder="Salón Roma Norte" required />
         </Field>
         <Field>
-          <FieldLabel required>Clave de sucursal</FieldLabel>
-          <Input className="uppercase" minLength={1} name="sucursalClave" placeholder="MATRIZ" required />
+          <FieldLabel>Clave de sucursal</FieldLabel>
+          <Input className="uppercase" name="sucursalClave" placeholder="Se genera del nombre si la dejas vacía" />
         </Field>
       </div>
 

@@ -1,33 +1,40 @@
 "use client";
 
-import { useActionState } from "react";
+import { setSucursalActivaAction } from "@/app/admin/sucursales/actions";
+import { ToggleActivo } from "@/components/admin/toggle-activo";
 
-import { toggleSucursalAction } from "@/app/admin/sucursales/actions";
-import { Button } from "@/components/ui/button";
-import { ActionFeedback } from "@/components/ui/toast";
-import { initialActionState } from "@/lib/action-state";
-
-/** Activa/desactiva una sucursal sin borrar su historial. */
-export function SucursalToggleForm({
+/**
+ * Activa/desactiva una sucursal sin borrar su historial. Usa el patrón
+ * compartido `ToggleActivo`: la baja muestra "Deshacer" durante 5 s y la
+ * acción (`setSucursalActivaAction`) valida plan y cobertura en el servidor.
+ */
+export function SucursalToggle({
   organizationId,
   sucursalId,
+  nombre,
   activo,
 }: {
   organizationId: string;
   sucursalId: string;
+  nombre: string;
   activo: boolean;
 }) {
-  const [state, action, pending] = useActionState(toggleSucursalAction, initialActionState);
-
   return (
-    <form action={action}>
-      <input name="organizacionId" type="hidden" value={organizationId} />
-      <input name="sucursalId" type="hidden" value={sucursalId} />
-      <input name="activo" type="hidden" value={String(!activo)} />
-      <Button className="rounded-xl" disabled={pending} type="submit" variant={activo ? "outline" : "default"}>
-        {pending ? "Aplicando…" : activo ? "Desactivar" : "Activar"}
-      </Button>
-      <ActionFeedback state={state} />
-    </form>
+    <ToggleActivo
+      action={setSucursalActivaAction}
+      activo={activo}
+      confirmHint="Dejará de aparecer en la agenda, el punto de venta y el selector de sucursal."
+      entidad="sucursal"
+      id={sucursalId}
+      labels={{
+        baja: "Desactivar",
+        articulo: "la",
+        participioAlta: "activada",
+        participioBaja: "desactivada",
+      }}
+      nombre={nombre}
+      organizationId={organizationId}
+      telemetryBase="sucursales.sucursal"
+    />
   );
 }

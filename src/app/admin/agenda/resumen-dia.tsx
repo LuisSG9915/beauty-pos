@@ -39,7 +39,7 @@ export function ResumenDia({
 
   if (vivas.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed border-border bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground">
+      <p className="anim-entrada rounded-xl border border-dashed border-border bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground">
         Día libre — toca un horario libre en la rejilla o usa{" "}
         <span className="font-semibold text-foreground">Nueva cita</span> para agendar.
       </p>
@@ -47,7 +47,7 @@ export function ResumenDia({
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2" role="status">
+    <div className="anim-entrada flex flex-wrap items-center gap-2" role="status">
       <span className="rounded-full border border-border bg-card px-3 py-1.5 text-sm font-semibold text-foreground">
         {vivas.length} {vivas.length === 1 ? "cita" : "citas"}
       </span>

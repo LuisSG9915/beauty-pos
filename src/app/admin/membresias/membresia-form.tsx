@@ -4,7 +4,7 @@ import { useActionState } from "react";
 
 import { saveMembresia, type MembresiaActionState } from "@/app/admin/membresias/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
 
 export type MembresiaData = {
@@ -38,11 +38,7 @@ export function MembresiaForm({
         Beneficio por tiempo: el cliente paga por adelantado y obtiene un descuento mientras la membresía esté vigente.
       </p>
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field>
-          <FieldLabel required>Clave</FieldLabel>
-          <Input defaultValue={String(value("clave"))} name="clave" placeholder="VIP30" required />
-        </Field>
-        <Field>
+        <Field className="sm:col-span-2">
           <FieldLabel required>Nombre</FieldLabel>
           <Input defaultValue={String(value("nombre"))} name="nombre" placeholder="Membresía VIP" required />
         </Field>
@@ -70,6 +66,18 @@ export function MembresiaForm({
           <FieldLabel>Descripción</FieldLabel>
           <Textarea defaultValue={String(value("descripcion"))} name="descripcion" />
         </Field>
+        {initial ? (
+          <details className="rounded-xl border border-border bg-muted/60 px-4 py-3 sm:col-span-2">
+            <summary className="cursor-pointer list-none text-sm font-medium text-muted-foreground hover:text-primary">
+              Opciones avanzadas
+            </summary>
+            <Field className="mt-3">
+              <FieldLabel>Clave</FieldLabel>
+              <Input name="clave" placeholder={initial.clave} />
+              <FieldDescription>Déjala vacía para conservar la clave actual.</FieldDescription>
+            </Field>
+          </details>
+        ) : null}
       </div>
       <div className="mt-4">
         <ActionFeedback state={state} successMessage="Membresía guardada correctamente." />

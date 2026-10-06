@@ -84,6 +84,8 @@ export type RecursoConfig = {
   tipo: string;
   capacidad: number;
   activo: boolean;
+  /** Mueble del plano enlazado a este recurso (plan 11); null si no hay. */
+  muebleNombre?: string | null;
 };
 
 const DIAS = [
@@ -789,6 +791,13 @@ export function DisponibilidadPanel({
                         {RECURSO_TIPO_LABEL[recurso.tipo as (typeof RECURSO_TIPOS)[number]] ?? recurso.tipo}
                         {recurso.capacidad > 1 ? ` · capacidad ${recurso.capacidad}` : ""}
                       </p>
+                      {/* Plan 11: chip solo lectura — el mueble enlazado se
+                          administra desde el plano, no desde la agenda. */}
+                      {recurso.muebleNombre ? (
+                        <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-accent/60 px-2 py-0.5 text-[10px] font-medium text-accent-foreground">
+                          Mueble: {recurso.muebleNombre}
+                        </p>
+                      ) : null}
                     </div>
                     {!recurso.activo ? <StatusBadge tone="neutral">inactivo</StatusBadge> : null}
                     <Button

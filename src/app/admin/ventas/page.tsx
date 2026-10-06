@@ -3,14 +3,21 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AdminPageHeader } from "@/components/admin/page-header";
+import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge, type StatusTone } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
-import { clientes } from "@/db/schema/core";
-import { ventas } from "@/db/schema/operations";
+import { clientes, usuarios } from "@/db/schema/core";
+import {
+  detalleVentasMembresias,
+  detalleVentasPaquetes,
+  detalleVentasProductos,
+  detalleVentasServicios,
+  ventas,
+} from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate, formatTime, todayDateInput } from "@/lib/format";
@@ -86,9 +93,24 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
       fecha: fechaVenta,
       clienteNombre: clientes.nombre,
       clienteApellidoPaterno: clientes.apellidoPaterno,
+      // Quien cobró la venta (ventas.usuario_id → usuarios).
+      vendedorNombre: usuarios.nombre,
+      // Piezas del ticket (servicios + productos + paquetes + membresías) como
+      // subselects escalares en la misma consulta: sin queries extra ni N+1.
+      articulos: sql<number>`(
+        coalesce((select sum(dvs.cantidad) from ${detalleVentasServicios} dvs
+           where dvs.venta_id = ${ventas.id} and dvs.activo), 0)
+        + coalesce((select sum(dvp.cantidad) from ${detalleVentasProductos} dvp
+           where dvp.venta_id = ${ventas.id} and dvp.activo), 0)
+        + coalesce((select sum(dvq.cantidad) from ${detalleVentasPaquetes} dvq
+           where dvq.venta_id = ${ventas.id} and dvq.activo), 0)
+        + coalesce((select sum(dvm.cantidad) from ${detalleVentasMembresias} dvm
+           where dvm.venta_id = ${ventas.id} and dvm.activo), 0)
+      )::int`,
     })
     .from(ventas)
     .leftJoin(clientes, eq(ventas.clienteId, clientes.id))
+    .leftJoin(usuarios, eq(ventas.usuarioId, usuarios.id))
     .where(and(...conditions))
     .orderBy(desc(fechaVenta), desc(ventas.id))
     .limit(PAGE_SIZE + 1)
@@ -107,6 +129,83 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
       sucursalId,
       extra: { desde, hasta, estado, q, page: String(nextPage) },
     });
+
+  type VentaRow = (typeof pageRows)[number];
+  const estadoVentaDe = (venta: VentaRow) =>
+    ESTADOS.includes(venta.estado as (typeof ESTADOS)[number])
+      ? (venta.estado as (typeof ESTADOS)[number])
+      : "en_proceso";
+  const ticketHref = (ventaId: string) =>
+    buildAdminHref("/pos", {
+      organizationId,
+      sucursalId,
+      extra: { ventaId, returnTo: currentHref },
+    });
+
+  const columns: Array<DataTableColumn<VentaRow>> = [
+    {
+      id: "fecha",
+      header: "Fecha de cobro",
+      cell: (venta) => (
+        <span className="whitespace-nowrap text-muted-foreground">
+          {formatDate(venta.fecha, { timeZone })} · {formatTime(venta.fecha, { timeZone })}
+        </span>
+      ),
+    },
+    {
+      id: "cliente",
+      header: "Cliente",
+      cell: (venta) => (
+        <p className="font-medium text-foreground">
+          {[venta.clienteNombre, venta.clienteApellidoPaterno].filter(Boolean).join(" ") || GLOSARIO.clienteDePaso}
+        </p>
+      ),
+    },
+    {
+      id: "vendedor",
+      header: "Vendedor",
+      cell: (venta) => <span className="text-muted-foreground">{venta.vendedorNombre ?? "—"}</span>,
+      hideBelow: "lg",
+    },
+    {
+      id: "articulos",
+      header: "Artículos",
+      cell: (venta) => <span className="tabular-nums text-muted-foreground">{venta.articulos}</span>,
+      align: "right",
+    },
+    {
+      id: "estado",
+      header: "Estado",
+      cell: (venta) => {
+        const estadoVenta = estadoVentaDe(venta);
+        return <StatusBadge tone={ESTADO_TONE[estadoVenta]}>{ESTADO_LABEL[estadoVenta]}</StatusBadge>;
+      },
+    },
+    {
+      id: "total",
+      header: "Total",
+      cell: (venta) => (
+        <span className="font-semibold tabular-nums">
+          {formatCurrency(Number(venta.total) + Number(venta.propina), { currency })}
+        </span>
+      ),
+      align: "right",
+    },
+    {
+      id: "accion",
+      header: "Acción",
+      cell: (venta) => (
+        <Link
+          className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-xs font-medium text-primary hover:bg-muted/60"
+          href={ticketHref(venta.id)}
+        >
+          Abrir ticket
+        </Link>
+      ),
+      align: "right",
+      stickyEnd: true,
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -156,21 +255,14 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
         <>
           <RegistroList>
             {pageRows.map((venta) => {
-              const estadoVenta = ESTADOS.includes(venta.estado as (typeof ESTADOS)[number])
-                ? (venta.estado as (typeof ESTADOS)[number])
-                : "en_proceso";
-              const href = buildAdminHref("/pos", {
-                organizationId,
-                sucursalId,
-                extra: { ventaId: venta.id, returnTo: currentHref },
-              });
+              const estadoVenta = estadoVentaDe(venta);
               const cliente = [venta.clienteNombre, venta.clienteApellidoPaterno].filter(Boolean).join(" ") || GLOSARIO.clienteDePaso;
               return (
                 <RegistroCard
                   acciones={
                     <Link
                       className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-xs font-medium text-primary hover:bg-muted/60"
-                      href={href}
+                      href={ticketHref(venta.id)}
                     >
                       Abrir ticket
                     </Link>
@@ -178,6 +270,8 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
                   badge={<StatusBadge tone={ESTADO_TONE[estadoVenta]}>{ESTADO_LABEL[estadoVenta]}</StatusBadge>}
                   campos={[
                     { label: "Cobro", value: `${formatDate(venta.fecha, { timeZone })} · ${formatTime(venta.fecha, { timeZone })}` },
+                    ...(venta.vendedorNombre ? [{ label: "Vendedor", value: venta.vendedorNombre }] : []),
+                    { label: "Artículos", value: String(venta.articulos) },
                     { label: "Total", value: formatCurrency(Number(venta.total) + Number(venta.propina), { currency }) },
                   ]}
                   key={venta.id}
@@ -187,53 +281,12 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
             })}
           </RegistroList>
           <div className="hidden overflow-hidden rounded-2xl border border-border bg-card shadow-sm md:block">
-            <div className="overflow-x-auto">
-            <table className="w-full min-w-[680px] text-sm">
-              <thead className="border-b border-border bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Fecha de cobro</th>
-                  <th className="px-4 py-3 font-medium">Cliente</th>
-                  <th className="px-4 py-3 font-medium">Estado</th>
-                  <th className="px-4 py-3 text-right font-medium">Total</th>
-                  <th className="px-4 py-3 text-right font-medium">Acción</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pageRows.map((venta) => {
-                  const estadoVenta = ESTADOS.includes(venta.estado as (typeof ESTADOS)[number])
-                    ? (venta.estado as (typeof ESTADOS)[number])
-                    : "en_proceso";
-                  const href = buildAdminHref("/pos", {
-                    organizationId,
-                    sucursalId,
-                    extra: { ventaId: venta.id, returnTo: currentHref },
-                  });
-                  return (
-                    <tr className="border-b border-border last:border-0" key={venta.id}>
-                      <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                        {formatDate(venta.fecha, { timeZone })} · {formatTime(venta.fecha, { timeZone })}
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="font-medium text-foreground" title={venta.id}>{[venta.clienteNombre, venta.clienteApellidoPaterno].filter(Boolean).join(" ") || GLOSARIO.clienteDePaso}</p>
-                      </td>
-                      <td className="px-4 py-3"><StatusBadge tone={ESTADO_TONE[estadoVenta]}>{ESTADO_LABEL[estadoVenta]}</StatusBadge></td>
-                      <td className="px-4 py-3 text-right font-semibold tabular-nums">
-                        {formatCurrency(Number(venta.total) + Number(venta.propina), { currency })}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <Link
-                          className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-xs font-medium text-primary hover:bg-muted/60"
-                          href={href}
-                        >
-                          Abrir ticket
-                        </Link>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-            </div>
+            <DataTable
+              columns={columns}
+              minWidth="860px"
+              rowKey={(venta) => venta.id}
+              rows={pageRows}
+            />
           </div>
         </>
       )}

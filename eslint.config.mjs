@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     ".open-next/**",
     ".wrangler/**",
     "next-env.d.ts",
+    // Generado por `wrangler types` (cf:typegen): sus eslint-disable sin uso
+    // cambian con cada versión de workerd y no son accionables.
+    "worker-configuration.d.ts",
   ]),
 ]);
 

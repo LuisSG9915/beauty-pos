@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertDialog as AlertDialogPrimitive } from "@base-ui/react/alert-dialog";
-import type { ComponentProps, ReactElement } from "react";
+import { useState, type ComponentProps, type ReactElement } from "react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -137,6 +137,9 @@ function ConfirmDialog({
   destructive = true,
   onConfirm,
 }: ConfirmDialogProps) {
+  // Antidoble-clic: `Close` desmonta el popup al instante, pero un segundo
+  // clic en la ventana de salida no debe disparar otra vez la acción.
+  const [confirmando, setConfirmando] = useState(false);
   return (
     <AlertDialogPrimitive.Root
       defaultOpen={defaultOpen}
@@ -153,7 +156,20 @@ function ConfirmDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>{cancelLabel}</AlertDialogCancel>
-          <AlertDialogAction destructive={destructive} onClick={onConfirm}>
+          <AlertDialogAction
+            destructive={destructive}
+            disabled={confirmando}
+            onClick={(event) => {
+              if (confirmando) {
+                event.preventDefault();
+                return;
+              }
+              setConfirmando(true);
+              onConfirm?.();
+              // Reactiva el botón tras la animación de cierre (~150 ms).
+              window.setTimeout(() => setConfirmando(false), 400);
+            }}
+          >
             {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>

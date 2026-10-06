@@ -811,6 +811,130 @@ export async function rescheduleCita(formData: FormData): Promise<CitaMutationRe
   }
 }
 
+const duracionSchema = z.object({
+  organizacionId: z.string().uuid(),
+  citaId: z.string().uuid(),
+  // Rango alineado al asa de la tarjeta: snap de 15 min, 15–720.
+  duracionMinutos: z.coerce.number().int().min(15).max(720),
+  version: z.coerce.number().int().min(1).optional(),
+});
+
+/**
+ * Ajusta la duración de una cita (asa inferior de la tarjeta) conservando su
+ * inicio, profesional y estado. Valida múltiplo de 15, versión optimista y
+ * disponibilidad contra citas, bloqueos y recursos existentes. No encola aviso
+ * al cliente: la hora de inicio no cambia.
+ */
+export async function cambiarDuracionCita(formData: FormData): Promise<CitaMutationResult> {
+  const result = duracionSchema.safeParse(Object.fromEntries(formData.entries()));
+  if (!result.success) {
+    return { success: false, error: "La duración debe ser un múltiplo de 15 entre 15 y 720 minutos." };
+  }
+  const input = result.data;
+  if (input.duracionMinutos % 15 !== 0) {
+    return { success: false, error: "La duración debe ser múltiplo de 15 minutos." };
+  }
+  const access = await checkPermission(input.organizacionId, "agenda.editar");
+  if (!access) return { success: false, error: "No tienes permiso para editar la agenda." };
+  const userId = access.user.id;
+  const db = getDatabase();
+
+  try {
+    const outcome = await db.transaction(async (tx): Promise<CitaMutationResult> => {
+      const referencia = await getCita(tx, input.organizacionId, input.citaId);
+      if (!referencia || !referencia.activo) {
+        return { success: false, error: "La cita no existe." };
+      }
+      if (!canAccessBranch(access, referencia.sucursalId)) {
+        return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
+      }
+      const sucursal = await lockSucursalAgenda(tx, input.organizacionId, referencia.sucursalId);
+      if (!sucursal) return { success: false, error: "La sucursal ya no existe." };
+      // Relectura bajo el lock de sucursal para validar el estado más reciente.
+      const cita = await getCita(tx, input.organizacionId, input.citaId);
+      if (!cita || !cita.activo) return { success: false, error: "La cita no existe." };
+      if (!isCitaEditable(cita.estado)) {
+        return {
+          success: false,
+          error: "Solo se puede ajustar la duración de citas pendientes, confirmadas o en proceso.",
+        };
+      }
+      if (!versionCoincide(cita, input.version)) {
+        return { success: false, error: CITA_STALE_MESSAGE };
+      }
+      if (input.duracionMinutos === cita.duracionMinutos) {
+        return { success: true, message: "La duración ya era la indicada." };
+      }
+
+      // La cita conserva sus recursos asignados al cambiar duración.
+      const recursoIds = await recursosDeCita(tx, cita.id);
+      const disponibilidad = await validarDisponibilidadCita(tx, {
+        organizacionId: input.organizacionId,
+        sucursalId: cita.sucursalId,
+        usuarioId: cita.usuarioId,
+        fechaHora: cita.fechaHora,
+        duracionMinutos: input.duracionMinutos,
+        zonaHoraria: sucursal.zonaHoraria,
+        ignoreCitaId: cita.id,
+        capacidadSinAsignar: sucursal.capacidadSinAsignar,
+        recursoIds,
+      });
+      if (!disponibilidad.ok) {
+        const sugerencias = await sugerenciasEnConflicto(tx, {
+          organizacionId: input.organizacionId,
+          sucursalId: cita.sucursalId,
+          usuarioId: cita.usuarioId,
+          fechaHora: cita.fechaHora,
+          duracionMinutos: input.duracionMinutos,
+          zonaHoraria: sucursal.zonaHoraria,
+          capacidadSinAsignar: sucursal.capacidadSinAsignar,
+          ignoreCitaId: cita.id,
+          recursoIds,
+        });
+        return { success: false, error: violacionesAError(disponibilidad), sugerencias };
+      }
+
+      await tx
+        .update(citas)
+        .set({
+          duracionMinutos: input.duracionMinutos,
+          version: cita.version + 1,
+          updatedBy: userId,
+        })
+        .where(eq(citas.id, cita.id));
+      await registrarHistorialCita(tx, {
+        citaId: cita.id,
+        organizacionId: input.organizacionId,
+        usuarioId: userId,
+        accion: "duracion",
+        detalle: { de: cita.duracionMinutos, a: input.duracionMinutos },
+      });
+      await auditEvent(tx, {
+        organizacionId: input.organizacionId,
+        sucursalId: cita.sucursalId,
+        usuarioId: userId,
+        accion: "agenda.cita_duracion",
+        entidad: "citas",
+        entidadId: cita.id,
+        detalle: {
+          duracionDe: cita.duracionMinutos,
+          duracionA: input.duracionMinutos,
+        },
+      });
+      return { success: true, message: "Duración actualizada." };
+    });
+
+    if (outcome.success) {
+      revalidatePath("/admin/agenda");
+      revalidatePath("/admin/pos");
+    }
+    return outcome;
+  } catch (error) {
+    console.error("cambiarDuracionCita", error);
+    return { success: false, error: "No se pudo cambiar la duración." };
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Disponibilidad: horarios, bloqueos y capacidad "sin asignar"          */
 /* ------------------------------------------------------------------ */

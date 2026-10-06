@@ -6,10 +6,10 @@ import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { catRoles, invitacionesUsuarios, relMiembrosRoles } from "@/db/schema/access";
-import { miembrosOrganizaciones, relUsuariosSucursales, sucursales } from "@/db/schema/core";
+import { miembrosOrganizaciones } from "@/db/schema/core";
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
 import { auditEvent } from "@/lib/audit";
-import { assertBranchScope, canAccessBranch, checkPermission } from "@/lib/auth/authorization";
+import { assertBranchScope, checkPermission } from "@/lib/auth/authorization";
 import { revalidateCatalogos } from "@/lib/catalogo-cache";
 import { issueInvitation } from "@/lib/invitations";
 
@@ -167,97 +167,6 @@ export async function setMemberRoles(
   revalidatePath("/admin/usuarios");
   revalidateCatalogos(input.organizacionId);
   return actionSuccess("Roles actualizados.");
-}
-
-const branchesSchema = memberSchema.extend({
-  sucursalIds: z.array(z.string().uuid()).max(50),
-});
-
-/**
- * Reemplaza las sucursales asignadas de un miembro (`usuarios.editar`).
- * Solo puede otorgarse acceso a sucursales dentro del alcance propio.
- */
-export async function setMemberBranches(
-  _previousState: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const sucursalIds = [...new Set(formData.getAll("sucursalIds").map(String).filter(Boolean))];
-  const parsed = parseWithSchema(branchesSchema, {
-    organizacionId: formData.get("organizacionId"),
-    miembroId: formData.get("miembroId"),
-    sucursalIds,
-  });
-  if (!parsed.success) return parsed.state;
-  const input = parsed.data;
-
-  const access = await checkPermission(input.organizacionId, "usuarios.editar");
-  if (!access) return actionError("No tienes permiso para editar miembros.");
-  const { user } = access;
-
-  const member = await findMember(input.organizacionId, input.miembroId);
-  if (!member) return actionError("El miembro no pertenece a la organización.");
-  if (member.usuarioId === user.id) {
-    return actionError("No puedes modificar tus propias sucursales.");
-  }
-
-  const db = getDatabase();
-  try {
-    await db.transaction(async (tx) => {
-      if (input.sucursalIds.length > 0) {
-        const valid = await tx
-          .select({ id: sucursales.id })
-          .from(sucursales)
-          .where(
-            and(
-              inArray(sucursales.id, input.sucursalIds),
-              eq(sucursales.organizacionId, input.organizacionId),
-              eq(sucursales.activo, true),
-            ),
-          );
-        if (valid.length !== input.sucursalIds.length) {
-          throw new Error("Una o más sucursales no son válidas.");
-        }
-        for (const sucursalId of input.sucursalIds) {
-          if (!canAccessBranch(access, sucursalId)) {
-            throw new Error("No puedes asignar sucursales fuera de tu alcance.");
-          }
-        }
-      }
-
-      await tx
-        .delete(relUsuariosSucursales)
-        .where(
-          and(
-            eq(relUsuariosSucursales.organizacionId, input.organizacionId),
-            eq(relUsuariosSucursales.usuarioId, member.usuarioId),
-          ),
-        );
-      if (input.sucursalIds.length > 0) {
-        await tx.insert(relUsuariosSucursales).values(
-          input.sucursalIds.map((sucursalId) => ({
-            organizacionId: input.organizacionId,
-            usuarioId: member.usuarioId,
-            sucursalId,
-            createdBy: user.id,
-          })),
-        );
-      }
-      await auditEvent(tx, {
-        organizacionId: input.organizacionId,
-        usuarioId: user.id,
-        accion: "miembro.sucursales",
-        entidad: "miembro",
-        entidadId: member.usuarioId,
-        detalle: { sucursalIds: input.sucursalIds },
-      });
-    });
-  } catch (error) {
-    return actionError(error instanceof Error ? error.message : "No se pudieron actualizar las sucursales.");
-  }
-
-  revalidatePath("/admin/usuarios");
-  revalidateCatalogos(input.organizacionId);
-  return actionSuccess("Sucursales actualizadas.");
 }
 
 const toggleSchema = memberSchema.extend({
