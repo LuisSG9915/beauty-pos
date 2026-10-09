@@ -1,13 +1,16 @@
 import { createHash, randomBytes } from "node:crypto";
 
-import { and, eq, gt, lt } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
+import { withDbRetry } from "@/db/retry";
 import { clientes, organizaciones, sucursales } from "@/db/schema/core";
 import { servicios } from "@/db/schema/catalogs";
-import { citas, detalleCitasServicios, rateLimitEventos, reservasGestionTokens } from "@/db/schema/operations";
+import { citas, clientesFichasTecnicas, detalleCitasServicios, reservasGestionTokens } from "@/db/schema/operations";
 import { auditEvent } from "@/lib/audit";
+import { registrarYVerificarRateLimit } from "@/lib/rate-limit";
 import { getRuntimeEnv } from "@/lib/runtime-env";
+import { calcularRetencionSugerida } from "@/modules/expedientes/retencion";
 import {
   getOcupacionAgenda,
   lockSucursalAgenda,
@@ -25,7 +28,6 @@ import {
   LIMITES_RESERVAS,
   normalizarContacto,
   puedeGestionarCita,
-  rateLimitExcedido,
   slotsDisponiblesDia,
   type PoliticaReservas,
 } from "./rules";
@@ -76,43 +78,15 @@ export async function emitirTokenGestion(
 }
 
 /**
- * Antiabuso persistente: registra el intento y evalúa el límite de ventana
- * deslizante. Los intentos bloqueados también se registran (escalan el costo
- * de abusar). Devuelve true si el intento excede el límite.
+ * Antiabuso respaldado por Cloudflare KV / memoria: no toca CockroachDB ni genera tombstones MVCC.
+ * Devuelve true si el intento excede el límite.
  */
 async function excedeRateLimit(
-  tx: Tx,
+  _tx: Tx,
   params: { bucket: string; clave: string; limite: number; ventanaMs: number },
   ahora: Date,
 ): Promise<boolean> {
-  const corte = new Date(ahora.getTime() - params.ventanaMs);
-  const eventos = await tx
-    .select({ createdAt: rateLimitEventos.createdAt })
-    .from(rateLimitEventos)
-    .where(
-      and(
-        eq(rateLimitEventos.bucket, params.bucket),
-        eq(rateLimitEventos.clave, params.clave),
-        gt(rateLimitEventos.createdAt, corte),
-      ),
-    );
-  const excede = rateLimitExcedido(
-    eventos.map((e) => e.createdAt),
-    { limite: params.limite, ventanaMs: params.ventanaMs },
-    ahora,
-  );
-  await tx.insert(rateLimitEventos).values({ bucket: params.bucket, clave: params.clave });
-  // Poda: conserva solo el historial reciente de esta clave.
-  await tx
-    .delete(rateLimitEventos)
-    .where(
-      and(
-        eq(rateLimitEventos.bucket, params.bucket),
-        eq(rateLimitEventos.clave, params.clave),
-        lt(rateLimitEventos.createdAt, new Date(ahora.getTime() - params.ventanaMs * 4)),
-      ),
-    );
-  return excede;
+  return registrarYVerificarRateLimit(params, ahora);
 }
 
 /** Rate limit de creación pública: por IP+org y por contacto normalizado. */
@@ -255,6 +229,24 @@ function telefonoCoincide(row: ReservaGestionRow, telefono: string | undefined):
   return normalizarContacto(telefono) === row.clienteTelefono;
 }
 
+export type PasaporteBellezaPublico = {
+  antesUrl?: string | null;
+  despuesUrl?: string | null;
+  otrasFotosUrls: string[];
+  servicioNombre: string;
+  resumenCuidado: string | null;
+  rutinaCuidadoCasa: string[];
+  retencion: {
+    diasRecomendados: number;
+    fechaSugeridaIso: string;
+    diasRestantes: number;
+    estadoCiclo: "a_tiempo" | "ventana_optima" | "vencido";
+    tituloTratamiento: string;
+    motivoExplicativo: string;
+    linkReserva?: string;
+  };
+};
+
 export type ReservaGestionPublica = {
   estado: string;
   fechaHora: string;
@@ -273,6 +265,8 @@ export type ReservaGestionPublica = {
   origen: string;
   /** La reserva tiene teléfono registrado: las mutaciones lo pedirán. */
   verificacionContacto: boolean;
+  /** Pasaporte de Belleza con comparativa antes/después y cuidado en casa. */
+  pasaporteBelleza?: PasaporteBellezaPublico | null;
 };
 
 /**
@@ -308,6 +302,68 @@ export async function obtenerReservaPorToken(
     .set({ ultimoUsoAt: ahora })
     .where(eq(reservasGestionTokens.id, row.tokenId));
 
+  // Buscar ficha técnica asociada a la cita (para Pasaporte de Belleza)
+  const [ficha] = await db
+    .select({
+      id: clientesFichasTecnicas.id,
+      tipo: clientesFichasTecnicas.tipo,
+      formula: clientesFichasTecnicas.formula,
+      notas: clientesFichasTecnicas.notas,
+      fotosDetalle: clientesFichasTecnicas.fotosDetalle,
+      fotos: clientesFichasTecnicas.fotos,
+    })
+    .from(clientesFichasTecnicas)
+    .where(
+      and(
+        eq(clientesFichasTecnicas.citaId, row.cita.id),
+        eq(clientesFichasTecnicas.privada, false),
+        eq(clientesFichasTecnicas.activo, true),
+      ),
+    )
+    .limit(1);
+
+  const retencion = calcularRetencionSugerida({
+    fechaServicio: row.cita.fechaHora,
+    servicioNombre: row.servicio?.nombre,
+    formula: ficha?.formula,
+    tipoFicha: ficha?.tipo,
+    clienteNombre: row.cliente?.nombre,
+    salonNombre: row.organizacion.nombre,
+    telefonoCliente: row.clienteTelefono,
+    slugReserva: row.organizacion.slug,
+  });
+
+  const fotoAntesKey = ficha?.fotosDetalle?.find((f) => f.rol === "antes")?.claveR2;
+  const fotoDespuesKey = ficha?.fotosDetalle?.find((f) => f.rol === "despues")?.claveR2;
+  const otrasClaves = (ficha?.fotosDetalle ?? [])
+    .filter((f) => f.rol !== "antes" && f.rol !== "despues")
+    .map((f) => f.claveR2);
+
+  const fallbackAntes = !fotoAntesKey && ficha?.fotos && ficha.fotos.length > 0 ? ficha.fotos[0] : null;
+  const fallbackDespues = !fotoDespuesKey && ficha?.fotos && ficha.fotos.length > 1 ? ficha.fotos[1] : null;
+  const finalAntesKey = fotoAntesKey ?? fallbackAntes;
+  const finalDespuesKey = fotoDespuesKey ?? fallbackDespues;
+
+  const buildUrl = (k: string) => `/api/medios/${encodeURI(k)}?token=${token}`;
+
+  const pasaporteBelleza: PasaporteBellezaPublico = {
+    antesUrl: finalAntesKey ? buildUrl(finalAntesKey) : null,
+    despuesUrl: finalDespuesKey ? buildUrl(finalDespuesKey) : null,
+    otrasFotosUrls: otrasClaves.map(buildUrl),
+    servicioNombre: row.servicio?.nombre ?? "Servicio en salón",
+    resumenCuidado: ficha?.notas ?? ficha?.formula ?? null,
+    rutinaCuidadoCasa: retencion.rutinaCuidadoCasa,
+    retencion: {
+      diasRecomendados: retencion.diasRecomendados,
+      fechaSugeridaIso: retencion.fechaSugeridaIso,
+      diasRestantes: retencion.diasRestantes,
+      estadoCiclo: retencion.estadoCiclo,
+      tituloTratamiento: retencion.tituloTratamiento,
+      motivoExplicativo: retencion.motivoExplicativo,
+      linkReserva: retencion.linkReserva,
+    },
+  };
+
   const politica = politicaDe(row);
   const gestion = puedeGestionarCita(row.cita, politica, ahora);
   return {
@@ -326,6 +382,7 @@ export async function obtenerReservaPorToken(
     horizonteDias: politica.horizonteDias,
     origen: row.cita.origen,
     verificacionContacto: Boolean(row.clienteTelefono),
+    pasaporteBelleza,
   };
 }
 
@@ -341,7 +398,8 @@ export async function cancelarReservaPublica(token: string, telefono?: string): 
   const tokenHash = hashTokenGestion(token);
 
   try {
-    return await db.transaction(async (tx): Promise<GestionResult> => {
+    return await withDbRetry(() =>
+      db.transaction(async (tx): Promise<GestionResult> => {
       const row = await reservaPorHash(tx, tokenHash);
       if (!row || row.revocadoAt) return { ok: false, error: "Enlace inválido o revocado." };
 
@@ -399,7 +457,8 @@ export async function cancelarReservaPublica(token: string, telefono?: string): 
         tipo: TIPO_CANCELACION,
       });
       return { ok: true };
-    });
+    }),
+    );
   } catch (error) {
     console.error("cancelarReservaPublica", error);
     return { ok: false, error: "No se pudo cancelar la cita. Inténtalo de nuevo." };
@@ -423,7 +482,8 @@ export async function reagendarReservaPublica(
   const tokenHash = hashTokenGestion(token);
 
   try {
-    return await db.transaction(async (tx): Promise<GestionResult> => {
+    return await withDbRetry(() =>
+      db.transaction(async (tx): Promise<GestionResult> => {
       const row = await reservaPorHash(tx, tokenHash);
       if (!row || row.revocadoAt) return { ok: false, error: "Enlace inválido o revocado." };
 
@@ -512,7 +572,8 @@ export async function reagendarReservaPublica(
         gestionUrl: urlGestion(token),
       });
       return { ok: true };
-    });
+    }),
+    );
   } catch (error) {
     console.error("reagendarReservaPublica", error);
     return { ok: false, error: "No se pudo reagendar la cita. Inténtalo de nuevo." };

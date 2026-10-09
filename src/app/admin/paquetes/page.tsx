@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { togglePaquete } from "@/app/admin/paquetes/actions";
 import { PaqueteForm } from "@/app/admin/paquetes/paquete-form";
 import { FormSheet } from "@/components/admin/form-sheet";
+import { AdminNavTabs, CATALOGO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
@@ -95,7 +96,16 @@ export default async function PaquetesPage({ searchParams }: { searchParams: Sea
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader description="Paquetes prepagados: sesiones de un servicio que el cliente paga por adelantado." title="Paquetes" />
+      <AdminPageHeader
+        description="Paquetes prepagados: sesiones de un servicio que el cliente paga por adelantado."
+        tabs={
+          <AdminNavTabs
+            organizationId={organizationId}
+            tabs={CATALOGO_TABS}
+          />
+        }
+        title="Paquetes"
+      />
 
       <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />

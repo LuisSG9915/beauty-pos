@@ -78,6 +78,8 @@ export const gastos = pgTable(
     index("gastos_organizacion_idx").on(table.organizacionId),
     index("gastos_sucursal_fecha_idx").on(table.sucursalId, table.fechaGasto),
     index("gastos_categoria_idx").on(table.categoriaId),
+    index("gastos_medio_pago_idx").on(table.medioPagoId),
+    index("gastos_usuario_idx").on(table.usuarioId),
     // Un movimiento de caja pertenece a un solo gasto.
     uniqueIndex("gastos_movimiento_caja_uq")
       .on(table.movimientoCajaId)

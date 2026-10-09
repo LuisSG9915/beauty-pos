@@ -372,6 +372,27 @@
       "when": 1791247803325,
       "tag": "0052_brief_firebrand",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1791514656167,
+      "tag": "0053_white_nighthawk",
+      "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1791515143271,
+      "tag": "0054_reflective_guardsmen",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1791516358012,
+      "tag": "0055_mysterious_joshua_kane",
+      "breakpoints": true
     }
   ]
 }

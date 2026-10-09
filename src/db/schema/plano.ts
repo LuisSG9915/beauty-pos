@@ -189,6 +189,7 @@ export const mobiliario = pgTable(
     index("mobiliario_sucursal_idx").on(table.sucursalId),
     index("mobiliario_piso_idx").on(table.pisoId),
     index("mobiliario_organizacion_idx").on(table.organizacionId),
+    index("mobiliario_recurso_idx").on(table.recursoId),
     check(
       "mobiliario_tipo_chk",
       sql`${table.tipo} in ('asiento','mesa','tocador','lavacabezas','camilla','carrito','espejo','otro')`,

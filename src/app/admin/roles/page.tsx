@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { RoleCard } from "@/app/admin/roles/role-card";
 import { RoleForm } from "@/app/admin/roles/role-form";
 import { FormSheet } from "@/components/admin/form-sheet";
+import { AdminNavTabs, EQUIPO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
@@ -90,6 +91,12 @@ export default async function RolesPage({ searchParams }: { searchParams: Search
           ) : undefined
         }
         description="Roles del equipo y los permisos que otorgan dentro de la organización."
+        tabs={
+          <AdminNavTabs
+            organizationId={organizationId}
+            tabs={EQUIPO_TABS}
+          />
+        }
         title="Roles y permisos"
       />
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">

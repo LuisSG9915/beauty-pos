@@ -133,43 +133,48 @@ export function MiembroSucursalesForm({
 
       {todas ? (
         <p className="text-xs leading-5 text-muted-foreground">
-          Ve cualquier sucursal, incluidas las nuevas. Sin sucursal asignada = ve todas.
+          Ve cualquier sucursal, incluidas las nuevas (perfil administrativo).
         </p>
       ) : (
-        <div className="flex flex-wrap gap-2">
-          {sucursales.map((sucursal) => (
-            <label
-              className={cn(
-                "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
-                disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer",
-                seleccionadas.has(sucursal.id)
-                  ? "border-primary bg-accent/70 text-primary"
-                  : "border-border bg-card text-muted-foreground hover:border-accent-foreground/30",
-              )}
-              key={sucursal.id}
-            >
-              <input
-                checked={seleccionadas.has(sucursal.id)}
-                className="sr-only"
-                disabled={disabled}
-                name="sucursalIds"
-                onChange={(event) => alternar(sucursal.id, event.target.checked)}
-                type="checkbox"
-                value={sucursal.id}
-              />
-              {sucursal.nombre}
-            </label>
-          ))}
-          {fueraDeAlcance.map((nombre) => (
-            <span
-              className="inline-flex min-h-9 items-center rounded-full border border-dashed border-border bg-muted/60 px-3 text-xs font-medium text-muted-foreground"
-              key={nombre}
-              title="Fuera de tu alcance"
-            >
-              {nombre}
-            </span>
-          ))}
-        </div>
+        <>
+          <p className="text-xs leading-5 text-muted-foreground">
+            Sucursal fija asignada: las ventas, citas y operaciones de este trabajador se vincularán automáticamente a la sucursal seleccionada.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {sucursales.map((sucursal) => (
+              <label
+                className={cn(
+                  "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
+                  disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer",
+                  seleccionadas.has(sucursal.id)
+                    ? "border-primary bg-accent/70 text-primary"
+                    : "border-border bg-card text-muted-foreground hover:border-accent-foreground/30",
+                )}
+                key={sucursal.id}
+              >
+                <input
+                  checked={seleccionadas.has(sucursal.id)}
+                  className="sr-only"
+                  disabled={disabled}
+                  name="sucursalIds"
+                  onChange={(event) => alternar(sucursal.id, event.target.checked)}
+                  type="checkbox"
+                  value={sucursal.id}
+                />
+                {sucursal.nombre}
+              </label>
+            ))}
+            {fueraDeAlcance.map((nombre) => (
+              <span
+                className="inline-flex min-h-9 items-center rounded-full border border-dashed border-border bg-muted/60 px-3 text-xs font-medium text-muted-foreground"
+                key={nombre}
+                title="Fuera de tu alcance"
+              >
+                {nombre}
+              </span>
+            ))}
+          </div>
+        </>
       )}
 
       {sinElegir ? (

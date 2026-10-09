@@ -1,17 +1,31 @@
 "use server";
 
-import { and, eq, inArray, ne, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, ne, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
-import { clientes } from "@/db/schema/core";
-import { clientesConsentimientos, clientesFichasTecnicas, citas, FICHA_TIPOS } from "@/db/schema/operations";
+import { clientes, usuarios } from "@/db/schema/core";
+import {
+  citas,
+  clientesConsentimientos,
+  clientesFichasTecnicas,
+  FICHA_TIPOS,
+  type FichaFotoDetalle,
+  type FichaInsumo,
+} from "@/db/schema/operations";
 import { medios } from "@/db/schema/media";
-import { servicios } from "@/db/schema/catalogs";
+import { productos, servicios } from "@/db/schema/catalogs";
 import { auditEvent } from "@/lib/audit";
 import { checkPermission, hasPermission } from "@/lib/auth/authorization";
 import { revalidateCatalogos } from "@/lib/catalogo-cache";
+import {
+  fichaFotoDetalleSchema,
+  fichaInsumoSchema,
+  formatearResumenFormula,
+  obtenerConsumosInventario,
+} from "@/modules/expedientes/formulas";
+import { applyInventoryMovement } from "@/modules/inventory/service";
 
 const clientSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
@@ -94,10 +108,13 @@ const fichaSchema = z.object({
   id: z.string().uuid().optional().or(z.literal("")),
   organizacionId: z.string().uuid(),
   clienteId: z.string().uuid(),
+  sucursalId: z.string().uuid().optional().or(z.literal("")),
   citaId: z.string().uuid().optional().or(z.literal("")),
   servicioId: z.string().uuid().optional().or(z.literal("")),
   tipo: z.enum(FICHA_TIPOS),
   formula: z.string().trim().max(4000).optional().or(z.literal("")),
+  insumos: z.string().trim().optional().or(z.literal("")),
+  fotosDetalle: z.string().trim().optional().or(z.literal("")),
   tiempoPoseMinutos: z.coerce.number().int().min(0).max(1440).optional().or(z.literal("")),
   notas: z.string().trim().max(4000).optional().or(z.literal("")),
   // Llaves R2 en JSON (string[]) — se verifican contra `medios` antes de
@@ -129,7 +146,7 @@ export async function saveFichaTecnica(
   const db = getDatabase();
 
   const [cliente] = await db
-    .select({ id: clientes.id })
+    .select({ id: clientes.id, nombre: clientes.nombre })
     .from(clientes)
     .where(and(eq(clientes.id, input.clienteId), eq(clientes.organizacionId, input.organizacionId), eq(clientes.activo, true)))
     .limit(1);
@@ -152,6 +169,35 @@ export async function saveFichaTecnica(
     if (!servicio) return { error: "El servicio asociado no existe." };
   }
 
+  // Parsear insumos estructurados y fotos con rol
+  let insumosParsed: FichaInsumo[] = [];
+  if (input.insumos) {
+    try {
+      const rawInsumos = JSON.parse(input.insumos);
+      const parsed = z.array(fichaInsumoSchema).safeParse(rawInsumos);
+      if (parsed.success) {
+        insumosParsed = parsed.data;
+      }
+    } catch {
+      // Ignorar si no es JSON válido
+    }
+  }
+
+  let fotosDetalleParsed: FichaFotoDetalle[] = [];
+  if (input.fotosDetalle) {
+    try {
+      const rawFotos = JSON.parse(input.fotosDetalle);
+      const parsed = z.array(fichaFotoDetalleSchema).safeParse(rawFotos);
+      if (parsed.success) {
+        fotosDetalleParsed = parsed.data;
+      }
+    } catch {
+      // Ignorar si no es JSON válido
+    }
+  }
+
+  const formulaFinal = formatearResumenFormula(insumosParsed, input.formula);
+
   // Las llaves R2 deben existir en `medios` de la org, ligadas a la ficha que
   // se está creando (entidad 'ficha' + el uuid generado por el formulario).
   let clavesFotos: string[] = [];
@@ -159,17 +205,25 @@ export async function saveFichaTecnica(
     try {
       const parsed = JSON.parse(input.fotos) as unknown;
       if (
-        !Array.isArray(parsed) ||
-        parsed.length > MAX_FOTOS_FICHA ||
-        parsed.some((clave) => typeof clave !== "string" || clave.length > 500)
+        Array.isArray(parsed) &&
+        parsed.length <= MAX_FOTOS_FICHA &&
+        parsed.every((clave) => typeof clave === "string" && clave.length <= 500)
       ) {
-        return { error: "Las fotos adjuntas no son válidas." };
+        clavesFotos = [...new Set(parsed as string[])];
       }
-      clavesFotos = [...new Set(parsed as string[])];
     } catch {
       return { error: "Las fotos adjuntas no son válidas." };
     }
   }
+
+  if (fotosDetalleParsed.length > 0) {
+    for (const f of fotosDetalleParsed) {
+      if (!clavesFotos.includes(f.claveR2) && clavesFotos.length < MAX_FOTOS_FICHA) {
+        clavesFotos.push(f.claveR2);
+      }
+    }
+  }
+
   if (clavesFotos.length > 0) {
     if (!input.id) return { error: "Las fotos no se pudieron asociar a la ficha." };
     const existentes = await db
@@ -188,6 +242,40 @@ export async function saveFichaTecnica(
     }
   }
 
+  // Resolver sucursal para descuento de inventario
+  let targetSucursalId = input.sucursalId || null;
+  if (!targetSucursalId && input.citaId) {
+    const [citaData] = await db
+      .select({ sucursalId: citas.sucursalId })
+      .from(citas)
+      .where(and(eq(citas.id, input.citaId), eq(citas.organizacionId, input.organizacionId)))
+      .limit(1);
+    if (citaData) targetSucursalId = citaData.sucursalId;
+  }
+
+  const consumos = obtenerConsumosInventario(insumosParsed);
+  const advertenciasStock: string[] = [];
+  if (consumos.length > 0 && targetSucursalId) {
+    for (const item of consumos) {
+      try {
+        const movResult = await applyInventoryMovement(db, {
+          organizacionId: input.organizacionId,
+          sucursalId: targetSucursalId,
+          productoId: item.productoId,
+          tipo: "consumo",
+          cantidad: item.cantidad,
+          notas: `Consumo en servicio: ${item.nombre} (${cliente.nombre})`,
+          userId: user.id,
+        });
+        if (!movResult.success) {
+          advertenciasStock.push(`${item.nombre}: ${movResult.error ?? "error de stock"}`);
+        }
+      } catch (err) {
+        console.error("Error al registrar consumo de inventario en ficha:", err);
+      }
+    }
+  }
+
   await db.insert(clientesFichasTecnicas).values({
     ...(input.id ? { id: input.id } : {}),
     organizacionId: input.organizacionId,
@@ -196,13 +284,16 @@ export async function saveFichaTecnica(
     servicioId: input.servicioId || null,
     usuarioId: user.id,
     tipo: input.tipo,
-    formula: input.formula || null,
+    formula: formulaFinal || null,
+    insumos: insumosParsed,
+    fotosDetalle: fotosDetalleParsed,
     tiempoPoseMinutos: input.tiempoPoseMinutos === "" || input.tiempoPoseMinutos == null ? null : input.tiempoPoseMinutos,
     notas: input.notas || null,
     privada: esPrivada,
     fotos: clavesFotos,
     createdBy: user.id,
   });
+
   // Las alergias/notas privadas son dato sensible: se audita el tipo sin el contenido.
   await auditEvent(db, {
     organizacionId: input.organizacionId,
@@ -210,10 +301,85 @@ export async function saveFichaTecnica(
     accion: "expediente.ficha_creada",
     entidad: "cliente",
     entidadId: input.clienteId,
-    detalle: { tipo: input.tipo, privada: esPrivada },
+    detalle: { tipo: input.tipo, privada: esPrivada, insumosTotal: insumosParsed.length },
   });
+
   revalidatePath("/admin/clientes");
-  return { success: true, message: "Registro guardado en la ficha." };
+  revalidatePath("/admin/agenda");
+  revalidatePath("/admin/mi-dia");
+
+  let message = "Registro guardado en la ficha.";
+  if (advertenciasStock.length > 0) {
+    message += ` Nota: No se pudo descontar todo el stock (${advertenciasStock.join("; ")}).`;
+  }
+
+  return { success: true, message };
+}
+
+/** Obtiene el historial previo de fórmulas de un cliente para consulta y replicación rápida. */
+export async function getHistorialFormulasCliente(
+  organizacionId: string,
+  clienteId: string,
+  limit = 5,
+) {
+  const access = await checkPermission(organizacionId, "clientes.ver");
+  if (!access) return { error: "Sin permiso para ver expedientes." };
+  const db = getDatabase();
+  const puedePrivado = hasPermission(access, "expedientes.privado");
+
+  const whereConditions = [
+    eq(clientesFichasTecnicas.clienteId, clienteId),
+    eq(clientesFichasTecnicas.organizacionId, organizacionId),
+    eq(clientesFichasTecnicas.activo, true),
+    inArray(clientesFichasTecnicas.tipo, ["color", "tratamiento"]),
+  ];
+
+  if (!puedePrivado) {
+    whereConditions.push(eq(clientesFichasTecnicas.privada, false));
+  }
+
+  const filas = await db
+    .select({
+      id: clientesFichasTecnicas.id,
+      tipo: clientesFichasTecnicas.tipo,
+      formula: clientesFichasTecnicas.formula,
+      insumos: clientesFichasTecnicas.insumos,
+      tiempoPoseMinutos: clientesFichasTecnicas.tiempoPoseMinutos,
+      notas: clientesFichasTecnicas.notas,
+      fotos: clientesFichasTecnicas.fotos,
+      fotosDetalle: clientesFichasTecnicas.fotosDetalle,
+      createdAt: clientesFichasTecnicas.createdAt,
+      servicioNombre: servicios.nombre,
+      autorNombre: usuarios.nombre,
+    })
+    .from(clientesFichasTecnicas)
+    .leftJoin(servicios, eq(clientesFichasTecnicas.servicioId, servicios.id))
+    .leftJoin(usuarios, eq(clientesFichasTecnicas.usuarioId, usuarios.id))
+    .where(and(...whereConditions))
+    .orderBy(desc(clientesFichasTecnicas.createdAt))
+    .limit(limit);
+
+  return { success: true, data: filas };
+}
+
+/** Obtiene el catálogo de productos disponibles para usarse como insumos en fórmulas. */
+export async function getCatalogoInsumos(organizacionId: string) {
+  const access = await checkPermission(organizacionId, "clientes.ver");
+  if (!access) return { error: "Sin permiso para ver productos." };
+  const db = getDatabase();
+  const prods = await db
+    .select({
+      id: productos.id,
+      nombre: productos.nombre,
+      sku: productos.sku,
+      tipo: productos.tipo,
+    })
+    .from(productos)
+    .where(and(eq(productos.organizacionId, organizacionId), eq(productos.activo, true)))
+    .orderBy(asc(productos.nombre))
+    .limit(200);
+
+  return { success: true, data: prods };
 }
 
 export async function toggleFichaTecnicaActiva(formData: FormData) {

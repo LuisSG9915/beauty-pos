@@ -1,0 +1,21 @@
+CREATE INDEX "productos_unidad_medida_idx" ON "productos" USING btree ("unidad_medida_id");--> statement-breakpoint
+CREATE INDEX "compras_proveedor_idx" ON "compras" USING btree ("proveedor_id");--> statement-breakpoint
+CREATE INDEX "clientes_organizacion_fecha_idx" ON "clientes" USING btree ("organizacion_id","created_at");--> statement-breakpoint
+CREATE INDEX "rel_usuarios_sucursales_sucursal_idx" ON "rel_usuarios_sucursales" USING btree ("sucursal_id");--> statement-breakpoint
+CREATE INDEX "ajustes_pagos_venta_medio_origen_idx" ON "ajustes_pagos_venta" USING btree ("medio_pago_origen_id");--> statement-breakpoint
+CREATE INDEX "ajustes_pagos_venta_medio_destino_idx" ON "ajustes_pagos_venta" USING btree ("medio_pago_destino_id");--> statement-breakpoint
+CREATE INDEX "ajustes_pagos_venta_usuario_idx" ON "ajustes_pagos_venta" USING btree ("usuario_id");--> statement-breakpoint
+CREATE INDEX "anticipos_cliente_idx" ON "anticipos" USING btree ("cliente_id");--> statement-breakpoint
+CREATE INDEX "anticipos_medio_pago_idx" ON "anticipos" USING btree ("medio_pago_id");--> statement-breakpoint
+CREATE INDEX "anticipos_usuario_idx" ON "anticipos" USING btree ("usuario_id");--> statement-breakpoint
+CREATE INDEX "cliente_membresias_membresia_idx" ON "cliente_membresias" USING btree ("membresia_id");--> statement-breakpoint
+CREATE INDEX "cliente_membresias_sucursal_idx" ON "cliente_membresias" USING btree ("sucursal_id");--> statement-breakpoint
+CREATE INDEX "comprobantes_sucursal_idx" ON "comprobantes" USING btree ("sucursal_id");--> statement-breakpoint
+CREATE INDEX "comprobantes_cliente_idx" ON "comprobantes" USING btree ("cliente_id");--> statement-breakpoint
+CREATE INDEX "detalle_citas_servicios_servicio_idx" ON "detalle_citas_servicios" USING btree ("servicio_id");--> statement-breakpoint
+CREATE INDEX "detalle_ventas_comisiones_comision_idx" ON "detalle_ventas_comisiones" USING btree ("comision_id");--> statement-breakpoint
+CREATE INDEX "liquidaciones_comisiones_medio_pago_idx" ON "liquidaciones_comisiones" USING btree ("medio_pago_id");--> statement-breakpoint
+CREATE INDEX "liquidaciones_comisiones_movimiento_idx" ON "liquidaciones_comisiones" USING btree ("movimiento_caja_id");--> statement-breakpoint
+CREATE INDEX "ventas_promocion_idx" ON "ventas" USING btree ("promocion_id");--> statement-breakpoint
+CREATE INDEX "ventas_membresia_idx" ON "ventas" USING btree ("membresia_id");--> statement-breakpoint
+CREATE INDEX "mobiliario_recurso_idx" ON "mobiliario" USING btree ("recurso_id");

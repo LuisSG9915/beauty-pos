@@ -1,8 +1,11 @@
 "use client";
 
-import { Check, Pencil } from "lucide-react";
+import { Calendar, Check, CreditCard, Pencil, Receipt, Timer } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+
+import { crearPoseTimer, iniciarPoseTimerEnNavegador } from "@/modules/agenda/temporizador";
 
 import {
   cambiarEstadoMobiliario,
@@ -381,6 +384,109 @@ export function MobiliarioSheet({
             </SheetHeader>
 
             <div className="space-y-4">
+              {mueble.sesionActiva ? (
+                <div className="space-y-3.5 rounded-2xl border border-primary/25 bg-primary/5 p-4 shadow-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary">
+                      <span className="relative flex size-2">
+                        <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
+                        <span className="relative inline-flex size-2 rounded-full bg-primary" />
+                      </span>
+                      Sesión en curso
+                    </span>
+                    {mueble.sesionActiva.poseMinutos ? (
+                      <span className="flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                        <Timer aria-hidden="true" className="size-3.5" />
+                        Pose {mueble.sesionActiva.poseMinutos}m
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div>
+                    <h4 className="text-base font-bold text-foreground">
+                      {mueble.sesionActiva.clienteNombre || "Cliente de paso"}
+                    </h4>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {mueble.sesionActiva.servicioNombre || "Servicio en estación"}
+                      {mueble.sesionActiva.profesionalNombre
+                        ? ` · Atiende ${mueble.sesionActiva.profesionalNombre}`
+                        : ""}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 border-t border-primary/15 pt-2">
+                    <Button
+                      className="h-8 gap-1.5 rounded-xl text-xs"
+                      nativeButton={false}
+                      render={
+                        <Link
+                          href={`/admin/agenda?fecha=${mueble.sesionActiva.fechaHora.slice(0, 10)}`}
+                        />
+                      }
+                      size="sm"
+                      type="button"
+                      variant="outline"
+                    >
+                      <Calendar aria-hidden="true" className="size-3.5 text-muted-foreground" />
+                      Ver en agenda
+                    </Button>
+
+                    {mueble.sesionActiva.ventaId ? (
+                      <Button
+                        className="h-8 gap-1.5 rounded-xl text-xs"
+                        nativeButton={false}
+                        render={<Link href={`/admin/ventas?id=${mueble.sesionActiva.ventaId}`} />}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <Receipt aria-hidden="true" className="size-3.5 text-muted-foreground" />
+                        Ver ticket
+                      </Button>
+                    ) : (
+                      <Button
+                        className="h-8 gap-1.5 rounded-xl text-xs"
+                        nativeButton={false}
+                        render={
+                          <Link href={`/admin/ventas/nueva?citaId=${mueble.sesionActiva.citaId}`} />
+                        }
+                        size="sm"
+                        type="button"
+                        variant="secondary"
+                      >
+                        <CreditCard aria-hidden="true" className="size-3.5 text-primary" />
+                        Cobrar ticket
+                      </Button>
+                    )}
+
+                    {mueble.sesionActiva.poseMinutos ? (
+                      <Button
+                        className="h-8 gap-1.5 rounded-xl border-amber-500/30 bg-amber-500/10 text-xs font-semibold text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
+                        onClick={() => {
+                          const nuevo = crearPoseTimer({
+                            citaId: mueble.sesionActiva?.citaId ?? mueble.id,
+                            clienteNombre: mueble.sesionActiva?.clienteNombre || "Cliente",
+                            servicioNombre:
+                              mueble.sesionActiva?.servicioNombre || "Coloración / Tratamiento",
+                            estacionNombre: mueble.nombre,
+                            minutosTotales: mueble.sesionActiva?.poseMinutos || 30,
+                            tipo: "color",
+                          });
+                          iniciarPoseTimerEnNavegador(nuevo);
+                          toast.success(`Cronómetro activado (${nuevo.minutosTotales} min)`);
+                        }}
+                        size="sm"
+                        type="button"
+                        variant="outline"
+                      >
+                        <Timer aria-hidden="true" className="size-3.5 text-amber-600 dark:text-amber-400" />
+                        Cronómetro
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+
               {mueble.fotoClaveR2 ? (
                 // eslint-disable-next-line @next/next/no-img-element -- la ruta exige sesión; next/image no reenvía cookies
                 <img

@@ -759,20 +759,29 @@ export function CitaSidePanel({
         </section>
       ) : null}
 
-      {/* Ficha técnica: registro rápido mientras la cita está en proceso. */}
-      {cita.estado === "en_proceso" && cita.clienteId ? (
-        <details className="rounded-xl border border-border bg-muted/60 px-4 py-3">
-          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-primary select-none">
-            Registrar en ficha técnica
+      {/* Ficha técnica: registro rápido de recetario y fórmulas del servicio. */}
+      {cita.clienteId ? (
+        <details
+          className="rounded-xl border border-border bg-card p-4 shadow-sm"
+          open={cita.estado === "en_proceso"}
+        >
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-primary select-none flex items-center justify-between">
+            <span>Ficha técnica & Fórmulas</span>
+            <span className="text-[11px] font-normal text-muted-foreground">
+              {cita.estado === "en_proceso" ? "servicio en curso" : "ver o registrar"}
+            </span>
           </summary>
-          <div className="mt-3">
+          <div className="mt-3 border-t border-border pt-3">
             <FichaForm
               citaId={cita.id}
               clienteId={cita.clienteId}
+              clienteNombre={cita.clienteNombre ?? undefined}
               compact
               onSaved={onToggleServicio}
               organizationId={organizationId}
               servicioId={cita.servicios[0]?.id}
+              servicioNombre={cita.servicios[0]?.nombre}
+              sucursalId={cita.sucursalId}
             />
           </div>
         </details>

@@ -416,9 +416,45 @@ export function PlanoBoard({
     const nombreVisible = m.nombre.slice(0, Math.max(4, Math.floor((rect.ancho * CELDA - 14) / 6.2)));
     const enMantenimiento = m.estado === "mantenimiento";
     const deBaja = m.estado === "baja";
+    const sesion = m.sesionActiva;
+    const ocupado = Boolean(sesion);
+    const enPose = Boolean(sesion?.poseMinutos);
+    const listoCobro = sesion?.ventaEstado === "en_proceso" || (sesion?.estado === "completada" && Boolean(sesion?.ventaId));
+
+    const fillColor = enMantenimiento
+      ? "var(--warning-soft)"
+      : enPose
+        ? "var(--warning-soft)"
+        : listoCobro
+          ? "var(--info-soft, #e0f2fe)"
+          : ocupado
+            ? "var(--success-soft)"
+            : "var(--muted)";
+
+    const strokeColor = enMantenimiento
+      ? "var(--warning)"
+      : enPose
+        ? "var(--warning)"
+        : listoCobro
+          ? "var(--info, #0284c7)"
+          : ocupado
+            ? "var(--success)"
+            : "var(--muted-foreground)";
+
+    const strokeOpacity = enMantenimiento || ocupado || enPose || listoCobro ? 0.95 : 0.45;
+    const strokeWidth = ocupado || enPose || listoCobro ? 2 : 1.4;
+
+    const labelEstadoVivo = enPose
+      ? `En pose (${sesion?.clienteNombre ?? ""})`
+      : listoCobro
+        ? `Listo para cobro (${sesion?.clienteNombre ?? ""})`
+        : ocupado
+          ? `En atención (${sesion?.clienteNombre ?? ""})`
+          : MOBILIARIO_ESTADO_LABEL[m.estado as keyof typeof MOBILIARIO_ESTADO_LABEL] ?? m.estado;
+
     return (
       <g
-        aria-label={`${m.nombre}, ${MOBILIARIO_TIPO_LABEL[m.tipo as MobiliarioTipo] ?? m.tipo}, ${MOBILIARIO_ESTADO_LABEL[m.estado as keyof typeof MOBILIARIO_ESTADO_LABEL] ?? m.estado}`}
+        aria-label={`${m.nombre}, ${MOBILIARIO_TIPO_LABEL[m.tipo as MobiliarioTipo] ?? m.tipo}, ${labelEstadoVivo}`}
         className={cn("outline-none", esArrastrado && "opacity-60", deBaja && "opacity-45")}
         key={m.id}
         onClick={() => clickElemento("mobiliario", m.id)}
@@ -435,10 +471,10 @@ export function PlanoBoard({
           height={rect.alto * CELDA - 6}
           rx={8}
           style={{
-            fill: enMantenimiento ? "var(--warning-soft)" : "var(--muted)",
-            stroke: enMantenimiento ? "var(--warning)" : "var(--muted-foreground)",
-            strokeOpacity: enMantenimiento ? 0.9 : 0.45,
-            strokeWidth: 1.4,
+            fill: fillColor,
+            stroke: strokeColor,
+            strokeOpacity,
+            strokeWidth,
             strokeDasharray: deBaja ? "5 3" : undefined,
           }}
           width={rect.ancho * CELDA - 6}
@@ -448,7 +484,7 @@ export function PlanoBoard({
         <Icono
           aria-hidden="true"
           height={14}
-          style={{ color: enMantenimiento ? "var(--warning)" : "var(--muted-foreground)" }}
+          style={{ color: enMantenimiento || enPose ? "var(--warning)" : ocupado ? "var(--success)" : "var(--muted-foreground)" }}
           width={14}
           x={8}
           y={7}
@@ -464,6 +500,21 @@ export function PlanoBoard({
         >
           {nombreVisible}
         </text>
+        {ocupado && sesion?.clienteNombre && rect.alto >= 1.5 ? (
+          <text
+            aria-hidden="true"
+            className="select-none font-medium truncate"
+            fontSize={9.5}
+            style={{
+              fill: enPose ? "var(--warning)" : ocupado ? "var(--success)" : "var(--foreground)",
+              pointerEvents: "none",
+            }}
+            x={8}
+            y={Math.min(rect.alto * CELDA - 10, 32)}
+          >
+            {enPose ? `⏱️ Pose: ${sesion.clienteNombre}` : sesion.clienteNombre}
+          </text>
+        ) : null}
         {puedeEditarPlano ? (
           <rect
             aria-label={`Cambiar tamaño de ${m.nombre}`}

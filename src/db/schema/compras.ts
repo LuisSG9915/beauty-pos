@@ -105,6 +105,7 @@ export const compras = pgTable(
   (table) => [
     index("compras_org_idx").on(table.organizacionId),
     index("compras_sucursal_estado_idx").on(table.sucursalId, table.estado),
+    index("compras_proveedor_idx").on(table.proveedorId),
     check(
       "compras_estado_chk",
       sql`${table.estado} in ('borrador','por_verificar','verificada','con_observacion','cancelada')`,

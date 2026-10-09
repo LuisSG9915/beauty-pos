@@ -77,6 +77,7 @@ export function canAccessBranch(access: ResolvedAccess, sucursalId: string): boo
  * por organización.
  */
 export type AccesoRow = {
+  organization_id?: string | null;
   membership_id: string | null;
   permisos: string[] | null;
   sucursales: string[] | null;
@@ -128,10 +129,11 @@ export type UsuarioSesion = {
 };
 
 const ACCESO_FRAGMENT = (
-  organizationId: string | null,
+  organizationId: SQL | string | null,
   usuarioRef: SQL | string,
 ) => sql`
   jsonb_build_object(
+    'organization_id', (${organizationId})::text,
     'membership_id', (select mo.id
        from miembros_organizaciones mo
       where mo.organizacion_id = ${organizationId}
@@ -284,6 +286,20 @@ export const resolveSessionContext = cache(async function resolveSessionContext(
         from usuarios
        where auth_usuario_id = ${authUsuarioId}
        limit 1
+    ),
+    target_org as (
+      select coalesce(
+        ${requestedOrganizationId}::uuid,
+        (
+          select mo.organizacion_id
+            from miembros_organizaciones mo
+            join organizaciones o on mo.organizacion_id = o.id and o.activo
+           where mo.usuario_id = (select id from u)
+             and mo.estado = 'activo'
+           order by o.nombre
+           limit 1
+        )
+      ) as id
     )
     select
       (select jsonb_build_object(
@@ -352,7 +368,7 @@ export const resolveSessionContext = cache(async function resolveSessionContext(
                             and rus.usuario_id = (select id from u)
                        )
                      )
-                ), '[]'::jsonb)
+                 ), '[]'::jsonb)
               ) order by o.nombre)
               from miembros_organizaciones mo
               join organizaciones o on mo.organizacion_id = o.id
@@ -361,11 +377,11 @@ export const resolveSessionContext = cache(async function resolveSessionContext(
           ), '[]'::jsonb)
       end as organizaciones,
       case
-        when ${requestedOrganizationId}::text is null
+        when (select id from target_org) is null
           or coalesce((select es_administrador_plataforma from u), false)
           then null
         else (
-          select ${ACCESO_FRAGMENT(requestedOrganizationId, sql`(select id from u)`)}
+          select ${ACCESO_FRAGMENT(sql`(select id from target_org)`, sql`(select id from u)`)}
         )
       end as acceso
   `);

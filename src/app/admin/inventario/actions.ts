@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
+import { withDbRetry } from "@/db/retry";
 import { actionError, parseWithSchema, type ActionState } from "@/lib/action-state";
 import { auditEvent } from "@/lib/audit";
 import { assertBranchScope, checkPermission } from "@/lib/auth/authorization";
@@ -35,8 +36,9 @@ export async function registrarMovimiento(
   const db = getDatabase();
 
   try {
-    const outcome = await db.transaction(async (tx) =>
-      applyInventoryMovement(tx, {
+    const outcome = await withDbRetry(() =>
+      db.transaction(async (tx) =>
+        applyInventoryMovement(tx, {
         organizacionId: input.organizacionId,
         sucursalId: input.sucursalId,
         productoId: input.productoId,
@@ -45,6 +47,7 @@ export async function registrarMovimiento(
         notas: input.notas,
         userId: user.id,
       }),
+      ),
     );
 
     if (!outcome.success) return outcome;

@@ -94,6 +94,7 @@ export const detalleCitasServicios = pgTable(
   (table) => [
     uniqueIndex("detalle_citas_servicios_cita_servicio_uq").on(table.citaId, table.servicioId),
     index("detalle_citas_servicios_cita_idx").on(table.citaId),
+    index("detalle_citas_servicios_servicio_idx").on(table.servicioId),
   ],
 );
 
@@ -178,6 +179,10 @@ export const ventas = pgTable(
     index("ventas_corte_idx").on(table.corteId),
     index("ventas_sucursal_cobrada_idx").on(table.sucursalId, table.cobradaAt),
     index("ventas_estado_idx").on(table.estado),
+    index("ventas_org_cliente_idx").on(table.organizacionId, table.clienteId),
+    index("ventas_org_usuario_idx").on(table.organizacionId, table.usuarioId),
+    index("ventas_promocion_idx").on(table.promocionId),
+    index("ventas_membresia_idx").on(table.membresiaId),
   ],
 );
 
@@ -197,6 +202,8 @@ export const detalleVentasServicios = pgTable(
   },
   (table) => [
     index("detalle_ventas_servicios_venta_idx").on(table.ventaId),
+    index("detalle_ventas_servicios_usuario_idx").on(table.usuarioId),
+    index("detalle_ventas_servicios_servicio_idx").on(table.servicioId),
   ],
 );
 
@@ -237,6 +244,7 @@ export const detalleVentasMediosPagos = pgTable(
   },
   (table) => [
     index("detalle_ventas_medios_pagos_venta_idx").on(table.ventaId),
+    index("detalle_ventas_medios_pagos_medio_idx").on(table.medioPagoId),
   ],
 );
 
@@ -261,6 +269,9 @@ export const ajustesPagosVenta = pgTable(
     index("ajustes_pagos_venta_organizacion_idx").on(table.organizacionId),
     index("ajustes_pagos_venta_venta_idx").on(table.ventaId),
     index("ajustes_pagos_venta_pago_idx").on(table.detalleVentaMedioPagoId),
+    index("ajustes_pagos_venta_medio_origen_idx").on(table.medioPagoOrigenId),
+    index("ajustes_pagos_venta_medio_destino_idx").on(table.medioPagoDestinoId),
+    index("ajustes_pagos_venta_usuario_idx").on(table.usuarioId),
     check("ajustes_pagos_venta_monto_chk", sql`${table.monto} > 0`),
   ],
 );
@@ -312,6 +323,8 @@ export const liquidacionesComisiones = pgTable(
     index("liquidaciones_comisiones_organizacion_idx").on(table.organizacionId),
     index("liquidaciones_comisiones_sucursal_idx").on(table.sucursalId, table.periodoHasta),
     index("liquidaciones_comisiones_usuario_idx").on(table.usuarioId),
+    index("liquidaciones_comisiones_medio_pago_idx").on(table.medioPagoId),
+    index("liquidaciones_comisiones_movimiento_idx").on(table.movimientoCajaId),
     check("liquidaciones_comisiones_estado_chk", sql`${table.estado} in ('confirmada','revertida')`),
     check("liquidaciones_comisiones_total_chk", sql`${table.total} > 0`),
   ],
@@ -340,6 +353,7 @@ export const detalleVentasComisiones = pgTable(
     index("detalle_ventas_comisiones_usuario_idx").on(table.usuarioId),
     index("detalle_ventas_comisiones_linea_idx").on(table.detalleVentaServicioId),
     index("detalle_ventas_comisiones_liquidacion_idx").on(table.liquidacionId),
+    index("detalle_ventas_comisiones_comision_idx").on(table.comisionId),
   ],
 );
 
@@ -387,9 +401,24 @@ export const movimientosInventario = pgTable(
 export const FICHA_TIPOS = ["color", "tratamiento", "alergia", "nota"] as const;
 export type FichaTipo = (typeof FICHA_TIPOS)[number];
 
+export type FichaInsumo = {
+  id: string;
+  productoId?: string | null;
+  nombre: string;
+  cantidad: number;
+  unidad: "g" | "ml" | "oz" | "gotas" | "unidad";
+  proporcion?: string | null;
+  descontarStock?: boolean;
+};
+
+export type FichaFotoDetalle = {
+  claveR2: string;
+  rol: "antes" | "despues" | "proceso";
+};
+
 // Ficha técnica del cliente: fórmulas de color, tratamientos, alergias y notas
-// registradas durante el servicio. `fotos` guarda URLs (antes/después) cuando
-// se configure almacenamiento (fase posterior).
+// registradas durante el servicio. `fotos` guarda URLs/claves (antes/después)
+// y `fotosDetalle` preserva los roles para comparativas.
 export const clientesFichasTecnicas = pgTable(
   "clientes_fichas_tecnicas",
   {
@@ -401,12 +430,14 @@ export const clientesFichasTecnicas = pgTable(
     usuarioId: uuid("usuario_id").references(() => usuarios.id),
     tipo: varchar("tipo", { length: 20 }).notNull(),
     formula: text("formula"),
+    insumos: jsonb("insumos").$type<FichaInsumo[]>().default(sql`'[]'::jsonb`).notNull(),
     tiempoPoseMinutos: integer("tiempo_pose_minutos"),
     notas: text("notas"),
     // Notas privadas del expediente: solo las ve/crea quien tiene el permiso
     // `expedientes.privado` (observaciones internas, datos sensibles).
     privada: boolean("privada").default(false).notNull(),
     fotos: jsonb("fotos").$type<string[]>().default(sql`'[]'::jsonb`).notNull(),
+    fotosDetalle: jsonb("fotos_detalle").$type<FichaFotoDetalle[]>().default(sql`'[]'::jsonb`).notNull(),
     activo: boolean("activo").default(true).notNull(),
     ...opAuditColumns,
   },
@@ -591,6 +622,7 @@ export const clavesIdempotencia = pgTable(
   },
   (table) => [
     uniqueIndex("claves_idempotencia_org_clave_uq").on(table.organizacionId, table.clave),
+    index("claves_idempotencia_fecha_idx").on(table.createdAt),
   ],
 );
 
@@ -668,6 +700,9 @@ export const anticipos = pgTable(
     index("anticipos_cita_idx").on(table.citaId),
     index("anticipos_venta_idx").on(table.ventaId),
     index("anticipos_sucursal_estado_idx").on(table.sucursalId, table.estado),
+    index("anticipos_cliente_idx").on(table.clienteId),
+    index("anticipos_medio_pago_idx").on(table.medioPagoId),
+    index("anticipos_usuario_idx").on(table.usuarioId),
     check("anticipos_estado_chk", sql`${table.estado} in ('vigente','aplicado','devuelto')`),
     check("anticipos_monto_chk", sql`${table.monto} > 0`),
   ],
@@ -798,6 +833,8 @@ export const clienteMembresias = pgTable(
     index("cliente_membresias_organizacion_idx").on(table.organizacionId),
     index("cliente_membresias_cliente_estado_idx").on(table.clienteId, table.estado),
     index("cliente_membresias_venta_idx").on(table.ventaId),
+    index("cliente_membresias_membresia_idx").on(table.membresiaId),
+    index("cliente_membresias_sucursal_idx").on(table.sucursalId),
     check("cliente_membresias_estado_chk", sql`${table.estado} in ('vigente','vencida','cancelado')`),
     check("cliente_membresias_vigencia_chk", sql`${table.vigenciaHasta} >= ${table.vigenciaDesde}`),
   ],
@@ -874,6 +911,8 @@ export const comprobantes = pgTable(
     index("comprobantes_organizacion_idx").on(table.organizacionId),
     index("comprobantes_venta_idx").on(table.ventaId),
     index("comprobantes_organizacion_estado_idx").on(table.organizacionId, table.estado),
+    index("comprobantes_sucursal_idx").on(table.sucursalId),
+    index("comprobantes_cliente_idx").on(table.clienteId),
     check("comprobantes_estado_chk", sql`${table.estado} in ('borrador','timbrada','cancelada','error')`),
   ],
 );

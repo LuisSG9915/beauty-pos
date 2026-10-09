@@ -21,6 +21,7 @@ import {
 import { BrandWordmark } from "@/components/brand-mark";
 import { ThemeModeSelector } from "@/components/theme-mode-selector";
 import { ToastProvider } from "@/components/ui/toast";
+import { PoseTimerBar } from "@/components/pose-timer-bar";
 import { trackPerformance } from "@/lib/telemetry/cliente";
 import { buildAdminHref, buildHref, firstParam } from "@/lib/url-context";
 
@@ -307,19 +308,35 @@ type NavWiring = {
   platformAdmin: boolean;
   permissionsByOrg?: Record<string, string[]> | null;
   capacidadesFaltantesByOrg?: Record<string, string[]> | null;
+  sucursalPreferidaPorOrg?: Record<string, string>;
 };
 
 /**
- * Resuelve la organización activa (URL o primera accesible) y los filtros
- * de permisos/capacidades que alimentan sidebar y tab bar.
+ * Resuelve la organización activa (URL o primera accesible), la sucursal activa
+ * y los filtros de permisos/capacidades que alimentan sidebar y tab bar.
  */
 function useNavWiring({
   organizations,
   platformAdmin,
   permissionsByOrg,
   capacidadesFaltantesByOrg,
+  sucursalPreferidaPorOrg = {},
 }: NavWiring) {
-  const organizationId = useEffectiveOrganization(organizations)?.id;
+  const searchParams = useSearchParams();
+  const organization = useEffectiveOrganization(organizations);
+  const organizationId = organization?.id;
+  const branches = organization?.sucursales ?? [];
+  const urlSucursalId = firstParam(searchParams.get("sucursalId"));
+  const preferidaId = organizationId ? sucursalPreferidaPorOrg[organizationId] : undefined;
+  const sucursalId =
+    (urlSucursalId && branches.some((branch) => branch.id === urlSucursalId)
+      ? urlSucursalId
+      : undefined) ??
+    (preferidaId && branches.some((branch) => branch.id === preferidaId)
+      ? preferidaId
+      : undefined) ??
+    branches[0]?.id;
+
   const permissions =
     platformAdmin || permissionsByOrg == null
       ? null
@@ -328,30 +345,32 @@ function useNavWiring({
     platformAdmin || capacidadesFaltantesByOrg == null
       ? null
       : (organizationId ? (capacidadesFaltantesByOrg[organizationId] ?? []) : []);
-  return { organizationId, permissions, capacidadesFaltantes };
+  return { organizationId, sucursalId, permissions, capacidadesFaltantes };
 }
 
 function SidebarNav({ wiring }: { wiring: NavWiring }) {
-  const { organizationId, permissions, capacidadesFaltantes } = useNavWiring(wiring);
+  const { organizationId, sucursalId, permissions, capacidadesFaltantes } = useNavWiring(wiring);
   return (
     <AdminSidebarNav
       capacidadesFaltantes={capacidadesFaltantes}
       organizationId={organizationId}
       permissions={permissions}
       platformAdmin={wiring.platformAdmin}
+      sucursalId={sucursalId}
     />
   );
 }
 
 /** Tab bar móvil con los accesos filtrados por los permisos de la org activa. */
 function ShellTabBar({ wiring }: { wiring: NavWiring }) {
-  const { organizationId, permissions, capacidadesFaltantes } = useNavWiring(wiring);
+  const { organizationId, sucursalId, permissions, capacidadesFaltantes } = useNavWiring(wiring);
   return (
     <AdminTabBar
       capacidadesFaltantes={capacidadesFaltantes}
       organizationId={organizationId}
       permissions={permissions}
       platformAdmin={wiring.platformAdmin}
+      sucursalId={sucursalId}
     />
   );
 }
@@ -530,6 +549,7 @@ export function AdminShell({
     platformAdmin: isPlatformAdmin,
     permissionsByOrg,
     capacidadesFaltantesByOrg,
+    sucursalPreferidaPorOrg,
   };
   return (
     <ToastProvider>
@@ -639,6 +659,7 @@ export function AdminShell({
         <Suspense fallback={null}>
           <ShellTabBar wiring={wiring} />
         </Suspense>
+        <PoseTimerBar />
       </div>
     </ToastProvider>
   );

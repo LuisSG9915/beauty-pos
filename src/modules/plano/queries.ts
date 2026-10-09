@@ -32,6 +32,19 @@ export type PlanoUbicacion = {
   productos: PlanoUbicacionProducto[];
 };
 
+export type PlanoSesionActiva = {
+  citaId: string;
+  clienteNombre: string | null;
+  profesionalNombre: string | null;
+  estado: string;
+  fechaHora: string;
+  duracionMinutos: number;
+  servicioNombre: string | null;
+  ventaId: string | null;
+  ventaEstado: string | null;
+  poseMinutos: number | null;
+};
+
 export type PlanoMobiliario = {
   id: string;
   /** null = mueble registrado sin colocar en el plano. */
@@ -51,6 +64,7 @@ export type PlanoMobiliario = {
   y: number;
   ancho: number;
   alto: number;
+  sesionActiva?: PlanoSesionActiva | null;
 };
 
 export type PlanoProducto = {
@@ -134,7 +148,45 @@ export async function cargarPlano(
             'fotoId', m.foto_id, 'fotoClaveR2', f.clave_r2,
             'fechaAdquisicion', m.fecha_adquisicion,
             'costo', m.costo::text, 'notas', m.notas,
-            'x', m.x, 'y', m.y, 'ancho', m.ancho, 'alto', m.alto
+            'x', m.x, 'y', m.y, 'ancho', m.ancho, 'alto', m.alto,
+            'sesionActiva', (
+              case when m.recurso_id is not null then (
+                select jsonb_build_object(
+                  'citaId', c.id,
+                  'clienteNombre', cl.nombre,
+                  'profesionalNombre', u.nombre,
+                  'estado', c.estado,
+                  'fechaHora', c.fecha_hora,
+                  'duracionMinutos', c.duracion_minutos,
+                  'servicioNombre', (
+                    select s.nombre
+                      from detalle_citas_servicios dcs
+                      join servicios s on s.id = dcs.servicio_id
+                     where dcs.cita_id = c.id
+                     limit 1
+                  ),
+                  'ventaId', c.venta_id,
+                  'ventaEstado', v.estado,
+                  'poseMinutos', (
+                    select ft.tiempo_pose_minutos
+                      from clientes_fichas_tecnicas ft
+                     where ft.cita_id = c.id and ft.activo and ft.tiempo_pose_minutos is not null
+                     order by ft.created_at desc
+                     limit 1
+                  )
+                )
+                from cita_recursos cr
+                join citas c on c.id = cr.cita_id and c.activo and c.estado in ('en_proceso', 'confirmada', 'completada')
+                left join clientes cl on cl.id = c.cliente_id
+                left join usuarios u on u.id = c.usuario_id
+                left join ventas v on v.id = c.venta_id and v.activo
+               where cr.recurso_id = m.recurso_id
+                 and c.fecha_hora >= now() - interval '6 hours'
+                 and c.fecha_hora <= now() + interval '6 hours'
+               order by (case when c.estado = 'en_proceso' then 0 when c.estado = 'confirmada' then 1 else 2 end), c.fecha_hora desc
+               limit 1
+              ) else null end
+            )
           ) order by m.nombre)
           from mobiliario m
           left join recursos r on r.id = m.recurso_id

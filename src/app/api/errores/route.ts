@@ -1,9 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
-import { rateLimitEventos } from "@/db/schema/operations";
 import { createAuth } from "@/lib/auth/server";
 import { registrarError } from "@/lib/observability/error-core";
 
@@ -24,29 +23,16 @@ const reporteSchema = z.object({
   rastro: z.array(z.string().max(100)).max(8).optional(),
 });
 
-async function limitePorClave(
-  db: ReturnType<typeof getDatabase>,
-  clave: string,
-): Promise<boolean> {
-  // Máx. 60 reportes/hora por clave (sid o IP): evita inundar incidentes.
-  const corte = new Date(Date.now() - 60 * 60_000);
-  const recientes = await db
-    .select({ createdAt: rateLimitEventos.createdAt })
-    .from(rateLimitEventos)
-    .where(
-      and(
-        eq(rateLimitEventos.bucket, "errores_cliente"),
-        eq(rateLimitEventos.clave, clave),
-        gt(rateLimitEventos.createdAt, corte),
-      ),
-    )
-    .limit(61);
-  if (recientes.length > 60) return true;
-  await db.insert(rateLimitEventos).values({
+import { registrarYVerificarRateLimit } from "@/lib/rate-limit";
+
+async function limitePorClave(clave: string): Promise<boolean> {
+  // Máx. 60 reportes/hora por clave (sid o IP): evita inundar incidentes sin tocar CockroachDB.
+  return registrarYVerificarRateLimit({
     bucket: "errores_cliente",
     clave,
+    limite: 60,
+    ventanaMs: 60 * 60_000,
   });
-  return false;
 }
 
 /**
@@ -72,7 +58,7 @@ export async function POST(request: NextRequest) {
       request.headers.get("cf-connecting-ip") ??
       request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
       "anon";
-    if (await limitePorClave(db, clave)) {
+    if (await limitePorClave(clave)) {
       return new NextResponse(null, { status: 204 });
     }
 

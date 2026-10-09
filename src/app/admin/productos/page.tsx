@@ -6,6 +6,7 @@ import { toggleProduct } from "@/app/admin/productos/actions";
 import { ProductForm } from "@/app/admin/productos/product-form";
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { FormSheet } from "@/components/admin/form-sheet";
+import { AdminNavTabs, CATALOGO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { ToggleActivo } from "@/components/admin/toggle-activo";
@@ -266,9 +267,24 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
             <Button nativeButton={false} render={<Link href={buildAdminHref("/unidades-medida", { organizationId })} />} variant="outline">
               Unidades
             </Button>
+            <Button
+              data-action-clave="1"
+              data-action-id="catalogo.productos.nuevo"
+              nativeButton={false}
+              render={<Link href={buildAdminHref("/productos", { organizationId, extra: { ...preserved, nuevo: "1" } })} />}
+              size="lg"
+            >
+              Nuevo
+            </Button>
           </>
         }
         description="Productos vendibles e insumos consumidos por los servicios."
+        tabs={
+          <AdminNavTabs
+            organizationId={organizationId}
+            tabs={CATALOGO_TABS}
+          />
+        }
         title="Productos e insumos"
       />
 
@@ -331,10 +347,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       <AdminCard
         actions={
           <Button
-            data-action-clave="1" size="lg"
-            data-action-id="catalogo.productos.nuevo"
             nativeButton={false}
             render={<Link href={buildAdminHref("/productos", { organizationId, extra: { ...preserved, nuevo: "1" } })} />}
+            variant="outline"
           >
             Nuevo
           </Button>

@@ -5,6 +5,7 @@ import { and, asc, desc, eq, gt, gte, sql } from "drizzle-orm";
 import { MovimientoForm } from "@/app/admin/inventario/movimiento-form";
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { FormSheet } from "@/components/admin/form-sheet";
+import { AdminNavTabs, CATALOGO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader, AdminSection } from "@/components/admin/page-header";
 import { StatCard, StatCardGrid } from "@/components/admin/stat-card";
 import { DonutChart, HBarChart } from "@/components/charts";
@@ -372,6 +373,13 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
           </>
         }
         description={`${branch.nombre} · ${timeZone}`}
+        tabs={
+          <AdminNavTabs
+            organizationId={organizationId}
+            sucursalId={branch.id}
+            tabs={CATALOGO_TABS}
+          />
+        }
         title="Inventario"
       />
 

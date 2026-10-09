@@ -5,6 +5,7 @@ import { AperturaCajaForm } from "@/app/admin/caja/apertura-caja-form";
 import { CierreCajaForm } from "@/app/admin/caja/cierre-caja-form";
 import { MovimientoCajaForm } from "@/app/admin/caja/movimiento-caja-form";
 import { PoliticaCajaToggle } from "@/app/admin/caja/politica-caja-toggle";
+import { AdminNavTabs, CAJA_VENTAS_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { getDatabase } from "@/db/client";
@@ -155,7 +156,17 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader description={`${branch.nombre} · cierre ciego por turno`} title="Caja" />
+      <AdminPageHeader
+        description={`${branch.nombre} · cierre ciego por turno`}
+        tabs={
+          <AdminNavTabs
+            organizationId={organization.id}
+            sucursalId={branch.id}
+            tabs={CAJA_VENTAS_TABS}
+          />
+        }
+        title="Caja"
+      />
 
       {hasPermission(context.access, "caja.configurar") ? (
         <PoliticaCajaToggle

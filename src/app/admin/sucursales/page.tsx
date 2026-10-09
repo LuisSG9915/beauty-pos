@@ -6,6 +6,7 @@ import { SucursalAsignacionForm, type MiembroAsignable } from "@/app/admin/sucur
 import { SucursalEditarForm, SucursalNuevaForm } from "@/app/admin/sucursales/sucursal-form";
 import { SucursalToggle } from "@/app/admin/sucursales/toggle-form";
 import { FormSheet } from "@/components/admin/form-sheet";
+import { AdminNavTabs, EQUIPO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -165,6 +166,12 @@ export default async function SucursalesPage({ searchParams }: Props) {
           ) : undefined
         }
         description="Datos de contacto, equipo y activación de cada sucursal. Desactivar conserva todo el historial."
+        tabs={
+          <AdminNavTabs
+            organizationId={organization.id}
+            tabs={EQUIPO_TABS}
+          />
+        }
         title="Sucursales"
       />
 

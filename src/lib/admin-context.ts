@@ -102,10 +102,12 @@ export async function getAdminContext(
     };
   }
 
-  // El acceso ya viaja en la consulta de contexto cuando la org pedida es la
-  // efectiva; en el fallback (sin parámetro u org distinta) se resuelve aparte.
+  // El acceso ya viaja en la consulta de contexto cuando la org pedida (o la
+  // primera por defecto) coincide con el acceso devuelto; solo se consulta aparte
+  // si el usuario pidió explícitamente otra organización distinta.
+  const orgAccesoId = contextRow.acceso?.organization_id ?? (requestedOrganizationId ?? organizations[0]?.id);
   const access =
-    organization.id === requestedOrganizationId && contextRow.acceso
+    organization.id === orgAccesoId && contextRow.acceso
       ? (accessFromContextRow(user, organization.id, contextRow.acceso) ??
         (await resolveAccess(organization.id)))
       : await resolveAccess(organization.id);

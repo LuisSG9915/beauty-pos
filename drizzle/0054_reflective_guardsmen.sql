@@ -1,0 +1,2 @@
+ALTER TABLE "clientes_fichas_tecnicas" ADD COLUMN "insumos" jsonb DEFAULT '[]'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "clientes_fichas_tecnicas" ADD COLUMN "fotos_detalle" jsonb DEFAULT '[]'::jsonb NOT NULL;

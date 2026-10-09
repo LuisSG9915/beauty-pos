@@ -1,14 +1,17 @@
-import { and, desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, isNull, ne } from "drizzle-orm";
 import { revalidateTag } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
 
 import { getDatabase } from "@/db/client";
 import { productos, servicios } from "@/db/schema/catalogs";
 import { medios, type MedioEntidad } from "@/db/schema/media";
+import { citas, reservasGestionTokens } from "@/db/schema/operations";
 import { getApiSessionUser } from "@/lib/auth/access";
 import { hasPermission, resolveAccessSafe } from "@/lib/auth/authorization";
 import { catalogoTag } from "@/lib/catalogo-cache";
 import { getMediaBucket, mediaDelete, mediaGet, PERMISO_POR_ENTIDAD } from "@/lib/media";
+import { kvInvalidate, kvReadThrough } from "@/lib/kv-cache";
+import { hashTokenGestion } from "@/modules/reservas/gestion";
 
 type RouteParams = { params: Promise<{ key: string[] }> };
 
@@ -29,11 +32,11 @@ function claveDesdeParams(segments: string[] | undefined): string | null {
 }
 
 /**
- * Sirve una imagen de R2 verificando que la llave pertenece a una organización
- * donde el usuario es miembro activo (la key trae la org en el primer segmento
- * y se contrasta contra la fila `medios`). Cache immutable: cada subida genera
- * llave nueva, así que la URL nunca cambia de contenido. `private` porque el
- * acceso requiere sesión; un CDN compartido no debe guardarla.
+ * Sirve una imagen de R2.
+ * Catálogo (producto/servicio): imágenes públicas con llave inmutable (UUID).
+ * Se cachean en el edge (CDN) y el lookup de metadatos se lee de Cloudflare KV,
+ * eliminando por completo las consultas a CockroachDB en navegación habitual.
+ * Privados (fichas, compras): requieren sesión y membresía activa.
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const segments = (await params).key;
@@ -44,33 +47,73 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   // placeholder, sin tocar la BD.
   if (!getMediaBucket()) return new Response(null, { status: 404 });
 
-  const user = await getApiSessionUser();
-  if (!user) return new Response(null, { status: 401 });
+  const entidad = segments[1];
+  const esCatalogo = entidad === "producto" || entidad === "servicio";
 
-  const db = getDatabase();
-  const [medio] = await db
-    .select({
-      organizacionId: medios.organizacionId,
-      mime: medios.mime,
-      activo: medios.activo,
-    })
-    .from(medios)
-    .where(eq(medios.claveR2, clave))
-    .limit(1);
+  if (!esCatalogo) {
+    const user = await getApiSessionUser();
+    let autorizado = false;
+    if (user) {
+      const access = await resolveAccessSafe(segments[0]!, user);
+      if (access) autorizado = true;
+    } else if (entidad === "ficha") {
+      const token = request.nextUrl.searchParams.get("token");
+      if (token && /^[0-9a-f]{64}$/i.test(token)) {
+        const tokenHash = hashTokenGestion(token);
+        const db = getDatabase();
+        const [tokenRow] = await db
+          .select({ id: reservasGestionTokens.id })
+          .from(reservasGestionTokens)
+          .innerJoin(citas, eq(reservasGestionTokens.citaId, citas.id))
+          .where(
+            and(
+              eq(reservasGestionTokens.tokenHash, tokenHash),
+              eq(citas.organizacionId, segments[0]!),
+              isNull(reservasGestionTokens.revocadoAt),
+              eq(citas.activo, true),
+            ),
+          )
+          .limit(1);
+        if (tokenRow) autorizado = true;
+      }
+    }
+
+    if (!autorizado) {
+      return new Response(null, { status: user ? 404 : 401 });
+    }
+  }
+
+  // Lectura de metadata amortiguada con Cloudflare KV (24h de TTL)
+  const medio = await kvReadThrough<{ organizacionId: string; mime: string; activo: boolean } | null>(
+    `medio:${clave}`,
+    86400,
+    async () => {
+      const db = getDatabase();
+      const [row] = await db
+        .select({
+          organizacionId: medios.organizacionId,
+          mime: medios.mime,
+          activo: medios.activo,
+        })
+        .from(medios)
+        .where(eq(medios.claveR2, clave))
+        .limit(1);
+      return row ?? null;
+    },
+  );
+
   // La fila debe existir, seguir activa y coincidir con la org de la key.
   if (!medio || !medio.activo || medio.organizacionId !== segments[0]) {
     return new Response(null, { status: 404 });
   }
 
-  const access = await resolveAccessSafe(medio.organizacionId, user);
-  // 404 (no 403): no filtrar si la llave existe en otra organización.
-  if (!access) return new Response(null, { status: 404 });
-
   const objeto = await mediaGet(clave);
   if (!objeto) return new Response(null, { status: 404 });
 
   const baseHeaders = {
-    "Cache-Control": "private, max-age=31536000, immutable",
+    "Cache-Control": esCatalogo
+      ? "public, max-age=31536000, immutable"
+      : "private, max-age=31536000, immutable",
     ETag: objeto.httpEtag,
     "X-Content-Type-Options": "nosniff",
   };
@@ -82,8 +125,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   objeto.writeHttpMetadata?.(headers);
   if (!headers.has("content-type")) headers.set("content-type", medio.mime);
   headers.set("content-length", String(objeto.size));
-  // El stream de workerd no coincide nominalmente con el ReadableStream del
-  // DOM; en runtime es el mismo objeto.
   return new Response(objeto.body as unknown as BodyInit, { headers });
 }
 
@@ -170,6 +211,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
 
   // Best-effort: si R2 falla el objeto queda huérfano pero desreferenciado.
   await mediaDelete(clave).catch(() => {});
+  await kvInvalidate(`medio:${clave}`).catch(() => {});
   if (esCatalogo) revalidateTag(catalogoTag(medio.organizacionId), "max");
   return NextResponse.json({ ok: true });
 }

@@ -159,14 +159,29 @@ export function CobroForm({
 
   const chipPagoClass = (seleccionado: boolean) =>
     cn(
-      "min-h-10 rounded-lg border px-3.5 text-sm font-medium transition-colors",
+      "min-h-10 rounded-xl border px-3.5 text-xs font-medium transition-all duration-150 active:scale-95 cursor-pointer select-none",
       seleccionado
-        ? "border-primary bg-accent/70 text-primary"
-        : "border-border bg-card text-muted-foreground hover:border-accent-foreground/30 hover:text-primary",
+        ? "border-primary bg-accent/80 text-primary font-semibold ring-2 ring-primary/20 shadow-xs"
+        : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
     );
 
   const inputClass =
-    "h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30";
+    "h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-all duration-150 focus:border-primary focus:ring-3 focus:ring-primary/20 hover:border-border";
+
+  const quickCashOptions = useMemo(() => {
+    if (aCubrir <= 0) return [];
+    const set = new Set<number>();
+    set.add(aCubrir);
+    const commonBills = [50, 100, 200, 500, 1000];
+    for (const b of commonBills) {
+      if (b > aCubrir) set.add(b);
+      else if (aCubrir > b) {
+        const nextMultiple = Math.ceil(aCubrir / b) * b;
+        if (nextMultiple > aCubrir) set.add(nextMultiple);
+      }
+    }
+    return [...set].sort((a, b) => a - b).slice(0, 4);
+  }, [aCubrir]);
 
   return (
     <form
@@ -202,9 +217,9 @@ export function CobroForm({
             <button
               aria-pressed={propinaOpcion === opcion.value}
               className={cn(
-                "min-h-9 rounded-lg border px-3 text-xs font-medium transition-colors",
+                "min-h-9 rounded-xl border px-3 text-xs font-medium transition-all duration-150 active:scale-95 cursor-pointer",
                 propinaOpcion === opcion.value
-                  ? "border-primary bg-accent/70 text-primary"
+                  ? "border-primary bg-accent/70 text-primary font-semibold ring-2 ring-primary/20 shadow-xs"
                   : "border-border bg-card text-muted-foreground hover:border-accent-foreground/30 hover:text-primary",
               )}
               key={opcion.value}
@@ -251,7 +266,7 @@ export function CobroForm({
           </p>
           {pagos.length < MAX_PAGOS && mediosPago.length > 0 ? (
             <button
-              className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-medium text-primary transition-colors hover:bg-accent/70"
+              className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-medium text-primary transition-colors hover:bg-accent/70 cursor-pointer active:scale-95"
               onClick={agregarPago}
               type="button"
             >
@@ -269,11 +284,12 @@ export function CobroForm({
 
         {pagos.map((pago, index) => {
           const medio = medioPorId.get(pago.medioPagoId);
-          const requiereReferencia = medio ? medio.categoria !== "efectivo" : false;
+          const esEfectivo = medio ? medio.categoria === "efectivo" : false;
+          const requiereReferencia = medio ? !esEfectivo : false;
           const resto = restoPara(index);
           return (
             <div
-              className="space-y-2 rounded-xl border border-border p-3"
+              className="space-y-2.5 rounded-2xl border border-border/80 bg-muted/20 p-3.5 shadow-xs"
               key={`pago-${index}`}
             >
               <div
@@ -293,6 +309,28 @@ export function CobroForm({
                   </button>
                 ))}
               </div>
+
+              {esEfectivo && quickCashOptions.length > 0 ? (
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <span className="text-[11px] font-medium text-muted-foreground">Billetes rápidos:</span>
+                  {quickCashOptions.map((opt) => (
+                    <button
+                      className={cn(
+                        "inline-flex min-h-7 items-center rounded-lg border px-2.5 text-xs font-semibold tabular-nums transition-all duration-150 active:scale-95 cursor-pointer select-none",
+                        Math.abs((Number(pago.monto) || 0) - opt) < 0.005
+                          ? "border-primary bg-primary text-primary-foreground shadow-xs"
+                          : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground",
+                      )}
+                      key={opt}
+                      onClick={() => updatePago(index, { monto: opt.toFixed(2) })}
+                      type="button"
+                    >
+                      {opt === aCubrir ? `Exacto (${formatCurrency(opt)})` : formatCurrency(opt)}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
               <div className="flex flex-wrap items-center gap-2">
                 <input
                   aria-label={`Monto del pago ${index + 1}`}
@@ -306,7 +344,7 @@ export function CobroForm({
                   value={pago.monto}
                 />
                 <button
-                  className="min-h-10 rounded-lg border border-border bg-card px-3 text-xs font-medium text-primary transition-colors hover:bg-accent/70 disabled:opacity-50"
+                  className="min-h-10 rounded-xl border border-border bg-card px-3 text-xs font-medium text-primary transition-all hover:bg-accent/70 active:scale-95 disabled:opacity-50 cursor-pointer"
                   disabled={resto <= 0}
                   onClick={() => updatePago(index, { monto: resto.toFixed(2) })}
                   type="button"
@@ -316,7 +354,7 @@ export function CobroForm({
                 {pagos.length > 1 ? (
                   <button
                     aria-label={`Quitar pago ${index + 1}`}
-                    className="flex size-10 items-center justify-center rounded-lg text-destructive transition-colors hover:bg-muted/60"
+                    className="flex size-10 items-center justify-center rounded-xl text-destructive transition-all hover:bg-destructive-soft active:scale-90 cursor-pointer"
                     onClick={() => quitarPago(index)}
                     type="button"
                   >
@@ -343,16 +381,33 @@ export function CobroForm({
 
       <div className="mt-4">
         {cubiertoPorAnticipo ? null : cubre ? (
-          <p className="rounded-xl border border-success/30 bg-success/10 px-4 py-2.5 text-sm font-medium text-success">
-            {cambio > 0.005 ? `Cambio ${formatCurrency(cambio)}` : "Monto exacto"}
-          </p>
+          <div
+            className={cn(
+              "rounded-2xl border p-3.5 transition-all duration-200 animate-in fade-in zoom-in-95",
+              cambio > 0.005
+                ? "border-success/40 bg-success-soft/70 text-success-soft-foreground shadow-xs"
+                : "border-success/30 bg-success/10 text-success",
+            )}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider">
+                {cambio > 0.005 ? "Cambio a entregar" : "Monto cubierto"}
+              </span>
+              <span className="text-lg font-extrabold tabular-nums">
+                {cambio > 0.005 ? formatCurrency(cambio) : "Monto exacto"}
+              </span>
+            </div>
+          </div>
         ) : (
-          <p className="rounded-xl border border-warning/30 bg-warning/10 px-4 py-2.5 text-sm font-medium text-warning">
-            Falta {formatCurrency(faltante)}
-          </p>
+          <div className="rounded-2xl border border-warning/40 bg-warning-soft/70 p-3.5 text-warning-soft-foreground shadow-xs animate-in fade-in">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider">Falta por cubrir</span>
+              <span className="text-lg font-extrabold tabular-nums">{formatCurrency(faltante)}</span>
+            </div>
+          </div>
         )}
         {cubre && !pagosCompletos ? (
-          <p className="mt-1.5 text-xs text-warning">
+          <p className="mt-2 text-xs font-medium text-warning animate-in fade-in">
             Completa medio, monto y referencia de cada pago.
           </p>
         ) : null}
@@ -361,14 +416,17 @@ export function CobroForm({
       <ActionFeedback className="mt-3" state={state} />
 
       <Button
-        className="mt-4 w-full rounded-xl"
+        className={cn(
+          "mt-4 w-full rounded-2xl font-bold shadow-sm transition-all duration-200 active:scale-[0.98]",
+          puedeCobrar && "bg-primary text-primary-foreground hover:brightness-105 hover:shadow-md",
+        )}
         data-action-clave="1"
         data-action-id="pos.cobro.confirmar"
         disabled={!puedeCobrar}
         size="lg"
         type="submit"
       >
-        {pending ? "Cobrando…" : cubiertoPorAnticipo ? (anticipo > 0 ? "Completar venta (anticipo)" : "Completar venta") : `Cobrar ${formatCurrency(aCubrir)}`}
+        {pending ? "Procesando cobro…" : cubiertoPorAnticipo ? (anticipo > 0 ? "Completar venta (anticipo)" : "Completar venta") : `Cobrar ${formatCurrency(aCubrir)}`}
       </Button>
     </form>
   );

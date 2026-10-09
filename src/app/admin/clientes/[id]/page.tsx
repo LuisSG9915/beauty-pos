@@ -1,10 +1,12 @@
 import { and, desc, eq, ne, or, sql } from "drizzle-orm";
+import { Calendar, CalendarHeart, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { toggleConsentimientoActivo, toggleFichaTecnicaActiva } from "@/app/admin/client-actions";
 import { ConsentimientoForm } from "@/app/admin/clientes/consentimiento-form";
 import { FichaForm } from "@/app/admin/clientes/ficha-form";
+import { AntesDespuesSlider } from "@/components/antes-despues-slider";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { FormTabs } from "@/components/form-tabs";
 import { getDatabase } from "@/db/client";
@@ -15,6 +17,7 @@ import { getAdminContext } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate, formatTime } from "@/lib/format";
 import { buildAdminHref } from "@/lib/url-context";
+import { calcularRetencionSugerida } from "@/modules/expedientes/retencion";
 
 export const dynamic = "force-dynamic";
 
@@ -91,10 +94,12 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
         id: clientesFichasTecnicas.id,
         tipo: clientesFichasTecnicas.tipo,
         formula: clientesFichasTecnicas.formula,
+        insumos: clientesFichasTecnicas.insumos,
         tiempoPoseMinutos: clientesFichasTecnicas.tiempoPoseMinutos,
         notas: clientesFichasTecnicas.notas,
         privada: clientesFichasTecnicas.privada,
         fotos: clientesFichasTecnicas.fotos,
+        fotosDetalle: clientesFichasTecnicas.fotosDetalle,
         createdAt: clientesFichasTecnicas.createdAt,
         servicioNombre: servicios.nombre,
         autorNombre: usuarios.nombre,
@@ -128,12 +133,15 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
       .orderBy(desc(clientesConsentimientos.createdAt)),
   ]);
 
+  const nombreCompleto =
+    [cliente.nombre, cliente.apellidoPaterno, cliente.apellidoMaterno].filter(Boolean).join(" ") ||
+    cliente.nombre;
   const fichasPorTipo = (tipos: string[]) => fichaRows.filter((ficha) => tipos.includes(ficha.tipo));
 
   const datosTab = (
     <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
       {[
-        ["Nombre", [cliente.nombre, cliente.apellidoPaterno, cliente.apellidoMaterno].filter(Boolean).join(" ")],
+        ["Nombre", nombreCompleto],
         ["Teléfono", cliente.telefono],
         ["Correo", cliente.correo],
         ["Notas operativas", cliente.notasOperativas],
@@ -226,19 +234,58 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
             {ficha.formula ? (
               <p className="mt-2 rounded-lg bg-muted/60 px-3 py-2 font-mono text-sm text-foreground">{ficha.formula}</p>
             ) : null}
+            {ficha.insumos && ficha.insumos.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {ficha.insumos.map((insumo) => (
+                  <span
+                    className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-xs font-mono text-foreground shadow-2xs"
+                    key={insumo.id}
+                  >
+                    <span className="font-semibold">{insumo.nombre}</span>
+                    <span className="text-muted-foreground">({insumo.cantidad} {insumo.unidad})</span>
+                    {insumo.proporcion ? <span className="text-primary font-sans">[{insumo.proporcion}]</span> : null}
+                  </span>
+                ))}
+              </div>
+            ) : null}
             {ficha.notas ? <p className="mt-2 text-sm leading-6 text-muted-foreground">{ficha.notas}</p> : null}
+            {(() => {
+              const fotoAntes = ficha.fotosDetalle?.find((d) => d.rol === "antes")?.claveR2;
+              const fotoDespues = ficha.fotosDetalle?.find((d) => d.rol === "despues")?.claveR2;
+              if (fotoAntes && fotoDespues) {
+                return (
+                  <div className="mt-3 max-w-sm">
+                    <AntesDespuesSlider
+                      antesUrl={`/api/medios/${encodeURI(fotoAntes)}`}
+                      aspectRatioClass="aspect-video"
+                      despuesUrl={`/api/medios/${encodeURI(fotoDespues)}`}
+                    />
+                  </div>
+                );
+              }
+              return null;
+            })()}
             {ficha.fotos.length > 0 ? (
               <div className="mt-2 flex flex-wrap gap-2">
-                {ficha.fotos.map((clave) => (
-                  // eslint-disable-next-line @next/next/no-img-element -- la ruta exige sesión; next/image no reenvía cookies
-                  <img
-                    alt="Foto de la ficha"
-                    className="size-16 rounded-lg border border-border object-cover"
-                    key={clave}
-                    loading="lazy"
-                    src={`/api/medios/${encodeURI(clave)}`}
-                  />
-                ))}
+                {ficha.fotos.map((clave) => {
+                  const detalle = ficha.fotosDetalle?.find((d) => d.claveR2 === clave);
+                  return (
+                    <div className="relative" key={clave}>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- la ruta exige sesión; next/image no reenvía cookies */}
+                      <img
+                        alt="Foto de la ficha"
+                        className="size-16 rounded-lg border border-border object-cover"
+                        loading="lazy"
+                        src={`/api/medios/${encodeURI(clave)}`}
+                      />
+                      {detalle?.rol ? (
+                        <span className="absolute bottom-1 left-1 rounded bg-black/75 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur-xs">
+                          {detalle.rol}
+                        </span>
+                      ) : null}
+                    </div>
+                  );
+                })}
               </div>
             ) : null}
           </li>
@@ -246,15 +293,98 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
       </ul>
     );
 
+  const ultimaFichaQuimica = fichaRows.find((f) => f.tipo === "color" || f.tipo === "tratamiento");
+  const retencionSugerida = ultimaFichaQuimica
+    ? calcularRetencionSugerida({
+        fechaServicio: ultimaFichaQuimica.createdAt,
+        formula: ultimaFichaQuimica.formula,
+        tipoFicha: ultimaFichaQuimica.tipo,
+        clienteNombre: nombreCompleto,
+        salonNombre: organization.nombre,
+        telefonoCliente: cliente.telefono,
+        slugReserva: organization.slug,
+      })
+    : null;
+
   const formulasTab = (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-        <h3 className="text-sm font-semibold text-foreground">Registrar fórmula o tratamiento</h3>
-        <div className="mt-4">
-          <FichaForm clienteId={cliente.id} organizationId={organization.id} tipoDefault="color" />
+    <div className="space-y-6">
+      {retencionSugerida ? (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-primary/25 bg-primary/5 p-4 sm:p-5">
+          <div className="min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <CalendarHeart className="size-4 text-primary" />
+              <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                Radar de Retención Predictiva
+              </span>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                  retencionSugerida.estadoCiclo === "ventana_optima"
+                    ? "border border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                    : retencionSugerida.estadoCiclo === "vencido"
+                    ? "border border-destructive/20 bg-destructive/10 text-destructive"
+                    : "border border-emerald-500/20 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                }`}
+              >
+                {retencionSugerida.estadoCiclo === "ventana_optima"
+                  ? "¡Ventana ideal de retoque!"
+                  : retencionSugerida.estadoCiclo === "vencido"
+                  ? "Retoque vencido"
+                  : `A tiempo (${retencionSugerida.diasRestantes} días restantes)`}
+              </span>
+            </div>
+            <p className="text-sm font-semibold text-foreground">
+              Próximo servicio sugerido: {retencionSugerida.tituloTratamiento}
+            </p>
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              {retencionSugerida.motivoExplicativo} · Fecha recomendada:{" "}
+              <strong className="text-foreground">
+                {new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "long" }).format(
+                  retencionSugerida.fechaSugerida,
+                )}
+              </strong>
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {retencionSugerida.whatsappUrl ? (
+              <a
+                className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-500"
+                href={retencionSugerida.whatsappUrl}
+                rel="noopener noreferrer"
+                target="_blank"
+              >
+                <MessageCircle className="size-4" />
+                WhatsApp recordatorio
+              </a>
+            ) : null}
+            <Link
+              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground hover:bg-muted"
+              href={buildAdminHref("/agenda", {
+                organizationId: organization.id,
+                extra: { nueva: "1", clienteId: cliente.id },
+              })}
+            >
+              <Calendar className="size-3.5" />
+              Agendar cita
+            </Link>
+          </div>
         </div>
-      </section>
-      <div>{fichaList(fichasPorTipo(["color", "tratamiento"]), "Sin fórmulas registradas.")}</div>
+      ) : null}
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <h3 className="text-sm font-semibold text-foreground">Registrar fórmula o tratamiento</h3>
+          <div className="mt-4">
+            <FichaForm
+              clienteId={cliente.id}
+              clienteNombre={nombreCompleto}
+              organizationId={organization.id}
+              tipoDefault="color"
+            />
+          </div>
+        </section>
+        <div>{fichaList(fichasPorTipo(["color", "tratamiento"]), "Sin fórmulas registradas.")}</div>
+      </div>
     </div>
   );
 

@@ -1,7 +1,10 @@
+import { Calendar, CalendarHeart, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 
+import { AntesDespuesSlider } from "@/components/antes-despues-slider";
 import { BrandMark } from "@/components/brand-mark";
 import { ThemeModeSelector } from "@/components/theme-mode-selector";
+import { Button } from "@/components/ui/button";
 import { clientIp } from "@/lib/client-ip";
 import { obtenerReservaPorToken } from "@/modules/reservas/gestion";
 import { GestionPanel } from "./gestion-panel";
@@ -118,6 +121,115 @@ export default async function MiCitaPage({ params }: { params: Promise<{ token: 
             token={token}
             reserva={reserva}
           />
+
+          {reserva.pasaporteBelleza ? (
+            <section className="mt-8 space-y-6 rounded-3xl border border-primary/20 bg-gradient-to-b from-primary/5 via-card to-card p-6 shadow-sm sm:p-8">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Sparkles aria-hidden="true" className="size-4 text-primary" />
+                    <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                      Tu Pasaporte de Belleza
+                    </span>
+                  </div>
+                  <h2 className="mt-1 text-xl font-bold tracking-tight text-foreground">
+                    Transformación & Cuidado Personalizado
+                  </h2>
+                </div>
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  {reserva.pasaporteBelleza.servicioNombre}
+                </span>
+              </div>
+
+              {/* Comparador visual interactivo Antes / Después */}
+              {reserva.pasaporteBelleza.antesUrl || reserva.pasaporteBelleza.despuesUrl ? (
+                <div className="space-y-2">
+                  <AntesDespuesSlider
+                    antesUrl={reserva.pasaporteBelleza.antesUrl}
+                    aspectRatioClass="aspect-[4/5] sm:aspect-video"
+                    despuesUrl={reserva.pasaporteBelleza.despuesUrl}
+                  />
+                  <p className="text-center text-xs text-muted-foreground">
+                    Desliza horizontalmente para comparar el antes y después de tu sesión.
+                  </p>
+                </div>
+              ) : null}
+
+              {/* Resumen o notas del ritual */}
+              {reserva.pasaporteBelleza.resumenCuidado ? (
+                <div className="rounded-2xl border border-border bg-card p-4 text-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Notas del servicio
+                  </p>
+                  <p className="mt-1 font-mono text-xs leading-5 text-foreground">
+                    {reserva.pasaporteBelleza.resumenCuidado}
+                  </p>
+                </div>
+              ) : null}
+
+              {/* Prescripción de Cuidado en Casa */}
+              {reserva.pasaporteBelleza.rutinaCuidadoCasa.length > 0 ? (
+                <div className="space-y-3">
+                  <h3 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <ShieldCheck aria-hidden="true" className="size-4 text-emerald-500" />
+                    Prescripción de mantenimiento en casa
+                  </h3>
+                  <ul className="space-y-2 text-xs">
+                    {reserva.pasaporteBelleza.rutinaCuidadoCasa.map((tip, index) => (
+                      <li
+                        className="flex items-start gap-2.5 rounded-xl border border-border bg-card p-3"
+                        key={index}
+                      >
+                        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">
+                          {index + 1}
+                        </span>
+                        <span className="leading-5 text-foreground">{tip}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+
+              {/* Radar de Próxima Cita Sugerida */}
+              {reserva.pasaporteBelleza.retencion ? (
+                <div className="space-y-3 rounded-2xl border border-primary/30 bg-primary/10 p-5">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-primary">
+                    <CalendarHeart aria-hidden="true" className="size-4" />
+                    Radar de mantenimiento sugerido
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground">
+                      {reserva.pasaporteBelleza.retencion.tituloTratamiento}
+                    </h4>
+                    <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                      {reserva.pasaporteBelleza.retencion.motivoExplicativo}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center justify-between gap-3 border-t border-primary/20 pt-2">
+                    <div className="text-xs">
+                      <span className="text-muted-foreground">Fecha ideal recomendada: </span>
+                      <strong className="text-foreground">
+                        {new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "long" }).format(
+                          new Date(reserva.pasaporteBelleza.retencion.fechaSugeridaIso),
+                        )}
+                      </strong>
+                    </div>
+                    {reserva.pasaporteBelleza.retencion.linkReserva ? (
+                      <Button
+                        className="h-8 gap-1.5 rounded-xl text-xs"
+                        nativeButton={false}
+                        render={<Link href={reserva.pasaporteBelleza.retencion.linkReserva} />}
+                        size="sm"
+                      >
+                        <Calendar aria-hidden="true" className="size-3.5" />
+                        Reagendar en línea
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
           <p className="mt-6 text-xs leading-5 text-muted-foreground">
             ¿No fuiste tú? Alguien con tu enlace puede ver esta cita. Comunícate con{" "}

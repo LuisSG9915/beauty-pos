@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 import { getAdminNavSections } from "@/components/admin-nav";
 
 function allPaths(sections: ReturnType<typeof getAdminNavSections>) {
-  return sections.flatMap((section) => section.items.map((item) => item.path));
+  return sections.flatMap((section) =>
+    section.items.flatMap((item) => [item.path, ...(item.children?.map((c) => c.path) ?? [])]),
+  );
 }
 
 describe("getAdminNavSections", () => {

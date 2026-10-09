@@ -6,6 +6,7 @@ import { crearVentaDirecta } from "@/app/admin/pos/actions";
 import { OfflineCatalogoCache } from "@/app/admin/pos/offline-cache";
 import { VentaDirectaSubmit } from "@/app/admin/pos/venta-directa-submit";
 import { VentaTicket } from "@/app/admin/pos/venta-ticket";
+import { AdminNavTabs, CAJA_VENTAS_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,28 @@ export default async function PosPage({ searchParams }: { searchParams: SearchPa
     );
   }
 
+  // Si viene con `nueva=1` (ej. botón directo de nueva venta),
+  // crea la venta de inmediato en la sucursal activa sin pasar por pasos intermedios.
+  if (!ventaIdParam && firstParam(params.nueva) === "1" && context.sucursalId) {
+    requireAccessPermission(context.access, "ventas.crear");
+    const [nuevaVenta] = await db
+      .insert(ventas)
+      .values({
+        organizacionId: organizationId,
+        sucursalId: context.sucursalId,
+        estado: "en_proceso",
+        createdBy: context.user.id,
+      })
+      .returning({ id: ventas.id });
+    redirect(
+      buildAdminHref("/pos", {
+        organizationId,
+        sucursalId: context.sucursalId,
+        extra: { ventaId: nuevaVenta.id },
+      }),
+    );
+  }
+
   if (!ventaIdParam) return <PosIndex context={context} />;
 
   const ticket = await getTicketData(organizationId, ventaIdParam);
@@ -86,6 +109,13 @@ export default async function PosPage({ searchParams }: { searchParams: SearchPa
           { label: "Ticket" },
         ]}
         description="Revisa el ticket, agrega líneas y confirma el cobro."
+        tabs={
+          <AdminNavTabs
+            organizationId={organizationId}
+            sucursalId={ticket.venta.sucursalId}
+            tabs={CAJA_VENTAS_TABS}
+          />
+        }
         title="Cobrar"
       />
       <VentaTicket
@@ -159,15 +189,40 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
     <div className="space-y-6">
       <AdminPageHeader
         actions={
-          <Button
-            nativeButton={false}
-            render={<Link href={buildAdminHref("/ventas", { organizationId, sucursalId })} />}
-            variant="outline"
-          >
-            Ver historial
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              data-action-clave="1"
+              nativeButton={false}
+              render={
+                <Link
+                  href={buildAdminHref("/pos", {
+                    organizationId,
+                    sucursalId,
+                    extra: { nueva: "1" },
+                  })}
+                />
+              }
+              size="lg"
+            >
+              Nueva venta rápida
+            </Button>
+            <Button
+              nativeButton={false}
+              render={<Link href={buildAdminHref("/ventas", { organizationId, sucursalId })} />}
+              variant="outline"
+            >
+              Ver historial
+            </Button>
+          </div>
         }
         description="Abre una venta directa o continúa una venta del día en la sucursal seleccionada."
+        tabs={
+          <AdminNavTabs
+            organizationId={organizationId}
+            sucursalId={sucursalId}
+            tabs={CAJA_VENTAS_TABS}
+          />
+        }
         title="Cobrar"
       />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

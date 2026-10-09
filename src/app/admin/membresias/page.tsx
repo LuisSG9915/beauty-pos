@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { toggleMembresia } from "@/app/admin/membresias/actions";
 import { MembresiaForm } from "@/app/admin/membresias/membresia-form";
 import { FormSheet } from "@/components/admin/form-sheet";
+import { AdminNavTabs, CATALOGO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
@@ -95,7 +96,16 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader description="Membresías: descuento porcentual por tiempo limitado que el cliente compra por adelantado." title="Membresías" />
+      <AdminPageHeader
+        description="Membresías: descuento porcentual por tiempo limitado que el cliente compra por adelantado."
+        tabs={
+          <AdminNavTabs
+            organizationId={organizationId}
+            tabs={CATALOGO_TABS}
+          />
+        }
+        title="Membresías"
+      />
 
       <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />

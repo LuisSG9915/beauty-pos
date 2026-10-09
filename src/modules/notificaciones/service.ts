@@ -227,23 +227,25 @@ export async function procesarNotificaciones(ahora = new Date()): Promise<Result
       )
       .limit(LOTE_SCAN);
 
-    for (const cita of candidatas) {
-      const [encolado] = await db
+    if (candidatas.length > 0) {
+      const encolados = await db
         .insert(notificacionesEnvios)
-        .values({
-          organizacionId: org.id,
-          citaId: cita.id,
-          tipo: TIPO_RECORDATORIO,
-          correoDestino: cita.correoCliente!,
-          fechaHoraSnapshot: cita.fechaHora,
-          versionCita: cita.version,
-          programadoPara: instanteRecordatorio(cita.fechaHora, org.horasAntes),
-        })
+        .values(
+          candidatas.map((cita) => ({
+            organizacionId: org.id,
+            citaId: cita.id,
+            tipo: TIPO_RECORDATORIO,
+            correoDestino: cita.correoCliente!,
+            fechaHoraSnapshot: cita.fechaHora,
+            versionCita: cita.version,
+            programadoPara: instanteRecordatorio(cita.fechaHora, org.horasAntes),
+          })),
+        )
         .onConflictDoNothing({
           target: [notificacionesEnvios.citaId, notificacionesEnvios.tipo, notificacionesEnvios.versionCita],
         })
         .returning({ id: notificacionesEnvios.id });
-      if (encolado) resultado.encolados += 1;
+      resultado.encolados += encolados.length;
     }
   }
 

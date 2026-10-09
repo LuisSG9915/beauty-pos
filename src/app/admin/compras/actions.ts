@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
+import { withDbRetry } from "@/db/retry";
 import { productos } from "@/db/schema/catalogs";
 import { compras, detalleCompras, proveedores } from "@/db/schema/compras";
 import {
@@ -140,8 +141,9 @@ export async function guardarLineaCompra(formData: FormData): Promise<ActionStat
   const db = getDatabase();
 
   try {
-    return await db.transaction(async (tx) => {
-      const compra = await cargarCompraBloqueada(tx, access, input.compraId, errorEdicionCompra);
+    return await withDbRetry(() =>
+      db.transaction(async (tx) => {
+        const compra = await cargarCompraBloqueada(tx, access, input.compraId, errorEdicionCompra);
       const productoId = input.productoId || null;
       if (productoId) {
         const [producto] = await tx
@@ -205,7 +207,8 @@ export async function guardarLineaCompra(formData: FormData): Promise<ActionStat
       }
 
       return actionSuccess("Línea guardada.");
-    });
+      }),
+    );
   } catch (error) {
     if (error instanceof CompraActionError) return actionError(error.message);
     console.error("guardarLineaCompra", error);
@@ -227,8 +230,9 @@ export async function quitarLineaCompra(formData: FormData): Promise<ActionState
   const db = getDatabase();
 
   try {
-    return await db.transaction(async (tx) => {
-      const compra = await cargarCompraBloqueada(tx, access, input.compraId, errorEdicionCompra);
+    return await withDbRetry(() =>
+      db.transaction(async (tx) => {
+        const compra = await cargarCompraBloqueada(tx, access, input.compraId, errorEdicionCompra);
       await tx
         .update(detalleCompras)
         .set({ activo: false, updatedBy: user.id })
@@ -241,7 +245,8 @@ export async function quitarLineaCompra(formData: FormData): Promise<ActionState
         );
       await recalcularTotal(tx, compra.id, user.id);
       return actionSuccess("Línea quitada.");
-    });
+      }),
+    );
   } catch (error) {
     if (error instanceof CompraActionError) return actionError(error.message);
     console.error("quitarLineaCompra", error);
@@ -285,8 +290,9 @@ export async function guardarDatosCompra(formData: FormData): Promise<ActionStat
   const db = getDatabase();
 
   try {
-    return await db.transaction(async (tx) => {
-      const compra = await cargarCompraBloqueada(tx, access, input.compraId, errorEdicionCompra);
+    return await withDbRetry(() =>
+      db.transaction(async (tx) => {
+        const compra = await cargarCompraBloqueada(tx, access, input.compraId, errorEdicionCompra);
 
       let proveedorId = input.proveedorId || null;
       const nombreNuevo = input.proveedorNuevo || "";
@@ -325,7 +331,8 @@ export async function guardarDatosCompra(formData: FormData): Promise<ActionStat
         })
         .where(eq(compras.id, compra.id));
       return actionSuccess("Datos de la compra guardados.");
-    });
+      }),
+    );
   } catch (error) {
     if (error instanceof CompraActionError) return actionError(error.message);
     console.error("guardarDatosCompra", error);
@@ -374,8 +381,9 @@ export async function recibirCompra(formData: FormData): Promise<ActionState> {
   const db = getDatabase();
 
   try {
-    const resultado = await db.transaction(async (tx) => {
-      const compra = await cargarCompraBloqueada(tx, access, input.compraId, errorRecepcionCompra);
+    const resultado = await withDbRetry(() =>
+      db.transaction(async (tx) => {
+        const compra = await cargarCompraBloqueada(tx, access, input.compraId, errorRecepcionCompra);
 
       const lineas = await tx
         .select()
@@ -478,7 +486,8 @@ export async function recibirCompra(formData: FormData): Promise<ActionState> {
         detalle: { lineas: plan.length, estado, actualizarCostos },
       });
       return estado;
-    });
+      }),
+    );
 
     revalidatePath("/admin/compras");
     revalidatePath("/admin/inventario");
@@ -511,8 +520,9 @@ export async function resolverObservacion(formData: FormData): Promise<ActionSta
   const db = getDatabase();
 
   try {
-    return await db.transaction(async (tx) => {
-      const compra = await cargarCompraBloqueada(tx, access, input.compraId, errorResolucionCompra);
+    return await withDbRetry(() =>
+      db.transaction(async (tx) => {
+        const compra = await cargarCompraBloqueada(tx, access, input.compraId, errorResolucionCompra);
       const observaciones = [compra.observaciones?.trim(), `Resolución: ${input.nota}`]
         .filter(Boolean)
         .join("\n");
@@ -535,7 +545,8 @@ export async function resolverObservacion(formData: FormData): Promise<ActionSta
         entidadId: compra.id,
       });
       return actionSuccess("Compra marcada como verificada.");
-    });
+      }),
+    );
   } catch (error) {
     if (error instanceof CompraActionError) return actionError(error.message);
     console.error("resolverObservacion", error);
@@ -555,8 +566,9 @@ export async function cancelarCompra(formData: FormData): Promise<ActionState> {
   const db = getDatabase();
 
   try {
-    return await db.transaction(async (tx) => {
-      const compra = await cargarCompraBloqueada(tx, access, input.compraId, errorCancelacionCompra);
+    return await withDbRetry(() =>
+      db.transaction(async (tx) => {
+        const compra = await cargarCompraBloqueada(tx, access, input.compraId, errorCancelacionCompra);
       await tx
         .update(compras)
         .set({ estado: "cancelada", updatedBy: user.id })
@@ -571,7 +583,8 @@ export async function cancelarCompra(formData: FormData): Promise<ActionState> {
         detalle: { estadoAnterior: compra.estado },
       });
       return actionSuccess("Compra cancelada.");
-    });
+      }),
+    );
   } catch (error) {
     if (error instanceof CompraActionError) return actionError(error.message);
     console.error("cancelarCompra", error);

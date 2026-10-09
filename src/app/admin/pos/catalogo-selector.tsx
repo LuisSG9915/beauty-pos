@@ -98,6 +98,8 @@ export function CatalogoSelector({
     });
   }, [categoriaId, items, query]);
 
+  const [agregadoId, setAgregadoId] = useState<string | null>(null);
+
   const reportResult = (result: ActionState) => {
     if (result.success) {
       toast.success(result.message ?? "Agregado al ticket.");
@@ -108,6 +110,9 @@ export function CatalogoSelector({
   };
 
   const agregar = (item: CatalogoItem) => {
+    setAgregadoId(item.id);
+    setTimeout(() => setAgregadoId((curr) => (curr === item.id ? null : curr)), 700);
+
     const data = new FormData();
     data.set("organizacionId", organizationId);
     data.set("ventaId", ventaId);
@@ -155,10 +160,10 @@ export function CatalogoSelector({
               <button
                 aria-pressed={activo}
                 className={cn(
-                  "inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-medium whitespace-nowrap transition-colors sm:px-4",
+                  "inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 sm:px-4 active:scale-95 cursor-pointer",
                   activo
-                    ? "bg-card text-primary shadow-sm"
-                    : "text-muted-foreground hover:text-primary",
+                    ? "bg-card text-primary shadow-xs font-semibold"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
                 key={opcion.value}
                 onClick={() => {
@@ -167,7 +172,7 @@ export function CatalogoSelector({
                 }}
                 type="button"
               >
-                <Icon aria-hidden="true" className="size-3.5" />
+                <Icon aria-hidden="true" className={cn("size-3.5 transition-transform duration-150", activo && "scale-110")} />
                 {opcion.label}
               </button>
             );
@@ -182,7 +187,7 @@ export function CatalogoSelector({
             Buscar en el catálogo
           </label>
           <input
-            className="h-10 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+            className="h-10 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm outline-none transition-all duration-150 focus:border-primary focus:ring-3 focus:ring-primary/20 hover:border-border"
             id="pos-catalogo-buscar"
             onChange={(event) => setQuery(event.target.value)}
             placeholder={tab === "servicios" ? "Buscar servicio" : tab === "paquetes" ? "Buscar paquete" : tab === "membresias" ? "Buscar membresía" : "Buscar por clave o nombre"}
@@ -233,15 +238,20 @@ export function CatalogoSelector({
                 : "No hay productos que coincidan."}
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4">
           {filtrados.map((item) => {
             const tone = categoryTone("categoriaId" in item ? item.categoriaId : null);
             const imagenClave = "imagenClaveR2" in item ? item.imagenClaveR2 : null;
+            const esAgregado = agregadoId === item.id;
             return (
               <button
                 aria-label={`Agregar ${item.nombre} al ticket`}
                 className={cn(
-                  "flex min-h-14 flex-col gap-1.5 rounded-xl border p-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+                  "group relative flex min-h-16 flex-col gap-2 rounded-2xl border p-2.5 text-left transition-all duration-200",
+                  "hover:-translate-y-1 hover:shadow-md hover:border-primary/40",
+                  "active:scale-[0.96] active:shadow-xs",
+                  "focus-visible:outline-2 focus-visible:outline-ring cursor-pointer select-none",
+                  esAgregado && "ring-2 ring-primary ring-offset-2 ring-offset-background scale-[0.98]",
                   tone.card,
                 )}
                 disabled={pending}
@@ -251,7 +261,7 @@ export function CatalogoSelector({
               >
                 <span
                   className={cn(
-                    "flex h-14 w-full shrink-0 items-center justify-center overflow-hidden rounded-lg text-lg font-semibold",
+                    "relative flex h-16 w-full shrink-0 items-center justify-center overflow-hidden rounded-xl text-lg font-semibold transition-transform duration-300 group-hover:scale-[1.02]",
                     tone.chip,
                   )}
                 >
@@ -259,28 +269,33 @@ export function CatalogoSelector({
                     // eslint-disable-next-line @next/next/no-img-element -- la ruta exige sesión; next/image no reenvía cookies
                     <img
                       alt=""
-                      className="size-full object-cover"
+                      className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
                       loading="lazy"
                       src={`/api/medios/${encodeURI(imagenClave)}`}
                     />
                   ) : (
                     item.nombre.trim().charAt(0).toUpperCase()
                   )}
+                  {esAgregado ? (
+                    <span className="absolute inset-0 flex items-center justify-center bg-primary/85 text-xs font-bold text-primary-foreground backdrop-blur-xs animate-in fade-in zoom-in-90 duration-150">
+                      ✓ Agregado
+                    </span>
+                  ) : null}
                 </span>
-                <span className="line-clamp-2 px-1 text-sm font-medium leading-5 text-foreground">
+                <span className="line-clamp-2 px-1 text-sm font-medium leading-snug text-foreground group-hover:text-primary transition-colors">
                   {item.nombre}
                 </span>
                 <span className="mt-auto flex items-baseline justify-between gap-2 px-1">
-                  <span className="text-sm font-semibold tabular-nums text-primary">
+                  <span className="text-sm font-bold tabular-nums text-primary">
                     {formatCurrency(item.precio, { currency })}
                   </span>
                   <span className="truncate text-xs tabular-nums text-muted-foreground">
                     {"duracionMinutos" in item
                       ? `${item.duracionMinutos} min`
                       : "sesiones" in item
-                        ? `${item.sesiones} sesiones · ${item.servicioNombre ?? ""}`
+                        ? `${item.sesiones} ses.`
                         : "duracionDias" in item
-                          ? `${Number(item.descuentoPorcentaje)}% · ${item.duracionDias} días`
+                          ? `${Number(item.descuentoPorcentaje)}% · ${item.duracionDias}d`
                           : item.sku}
                   </span>
                 </span>

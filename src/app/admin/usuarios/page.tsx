@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { MemberInviteForm } from "@/app/admin/usuarios/member-invite-form";
 import { MemberCard, PendingInvitations, type MemberRow } from "@/app/admin/usuarios/member-card";
 import { FormSheet } from "@/components/admin/form-sheet";
+import { AdminNavTabs, EQUIPO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
@@ -129,6 +130,12 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Sea
           ) : undefined
         }
         description="Miembros del negocio, sus roles y las sucursales donde trabajan."
+        tabs={
+          <AdminNavTabs
+            organizationId={organizationId}
+            tabs={EQUIPO_TABS}
+          />
+        }
         title="Equipo"
       />
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">

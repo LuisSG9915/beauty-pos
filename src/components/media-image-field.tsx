@@ -51,7 +51,7 @@ async function comprimirImagen(
   }
 }
 
-async function subirImagen({
+export async function subirImagen({
   archivo,
   entidad,
   entidadId,
@@ -97,7 +97,7 @@ async function subirImagen({
   };
 }
 
-async function eliminarImagen(claveR2: string): Promise<void> {
+export async function eliminarImagen(claveR2: string): Promise<void> {
   const response = await fetch(`/api/medios/${encodeURI(claveR2)}`, { method: "DELETE" });
   if (!response.ok) {
     const resultado = (await response.json().catch(() => ({}))) as { error?: string };
@@ -520,6 +520,193 @@ export function FichaFotosField({
             <span className="text-[10px] font-medium">Foto</span>
           </button>
         ) : null}
+      </div>
+      <MensajeError error={error} />
+    </div>
+  );
+}
+
+/**
+ * Captura dual Antes / Después para la ficha técnica del servicio.
+ * Permite capturar la foto inicial del cliente y la foto final del resultado,
+ * guardándolas en R2 con compresión automática y emitiendo tanto el jsonb
+ * compatible `fotos` (array de claves) como el jsonb estructurado `fotosDetalle`
+ * (claves con rol "antes" y "despues").
+ */
+export function AntesDespuesFotosField({
+  entidadId,
+  nameFotos = "fotos",
+  nameDetalle = "fotosDetalle",
+  organizacionId,
+}: {
+  entidadId: string;
+  nameFotos?: string;
+  nameDetalle?: string;
+  organizacionId: string;
+}) {
+  const toast = useToast();
+  const inputAntesRef = useRef<HTMLInputElement>(null);
+  const inputDespuesRef = useRef<HTMLInputElement>(null);
+  const [fotoAntes, setFotoAntes] = useState<string | null>(null);
+  const [fotoDespues, setFotoDespues] = useState<string | null>(null);
+  const [pendingAntes, setPendingAntes] = useState(false);
+  const [pendingDespues, setPendingDespues] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const subirFoto = async (file: File | undefined, rol: "antes" | "despues") => {
+    if (!file) return;
+    const isAntes = rol === "antes";
+    if (isAntes ? pendingAntes : pendingDespues) return;
+    if (isAntes) setPendingAntes(true);
+    else setPendingDespues(true);
+    setError(null);
+    try {
+      const subida = await subirImagen({
+        archivo: file,
+        entidad: "ficha",
+        entidadId,
+        organizacionId,
+      });
+      if (isAntes) setFotoAntes(subida.claveR2);
+      else setFotoDespues(subida.claveR2);
+    } catch (exc) {
+      const msg = exc instanceof Error ? exc.message : "No se pudo subir la foto.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      if (isAntes) {
+        setPendingAntes(false);
+        if (inputAntesRef.current) inputAntesRef.current.value = "";
+      } else {
+        setPendingDespues(false);
+        if (inputDespuesRef.current) inputDespuesRef.current.value = "";
+      }
+    }
+  };
+
+  const quitarFoto = async (claveR2: string, rol: "antes" | "despues") => {
+    try {
+      await eliminarImagen(claveR2);
+      if (rol === "antes") setFotoAntes(null);
+      else setFotoDespues(null);
+    } catch (exc) {
+      const msg = exc instanceof Error ? exc.message : "No se pudo eliminar la foto.";
+      toast.error(msg);
+    }
+  };
+
+  const claves = [fotoAntes, fotoDespues].filter((c): c is string => Boolean(c));
+  const detalles = [
+    fotoAntes ? { claveR2: fotoAntes, rol: "antes" as const } : null,
+    fotoDespues ? { claveR2: fotoDespues, rol: "despues" as const } : null,
+  ].filter((d): d is { claveR2: string; rol: "antes" | "despues" } => Boolean(d));
+
+  return (
+    <div className="space-y-2">
+      <input name={nameFotos} type="hidden" value={JSON.stringify(claves)} />
+      <input name={nameDetalle} type="hidden" value={JSON.stringify(detalles)} />
+
+      <input
+        accept={ACCEPT_IMAGEN}
+        capture="environment"
+        className="sr-only"
+        onChange={(e) => void subirFoto(e.target.files?.[0], "antes")}
+        ref={inputAntesRef}
+        type="file"
+      />
+      <input
+        accept={ACCEPT_IMAGEN}
+        capture="environment"
+        className="sr-only"
+        onChange={(e) => void subirFoto(e.target.files?.[0], "despues")}
+        ref={inputDespuesRef}
+        type="file"
+      />
+
+      <div className="grid grid-cols-2 gap-3">
+        {/* Ranura Antes */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Antes
+          </span>
+          {fotoAntes ? (
+            <div className="relative aspect-square overflow-hidden rounded-xl border border-border bg-muted">
+              <img
+                alt="Foto Antes"
+                className="size-full object-cover"
+                src={`/api/medios/${encodeURI(fotoAntes)}`}
+              />
+              <button
+                aria-label="Quitar foto antes"
+                className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-card/90 text-destructive shadow-sm hover:bg-card"
+                data-action-id="medios.ficha.antes_quitar"
+                onClick={() => void quitarFoto(fotoAntes, "antes")}
+                type="button"
+              >
+                <X aria-hidden="true" className="size-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              className="flex aspect-square flex-col items-center justify-center rounded-xl border border-dashed border-input bg-muted/60 p-2 text-center transition-colors hover:border-primary hover:bg-accent/40 disabled:cursor-wait"
+              data-action-id="medios.ficha.antes_subir"
+              disabled={pendingAntes}
+              onClick={() => inputAntesRef.current?.click()}
+              type="button"
+            >
+              {pendingAntes ? (
+                <Loader2 aria-hidden="true" className="size-5 animate-spin text-primary" />
+              ) : (
+                <>
+                  <Camera aria-hidden="true" className="size-5 text-primary" />
+                  <span className="mt-1 text-xs font-medium text-foreground">Subir Antes</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
+
+        {/* Ranura Después */}
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Después
+          </span>
+          {fotoDespues ? (
+            <div className="relative aspect-square overflow-hidden rounded-xl border border-border bg-muted">
+              <img
+                alt="Foto Después"
+                className="size-full object-cover"
+                src={`/api/medios/${encodeURI(fotoDespues)}`}
+              />
+              <button
+                aria-label="Quitar foto después"
+                className="absolute right-1.5 top-1.5 flex size-6 items-center justify-center rounded-full bg-card/90 text-destructive shadow-sm hover:bg-card"
+                data-action-id="medios.ficha.despues_quitar"
+                onClick={() => void quitarFoto(fotoDespues, "despues")}
+                type="button"
+              >
+                <X aria-hidden="true" className="size-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              className="flex aspect-square flex-col items-center justify-center rounded-xl border border-dashed border-input bg-muted/60 p-2 text-center transition-colors hover:border-primary hover:bg-accent/40 disabled:cursor-wait"
+              data-action-id="medios.ficha.despues_subir"
+              disabled={pendingDespues}
+              onClick={() => inputDespuesRef.current?.click()}
+              type="button"
+            >
+              {pendingDespues ? (
+                <Loader2 aria-hidden="true" className="size-5 animate-spin text-primary" />
+              ) : (
+                <>
+                  <Camera aria-hidden="true" className="size-5 text-primary" />
+                  <span className="mt-1 text-xs font-medium text-foreground">Subir Después</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
       <MensajeError error={error} />
     </div>

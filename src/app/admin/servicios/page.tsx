@@ -8,6 +8,7 @@ import { InsumosManager } from "@/app/admin/servicios/insumos-manager";
 import { ServiceForm } from "@/app/admin/servicios/service-form";
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { FormSheet } from "@/components/admin/form-sheet";
+import { AdminNavTabs, CATALOGO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { ToggleActivo } from "@/components/admin/toggle-activo";
@@ -202,6 +203,12 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
           </Button>
         }
         description="Catálogo de servicios, insumos y comisiones."
+        tabs={
+          <AdminNavTabs
+            organizationId={organizationId}
+            tabs={CATALOGO_TABS}
+          />
+        }
         title="Servicios"
       />
 

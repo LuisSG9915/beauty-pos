@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
+import { withDbRetry } from "@/db/retry";
 import { organizaciones, sucursales, usuarios } from "@/db/schema/core";
 import {
   bloqueosAgenda,
@@ -204,7 +205,8 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
   const db = getDatabase();
 
   try {
-    const outcome = await db.transaction(async (tx): Promise<CitaActionState> => {
+    const outcome = await withDbRetry(() =>
+      db.transaction(async (tx): Promise<CitaActionState> => {
       // Serializa mutaciones de agenda por sucursal antes de validar/escribir.
       const sucursal = await lockSucursalAgenda(tx, input.organizacionId, input.sucursalId);
       if (!sucursal) return { error: "La sucursal no existe o no pertenece a la organización." };
@@ -363,7 +365,8 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
         });
       }
       return { success: true, message: "Cita guardada correctamente.", citaId };
-    });
+    }),
+    );
 
     if (outcome.success) {
       revalidatePath("/admin/agenda");
@@ -398,7 +401,8 @@ export async function toggleServicioCita(formData: FormData): Promise<CitaMutati
   const db = getDatabase();
 
   try {
-    const outcome = await db.transaction(async (tx): Promise<CitaMutationResult> => {
+    const outcome = await withDbRetry(() =>
+      db.transaction(async (tx): Promise<CitaMutationResult> => {
       const cita = await getCita(tx, input.organizacionId, input.citaId);
       if (!cita || !cita.activo) return { success: false, error: "La cita no existe." };
       if (!canAccessBranch(access, cita.sucursalId)) {
@@ -456,7 +460,8 @@ export async function toggleServicioCita(formData: FormData): Promise<CitaMutati
         detalle: { servicioId: input.servicioId },
       });
       return { success: true, message: input.agregar ? "Servicio agregado." : "Servicio quitado." };
-    });
+    }),
+    );
 
     if (outcome.success) {
       revalidatePath("/admin/agenda");
@@ -488,7 +493,8 @@ export async function updateCitaEstado(formData: FormData): Promise<CitaMutation
   const db = getDatabase();
 
   try {
-    const outcome = await db.transaction(async (tx): Promise<CitaMutationResult> => {
+    const outcome = await withDbRetry(() =>
+      db.transaction(async (tx): Promise<CitaMutationResult> => {
       const referencia = await getCita(tx, input.organizacionId, input.citaId);
       if (!referencia || !referencia.activo) return { success: false, error: "La cita no existe." };
       if (!canAccessBranch(access, referencia.sucursalId)) {
@@ -586,7 +592,8 @@ export async function updateCitaEstado(formData: FormData): Promise<CitaMutation
         });
       }
       return { success: true, message: "Estado actualizado." };
-    });
+    }),
+    );
 
     if (outcome.success) {
       revalidatePath("/admin/agenda");
@@ -627,9 +634,10 @@ export async function toggleCitaActiva(formData: FormData): Promise<CitaMutation
   if (!versionCoincide(cita, parsed.data.version)) {
     return { success: false, error: CITA_STALE_MESSAGE };
   }
-  await db.transaction(async (tx) => {
-    await tx
-      .update(citas)
+  await withDbRetry(() =>
+    db.transaction(async (tx) => {
+      await tx
+        .update(citas)
       .set({ activo: !active, version: cita.version + 1, updatedBy: user.id })
       .where(and(eq(citas.id, id), eq(citas.organizacionId, organizationId)));
     await registrarHistorialCita(tx, {
@@ -641,7 +649,8 @@ export async function toggleCitaActiva(formData: FormData): Promise<CitaMutation
     if (active) {
       await encolarAvisoCita(tx, { organizacionId: organizationId, citaId: id, tipo: TIPO_CANCELACION });
     }
-  });
+  }),
+  );
   revalidatePath("/admin/agenda");
   revalidatePath("/admin/pos");
   return { success: true, message: active ? "Cita desactivada." : "Cita reactivada." };
@@ -773,7 +782,9 @@ export async function moveCita(formData: FormData): Promise<CitaMutationResult> 
   const db = getDatabase();
 
   try {
-    const outcome = await db.transaction((tx) => moverCitaEnTx(tx, input, formData, access, { reactivarAPendiente: false }));
+    const outcome = await withDbRetry(() =>
+      db.transaction((tx) => moverCitaEnTx(tx, input, formData, access, { reactivarAPendiente: false })),
+    );
     if (outcome.success) {
       revalidatePath("/admin/agenda");
       revalidatePath("/admin/pos");
@@ -799,7 +810,9 @@ export async function rescheduleCita(formData: FormData): Promise<CitaMutationRe
   const db = getDatabase();
 
   try {
-    const outcome = await db.transaction((tx) => moverCitaEnTx(tx, input, formData, access, { reactivarAPendiente: true }));
+    const outcome = await withDbRetry(() =>
+      db.transaction((tx) => moverCitaEnTx(tx, input, formData, access, { reactivarAPendiente: true })),
+    );
     if (outcome.success) {
       revalidatePath("/admin/agenda");
       revalidatePath("/admin/pos");
@@ -840,8 +853,9 @@ export async function cambiarDuracionCita(formData: FormData): Promise<CitaMutat
   const db = getDatabase();
 
   try {
-    const outcome = await db.transaction(async (tx): Promise<CitaMutationResult> => {
-      const referencia = await getCita(tx, input.organizacionId, input.citaId);
+    const outcome = await withDbRetry(() =>
+      db.transaction(async (tx): Promise<CitaMutationResult> => {
+        const referencia = await getCita(tx, input.organizacionId, input.citaId);
       if (!referencia || !referencia.activo) {
         return { success: false, error: "La cita no existe." };
       }
@@ -922,7 +936,8 @@ export async function cambiarDuracionCita(formData: FormData): Promise<CitaMutat
         },
       });
       return { success: true, message: "Duración actualizada." };
-    });
+    }),
+    );
 
     if (outcome.success) {
       revalidatePath("/admin/agenda");
@@ -963,8 +978,9 @@ export async function saveHorarioSucursal(formData: FormData): Promise<CitaMutat
   const db = getDatabase();
 
   try {
-    const outcome = await db.transaction(async (tx): Promise<CitaMutationResult> => {
-      // Rechaza turnos traslapados en el mismo día: los huecos entre turnos
+    const outcome = await withDbRetry(() =>
+      db.transaction(async (tx): Promise<CitaMutationResult> => {
+        // Rechaza turnos traslapados en el mismo día: los huecos entre turnos
       // (comida, limpieza) se modelan como dos turnos no traslapados.
       const existentes = await tx
         .select({ iniciaMinutos: horariosSucursales.iniciaMinutos, terminaMinutos: horariosSucursales.terminaMinutos })
@@ -1003,7 +1019,8 @@ export async function saveHorarioSucursal(formData: FormData): Promise<CitaMutat
         },
       });
       return { success: true, message: "Horario agregado." };
-    });
+    }),
+    );
     if (outcome.success) revalidatePath("/admin/agenda");
     return outcome;
   } catch (error) {
@@ -1063,8 +1080,9 @@ export async function saveBloqueoAgenda(formData: FormData): Promise<CitaMutatio
   const db = getDatabase();
 
   try {
-    const outcome = await db.transaction(async (tx): Promise<CitaMutationResult> => {
-      const sucursal = await lockSucursalAgenda(tx, input.organizacionId, input.sucursalId);
+    const outcome = await withDbRetry(() =>
+      db.transaction(async (tx): Promise<CitaMutationResult> => {
+        const sucursal = await lockSucursalAgenda(tx, input.organizacionId, input.sucursalId);
       if (!sucursal) return { success: false, error: "La sucursal no existe o no pertenece a la organización." };
       if (!sucursal.activo) return { success: false, error: "La sucursal está inactiva." };
       if (!canAccessBranch(access, input.sucursalId)) {
@@ -1108,7 +1126,8 @@ export async function saveBloqueoAgenda(formData: FormData): Promise<CitaMutatio
         },
       });
       return { success: true, message: "Bloqueo creado." };
-    });
+    }),
+    );
     if (outcome.success) revalidatePath("/admin/agenda");
     return outcome;
   } catch (error) {
@@ -1164,10 +1183,11 @@ export async function updateCapacidadSinAsignar(formData: FormData): Promise<Cit
     return { success: false, error: "No tienes acceso a esta sucursal." };
   }
   const db = getDatabase();
-  await db.transaction(async (tx) => {
-    await tx
-      .update(sucursales)
-      .set({ capacidadSinAsignar: input.capacidadSinAsignar, updatedBy: access.user.id })
+  await withDbRetry(() =>
+    db.transaction(async (tx) => {
+      await tx
+        .update(sucursales)
+        .set({ capacidadSinAsignar: input.capacidadSinAsignar, updatedBy: access.user.id })
       .where(and(eq(sucursales.id, input.sucursalId), eq(sucursales.organizacionId, input.organizacionId)));
     await auditEvent(tx, {
       organizacionId: input.organizacionId,
@@ -1178,7 +1198,8 @@ export async function updateCapacidadSinAsignar(formData: FormData): Promise<Cit
       entidadId: input.sucursalId,
       detalle: { capacidadSinAsignar: input.capacidadSinAsignar },
     });
-  });
+  }),
+  );
   revalidatePath("/admin/agenda");
   return { success: true, message: "Capacidad actualizada." };
 }
@@ -1216,11 +1237,12 @@ export async function updateReservasConfig(formData: FormData): Promise<CitaMuta
     if (negado) return { success: false, error: negado };
   }
   const db = getDatabase();
-  await db.transaction(async (tx) => {
-    await tx
-      .update(sucursales)
-      .set({
-        reservasOnline: input.reservasOnline,
+  await withDbRetry(() =>
+    db.transaction(async (tx) => {
+      await tx
+        .update(sucursales)
+        .set({
+          reservasOnline: input.reservasOnline,
         reservasAutoConfirmar: input.reservasOnline ? input.reservasAutoConfirmar : false,
         ...(input.reservasCancelacionHoras !== undefined
           ? { reservasCancelacionHoras: input.reservasCancelacionHoras }
@@ -1249,7 +1271,8 @@ export async function updateReservasConfig(formData: FormData): Promise<CitaMuta
         reservasHorizonteDias: input.reservasHorizonteDias,
       },
     });
-  });
+  }),
+  );
   revalidatePath("/admin/agenda");
   return {
     success: true,
@@ -1281,10 +1304,11 @@ export async function updateRecordatoriosConfig(formData: FormData): Promise<Cit
     if (negado) return { success: false, error: negado };
   }
   const db = getDatabase();
-  await db.transaction(async (tx) => {
-    await tx
-      .update(organizaciones)
-      .set({
+  await withDbRetry(() =>
+    db.transaction(async (tx) => {
+      await tx
+        .update(organizaciones)
+        .set({
         recordatoriosActivos: input.recordatoriosActivos,
         recordatoriosHorasAntes: input.recordatoriosHorasAntes,
         updatedBy: access.user.id,
@@ -1301,7 +1325,8 @@ export async function updateRecordatoriosConfig(formData: FormData): Promise<Cit
         recordatoriosHorasAntes: input.recordatoriosHorasAntes,
       },
     });
-  });
+  }),
+  );
   revalidatePath("/admin/agenda");
   return {
     success: true,
@@ -1397,9 +1422,10 @@ export async function saveRecurso(formData: FormData): Promise<CitaMutationResul
   }
   const db = getDatabase();
   try {
-    const outcome = await db.transaction(async (tx): Promise<CitaMutationResult> => {
-      const [inserted] = await tx
-        .insert(recursos)
+    const outcome = await withDbRetry(() =>
+      db.transaction(async (tx): Promise<CitaMutationResult> => {
+        const [inserted] = await tx
+          .insert(recursos)
         .values({
           organizacionId: input.organizacionId,
           sucursalId: input.sucursalId,
@@ -1420,7 +1446,8 @@ export async function saveRecurso(formData: FormData): Promise<CitaMutationResul
         detalle: { nombre: input.nombre, tipo: input.tipo, capacidad: input.capacidad },
       });
       return { success: true, message: "Recurso registrado." };
-    });
+    }),
+    );
     if (outcome.success) revalidatePath("/admin/agenda");
     return outcome;
   } catch (error) {
@@ -1478,8 +1505,9 @@ export async function toggleRecursoCita(formData: FormData): Promise<CitaMutatio
   const db = getDatabase();
 
   try {
-    const outcome = await db.transaction(async (tx): Promise<CitaMutationResult> => {
-      const cita = await getCita(tx, input.organizacionId, input.citaId);
+    const outcome = await withDbRetry(() =>
+      db.transaction(async (tx): Promise<CitaMutationResult> => {
+        const cita = await getCita(tx, input.organizacionId, input.citaId);
       if (!cita || !cita.activo) return { success: false, error: "La cita no existe." };
       if (!canAccessBranch(access, cita.sucursalId)) {
         return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
@@ -1554,7 +1582,8 @@ export async function toggleRecursoCita(formData: FormData): Promise<CitaMutatio
         detalle: { recursoId: input.recursoId, nombre: recurso.nombre },
       });
       return { success: true, message: input.agregar ? "Recurso asignado." : "Recurso liberado." };
-    });
+    }),
+    );
 
     if (outcome.success) {
       revalidatePath("/admin/agenda");

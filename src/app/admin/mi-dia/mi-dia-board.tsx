@@ -1,14 +1,30 @@
 "use client";
 
-import { CheckCircle2, CirclePlay, ClipboardList, Coins, Scissors, Wallet } from "lucide-react";
+import {
+  CheckCircle2,
+  CirclePlay,
+  ClipboardList,
+  Coins,
+  Scissors,
+  Sparkles,
+  Wallet,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { updateCitaEstado } from "@/app/admin/agenda/actions";
 import { CitaStatusBadge } from "@/app/admin/agenda/cita-side-panel";
+import { FichaForm } from "@/app/admin/clientes/ficha-form";
 import { iniciarVentaDeCita } from "@/app/admin/pos/actions";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/toast";
 import { initialActionState, type ActionState } from "@/lib/action-state";
 import { formatCurrency, formatDate, formatTime } from "@/lib/format";
@@ -63,6 +79,7 @@ export function MiDiaBoard({
   const toast = useToast();
   const [pending, startTransition] = useTransition();
   const [pendingAction, setPendingAction] = useState<string | null>(null);
+  const [citaFicha, setCitaFicha] = useState<MiDiaCita | null>(null);
 
   const runCitaAction = (cita: MiDiaCita, action: string, work: () => Promise<void>) => {
     const key = `${cita.id}:${action}`;
@@ -299,12 +316,53 @@ export function MiDiaBoard({
                       Ver ticket
                     </Button>
                   ) : null}
+                  {cita.clienteId ? (
+                    <Button
+                      data-action-id="mi_dia.cita.ficha"
+                      disabled={citaBusy}
+                      onClick={() => setCitaFicha(cita)}
+                      size="touch"
+                      type="button"
+                      variant="outline"
+                    >
+                      <Sparkles aria-hidden="true" className="size-4 text-primary" />
+                      Ficha & Fórmula
+                    </Button>
+                  ) : null}
                 </div>
               </li>
             );
           })}
         </ol>
       )}
+
+      {citaFicha && citaFicha.clienteId ? (
+        <Dialog onOpenChange={(open) => !open && setCitaFicha(null)} open={citaFicha != null}>
+          <DialogContent className="max-h-[90dvh] w-[min(94vw,36rem)] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Ficha & Recetario: {citaFicha.clienteNombre}</DialogTitle>
+              <DialogDescription>
+                Consulta fórmulas previas o registra la mezcla química y fotos de la sesión.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="pt-2">
+              <FichaForm
+                citaId={citaFicha.id}
+                clienteId={citaFicha.clienteId}
+                clienteNombre={citaFicha.clienteNombre}
+                compact
+                onSaved={() => {
+                  setCitaFicha(null);
+                  router.refresh();
+                }}
+                organizationId={organizationId}
+                servicioNombre={citaFicha.servicios[0]}
+                sucursalId={sucursalId}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      ) : null}
     </div>
   );
 }

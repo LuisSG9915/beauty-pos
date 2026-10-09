@@ -2,6 +2,7 @@ import { and, desc, eq, gte, ilike, lt, or, sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AdminNavTabs, CAJA_VENTAS_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
@@ -215,12 +216,27 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
             data-action-clave="1" size="lg"
             data-action-id="ventas.nueva"
             nativeButton={false}
-            render={<Link href={buildAdminHref("/pos", { organizationId, sucursalId })} />}
+            render={
+              <Link
+                href={buildAdminHref("/pos", {
+                  organizationId,
+                  sucursalId,
+                  extra: { nueva: "1" },
+                })}
+              />
+            }
           >
             Nueva venta
           </Button>
         }
         description={`${branch.nombre} · ${desde} → ${hasta}. La fecha mostrada es el cobro confirmado; las ventas antiguas usan su fecha de creación.`}
+        tabs={
+          <AdminNavTabs
+            organizationId={organizationId}
+            sucursalId={sucursalId}
+            tabs={CAJA_VENTAS_TABS}
+          />
+        }
         title="Historial de ventas"
       />
 

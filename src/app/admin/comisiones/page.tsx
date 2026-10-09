@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { LiquidarForm } from "@/app/admin/comisiones/liquidar-form";
 import { RevertirLiquidacionForm } from "@/app/admin/comisiones/revertir-liquidacion-form";
+import { AdminNavTabs, EQUIPO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { PlanUpgradeNotice } from "@/components/plan-gate";
@@ -87,6 +88,13 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
     <div className="space-y-6">
       <AdminPageHeader
         description={`${branch.nombre} · ${desde} → ${hasta}. Las comisiones se devengan al cobrar servicios; aquí se pagan al equipo. En efectivo salen del corte abierto.`}
+        tabs={
+          <AdminNavTabs
+            organizationId={organizationId}
+            sucursalId={sucursalId}
+            tabs={EQUIPO_TABS}
+          />
+        }
         title="Comisiones"
       />
 

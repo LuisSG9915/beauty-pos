@@ -1,14 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { and, eq, gt, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
-import { rateLimitEventos } from "@/db/schema/operations";
 import {
   telemetriaProductoEventos,
   telemetriaSesiones,
 } from "@/db/schema/telemetry";
 import { createAuth } from "@/lib/auth/server";
+import { registrarYVerificarRateLimit } from "@/lib/rate-limit";
 
 const LOTE_MAX = 50;
 const EVENTO_TIPOS = [
@@ -56,25 +56,14 @@ const loteSchema = z.object({
   eventos: z.array(eventoSchema).max(LOTE_MAX),
 });
 
-async function limitePorSesion(db: ReturnType<typeof getDatabase>, sid: string) {
-  // Máx. ~120 lotes/hora por sid: suficiente para uso real, corta abusos.
-  const corte = new Date(Date.now() - 60 * 60_000);
-  const recientes = await db
-    .select({ createdAt: rateLimitEventos.createdAt })
-    .from(rateLimitEventos)
-    .where(
-      and(
-        eq(rateLimitEventos.bucket, "telemetria_producto"),
-        eq(rateLimitEventos.clave, sid),
-        gt(rateLimitEventos.createdAt, corte),
-      ),
-    )
-    .limit(121);
-  if (recientes.length > 120) return true;
-  await db
-    .insert(rateLimitEventos)
-    .values({ bucket: "telemetria_producto", clave: sid });
-  return false;
+async function limitePorSesion(sid: string) {
+  // Máx. ~120 lotes/hora por sid: suficiente para uso real, corta abusos sin tocar CockroachDB.
+  return registrarYVerificarRateLimit({
+    bucket: "telemetria_producto",
+    clave: sid,
+    limite: 120,
+    ventanaMs: 60 * 60_000,
+  });
 }
 
 /**
@@ -93,7 +82,7 @@ export async function POST(request: NextRequest) {
     const db = getDatabase();
     const { sesion, eventos } = parsed.data;
 
-    if (await limitePorSesion(db, sesion.sid)) {
+    if (await limitePorSesion(sesion.sid)) {
       return new NextResponse(null, { status: 204 });
     }
 

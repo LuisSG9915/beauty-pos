@@ -1,6 +1,7 @@
 import { and, eq, or } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
+import { withDbRetry } from "@/db/retry";
 import { servicios } from "@/db/schema/catalogs";
 import { clientes, sucursales } from "@/db/schema/core";
 import { citas, detalleCitasServicios } from "@/db/schema/operations";
@@ -92,7 +93,8 @@ export async function crearReservaPublica(input: {
 
   const db = getDatabase();
   try {
-    return await db.transaction(async (tx): Promise<ReservaResult> => {
+    return await withDbRetry(() =>
+      db.transaction(async (tx): Promise<ReservaResult> => {
       // El lock FOR UPDATE serializa reservas web y cambios de agenda de la
       // sucursal: dos clientes no pueden tomar el mismo horario a la vez.
       const sucursal = await lockSucursalAgenda(tx, input.organizacionId, input.sucursalId);
@@ -252,7 +254,8 @@ export async function crearReservaPublica(input: {
       });
 
       return { ok: true, citaId: cita.id, confirmada: autoConfirmar, gestionUrl };
-    });
+    }),
+    );
   } catch (error) {
     console.error("crearReservaPublica", error);
     return { ok: false, error: "No se pudo completar la reserva. Inténtalo de nuevo." };

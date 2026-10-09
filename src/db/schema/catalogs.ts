@@ -164,6 +164,7 @@ export const productos = pgTable(
     uniqueIndex("productos_organizacion_sku_uq").on(table.organizacionId, table.sku),
     index("productos_organizacion_idx").on(table.organizacionId),
     index("productos_categoria_idx").on(table.categoriaId),
+    index("productos_unidad_medida_idx").on(table.unidadMedidaId),
   ],
 );
 

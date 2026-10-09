@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { togglePromotion } from "@/app/admin/promociones/actions";
 import { PromotionForm } from "@/app/admin/promociones/promotion-form";
 import { FormSheet } from "@/components/admin/form-sheet";
+import { AdminNavTabs, CATALOGO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
@@ -86,7 +87,16 @@ export default async function PromotionsPage({ searchParams }: { searchParams: S
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader description="Descuentos y promociones aplicables en el punto de venta." title="Promociones" />
+      <AdminPageHeader
+        description="Descuentos y promociones aplicables en el punto de venta."
+        tabs={
+          <AdminNavTabs
+            organizationId={organizationId}
+            tabs={CATALOGO_TABS}
+          />
+        }
+        title="Promociones"
+      />
 
       <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />

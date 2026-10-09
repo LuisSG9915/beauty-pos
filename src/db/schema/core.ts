@@ -106,6 +106,7 @@ export const clientes = pgTable(
     index("clientes_organizacion_nombre_idx").on(table.organizacionId, table.nombre),
     index("clientes_organizacion_telefono_idx").on(table.organizacionId, table.telefonoNormalizado),
     index("clientes_organizacion_correo_idx").on(table.organizacionId, table.correoNormalizado),
+    index("clientes_organizacion_fecha_idx").on(table.organizacionId, table.createdAt),
   ],
 );
 
@@ -167,5 +168,6 @@ export const relUsuariosSucursales = pgTable(
       table.sucursalId,
     ),
     index("rel_usuarios_sucursales_organizacion_idx").on(table.organizacionId),
+    index("rel_usuarios_sucursales_sucursal_idx").on(table.sucursalId),
   ],
 );

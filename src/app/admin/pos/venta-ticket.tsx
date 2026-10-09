@@ -35,6 +35,7 @@ import { ActionFeedback, useToast } from "@/components/ui/toast";
 import { initialActionState, type ActionState } from "@/lib/action-state";
 import { formatCurrency } from "@/lib/format";
 import { GLOSARIO } from "@/lib/glosario";
+import { cn } from "@/lib/utils";
 import { formaPagoDesdeCategoria } from "@/modules/facturacion/sat";
 import type { TicketData } from "@/modules/pos/ticket";
 
@@ -181,10 +182,15 @@ function TicketLine({
   };
 
   return (
-    <div className="rounded-xl border border-border px-3 py-2.5 text-sm sm:px-4">
+    <div
+      className={cn(
+        "group rounded-2xl border border-border/80 bg-card p-3 sm:px-4 text-sm shadow-xs transition-all duration-200 hover:border-border hover:shadow-sm animate-in fade-in slide-in-from-right-3 duration-200",
+        pending && "opacity-60",
+      )}
+    >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="min-w-0 flex-1 basis-44">
-          <p className="truncate font-medium">{line.nombre}</p>
+          <p className="truncate font-medium text-foreground">{line.nombre}</p>
           <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
             {formatCurrency(line.precio, { currency })} c/u
             {paquete?.usado ? " · cubierto por paquete" : ""}
@@ -195,12 +201,12 @@ function TicketLine({
           <>
             <div
               aria-label={`Cantidad de ${line.nombre}`}
-              className="flex items-center overflow-hidden rounded-lg border border-border"
+              className="flex items-center overflow-hidden rounded-xl border border-border bg-muted/30 shadow-xs"
               role="group"
             >
               <button
                 aria-label="Reducir cantidad"
-                className="flex size-9 items-center justify-center text-muted-foreground transition-colors hover:bg-muted/60 disabled:opacity-40"
+                className="flex size-8 items-center justify-center text-muted-foreground transition-all duration-100 hover:bg-muted hover:text-foreground active:scale-90 disabled:opacity-40"
                 disabled={pending}
                 onClick={() => run(cambiarCantidadLinea, { tipo, delta: "-1" })}
                 type="button"
@@ -209,13 +215,13 @@ function TicketLine({
               </button>
               <span
                 aria-live="polite"
-                className="w-9 text-center text-sm font-semibold tabular-nums"
+                className="w-8 text-center text-xs font-bold tabular-nums text-foreground"
               >
                 {line.cantidad}
               </span>
               <button
                 aria-label="Aumentar cantidad"
-                className="flex size-9 items-center justify-center text-muted-foreground transition-colors hover:bg-muted/60 disabled:opacity-40"
+                className="flex size-8 items-center justify-center text-muted-foreground transition-all duration-100 hover:bg-muted hover:text-foreground active:scale-90 disabled:opacity-40"
                 disabled={pending}
                 onClick={() => run(cambiarCantidadLinea, { tipo, delta: "1" })}
                 type="button"
@@ -223,18 +229,19 @@ function TicketLine({
                 <Plus aria-hidden="true" className="size-3.5" />
               </button>
             </div>
-            <span className="w-24 text-right font-semibold tabular-nums">
+            <span className="w-24 text-right font-bold tabular-nums text-foreground">
               {paquete?.usado ? "Paquete" : formatCurrency(importe, { currency })}
             </span>
             <Button
               aria-label={`Quitar ${line.nombre}`}
+              className="text-muted-foreground transition-all duration-150 hover:bg-destructive-soft hover:text-destructive active:scale-95"
               disabled={pending}
               onClick={() => run(removeAction, {})}
               size="icon-sm"
               type="button"
               variant="ghost"
             >
-              <Trash2 aria-hidden="true" className="text-destructive" />
+              <Trash2 aria-hidden="true" className="size-4" />
             </Button>
           </>
         ) : (
@@ -242,7 +249,7 @@ function TicketLine({
             <span className="text-xs tabular-nums text-muted-foreground">
               {line.cantidad} × {formatCurrency(line.precio, { currency })}
             </span>
-            <span className="w-24 text-right font-semibold tabular-nums">
+            <span className="w-24 text-right font-bold tabular-nums text-foreground">
               {paquete?.usado ? "Paquete" : formatCurrency(importe, { currency })}
             </span>
           </>
@@ -772,108 +779,133 @@ export function VentaTicket({
       </section>
 
       <aside className="space-y-4">
-        <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="text-sm font-semibold text-foreground">Totales</h2>
-          <div className="mt-3 space-y-2 rounded-xl bg-accent/70 p-4">
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>Subtotal</span>
-              <span className="tabular-nums">
-                {formatCurrency(venta.subtotal, { currency })}
-              </span>
-            </div>
-            {cubiertoPorPaquete > 0 ? (
-              <div className="flex justify-between text-xs text-success">
-                <span>Cubierto por paquete (no cobrado)</span>
-                <span className="tabular-nums">
-                  {formatCurrency(cubiertoPorPaquete, { currency })}
+        <section className="rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold tracking-wide text-foreground">Resumen de cobro</h2>
+            <span className="rounded-full bg-accent px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
+              {venta.estado === "en_proceso" ? "Pendiente" : venta.estado === "cobrada" ? "Cobrado" : "Cancelado"}
+            </span>
+          </div>
+
+          <div className="mt-3 divide-y divide-border/60 rounded-xl bg-accent/40 p-4 transition-all">
+            <div className="space-y-2 pb-3 text-sm">
+              <div className="flex justify-between text-muted-foreground">
+                <span>Subtotal</span>
+                <span className="font-mono tabular-nums text-foreground">
+                  {formatCurrency(venta.subtotal, { currency })}
                 </span>
               </div>
-            ) : null}
-            <div className="flex justify-between text-sm text-muted-foreground">
-              <span>Descuento</span>
-              <span className="tabular-nums">
-                -{formatCurrency(venta.descuento, { currency })}
-              </span>
-            </div>
-            {Number(venta.descuentoPromocion ?? 0) > 0 ? (
-              <div className="flex justify-between text-sm font-medium text-success">
-                <span>Promoción{venta.promocionNombre ? ` · ${venta.promocionNombre}` : ""}</span>
-                <span className="tabular-nums">
-                  -{formatCurrency(venta.descuentoPromocion ?? "0", { currency })}
-                </span>
-              </div>
-            ) : null}
-            {Number(venta.descuentoMembresia ?? 0) > 0 ? (
-              <div className="flex justify-between text-sm font-medium text-primary">
-                <span>Membresía{venta.membresiaNombre ? ` · ${venta.membresiaNombre}` : ""}</span>
-                <span className="tabular-nums">
-                  -{formatCurrency(venta.descuentoMembresia ?? "0", { currency })}
-                </span>
-              </div>
-            ) : null}
-            {propinaNum > 0 ? (
-              <div className="flex justify-between text-sm text-muted-foreground">
-                <span>Propina</span>
-                <span className="tabular-nums">
-                  +{formatCurrency(propinaNum, { currency })}
-                </span>
-              </div>
-            ) : null}
-            <div className="flex justify-between border-t border-border pt-2 text-lg font-bold text-primary">
-              <span>Total</span>
-              <span className="tabular-nums">
-                {formatCurrency(venta.total, { currency })}
-              </span>
-            </div>
-            {anticipoAplicado > 0 ? (
-              <div className="flex justify-between text-sm font-medium text-success">
-                <span>Anticipo aplicado</span>
-                <span className="tabular-nums">-{formatCurrency(anticipoAplicado, { currency })}</span>
-              </div>
-            ) : null}
-            {editable && anticipoPorAplicar > 0 ? (
-              <div className="flex justify-between text-sm font-medium text-success">
-                <span>Anticipo por aplicar</span>
-                <span className="tabular-nums">-{formatCurrency(anticipoPorAplicar, { currency })}</span>
-              </div>
-            ) : null}
-            {totalDevuelto > 0 ? (
-              <>
-                <div className="flex justify-between text-sm text-destructive">
-                  <span>Devuelto</span>
-                  <span className="tabular-nums">-{formatCurrency(totalDevuelto, { currency })}</span>
-                </div>
-                <div className="flex justify-between text-sm font-semibold text-foreground">
-                  <span>Neto cobrado</span>
-                  <span className="tabular-nums">
-                    {formatCurrency(Math.max(Number(venta.total) - totalDevuelto, 0), { currency })}
+              {cubiertoPorPaquete > 0 ? (
+                <div className="flex justify-between text-xs text-success">
+                  <span>Cubierto por paquete (no cobrado)</span>
+                  <span className="font-mono tabular-nums">
+                    {formatCurrency(cubiertoPorPaquete, { currency })}
                   </span>
                 </div>
-              </>
-            ) : null}
-            {propinaNum > 0 ? (
-              <div className="flex justify-between text-sm font-semibold text-primary">
-                <span>Total + propina</span>
-                <span className="tabular-nums">
-                  {formatCurrency(Number(venta.total) + propinaNum, { currency })}
+              ) : null}
+              {Number(venta.descuento) > 0 ? (
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Descuento directo</span>
+                  <span className="font-mono tabular-nums text-foreground">
+                    -{formatCurrency(venta.descuento, { currency })}
+                  </span>
+                </div>
+              ) : null}
+              {Number(venta.descuentoPromocion ?? 0) > 0 ? (
+                <div className="flex justify-between text-xs font-medium text-success">
+                  <span>Promoción{venta.promocionNombre ? ` · ${venta.promocionNombre}` : ""}</span>
+                  <span className="font-mono tabular-nums">
+                    -{formatCurrency(venta.descuentoPromocion ?? "0", { currency })}
+                  </span>
+                </div>
+              ) : null}
+              {Number(venta.descuentoMembresia ?? 0) > 0 ? (
+                <div className="flex justify-between text-xs font-medium text-primary">
+                  <span>Membresía{venta.membresiaNombre ? ` · ${venta.membresiaNombre}` : ""}</span>
+                  <span className="font-mono tabular-nums">
+                    -{formatCurrency(venta.descuentoMembresia ?? "0", { currency })}
+                  </span>
+                </div>
+              ) : null}
+              {propinaNum > 0 ? (
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Propina</span>
+                  <span className="font-mono tabular-nums text-foreground">
+                    +{formatCurrency(propinaNum, { currency })}
+                  </span>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="space-y-2 pt-3">
+              <div className="flex items-center justify-between rounded-xl border border-primary/25 bg-primary/10 p-3.5">
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-primary">Total</span>
+                  {anticipoAplicado > 0 ? (
+                    <p className="text-[11px] text-muted-foreground">
+                      Anticipo: -{formatCurrency(anticipoAplicado, { currency })}
+                    </p>
+                  ) : null}
+                </div>
+                <span className="font-mono text-2xl font-bold tracking-tight text-primary">
+                  {formatCurrency(venta.total, { currency })}
                 </span>
               </div>
-            ) : null}
+
+              {anticipoAplicado > 0 ? (
+                <div className="flex justify-between text-xs font-medium text-success">
+                  <span>Anticipo aplicado</span>
+                  <span className="font-mono tabular-nums">-{formatCurrency(anticipoAplicado, { currency })}</span>
+                </div>
+              ) : null}
+              {editable && anticipoPorAplicar > 0 ? (
+                <div className="flex justify-between text-xs font-medium text-success">
+                  <span>Anticipo por aplicar</span>
+                  <span className="font-mono tabular-nums">-{formatCurrency(anticipoPorAplicar, { currency })}</span>
+                </div>
+              ) : null}
+              {totalDevuelto > 0 ? (
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex justify-between text-xs text-destructive">
+                    <span>Devuelto</span>
+                    <span className="font-mono tabular-nums">-{formatCurrency(totalDevuelto, { currency })}</span>
+                  </div>
+                  <div className="flex justify-between text-sm font-semibold text-foreground">
+                    <span>Neto cobrado</span>
+                    <span className="font-mono tabular-nums">
+                      {formatCurrency(Math.max(Number(venta.total) - totalDevuelto, 0), { currency })}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+              {propinaNum > 0 ? (
+                <div className="flex justify-between text-xs font-semibold text-primary pt-1">
+                  <span>Total + propina</span>
+                  <span className="font-mono tabular-nums">
+                    {formatCurrency(Number(venta.total) + propinaNum, { currency })}
+                  </span>
+                </div>
+              ) : null}
+            </div>
           </div>
         </section>
 
         {editable ? (
           <form
             action={descuentoAction}
-            className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm"
+            className="space-y-3 rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md"
           >
             <input name="organizacionId" type="hidden" value={organizationId} />
             <input name="ventaId" type="hidden" value={venta.id} />
-            <h2 className="text-sm font-semibold text-foreground">Descuento</h2>
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-foreground">Descuento</h2>
+              <span className="text-xs text-muted-foreground">Directo</span>
+            </div>
             <div className="flex flex-wrap items-end gap-2">
-              <Field className="w-36">
-                <FieldLabel className="text-xs">Monto</FieldLabel>
+              <Field className="w-32">
+                <FieldLabel className="text-xs">Monto ($)</FieldLabel>
                 <Input
+                  className="font-mono"
                   defaultValue={venta.descuento}
                   key={venta.descuento}
                   min="0"
@@ -883,7 +915,7 @@ export function VentaTicket({
                 />
               </Field>
               <Button
-                className="rounded-xl"
+                className="rounded-xl active:scale-95 transition-transform"
                 disabled={descuentoPending}
                 type="submit"
                 variant="outline"
@@ -891,9 +923,9 @@ export function VentaTicket({
                 {descuentoPending ? "Aplicando…" : "Aplicar"}
               </Button>
               <div aria-label="Descuento rápido" className="flex gap-1.5" role="group">
-                {[5, 10].map((pct) => (
+                {[5, 10, 15, 20].map((pct) => (
                   <Button
-                    className="rounded-xl text-primary"
+                    className="rounded-xl border border-border/60 hover:border-primary/50 hover:bg-primary/5 text-primary text-xs font-semibold active:scale-90 transition-all duration-150 px-2.5"
                     disabled={descuentoPending}
                     key={pct}
                     onClick={() => aplicarPorcentaje(pct)}
@@ -911,18 +943,18 @@ export function VentaTicket({
         ) : null}
 
         {editable && (promocionesDisponibles.length > 0 || venta.promocionId) ? (
-          <section className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md">
             <h2 className="text-sm font-semibold text-foreground">Promoción</h2>
             {venta.promocionId ? (
-              <form action={quitarPromoAction} className="flex items-center justify-between gap-3">
+              <form action={quitarPromoAction} className="flex items-center justify-between gap-3 rounded-xl border border-success/20 bg-success/10 p-3">
                 <input name="organizacionId" type="hidden" value={organizationId} />
                 <input name="ventaId" type="hidden" value={venta.id} />
                 <p className="min-w-0 flex-1 text-sm text-success">
-                  <span className="font-medium">{venta.promocionNombre ?? "Aplicada"}</span>
-                  <span className="ml-2 tabular-nums">-{formatCurrency(venta.descuentoPromocion ?? "0", { currency })}</span>
+                  <span className="font-semibold">{venta.promocionNombre ?? "Aplicada"}</span>
+                  <span className="ml-2 font-mono tabular-nums">-{formatCurrency(venta.descuentoPromocion ?? "0", { currency })}</span>
                 </p>
                 <Button
-                  className="rounded-xl"
+                  className="rounded-xl text-destructive hover:bg-destructive/10 active:scale-95 transition-all"
                   disabled={quitarPromoPending}
                   size="sm"
                   type="submit"
@@ -954,7 +986,7 @@ export function VentaTicket({
                   />
                 </div>
                 <Button
-                  className="rounded-xl"
+                  className="rounded-xl active:scale-95 transition-transform"
                   disabled={promoPending}
                   type="submit"
                   variant="outline"
@@ -968,18 +1000,18 @@ export function VentaTicket({
         ) : null}
 
         {editable && (membresiasCliente.length > 0 || venta.membresiaId) ? (
-          <section className="space-y-3 rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md">
             <h2 className="text-sm font-semibold text-foreground">Membresía del cliente</h2>
             {venta.membresiaId ? (
-              <form action={quitarMembresiaAction} className="flex items-center justify-between gap-3">
+              <form action={quitarMembresiaAction} className="flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/10 p-3">
                 <input name="organizacionId" type="hidden" value={organizationId} />
                 <input name="ventaId" type="hidden" value={venta.id} />
                 <p className="min-w-0 flex-1 text-sm text-primary">
-                  <span className="font-medium">{venta.membresiaNombre ?? "Aplicada"}</span>
-                  <span className="ml-2 tabular-nums">-{formatCurrency(venta.descuentoMembresia ?? "0", { currency })}</span>
+                  <span className="font-semibold">{venta.membresiaNombre ?? "Aplicada"}</span>
+                  <span className="ml-2 font-mono tabular-nums">-{formatCurrency(venta.descuentoMembresia ?? "0", { currency })}</span>
                 </p>
                 <Button
-                  className="rounded-xl"
+                  className="rounded-xl text-destructive hover:bg-destructive/10 active:scale-95 transition-all"
                   disabled={quitarMembresiaPending}
                   size="sm"
                   type="submit"
@@ -1008,7 +1040,7 @@ export function VentaTicket({
                   />
                 </div>
                 <Button
-                  className="rounded-xl"
+                  className="rounded-xl active:scale-95 transition-transform"
                   disabled={membresiaPending}
                   type="submit"
                   variant="outline"
