@@ -189,7 +189,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
               'estado', c.estado, 'notas', c.notas,
               'totalEstimado', c.total_estimado::text,
               'clienteId', c.cliente_id,
-              'clienteNombre', cl.nombre,
+              'clienteNombre', trim(concat_ws(' ', cl.nombre, cl.apellido_paterno, cl.apellido_materno)),
               'clienteTelefono', cl.telefono,
               'clienteNotas', cl.notas_operativas,
               'sucursalId', c.sucursal_id,
@@ -324,42 +324,42 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
     : [fecha];
 
   return (
-    <div className="space-y-4">
-      <AdminPageHeader description={branch.nombre} title="Agenda" />
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
-        <div className="min-w-0 flex-1">
-          <AgendaToolbar
-            fecha={fecha}
-            hoy={todayDateInput(timeZone)}
-            q={q}
-            vista={vista}
-          />
-        </div>
-        {puedeEditar ? (
-          <DisponibilidadPanel
-            avisos={avisos}
-            bloqueos={bloqueosConfig}
-            capacidadSinAsignar={branch.capacidadSinAsignar}
-            horarios={horariosConfig}
-            organizacionSlug={organization.slug}
-            organizationId={organizationId ?? organization.id}
-            permiteAutoConfirmar={suscripcion.capacidades.has("reservas_auto_confirmar")}
-            permiteRecordatorios={suscripcion.capacidades.has("recordatorios_email")}
-            permiteReservasOnline={suscripcion.capacidades.has("reservas_online")}
-            recordatoriosActivos={organization.recordatoriosActivos}
-            recordatoriosHorasAntes={organization.recordatoriosHorasAntes}
-            recursos={recursosConfig}
-            reservasAnticipacionMinutos={branch.reservasAnticipacionMinutos}
-            reservasAutoConfirmar={branch.reservasAutoConfirmar}
-            reservasCancelacionHoras={branch.reservasCancelacionHoras}
-            reservasHorizonteDias={branch.reservasHorizonteDias}
-            reservasOnline={branch.reservasOnline}
-            staff={staffRows}
-            sucursalId={branch.id}
-            timeZone={timeZone}
-          />
-        ) : null}
+    <div className="space-y-2.5 sm:space-y-4">
+      <div className="hidden md:block">
+        <AdminPageHeader description={branch.nombre} title="Agenda" />
       </div>
+      <AgendaToolbar
+        action={
+          puedeEditar ? (
+            <DisponibilidadPanel
+              avisos={avisos}
+              bloqueos={bloqueosConfig}
+              capacidadSinAsignar={branch.capacidadSinAsignar}
+              horarios={horariosConfig}
+              organizacionSlug={organization.slug}
+              organizationId={organizationId ?? organization.id}
+              permiteAutoConfirmar={suscripcion.capacidades.has("reservas_auto_confirmar")}
+              permiteRecordatorios={suscripcion.capacidades.has("recordatorios_email")}
+              permiteReservasOnline={suscripcion.capacidades.has("reservas_online")}
+              recordatoriosActivos={organization.recordatoriosActivos}
+              recordatoriosHorasAntes={organization.recordatoriosHorasAntes}
+              recursos={recursosConfig}
+              reservasAnticipacionMinutos={branch.reservasAnticipacionMinutos}
+              reservasAutoConfirmar={branch.reservasAutoConfirmar}
+              reservasCancelacionHoras={branch.reservasCancelacionHoras}
+              reservasHorizonteDias={branch.reservasHorizonteDias}
+              reservasOnline={branch.reservasOnline}
+              staff={staffRows}
+              sucursalId={branch.id}
+              timeZone={timeZone}
+            />
+          ) : null
+        }
+        fecha={fecha}
+        hoy={todayDateInput(timeZone)}
+        q={q}
+        vista={vista}
+      />
       <AgendaBoard
         bloqueos={bloqueos}
         citas={citasSerializadas}

@@ -70,17 +70,17 @@ export function AdminPageHeader({
   ...props
 }: AdminPageHeaderProps) {
   return (
-    <header className={cn("flex flex-col gap-4", className)} {...props}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+    <header className={cn("flex flex-col gap-2.5 sm:gap-4", className)} {...props}>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="min-w-0">
           {breadcrumbs && breadcrumbs.length > 0 ? (
-            <AdminBreadcrumbs className="mb-2" items={breadcrumbs} />
+            <AdminBreadcrumbs className="mb-1.5 sm:mb-2" items={breadcrumbs} />
           ) : null}
-          <h1 className="text-2xl font-semibold tracking-[-0.02em] text-foreground">
+          <h1 className="text-xl font-semibold tracking-[-0.02em] text-foreground sm:text-2xl">
             {title}
           </h1>
           {description ? (
-            <p className="mt-1.5 max-w-2xl text-sm leading-6 text-muted-foreground">
+            <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground sm:mt-1.5 sm:text-sm sm:leading-6">
               {description}
             </p>
           ) : null}

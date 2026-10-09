@@ -527,7 +527,7 @@ export function AgendaBoard({
   ) : null;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5 sm:space-y-4">
       {vista === "dia" ? (
         <ResumenDia
           citas={citasBoard}
@@ -539,8 +539,8 @@ export function AgendaBoard({
 
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:text-sm">
-          <Clock3 aria-hidden="true" className="size-4" />
-          <span>
+          <Clock3 aria-hidden="true" className="hidden size-4 sm:inline" />
+          <span className="hidden sm:inline">
             {turnosDia.length > 0
               ? `Horario ${turnosDia.map((turno) => `${pad2(Math.floor(turno.iniciaMinutos / 60))}:${pad2(turno.iniciaMinutos % 60)}–${pad2(Math.floor(turno.terminaMinutos / 60))}:${pad2(turno.terminaMinutos % 60)}`).join(" · ")}`
               : "Sin horario configurado para este día"}
@@ -560,11 +560,24 @@ export function AgendaBoard({
         </Button>
       </div>
 
+      {/* Botón flotante móvil (FAB) para agendar con un solo toque de pulgar */}
+      <Button
+        aria-label="Nueva cita"
+        className="fixed bottom-24 right-4 z-40 size-14 rounded-full shadow-xl transition-transform active:scale-95 lg:hidden"
+        data-action-clave="1"
+        data-action-id="agenda.cita.abrir_formulario_fab"
+        onClick={abrirNuevaCita}
+        size="icon"
+        type="button"
+      >
+        <CalendarPlus aria-hidden="true" className="size-6" />
+      </Button>
+
       {vista === "dia" ? (
         <div className={cn(selected ? "xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(340px,26rem)] xl:gap-4" : "")}>
-          <div className="min-w-0 space-y-3">
-            <div className="flex items-center gap-3 px-1">
-              <h2 className="text-lg font-semibold text-foreground">{fechaLarga}</h2>
+          <div className="min-w-0 space-y-2.5 sm:space-y-3">
+            <div className="hidden items-center gap-3 px-1 sm:flex">
+              <h2 className="text-base font-semibold text-foreground sm:text-lg">{fechaLarga}</h2>
               {fecha === hoy ? (
                 <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-op-xs font-bold text-primary">
                   Hoy
@@ -691,7 +704,10 @@ export function AgendaBoard({
             </DialogDescription>
           </DialogHeader>
           <CitaForm
+            bloqueos={bloqueos}
+            citas={citasBoard}
             currency={currency}
+            horarios={horarios}
             initial={{
               organizacionId: organizationId,
               sucursalId: sucursal.id,
@@ -721,7 +737,10 @@ export function AgendaBoard({
           </DialogHeader>
           {editing ? (
             <CitaForm
+              bloqueos={bloqueos}
+              citas={citasBoard}
               currency={currency}
+              horarios={horarios}
               initial={{
                 id: editing.id,
                 organizacionId: organizationId,

@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   const organizationId = request.nextUrl.searchParams.get("organizationId")?.trim() ?? "";
   const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
 
-  if (!organizationId || q.length < 2) {
+  if (!organizationId) {
     return NextResponse.json({ items: [] });
   }
 
@@ -30,32 +30,55 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ items: [] }, { status: 403 });
   }
 
-  const patron = `%${q}%`;
-  const digitos = q.replace(/\D/g, "");
-  const filtros = [
-    ilike(clientes.nombre, patron),
-    ilike(clientes.apellidoPaterno, patron),
-    ilike(clientes.apellidoMaterno, patron),
-  ];
-  if (digitos.length >= 4) {
-    filtros.push(ilike(clientes.telefonoNormalizado, `%${digitos}%`));
+  const db = getDatabase();
+  const nombreCompleto = sql<string>`trim(concat_ws(' ', ${clientes.nombre}, ${clientes.apellidoPaterno}, ${clientes.apellidoMaterno}))`;
+
+  let whereCond;
+  if (!q) {
+    // Sin término de búsqueda: devuelve los primeros clientes activos para que el selector no esté vacío.
+    whereCond = and(
+      eq(clientes.organizacionId, organizationId),
+      eq(clientes.activo, true),
+    );
+  } else {
+    const patron = `%${q}%`;
+    const digitos = q.replace(/\D/g, "");
+    const palabras = q.split(/\s+/).filter((p) => p.length > 0);
+
+    const filtros = [
+      ilike(nombreCompleto, patron),
+      ilike(clientes.correo, patron),
+    ];
+
+    // Si el usuario escribió varias palabras (ej. "María López"), buscar que contenga cada una
+    if (palabras.length > 1) {
+      const matchPalabras = and(...palabras.map((p) => ilike(nombreCompleto, `%${p}%`)));
+      if (matchPalabras) {
+        filtros.push(matchPalabras);
+      }
+    }
+
+    if (digitos.length >= 3) {
+      filtros.push(ilike(clientes.telefonoNormalizado, `%${digitos}%`));
+      filtros.push(ilike(clientes.telefono, `%${digitos}%`));
+    }
+
+    whereCond = and(
+      eq(clientes.organizacionId, organizationId),
+      eq(clientes.activo, true),
+      or(...filtros),
+    );
   }
 
-  const db = getDatabase();
   const rows = await db
     .select({
       id: clientes.id,
-      nombre: sql<string>`trim(concat_ws(' ', ${clientes.nombre}, ${clientes.apellidoPaterno}, ${clientes.apellidoMaterno}))`,
+      nombre: nombreCompleto,
       telefono: clientes.telefono,
+      correo: clientes.correo,
     })
     .from(clientes)
-    .where(
-      and(
-        eq(clientes.organizacionId, organizationId),
-        eq(clientes.activo, true),
-        or(...filtros),
-      ),
-    )
+    .where(whereCond)
     .orderBy(asc(clientes.nombre))
     .limit(LIMITE);
 
@@ -63,7 +86,7 @@ export async function GET(request: NextRequest) {
     items: rows.map((row) => ({
       value: row.id,
       label: row.nombre,
-      description: row.telefono ?? undefined,
+      description: row.telefono || row.correo || undefined,
     })),
   });
 }

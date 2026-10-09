@@ -91,12 +91,15 @@ export function AgendaToolbar({
   vista,
   q,
   hoy,
+  action,
 }: {
   fecha: string;
   vista: AgendaVista;
   q: string;
   /** Fecha de hoy (`YYYY-MM-DD`) en la zona de la sucursal, para el atajo "Hoy". */
   hoy: string;
+  /** Elemento opcional de acción/configuración integrado en la barra. */
+  action?: React.ReactNode;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -150,158 +153,193 @@ export function AgendaToolbar({
 
   return (
     <div className="flex flex-col gap-2">
-    <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-2.5 shadow-sm sm:gap-3 sm:p-3 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex min-w-0 flex-wrap items-center gap-2">
-        <div className="flex items-center gap-1">
-          <Button
-            aria-label="Periodo anterior"
-            className="rounded-xl"
-            disabled={activePending === "fecha"}
-            onClick={() => navigate("fecha", hrefFor({ fecha: shiftByView(fecha, vista, -1) }))}
-            size="icon"
-            type="button"
-            variant="outline"
-          >
-            <ChevronLeft aria-hidden="true" />
-          </Button>
-          <Button
-            className={cn("rounded-xl", fecha === hoy && "border-primary/40 bg-accent text-accent-foreground")}
-            disabled={activePending === "fecha"}
-            onClick={() => navigate("fecha", hrefFor({ fecha: hoy }))}
-            type="button"
-            variant="outline"
-          >
-            Hoy
-          </Button>
-          <Button
-            aria-label="Periodo siguiente"
-            className="rounded-xl"
-            disabled={activePending === "fecha"}
-            onClick={() => navigate("fecha", hrefFor({ fecha: shiftByView(fecha, vista, 1) }))}
-            size="icon"
-            type="button"
-            variant="outline"
-          >
-            <ChevronRight aria-hidden="true" />
-          </Button>
-        </div>
-        {/* Fecha legible ("mié 23 sept"): el input[type=date] cubre invisible
-            todo el control — clic abre el picker nativo sin JS y el objetivo
-            táctil conserva el tamaño completo del botón. */}
-        <div className="relative rounded-xl border border-input bg-background transition-shadow focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
-          <div
-            aria-hidden="true"
-            className="flex h-10 items-center gap-2 whitespace-nowrap px-3 text-sm font-semibold text-foreground"
-          >
-            <CalendarDays className="size-4 text-muted-foreground" />
-            {fechaEtiqueta.format(new Date(`${fecha}T12:00:00Z`))}
+      <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-2 shadow-sm sm:gap-2.5 sm:p-3 lg:flex-row lg:items-center lg:justify-between">
+        {/* Fila 1: Navegación de fecha + picker (y vistas/ajustes en móvil) */}
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-1.5 sm:justify-start sm:gap-2">
+          <div className="flex items-center gap-1">
+            <Button
+              aria-label="Periodo anterior"
+              className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl"
+              disabled={activePending === "fecha"}
+              onClick={() => navigate("fecha", hrefFor({ fecha: shiftByView(fecha, vista, -1) }))}
+              size="icon"
+              type="button"
+              variant="outline"
+            >
+              <ChevronLeft aria-hidden="true" className="size-4" />
+            </Button>
+            <Button
+              className={cn("h-8 px-2.5 sm:h-9 sm:px-3 text-xs sm:text-sm rounded-xl font-medium", fecha === hoy && "border-primary/40 bg-accent text-accent-foreground")}
+              disabled={activePending === "fecha"}
+              onClick={() => navigate("fecha", hrefFor({ fecha: hoy }))}
+              type="button"
+              variant="outline"
+            >
+              Hoy
+            </Button>
+            <Button
+              aria-label="Periodo siguiente"
+              className="h-8 w-8 sm:h-9 sm:w-9 rounded-xl"
+              disabled={activePending === "fecha"}
+              onClick={() => navigate("fecha", hrefFor({ fecha: shiftByView(fecha, vista, 1) }))}
+              size="icon"
+              type="button"
+              variant="outline"
+            >
+              <ChevronRight aria-hidden="true" className="size-4" />
+            </Button>
           </div>
-          <input
-            aria-label="Cambiar fecha de la agenda"
-            className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
-            disabled={activePending === "fecha"}
-            onChange={(event) => {
-              if (event.target.value) navigate("fecha", hrefFor({ fecha: event.target.value }));
-            }}
-            ref={fechaInputRef}
-            type="date"
-            value={fecha}
-          />
+
+          {/* Fecha legible con input date nativo que cubre el botón */}
+          <div className="relative rounded-xl border border-input bg-background transition-shadow focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
+            <div
+              aria-hidden="true"
+              className="flex h-8 sm:h-9 items-center gap-1.5 whitespace-nowrap px-2.5 text-xs font-semibold text-foreground sm:gap-2 sm:text-sm"
+            >
+              <CalendarDays className="size-3.5 sm:size-4 text-muted-foreground" />
+              {fechaEtiqueta.format(new Date(`${fecha}T12:00:00Z`))}
+            </div>
+            <input
+              aria-label="Cambiar fecha de la agenda"
+              className="absolute inset-0 size-full cursor-pointer opacity-0 disabled:cursor-not-allowed"
+              disabled={activePending === "fecha"}
+              onChange={(event) => {
+                if (event.target.value) navigate("fecha", hrefFor({ fecha: event.target.value }));
+              }}
+              ref={fechaInputRef}
+              type="date"
+              value={fecha}
+            />
+          </div>
+
+          {/* Vistas y Ajustes visibles a la derecha en móviles/tablets */}
+          <div className="flex items-center gap-1 lg:hidden">
+            <div aria-label="Vista de agenda" className="flex shrink-0 rounded-xl border border-border bg-muted p-0.5" role="group">
+              {VIEWS.map((view) => (
+                <Link
+                  aria-current={vista === view.value ? "page" : undefined}
+                  aria-label={`Vista ${view.label}`}
+                  title={`Vista ${view.label}`}
+                  className={cn(
+                    "relative inline-flex h-7 items-center justify-center gap-1 rounded-lg px-2 text-xs font-medium whitespace-nowrap transition-colors",
+                    vista === view.value
+                      ? "bg-card font-semibold text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-primary",
+                  )}
+                  href={hrefFor({ vista: view.value })}
+                  key={view.value}
+                  onClick={guardRepeatedTap}
+                >
+                  <view.Icon aria-hidden="true" className="size-3.5" />
+                  <span className="hidden sm:inline">{view.label}</span>
+                  <ViewPendingIndicator label={view.label} />
+                </Link>
+              ))}
+            </div>
+            {action}
+          </div>
+
+          <span
+            aria-live="polite"
+            className={cn(
+              "hidden sm:inline text-xs font-medium text-primary transition-opacity",
+              activePending ? "opacity-100" : "opacity-0",
+            )}
+            role="status"
+          >
+            {activePending ? PENDING_LABEL[activePending] : "Actualizando…"}
+          </span>
         </div>
-        <span
-          aria-live="polite"
-          className={cn(
-            "min-h-5 text-xs font-medium text-primary transition-opacity",
-            activePending ? "opacity-100" : "opacity-0",
-          )}
-          role="status"
-        >
-          {activePending ? PENDING_LABEL[activePending] : "Actualizando…"}
-        </span>
+
+        {/* Fila 2 en móvil / Lado derecho en escritorio: Búsqueda y Vistas en lg */}
+        <div className="flex min-w-0 flex-row items-center gap-2">
+          <div className="relative min-w-0 flex-1 lg:w-64 xl:w-72">
+            <Search aria-hidden="true" className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 sm:size-4 -translate-y-1/2 text-muted-foreground" />
+            <label className="sr-only" htmlFor="agenda-buscar">
+              Buscar citas
+            </label>
+            <input
+              className="h-8 sm:h-9 w-full rounded-xl border border-input bg-background pl-8 sm:pl-9 pr-3 text-xs sm:text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+              defaultValue={q}
+              id="agenda-buscar"
+              key={q}
+              onChange={(event) => updateSearch(event.target.value)}
+              placeholder="Buscar cliente, servicio o profesional…"
+              type="search"
+            />
+          </div>
+
+          <div aria-label="Vista de agenda" className="hidden lg:flex shrink-0 rounded-xl border border-border bg-muted p-1" role="group">
+            {VIEWS.map((view) => (
+              <Link
+                aria-current={vista === view.value ? "page" : undefined}
+                className={cn(
+                  "relative inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-medium whitespace-nowrap transition-colors",
+                  vista === view.value
+                    ? "bg-card font-semibold text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-primary",
+                )}
+                href={hrefFor({ vista: view.value })}
+                key={view.value}
+                onClick={guardRepeatedTap}
+              >
+                <view.Icon aria-hidden="true" className="size-4" />
+                {view.label}
+                <ViewPendingIndicator label={view.label} />
+              </Link>
+            ))}
+          </div>
+
+          <div className="hidden lg:flex items-center">
+            {action}
+          </div>
+        </div>
       </div>
 
-      <div className="flex min-w-0 flex-row items-center gap-2">
-        <div className="relative min-w-0 flex-1 sm:w-72">
-          <Search aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <label className="sr-only" htmlFor="agenda-buscar">
-            Buscar citas
-          </label>
-          <input
-            className="h-10 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
-            defaultValue={q}
-            id="agenda-buscar"
-            key={q}
-            onChange={(event) => updateSearch(event.target.value)}
-            placeholder="Cliente, servicio o profesional"
-            type="search"
-          />
-        </div>
-        <div aria-label="Vista de agenda" className="flex shrink-0 rounded-xl border border-border bg-muted p-1" role="group">
-          {VIEWS.map((view) => (
-            <Link
-              aria-current={vista === view.value ? "page" : undefined}
-              className={cn(
-                "relative inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg px-2 text-sm font-medium whitespace-nowrap transition-colors sm:px-3",
-                vista === view.value
-                  ? "bg-card font-semibold text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-primary",
-              )}
-              href={hrefFor({ vista: view.value })}
-              key={view.value}
-              onClick={guardRepeatedTap}
-            >
-              <view.Icon aria-hidden="true" className="size-4" />
-              {view.label}
-              <ViewPendingIndicator label={view.label} />
-            </Link>
-          ))}
-        </div>
-      </div>
-    </div>
-    {vista === "dia" ? (
-      <nav
-        aria-label="Elegir día"
-        className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1.5 shadow-sm"
-        ref={tiraRef}
-      >
-        {diasTira.map((dia) => {
-          const activo = dia === fecha;
-          return (
-            <Link
-              aria-current={activo ? "page" : undefined}
-              className={cn(
-                "relative flex min-w-11 shrink-0 flex-col items-center justify-center rounded-xl px-2 py-1.5 text-center transition-colors",
-                activo
-                  ? "bg-primary font-semibold text-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
-              data-action-id="agenda.fecha.tira_dia"
-              href={hrefFor({ fecha: dia })}
-              key={dia}
-              onClick={guardRepeatedTap}
-              title={fechaEtiqueta.format(new Date(`${dia}T12:00:00Z`))}
-            >
-              <span className="text-op-xs capitalize leading-none">
-                {tiraDiaSemana.format(new Date(`${dia}T12:00:00Z`))}
-              </span>
-              <span className="text-base font-bold leading-tight tabular-nums">
-                {tiraNumero.format(new Date(`${dia}T12:00:00Z`))}
-              </span>
-              {dia === hoy ? (
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "absolute bottom-0.5 size-1 rounded-full",
-                    activo ? "bg-primary-foreground" : "bg-primary",
-                  )}
-                />
-              ) : null}
-              {activo ? <ViewPendingIndicator label="día" /> : null}
-            </Link>
-          );
-        })}
-      </nav>
-    ) : null}
+      {vista === "dia" ? (
+        <nav
+          aria-label="Elegir día"
+          className="flex items-center gap-1 overflow-x-auto rounded-2xl border border-border bg-card p-1 shadow-sm"
+          ref={tiraRef}
+        >
+          {diasTira.map((dia) => {
+            const activo = dia === fecha;
+            return (
+              <Link
+                aria-current={activo ? "page" : undefined}
+                className={cn(
+                  "relative flex min-w-10 sm:min-w-11 shrink-0 flex-col items-center justify-center rounded-xl px-1.5 sm:px-2 py-1 sm:py-1.5 text-center transition-colors",
+                  activo
+                    ? "bg-primary font-semibold text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+                data-action-id="agenda.fecha.tira_dia"
+                href={hrefFor({ fecha: dia })}
+                key={dia}
+                onClick={guardRepeatedTap}
+                title={fechaEtiqueta.format(new Date(`${dia}T12:00:00Z`))}
+              >
+                <span className="text-[11px] sm:text-op-xs capitalize leading-none">
+                  {tiraDiaSemana.format(new Date(`${dia}T12:00:00Z`))}
+                </span>
+                <span className="text-sm sm:text-base font-bold leading-tight tabular-nums">
+                  {tiraNumero.format(new Date(`${dia}T12:00:00Z`))}
+                </span>
+                {dia === hoy ? (
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "absolute bottom-0.5 size-1 rounded-full",
+                      activo ? "bg-primary-foreground" : "bg-primary",
+                    )}
+                  />
+                ) : null}
+                {activo ? <ViewPendingIndicator label="día" /> : null}
+              </Link>
+            );
+          })}
+        </nav>
+      ) : null}
     </div>
   );
 }

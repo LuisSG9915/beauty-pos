@@ -23,6 +23,7 @@ export type RemoteComboboxProps = {
   required?: boolean;
   disabled?: boolean;
   className?: string;
+  onValueChange?: (value: string | null, item: ComboboxItem | null) => void;
   "aria-describedby"?: string;
 };
 
@@ -37,20 +38,60 @@ export function RemoteCombobox({
   name,
   label,
   placeholder = "Escribe para buscar",
-  minQuery = 2,
-  emptyMessage = "Sin resultados",
+  minQuery = 0,
+  emptyMessage = "No se encontraron clientes",
   loadingMessage = "Buscando…",
   required = false,
   disabled = false,
   className,
+  onValueChange,
   "aria-describedby": ariaDescribedBy,
 }: RemoteComboboxProps) {
   const inputId = useId();
   const [items, setItems] = useState<ComboboxItem[]>(initialItem ? [initialItem] : []);
+  const [defaultItems, setDefaultItems] = useState<ComboboxItem[]>(initialItem ? [initialItem] : []);
   const [seleccion, setSeleccion] = useState<ComboboxItem | null>(initialItem);
   const [buscando, setBuscando] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Carga inicial de opciones para que el selector no esté vacío al abrirlo
+  useEffect(() => {
+    let activo = true;
+    const controller = new AbortController();
+    setBuscando(true);
+
+    async function cargarIniciales() {
+      try {
+        const res = await fetch(searchUrl, { signal: controller.signal });
+        if (!res.ok) return;
+        const data = (await res.json()) as { items?: ComboboxItem[] };
+        if (!activo) return;
+        const remotos = data.items ?? [];
+        setDefaultItems(remotos);
+        setItems((prev) => {
+          const fusion = seleccion ? [seleccion] : [];
+          for (const item of remotos) {
+            if (!fusion.some((ex) => ex.value === item.value)) {
+              fusion.push(item);
+            }
+          }
+          return fusion.length > 0 ? fusion : prev;
+        });
+      } catch {
+        // Red o abort
+      } finally {
+        if (activo) setBuscando(false);
+      }
+    }
+
+    void cargarIniciales();
+
+    return () => {
+      activo = false;
+      controller.abort();
+    };
+  }, [searchUrl, seleccion]);
 
   const buscar = useCallback(
     (termino: string) => {
@@ -58,8 +99,8 @@ export function RemoteCombobox({
       if (timerRef.current) clearTimeout(timerRef.current);
 
       const limpio = termino.trim();
-      if (limpio.length < minQuery) {
-        setItems(seleccion ? [seleccion] : []);
+      if (!limpio) {
+        setItems(defaultItems.length > 0 ? defaultItems : (seleccion ? [seleccion] : []));
         setBuscando(false);
         return;
       }
@@ -69,7 +110,8 @@ export function RemoteCombobox({
         abortRef.current = controller;
         setBuscando(true);
         try {
-          const res = await fetch(`${searchUrl}&q=${encodeURIComponent(limpio)}`, {
+          const sep = searchUrl.includes("?") ? "&" : "?";
+          const res = await fetch(`${searchUrl}${sep}q=${encodeURIComponent(limpio)}`, {
             signal: controller.signal,
           });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -89,9 +131,9 @@ export function RemoteCombobox({
         } finally {
           setBuscando(false);
         }
-      }, 250);
+      }, 200);
     },
-    [minQuery, searchUrl, seleccion],
+    [defaultItems, searchUrl, seleccion],
   );
 
   useEffect(() => {
@@ -119,7 +161,10 @@ export function RemoteCombobox({
         itemToStringValue={(item) => item.value}
         name={name}
         onInputValueChange={(valor) => buscar(valor)}
-        onValueChange={(item) => setSeleccion(item ?? null)}
+        onValueChange={(item) => {
+          setSeleccion(item ?? null);
+          onValueChange?.(item?.value ?? null, item ?? null);
+        }}
         required={required}
         value={seleccion}
       >
@@ -192,6 +237,14 @@ export function RemoteCombobox({
           </ComboboxPrimitive.Positioner>
         </ComboboxPrimitive.Portal>
       </ComboboxPrimitive.Root>
+      {seleccion ? (
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
+          <span>Cliente seleccionado:</span>
+          <span className="font-medium text-foreground">{seleccion.label}</span>
+          {seleccion.description ? <span>· {seleccion.description}</span> : null}
+        </p>
+      ) : null}
     </div>
   );
 }

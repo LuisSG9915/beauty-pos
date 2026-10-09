@@ -641,7 +641,7 @@ export function AdminShell({
               no crea contexto de scroll, así que los sticky internos siguen
               funcionando. */}
           <main
-            className="mx-auto w-full max-w-[1400px] flex-1 overflow-x-clip px-4 pb-24 pt-6 sm:px-6 lg:px-8 lg:pb-8"
+            className="mx-auto w-full max-w-[1400px] flex-1 overflow-x-clip px-2.5 pb-24 pt-2 sm:px-6 sm:pt-6 lg:px-8 lg:pb-8"
             id="contenido-admin"
           >
             {billingByOrg ? (

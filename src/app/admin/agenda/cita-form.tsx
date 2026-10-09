@@ -1,9 +1,11 @@
 "use client";
 
+import { Check, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useActionState } from "react";
 
 import { saveCita, type CitaActionState } from "@/app/admin/agenda/actions";
+import type { AgendaBloqueo, AgendaCita, AgendaHorario } from "@/app/admin/agenda/agenda-types";
 import { MediaThumb } from "@/components/media-thumb";
 import { Button } from "@/components/ui/button";
 import { RemoteCombobox } from "@/components/ui/remote-combobox";
@@ -17,7 +19,13 @@ import {
 } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
 import { formatCurrency, formatDate, formatTime } from "@/lib/format";
-import { getZonedParts } from "@/modules/agenda";
+import { cn } from "@/lib/utils";
+import {
+  getZonedParts,
+  intervalsOverlap,
+  isCitaEditable,
+  localDateTimeToUtc,
+} from "@/modules/agenda";
 
 type CitaData = {
   id?: string;
@@ -57,6 +65,9 @@ export function CitaForm({
   staff,
   servicios,
   recursos = [],
+  horarios = [],
+  bloqueos = [],
+  citas = [],
   currency = "MXN",
   timeZone,
   initial,
@@ -67,6 +78,9 @@ export function CitaForm({
   staff: Array<{ id: string; nombre: string }>;
   servicios: Array<{ id: string; nombre: string; precioBase: string; duracionMinutos: number; imagenClaveR2?: string | null }>;
   recursos?: Array<{ id: string; nombre: string; tipo: string; capacidad: number }>;
+  horarios?: AgendaHorario[];
+  bloqueos?: AgendaBloqueo[];
+  citas?: AgendaCita[];
   currency?: string;
   timeZone: string;
   initial?: CitaData;
@@ -75,6 +89,7 @@ export function CitaForm({
   const router = useRouter();
   const toast = useToast();
   const [state, formAction, pending] = useActionState<CitaActionState, FormData>(saveCita, {});
+  const [clienteId, setClienteId] = useState(initial?.clienteId ?? "");
   const [seleccionados, setSeleccionados] = useState<Set<string>>(() => new Set(initial?.servicioIds ?? []));
   const [recursosSel, setRecursosSel] = useState<Set<string>>(() => new Set(initial?.recursoIds ?? []));
   const [inicio, setInicio] = useState(() => toBranchDateTimeInput(initial?.fechaHora ?? "", timeZone));
@@ -106,6 +121,145 @@ export function CitaForm({
   }, [duracionManual, inicio, seleccionados, servicios]);
 
   const duracionEfectiva = seleccionados.size > 0 ? Math.max(resumen.totalDuracion, 5) : duracionManual;
+
+  // Análisis de disponibilidad y sugerencia inteligente de estilistas
+  const analisisStaff = useMemo(() => {
+    if (!inicio || staff.length === 0) {
+      return {
+        lista: staff.map((s) => ({
+          id: s.id,
+          nombre: s.nombre,
+          disponible: true,
+          motivo: "Elige fecha y hora para verificar",
+          esHabitual: false,
+          minutosOcupadosHoy: 0,
+        })),
+        sugerido: null,
+      };
+    }
+
+    const candidatoInicio = localDateTimeToUtc(inicio, timeZone);
+    if (!candidatoInicio || Number.isNaN(candidatoInicio.getTime())) {
+      return { lista: [], sugerido: null };
+    }
+
+    const candidatoFin = new Date(candidatoInicio.getTime() + duracionEfectiva * 60 * 1000);
+    const partes = getZonedParts(candidatoInicio, timeZone);
+    const diaSemana = partes.diaSemana;
+    const iniciaMinutos = partes.minutosDelDia;
+    const terminaMinutos = iniciaMinutos + duracionEfectiva;
+
+    // Verificar si la sucursal abre en ese turno
+    const turnosHoy = (horarios ?? []).filter((h) => h.diaSemana === diaSemana);
+    const dentroDeHorarioSucursal =
+      turnosHoy.length === 0 ||
+      turnosHoy.some((t) => iniciaMinutos >= t.iniciaMinutos && terminaMinutos <= t.terminaMinutos);
+
+    // Conteo de citas previas del cliente para saber su estilista habitual
+    const citasClientePorStaff = new Map<string, number>();
+    if (clienteId && citas) {
+      for (const c of citas) {
+        if (c.clienteId === clienteId && c.usuarioId) {
+          citasClientePorStaff.set(c.usuarioId, (citasClientePorStaff.get(c.usuarioId) ?? 0) + 1);
+        }
+      }
+    }
+
+    const intervaloCandidato = {
+      iniciaAtMs: candidatoInicio.getTime(),
+      terminaAtMs: candidatoFin.getTime(),
+    };
+
+    const evaluados = staff.map((profesional) => {
+      if (!dentroDeHorarioSucursal) {
+        return {
+          id: profesional.id,
+          nombre: profesional.nombre,
+          disponible: false,
+          motivo: "Fuera de horario de atención",
+          esHabitual: (citasClientePorStaff.get(profesional.id) ?? 0) > 0,
+          minutosOcupadosHoy: 0,
+        };
+      }
+
+      // 1. Bloqueos de este profesional o generales de la sucursal
+      const tieneBloqueo = (bloqueos ?? []).some((b) => {
+        if (b.usuarioId !== null && b.usuarioId !== profesional.id) return false;
+        const bInicio = new Date(b.iniciaAt).getTime();
+        const bFin = new Date(b.terminaAt).getTime();
+        return intervalsOverlap(intervaloCandidato, { iniciaAtMs: bInicio, terminaAtMs: bFin });
+      });
+
+      if (tieneBloqueo) {
+        return {
+          id: profesional.id,
+          nombre: profesional.nombre,
+          disponible: false,
+          motivo: "En descanso o bloqueo",
+          esHabitual: (citasClientePorStaff.get(profesional.id) ?? 0) > 0,
+          minutosOcupadosHoy: 0,
+        };
+      }
+
+      // 2. Traslape con otras citas activas
+      const citasProfesional = (citas ?? []).filter(
+        (c) => c.usuarioId === profesional.id && c.id !== initial?.id && isCitaEditable(c.estado),
+      );
+
+      const traslape = citasProfesional.some((c) => {
+        const cStart = new Date(c.fechaHora).getTime();
+        const cEnd = cStart + c.duracionMinutos * 60 * 1000;
+        return intervalsOverlap(intervaloCandidato, { iniciaAtMs: cStart, terminaAtMs: cEnd });
+      });
+
+      const minutosOcupadosHoy = citasProfesional.reduce((acc, c) => acc + c.duracionMinutos, 0);
+      const vecesAtendido = citasClientePorStaff.get(profesional.id) ?? 0;
+
+      if (traslape) {
+        return {
+          id: profesional.id,
+          nombre: profesional.nombre,
+          disponible: false,
+          motivo: "Ocupado con otra cita",
+          esHabitual: vecesAtendido > 0,
+          minutosOcupadosHoy,
+        };
+      }
+
+      return {
+        id: profesional.id,
+        nombre: profesional.nombre,
+        disponible: true,
+        motivo: `Disponible (${duracionEfectiva} min libres)`,
+        esHabitual: vecesAtendido > 0,
+        minutosOcupadosHoy,
+      };
+    });
+
+    const disponibles = evaluados.filter((e) => e.disponible);
+    let sugerido: ((typeof evaluados)[number] & { explicacion: string }) | null = null;
+
+    if (disponibles.length > 0) {
+      // Prioridad 1: Estilista habitual del cliente si está disponible
+      const habitual = disponibles.find((d) => d.esHabitual);
+      if (habitual) {
+        sugerido = {
+          ...habitual,
+          explicacion: `Estilista habitual del cliente · Disponible para los ${duracionEfectiva} min`,
+        };
+      } else {
+        // Prioridad 2: El estilista disponible con menor carga hoy
+        const ordenados = [...disponibles].sort((a, b) => a.minutosOcupadosHoy - b.minutosOcupadosHoy);
+        const mejor = ordenados[0]!;
+        sugerido = {
+          ...mejor,
+          explicacion: `Disponible para el tiempo estimado (${duracionEfectiva} min libres)`,
+        };
+      }
+    }
+
+    return { lista: evaluados, sugerido };
+  }, [bloqueos, citas, clienteId, duracionEfectiva, horarios, initial?.id, inicio, staff, timeZone]);
 
   const toggleServicio = (id: string) => {
     setSeleccionados((current) => {
@@ -149,6 +303,7 @@ export function CitaForm({
         }
         label="Cliente"
         name="clienteId"
+        onValueChange={(val) => setClienteId(val ?? "")}
         placeholder="Buscar cliente o dejar sin registrar"
         searchUrl={`/api/clientes?organizationId=${organizationId}`}
       />
@@ -236,7 +391,53 @@ export function CitaForm({
             />
           </Field>
         ) : null}
-        <Field className={seleccionados.size === 0 ? "sm:col-span-2" : undefined}>
+        {/* Tarjeta de Estilista Sugerido si hay recomendación inteligente */}
+        {analisisStaff.sugerido ? (
+          <div className="sm:col-span-2 rounded-xl border border-primary/25 bg-primary/8 p-3 shadow-sm transition-all">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+                  <Sparkles className="size-3.5" aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-op-xs font-bold uppercase tracking-wider text-primary">
+                      Estilista sugerido:
+                    </span>
+                    <span className="font-semibold text-foreground text-sm">
+                      {analisisStaff.sugerido.nombre}
+                    </span>
+                    {analisisStaff.sugerido.esHabitual ? (
+                      <span className="rounded bg-primary/20 px-1.5 py-0.5 text-op-xs font-semibold text-primary">
+                        Habitual
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {analisisStaff.sugerido.explicacion}
+                  </p>
+                </div>
+              </div>
+              {usuarioId !== analisisStaff.sugerido.id ? (
+                <Button
+                  className="h-8 rounded-lg text-xs font-semibold"
+                  onClick={() => setUsuarioId(analisisStaff.sugerido!.id)}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  Asignar a {analisisStaff.sugerido.nombre.split(" ")[0]}
+                </Button>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-md">
+                  <Check className="size-3.5" aria-hidden="true" /> Asignado
+                </span>
+              )}
+            </div>
+          </div>
+        ) : null}
+
+        <Field className="sm:col-span-2">
           <FieldLabel>Profesional asignado</FieldLabel>
           <Select
             name="usuarioId"
@@ -244,12 +445,78 @@ export function CitaForm({
             value={usuarioId}
           >
             <option value="">Sin asignar</option>
-            {staff.map((profesional) => (
-              <option key={profesional.id} value={profesional.id}>
-                {profesional.nombre}
-              </option>
-            ))}
+            {analisisStaff.lista.length > 0
+              ? analisisStaff.lista.map((profesional) => (
+                  <option key={profesional.id} value={profesional.id}>
+                    {profesional.nombre} — {profesional.disponible ? `Disponible (${duracionEfectiva} min)` : profesional.motivo}
+                  </option>
+                ))
+              : staff.map((profesional) => (
+                  <option key={profesional.id} value={profesional.id}>
+                    {profesional.nombre}
+                  </option>
+                ))}
           </Select>
+
+          {/* Botonera interactiva rápida de estilistas con estado en vivo */}
+          {staff.length > 0 ? (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setUsuarioId("")}
+                className={cn(
+                  "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                  usuarioId === ""
+                    ? "border-primary bg-primary/10 text-primary font-semibold"
+                    : "border-border bg-card text-muted-foreground hover:bg-muted"
+                )}
+              >
+                Sin asignar
+              </button>
+              {analisisStaff.lista.length > 0
+                ? analisisStaff.lista.map((est) => (
+                    <button
+                      type="button"
+                      key={est.id}
+                      onClick={() => setUsuarioId(est.id)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                        usuarioId === est.id
+                          ? "border-primary bg-primary/10 text-primary font-semibold ring-1 ring-primary/30"
+                          : "border-border bg-card text-foreground hover:bg-muted"
+                      )}
+                      title={est.motivo}
+                    >
+                      <span
+                        className={cn(
+                          "size-2 rounded-full shrink-0",
+                          est.disponible ? "bg-emerald-500" : "bg-amber-500/80"
+                        )}
+                        aria-hidden="true"
+                      />
+                      <span>{est.nombre}</span>
+                      {est.esHabitual ? (
+                        <span className="text-op-xs text-primary font-bold">★ Habitual</span>
+                      ) : null}
+                    </button>
+                  ))
+                : staff.map((profesional) => (
+                    <button
+                      type="button"
+                      key={profesional.id}
+                      onClick={() => setUsuarioId(profesional.id)}
+                      className={cn(
+                        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                        usuarioId === profesional.id
+                          ? "border-primary bg-primary/10 text-primary font-semibold ring-1 ring-primary/30"
+                          : "border-border bg-card text-foreground hover:bg-muted"
+                      )}
+                    >
+                      <span>{profesional.nombre}</span>
+                    </button>
+                  ))}
+            </div>
+          ) : null}
         </Field>
       </div>
 

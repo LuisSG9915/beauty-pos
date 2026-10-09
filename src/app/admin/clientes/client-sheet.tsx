@@ -37,8 +37,8 @@ export function ClientSheet({ closeHref, description, open, title, children }: C
       }}
       open={open && !cerrado}
     >
-      <SheetContent className="w-[min(100vw,30rem)]">
-        <SheetHeader>
+      <SheetContent className="w-[min(100vw,34rem)] sm:max-w-xl p-4 sm:p-6">
+        <SheetHeader className="mb-1">
           <SheetTitle>{title}</SheetTitle>
           <SheetDescription>{description}</SheetDescription>
         </SheetHeader>

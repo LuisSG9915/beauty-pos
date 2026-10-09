@@ -124,10 +124,8 @@ export function DayGrid({
   }, [columnsVisibles, citasPorColumna, timeZone]);
 
   // Autoposición al entrar o cambiar de fecha: la rejilla interna se abre en
-  // la hora actual (si es hoy) o en la primera cita, y en móvil la ventana
-  // baja hasta dejar la tarjeta bajo el header fijo — así la agenda aparece
-  // en pantalla sin que la persona tenga que buscarla. Idempotente: el
-  // efecto puede correr dos veces (StrictMode) y posiciona lo mismo.
+  // la hora actual (si es hoy) o en la primera cita del profesional visible.
+  // Idempotente: el efecto puede correr dos veces (StrictMode) y posiciona lo mismo.
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
       const region = scrollRef.current;
@@ -139,12 +137,6 @@ export function DayGrid({
         0,
         (objetivo - startMin) * PX_PER_MIN - COLUMN_HEADER_PX - HOUR_PX / 2,
       );
-      if (!isMd && cardRef.current) {
-        const top = cardRef.current.getBoundingClientRect().top;
-        if (top > 96) {
-          window.scrollTo({ top: top + window.scrollY - 64 });
-        }
-      }
     });
     return () => cancelAnimationFrame(frame);
   }, [fecha, isMd, startMin, primeraCitaMinuto, timeZone]);
@@ -191,7 +183,7 @@ export function DayGrid({
       {columns.length > 1 ? (
         <div
           aria-label="Profesional visible"
-          className="flex gap-2 overflow-x-auto border-b border-border bg-muted/50 p-2 md:hidden"
+          className="flex gap-1.5 overflow-x-auto border-b border-border bg-muted/40 p-1.5 md:hidden"
           role="tablist"
         >
           {columns.map((column) => {
@@ -202,18 +194,18 @@ export function DayGrid({
               <button
                 aria-selected={activo}
                 className={cn(
-                  "flex min-h-10 shrink-0 items-center gap-2 rounded-full border px-2.5 text-sm font-medium transition-colors",
-                  activo ? "border-primary/40 bg-accent text-accent-foreground" : "border-border bg-card text-muted-foreground",
+                  "flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors active:scale-95",
+                  activo ? "border-primary/40 bg-accent text-accent-foreground shadow-xs font-semibold" : "border-border bg-card text-muted-foreground",
                 )}
                 key={column.id || "sin-asignar"}
                 onClick={() => onColumnaMovil(column.id)}
                 role="tab"
                 type="button"
               >
-                <span className={cn("flex size-6 items-center justify-center rounded-full border text-op-xs font-semibold", tone.chip)}>
-                  {column.id ? iniciales(column.nombre) : <UserRound aria-hidden="true" className="size-3.5" />}
+                <span className={cn("flex size-5.5 items-center justify-center rounded-full border text-[11px] font-semibold", tone.chip)}>
+                  {column.id ? iniciales(column.nombre) : <UserRound aria-hidden="true" className="size-3" />}
                 </span>
-                <span className="max-w-24 truncate">{column.nombre}</span>
+                <span className="max-w-28 truncate">{column.nombre}</span>
                 <span className="rounded-full bg-background px-1.5 py-0.5 text-op-xs tabular-nums">{total}</span>
               </button>
             );
@@ -222,7 +214,7 @@ export function DayGrid({
       ) : null}
       <div
         aria-label={`Citas del día por profesional en ${sucursalNombre}`}
-        className="max-h-[calc(100dvh-10rem)] overflow-auto"
+        className="max-h-[calc(100dvh-13.5rem)] overflow-auto overscroll-contain sm:max-h-[calc(100dvh-10rem)]"
         data-agenda-grid
         ref={scrollRef}
         role="region"

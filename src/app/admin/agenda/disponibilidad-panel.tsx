@@ -159,6 +159,7 @@ export function DisponibilidadPanel({
   permiteRecordatorios,
   avisos,
   timeZone,
+  trigger,
 }: {
   organizationId: string;
   /** Slug público de la organización para construir el enlace de reservas. */
@@ -184,6 +185,8 @@ export function DisponibilidadPanel({
   /** Últimos avisos de cita encolados/enviados (bitácora operativa). */
   avisos: AvisoReciente[];
   timeZone: string;
+  /** Elemento opcional que actúa como disparador de apertura. */
+  trigger?: React.ReactElement;
 }) {
   const toast = useToast();
   const router = useRouter();
@@ -320,13 +323,24 @@ export function DisponibilidadPanel({
 
   return (
     <Sheet>
-      <DialogPrimitive.Trigger
-        render={
-          <Button className="w-full shrink-0 rounded-xl lg:w-auto" type="button" variant="outline" />
-        }
-      >
-        <Settings2 aria-hidden="true" /> Configurar agenda
-      </DialogPrimitive.Trigger>
+      {trigger ? (
+        <DialogPrimitive.Trigger render={trigger} />
+      ) : (
+        <DialogPrimitive.Trigger
+          render={
+            <Button
+              aria-label="Configurar agenda"
+              className="shrink-0 rounded-xl max-sm:h-9 max-sm:px-2.5"
+              title="Configurar agenda"
+              type="button"
+              variant="outline"
+            />
+          }
+        >
+          <Settings2 aria-hidden="true" className="size-4" />
+          <span className="hidden sm:inline">Configurar agenda</span>
+        </DialogPrimitive.Trigger>
+      )}
       <SheetContent className="w-[min(100vw,46rem)]">
         <SheetHeader>
           <SheetTitle>Disponibilidad de la sucursal</SheetTitle>
