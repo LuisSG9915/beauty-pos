@@ -44,9 +44,14 @@ export type PasoGuia = {
   opcional?: boolean;
   /** Evaluación derivada del estado real del negocio. */
   completado: (estado: EstadoNegocio) => boolean;
+  /** Resumen descriptivo del dato detectado en automático. */
+  detalleDetectado?: (estado: EstadoNegocio) => string | null;
 };
 
-export type PasoEvaluado = PasoGuia & { hecho: boolean };
+export type PasoEvaluado = PasoGuia & {
+  hecho: boolean;
+  detalleDetectadoTexto?: string | null;
+};
 
 export type ResumenGuia = {
   pasos: PasoEvaluado[];

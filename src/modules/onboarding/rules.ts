@@ -21,6 +21,10 @@ export const PASOS_GUIA: readonly PasoGuia[] = [
     opcional: true,
     completado: (estado) =>
       estado.sucursalNombre != null && estado.sucursalNombre !== "Sucursal principal",
+    detalleDetectado: (estado) =>
+      estado.sucursalNombre != null && estado.sucursalNombre !== "Sucursal principal"
+        ? `Sucursal: "${estado.sucursalNombre}"`
+        : null,
   },
   {
     clave: "servicios",
@@ -29,6 +33,10 @@ export const PASOS_GUIA: readonly PasoGuia[] = [
     href: "/servicios",
     permisos: ["catalogos.editar"],
     completado: (estado) => estado.serviciosActivos > 0,
+    detalleDetectado: (estado) =>
+      estado.serviciosActivos > 0
+        ? `${estado.serviciosActivos} servicio${estado.serviciosActivos > 1 ? "s" : ""} activo${estado.serviciosActivos > 1 ? "s" : ""}`
+        : null,
   },
   {
     clave: "horario",
@@ -37,6 +45,8 @@ export const PASOS_GUIA: readonly PasoGuia[] = [
     href: "/agenda",
     permisos: ["agenda.editar"],
     completado: (estado) => estado.horariosActivos > 0,
+    detalleDetectado: (estado) =>
+      estado.horariosActivos > 0 ? "Horarios de atención configurados" : null,
   },
   {
     clave: "equipo",
@@ -46,6 +56,10 @@ export const PASOS_GUIA: readonly PasoGuia[] = [
     permisos: ["usuarios.invitar"],
     opcional: true,
     completado: (estado) => estado.miembrosActivos > 1,
+    detalleDetectado: (estado) =>
+      estado.miembrosActivos > 1
+        ? `${estado.miembrosActivos} miembros en tu equipo`
+        : null,
   },
   {
     clave: "primera_cita",
@@ -54,6 +68,10 @@ export const PASOS_GUIA: readonly PasoGuia[] = [
     href: "/agenda",
     permisos: ["agenda.editar"],
     completado: (estado) => estado.citasRegistradas > 0,
+    detalleDetectado: (estado) =>
+      estado.citasRegistradas > 0
+        ? `${estado.citasRegistradas} cita${estado.citasRegistradas > 1 ? "s" : ""} agendada${estado.citasRegistradas > 1 ? "s" : ""}`
+        : null,
   },
   {
     clave: "primer_cobro",
@@ -62,6 +80,10 @@ export const PASOS_GUIA: readonly PasoGuia[] = [
     href: "/pos",
     permisos: ["ventas.cobrar"],
     completado: (estado) => estado.ventasCobradas > 0,
+    detalleDetectado: (estado) =>
+      estado.ventasCobradas > 0
+        ? `${estado.ventasCobradas} venta${estado.ventasCobradas > 1 ? "s" : ""} cobrada${estado.ventasCobradas > 1 ? "s" : ""}`
+        : null,
   },
   {
     clave: "resultado",
@@ -70,6 +92,8 @@ export const PASOS_GUIA: readonly PasoGuia[] = [
     href: "/reportes",
     permisos: ["reportes.operativos", "reportes.financieros"],
     completado: (estado) => estado.ventasCobradas > 0,
+    detalleDetectado: (estado) =>
+      estado.ventasCobradas > 0 ? "Reportes listos con datos reales" : null,
   },
 ];
 
@@ -92,7 +116,11 @@ export function evaluarPasos(
   pasos: readonly PasoGuia[],
   estado: EstadoNegocio,
 ): PasoEvaluado[] {
-  return pasos.map((paso) => ({ ...paso, hecho: paso.completado(estado) }));
+  return pasos.map((paso) => ({
+    ...paso,
+    hecho: paso.completado(estado),
+    detalleDetectadoTexto: paso.detalleDetectado ? paso.detalleDetectado(estado) : null,
+  }));
 }
 
 /**

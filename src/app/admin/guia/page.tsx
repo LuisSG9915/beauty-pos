@@ -1,4 +1,4 @@
-import { CheckCircle2, Circle, FlaskConical } from "lucide-react";
+import { ArrowRight, Calendar, CheckCircle2, Circle, CreditCard, FlaskConical, PartyPopper, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -93,13 +93,53 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
         </div>
       ) : null}
 
+      {resumen.terminada ? (
+        <div className="rounded-2xl border border-success/30 bg-success-soft/30 p-6 shadow-xs">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <PartyPopper className="size-5 text-success" />
+                <h2 className="text-lg font-semibold text-foreground">¡Todo listo para operar tu salón!</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Has completado la configuración inicial recomendada. Tu equipo ya puede recibir citas, cobrar y gestionar clientes con total tranquilidad.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button nativeButton={false} render={<Link href={buildAdminHref("/mi-dia", { organizationId, sucursalId })} />} size="sm">
+                Ir a Mi Día
+              </Button>
+              <Button nativeButton={false} render={<Link href={buildAdminHref("/agenda", { organizationId, sucursalId })} />} size="sm" variant="outline">
+                <Calendar className="size-4" />
+                Agenda
+              </Button>
+              <Button nativeButton={false} render={<Link href={buildAdminHref("/pos", { organizationId, sucursalId })} />} size="sm" variant="outline">
+                <CreditCard className="size-4" />
+                Cobrar / Caja
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <AdminCard>
         <div className="mb-5">
           <div className="flex items-center justify-between gap-3">
-            <p className="text-sm font-medium text-foreground">
-              {resumen.completados} de {resumen.total} pasos listos
-            </p>
-            {resumen.terminada ? <StatusBadge tone="success">Configuración completa</StatusBadge> : null}
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                {resumen.completados} de {resumen.total} pasos listos
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Detección automática en vivo según la base de datos de tu sucursal.
+              </p>
+            </div>
+            {resumen.terminada ? (
+              <StatusBadge tone="success">Configuración completa</StatusBadge>
+            ) : (
+              <span className="text-xs font-medium text-muted-foreground">
+                {Math.round((resumen.completados / resumen.total) * 100)}% completado
+              </span>
+            )}
           </div>
           <div
             aria-label="Progreso de la guía"
@@ -116,37 +156,79 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
           </div>
         </div>
 
-        <ol className="divide-y divide-border">
+        <ol className="divide-y divide-border/60">
           {resumen.pasos.map((paso, index) => {
             const esSiguiente = !paso.hecho && resumen.pasos.slice(0, index).every((p) => p.hecho);
             return (
-            <li className="flex items-center gap-4 py-4 first:pt-0 last:pb-0" key={paso.clave}>
-              <span
-                aria-hidden="true"
-                className={`flex size-9 shrink-0 items-center justify-center rounded-full ${
-                  paso.hecho ? "bg-success/10 text-success" : "bg-muted/60 text-muted-foreground"
+              <li
+                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4 px-3 rounded-xl transition-colors ${
+                  esSiguiente ? "bg-primary/5 border border-primary/20 shadow-xs" : ""
                 }`}
+                key={paso.clave}
               >
-                {paso.hecho ? <CheckCircle2 className="size-5" /> : <Circle className="size-5" />}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-2 font-medium text-foreground">
-                  {index + 1}. {paso.titulo}
-                  {paso.opcional ? <StatusBadge tone="neutral">Opcional</StatusBadge> : null}
-                </p>
-                <p className="mt-0.5 text-sm leading-6 text-muted-foreground">{paso.descripcion}</p>
-              </div>
-              <Button
-                data-action-clave={esSiguiente ? "1" : undefined}
-                data-action-id={esSiguiente ? "guia.paso.ir" : undefined}
-                nativeButton={false}
-                render={<Link href={buildAdminHref(paso.href, { organizationId, sucursalId })} />}
-                size="lg"
-                variant={paso.hecho ? "ghost" : "outline"}
-              >
-                {paso.hecho ? "Ver" : "Ir"}
-              </Button>
-            </li>
+                <div className="flex items-start gap-3.5 min-w-0">
+                  <span
+                    aria-hidden="true"
+                    className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full ${
+                      paso.hecho
+                        ? "bg-success/10 text-success"
+                        : esSiguiente
+                        ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                        : "bg-muted/70 text-muted-foreground"
+                    }`}
+                  >
+                    {paso.hecho ? (
+                      <CheckCircle2 className="size-5" />
+                    ) : esSiguiente ? (
+                      <span className="text-sm">{index + 1}</span>
+                    ) : (
+                      <Circle className="size-5" />
+                    )}
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-foreground">
+                        {index + 1}. {paso.titulo}
+                      </span>
+                      {esSiguiente ? <StatusBadge tone="info">Paso recomendado ahora</StatusBadge> : null}
+                      {paso.opcional ? <StatusBadge tone="neutral">Opcional</StatusBadge> : null}
+                      {paso.hecho && paso.detalleDetectadoTexto ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
+                          <Sparkles className="size-3" />
+                          {paso.detalleDetectadoTexto}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{paso.descripcion}</p>
+                    {!paso.hecho && paso.detalleDetectadoTexto ? (
+                      <p className="text-xs text-muted-foreground/80 font-medium">
+                        Progreso actual: {paso.detalleDetectadoTexto}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="flex items-center justify-end shrink-0 pl-12 sm:pl-0">
+                  <Button
+                    data-action-clave={esSiguiente ? "1" : undefined}
+                    data-action-id={esSiguiente ? "guia.paso.ir" : undefined}
+                    nativeButton={false}
+                    render={<Link href={buildAdminHref(paso.href, { organizationId, sucursalId })} />}
+                    size={esSiguiente ? "default" : "sm"}
+                    variant={paso.hecho ? "ghost" : esSiguiente ? "default" : "outline"}
+                  >
+                    {paso.hecho ? (
+                      "Revisar"
+                    ) : esSiguiente ? (
+                      <>
+                        Configurar ahora
+                        <ArrowRight className="size-4 ml-1" />
+                      </>
+                    ) : (
+                      "Configurar"
+                    )}
+                  </Button>
+                </div>
+              </li>
             );
           })}
         </ol>

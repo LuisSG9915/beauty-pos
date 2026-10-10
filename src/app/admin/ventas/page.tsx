@@ -243,22 +243,22 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
       <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <input name="sucursalId" type="hidden" value={sucursalId} />
-        <Field className="w-40">
+        <Field className="w-full sm:w-40">
           <FieldLabel>Desde</FieldLabel>
           <Input defaultValue={desde} name="desde" type="date" />
         </Field>
-        <Field className="w-40">
+        <Field className="w-full sm:w-40">
           <FieldLabel>Hasta</FieldLabel>
           <Input defaultValue={hasta} name="hasta" type="date" />
         </Field>
-        <Field className="w-44">
+        <Field className="w-full sm:w-44">
           <FieldLabel>Estado</FieldLabel>
           <Select defaultValue={estado} name="estado">
             <option value="">Todos</option>
             {ESTADOS.map((value) => <option key={value} value={value}>{ESTADO_LABEL[value]}</option>)}
           </Select>
         </Field>
-        <Field className="min-w-56 flex-1">
+        <Field className="w-full sm:w-auto sm:min-w-56 sm:flex-1">
           <FieldLabel>Buscar cliente</FieldLabel>
           <Input defaultValue={q} name="q" placeholder="Nombre del cliente" />
         </Field>

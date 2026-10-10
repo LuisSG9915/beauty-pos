@@ -9,14 +9,14 @@ export function VentaDirectaSubmit({ disabled }: { disabled: boolean }) {
   const { pending } = useFormStatus();
   return (
     <Button
-      className="rounded-xl"
+      className="rounded-xl font-semibold"
       data-action-clave="1"
       data-action-id="pos.venta.abrir"
       disabled={disabled || pending}
       size="touch"
       type="submit"
     >
-      {pending ? "Abriendo venta…" : "Abrir venta"}
+      {pending ? "Iniciando venta…" : "Iniciar cobro directo"}
     </Button>
   );
 }

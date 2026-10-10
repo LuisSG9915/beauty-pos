@@ -47,8 +47,8 @@ export function MemberInviteForm({
         </Field>
         <Field>
           <FieldLabel required>Sucursal</FieldLabel>
-          <Select name="sucursalId" required>
-            <option value="">Selecciona una sucursal</option>
+          <Select defaultValue={branches.length === 1 ? branches[0].id : ""} name="sucursalId" required>
+            {branches.length > 1 ? <option value="">Selecciona una sucursal</option> : null}
             {branches.map((branch) => (
               <option key={branch.id} value={branch.id}>
                 {branch.nombre}

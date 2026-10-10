@@ -463,3 +463,28 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * Impresión limpia de tickets térmicos (58mm/80mm):
+ * Oculta navegación, cabeceras, barras laterales, diálogos flotantes y avisos toast.
+ */
+@media print {
+  @page {
+    margin: 0;
+  }
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  nav,
+  header,
+  aside,
+  [data-sidebar],
+  [data-radix-portal],
+  .toast-container,
+  .no-print {
+    display: none !important;
+  }
+}

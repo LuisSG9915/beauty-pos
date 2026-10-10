@@ -27,8 +27,9 @@ export default async function PracticaPage({ searchParams }: { searchParams: Sea
         title="Práctica"
       />
       <PracticaFlow
+        agendaHref={buildAdminHref("/agenda", { organizationId, sucursalId })}
         ayudaHref={buildAdminHref("/ayuda", { organizationId, sucursalId })}
-        historialHref={buildAdminHref("/ventas", { organizationId, sucursalId })}
+        posHref={buildAdminHref("/pos", { organizationId, sucursalId })}
       />
     </div>
   );

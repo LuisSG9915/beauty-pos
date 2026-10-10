@@ -14,14 +14,21 @@ export function RoleForm({ organizationId }: { organizationId: string }) {
     <form action={formAction} className="space-y-4">
       <input name="organizacionId" type="hidden" value={organizationId} />
       <Field>
-        <FieldLabel required>Clave</FieldLabel>
-        <Input name="clave" placeholder="ej. supervisor" required />
-        <p className="mt-1 text-xs text-muted-foreground">Minúsculas, números y guion bajo.</p>
+        <FieldLabel required>Nombre del rol</FieldLabel>
+        <Input name="nombre" placeholder="ej. Supervisor de piso, Recepción turno tarde" required />
       </Field>
-      <Field>
-        <FieldLabel required>Nombre</FieldLabel>
-        <Input name="nombre" placeholder="ej. Supervisor de piso" required />
-      </Field>
+      <details className="rounded-xl border border-border bg-muted/40 px-4 py-3">
+        <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-primary">
+          Opciones avanzadas
+        </summary>
+        <div className="mt-3">
+          <Field>
+            <FieldLabel>Clave interna (opcional)</FieldLabel>
+            <Input name="clave" placeholder="Se genera automáticamente" />
+            <p className="mt-1 text-xs text-muted-foreground">Déjala vacía para que el sistema la genere a partir del nombre.</p>
+          </Field>
+        </div>
+      </details>
       <ActionFeedback state={state} />
       <Button className="rounded-xl" data-action-clave="1" size="lg" data-action-id="roles.rol.crear" disabled={isPending} type="submit">
         <ShieldPlus aria-hidden="true" className="size-4" />

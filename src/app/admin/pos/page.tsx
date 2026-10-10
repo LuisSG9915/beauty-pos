@@ -1,4 +1,5 @@
 import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { WifiOff } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -19,7 +20,7 @@ import { formatCurrency, formatTime } from "@/lib/format";
 import { GLOSARIO } from "@/lib/glosario";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { dayBoundsUtc, dayKey } from "@/modules/agenda/timezone";
-import { getTicketData } from "@/modules/pos/ticket";
+import { catalogosTicketCached, getTicketData } from "@/modules/pos/ticket";
 
 export const dynamic = "force-dynamic";
 
@@ -165,9 +166,9 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
   const day = dayKey(new Date(), context.timeZone);
   const bounds = dayBoundsUtc(day, context.timeZone);
   const fechaVenta = sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`;
-  const ventasHoy =
+  const [ventasHoy, catalogos] = await Promise.all([
     sucursalId && bounds
-      ? await db
+      ? db
           .select({ id: ventas.id, estado: ventas.estado, total: ventas.total, fecha: fechaVenta, clienteNombre: clientes.nombre })
           .from(ventas)
           .leftJoin(clientes, eq(ventas.clienteId, clientes.id))
@@ -181,15 +182,46 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
             ),
           )
           .orderBy(desc(fechaVenta))
-      : [];
+      : Promise.resolve([]),
+    sucursalId ? catalogosTicketCached(organizationId, sucursalId) : Promise.resolve(null),
+  ]);
 
   const currentHref = buildAdminHref("/pos", { organizationId, sucursalId });
 
   return (
     <div className="space-y-6">
+      {catalogos && sucursalId ? (
+        <OfflineCatalogoCache
+          catalogo={{
+            organizacionId: organizationId,
+            sucursalId,
+            sucursalNombre: context.branches.find((b) => b.id === sucursalId)?.nombre ?? "",
+            moneda: context.currency,
+            guardadoAt: "",
+            servicios: catalogos.catalogoServicios.map((s) => ({ id: s.id, nombre: s.nombre, precio: s.precio })),
+            productos: catalogos.catalogoProductos.map((p) => ({ id: p.id, nombre: p.nombre, precio: p.precio })),
+            mediosPago: catalogos.mediosPago,
+            staff: catalogos.staff,
+          }}
+        />
+      ) : null}
       <AdminPageHeader
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              nativeButton={false}
+              render={
+                <Link
+                  href={`/offline/venta?organizacionId=${organizationId}&sucursalId=${sucursalId || ""}`}
+                  title="Cobrar en modo de contingencia si el internet falla"
+                />
+              }
+              size="sm"
+              variant="outline"
+            >
+              <WifiOff className="size-4 mr-1 text-muted-foreground" />
+              Venta sin conexión
+            </Button>
             <Button
               data-action-clave="1"
               nativeButton={false}

@@ -1,107 +1,54 @@
 import { and, eq, sql } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
-import { servicios } from "@/db/schema/catalogs";
-import { miembrosOrganizaciones, sucursales } from "@/db/schema/core";
-import { citas, horariosSucursales, ventas } from "@/db/schema/operations";
 import { progresoGuias } from "@/db/schema/onboarding";
 import type { EstadoGuia, EstadoNegocio } from "./types";
 import { GUIA_CONFIGURACION, GUIA_VERSION } from "./types";
 
 type Db = ReturnType<typeof getDatabase>;
 
-async function contar(db: Db, query: Promise<{ total: number }[]>): Promise<number> {
-  const [row] = await query;
-  return row?.total ?? 0;
-}
-
 /**
  * Señales reales del negocio para evaluar el checklist de la guía.
- * Las consultas son independientes y se lanzan en paralelo.
+ * Fusionadas en 1 consulta única con subselects para evitar handshakes múltiples al pool.
  */
 export async function cargarEstadoNegocio(
   db: Db,
   organizacionId: string,
   sucursalId: string,
 ): Promise<EstadoNegocio> {
-  const conteo = sql<number>`count(*)::int`;
-  const [serviciosActivos, horariosActivos, miembrosActivos, citasRegistradas, ventasCobradas, sucursalRow] =
-    await Promise.all([
-      contar(
-        db,
-        db
-          .select({ total: conteo })
-          .from(servicios)
-          .where(and(eq(servicios.organizacionId, organizacionId), eq(servicios.activo, true))),
-      ),
-      contar(
-        db,
-        db
-          .select({ total: conteo })
-          .from(horariosSucursales)
-          .where(
-            and(
-              eq(horariosSucursales.organizacionId, organizacionId),
-              eq(horariosSucursales.sucursalId, sucursalId),
-              eq(horariosSucursales.activo, true),
-            ),
-          ),
-      ),
-      contar(
-        db,
-        db
-          .select({ total: conteo })
-          .from(miembrosOrganizaciones)
-          .where(
-            and(
-              eq(miembrosOrganizaciones.organizacionId, organizacionId),
-              eq(miembrosOrganizaciones.estado, "activo"),
-            ),
-          ),
-      ),
-      contar(
-        db,
-        db
-          .select({ total: conteo })
-          .from(citas)
-          .where(
-            and(
-              eq(citas.organizacionId, organizacionId),
-              eq(citas.sucursalId, sucursalId),
-              eq(citas.activo, true),
-            ),
-          ),
-      ),
-      contar(
-        db,
-        db
-          .select({ total: conteo })
-          .from(ventas)
-          .where(
-            and(
-              eq(ventas.organizacionId, organizacionId),
-              eq(ventas.sucursalId, sucursalId),
-              eq(ventas.activo, true),
-              eq(ventas.estado, "completada"),
-            ),
-          ),
-      ),
-      // Nombre de la sucursal del contexto: el paso "nombre_sucursal" se
-      // completa cuando deja de ser el genérico "Sucursal principal".
-      db
-        .select({ nombre: sucursales.nombre })
-        .from(sucursales)
-        .where(eq(sucursales.id, sucursalId))
-        .limit(1)
-        .then((rows) => rows[0] ?? null),
-    ]);
+  const result = await db.execute<{
+    servicios_activos: number;
+    horarios_activos: number;
+    miembros_activos: number;
+    citas_registradas: number;
+    ventas_cobradas: number;
+    sucursal_nombre: string | null;
+  }>(sql`
+    select
+      (select count(*)::int from servicios where organizacion_id = ${organizacionId} and activo = true) as servicios_activos,
+      (select count(*)::int from horarios_sucursales where organizacion_id = ${organizacionId} and sucursal_id = ${sucursalId} and activo = true) as horarios_activos,
+      (select count(*)::int from miembros_organizaciones where organizacion_id = ${organizacionId} and estado = 'activo') as miembros_activos,
+      (select count(*)::int from citas where organizacion_id = ${organizacionId} and sucursal_id = ${sucursalId} and activo = true) as citas_registradas,
+      (select count(*)::int from ventas where organizacion_id = ${organizacionId} and sucursal_id = ${sucursalId} and activo = true and estado = 'completada') as ventas_cobradas,
+      (select nombre from sucursales where id = ${sucursalId} limit 1) as sucursal_nombre
+  `);
+
+  const row = (result.rows?.[0] ?? {}) as {
+    servicios_activos?: number;
+    horarios_activos?: number;
+    miembros_activos?: number;
+    citas_registradas?: number;
+    ventas_cobradas?: number;
+    sucursal_nombre?: string | null;
+  };
+
   return {
-    serviciosActivos,
-    horariosActivos,
-    miembrosActivos,
-    citasRegistradas,
-    ventasCobradas,
-    sucursalNombre: sucursalRow?.nombre ?? null,
+    serviciosActivos: Number(row.servicios_activos ?? 0),
+    horariosActivos: Number(row.horarios_activos ?? 0),
+    miembrosActivos: Number(row.miembros_activos ?? 0),
+    citasRegistradas: Number(row.citas_registradas ?? 0),
+    ventasCobradas: Number(row.ventas_cobradas ?? 0),
+    sucursalNombre: row.sucursal_nombre ?? null,
   };
 }
 

@@ -9,6 +9,7 @@ import { catPermisos, catRoles, relMiembrosRoles, relRolesPermisos } from "@/db/
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
 import { auditEvent } from "@/lib/audit";
 import { checkPermission, hasPermission } from "@/lib/auth/authorization";
+import { claveDisponible } from "@/lib/clave";
 
 /** Rol intocable: quitarle permisos dejaría a la org sin administrador. */
 const PROTECTED_ROLE = "propietario";
@@ -19,9 +20,10 @@ const createRoleSchema = z.object({
     .string()
     .trim()
     .toLowerCase()
-    .min(2)
     .max(80)
-    .regex(/^[a-z0-9_]+$/, "Usa solo letras minúsculas, números y guion bajo."),
+    .regex(/^[a-z0-9_-]*$/, "Usa solo letras minúsculas, números, guion o guion bajo.")
+    .optional()
+    .or(z.literal("")),
   nombre: z.string().trim().min(2).max(120),
 });
 
@@ -38,10 +40,15 @@ export async function createRole(
   const { user } = access;
   const db = getDatabase();
 
+  const clave =
+    input.clave && input.clave.length >= 2
+      ? input.clave
+      : await claveDisponible(db, catRoles, input.organizacionId, input.nombre, 80);
+
   try {
     await db.insert(catRoles).values({
       organizacionId: input.organizacionId,
-      clave: input.clave,
+      clave,
       nombre: input.nombre,
       alcance: "organizacion",
       esSistema: false,

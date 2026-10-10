@@ -55,13 +55,6 @@ export function resolverCobroPagos(input: {
   for (const pago of pagos) {
     const medio = mediosPorId.get(pago.medioPagoId);
     if (!medio) return { ok: false, error: "Uno de los medios de pago no es válido." };
-    if (medio.categoria !== "efectivo" && !pago.referencia) {
-      return {
-        ok: false,
-        error: `El medio "${medio.nombre}" requiere referencia.`,
-        detalle: `Falta la referencia de ${medio.nombre}.`,
-      };
-    }
   }
 
   if (aCubrir > EPSILON && pagos.length === 0) {

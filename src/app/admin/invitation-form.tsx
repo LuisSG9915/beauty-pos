@@ -60,11 +60,16 @@ export function InvitationForm({ organizations, roles, branches }: InvitationFor
           </Field>
           <Field>
             <FieldLabel required>Sucursal</FieldLabel>
-            <Select disabled={!organizationId} name="sucursalId" required>
+            <Select
+              defaultValue={availableBranches.length === 1 ? availableBranches[0].id : ""}
+              disabled={!organizationId}
+              name="sucursalId"
+              required
+            >
               <option value="">{organizationId ? "Selecciona una sucursal" : "Primero selecciona organización"}</option>
               {availableBranches.map((branch) => (
                 <option key={branch.id} value={branch.id}>
-                  {branch.nombre} ({branch.clave})
+                  {branch.nombre}
                 </option>
               ))}
             </Select>

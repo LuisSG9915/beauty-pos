@@ -214,7 +214,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
 
       <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
-        <Field className="min-w-56 flex-1">
+        <Field className="w-full sm:w-auto sm:min-w-56 sm:flex-1">
           <FieldLabel>Buscar</FieldLabel>
           <Input defaultValue={query} key={query} name="q" placeholder="Nombre del servicio" />
         </Field>

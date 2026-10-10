@@ -27,6 +27,7 @@ import {
 import { CatalogoSelector } from "@/app/admin/pos/catalogo-selector";
 import { CobroForm } from "@/app/admin/pos/cobro-form";
 import { FacturarPanel } from "@/app/admin/pos/facturar-panel";
+import { TicketActionsBar } from "@/app/admin/pos/printable-ticket";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
@@ -1115,18 +1116,39 @@ export function VentaTicket({
             ) : null}
           </section>
         ) : (
-          <section className="rounded-2xl border border-success/30 bg-success/10 p-6 shadow-sm">
-            <h2 className="font-semibold text-success">Venta cerrada</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+          <section className="rounded-2xl border border-success/30 bg-success/10 p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-success">Venta cobrada con éxito</h2>
+              <StatusBadge tone="success">Completada</StatusBadge>
+            </div>
+            <p className="text-sm leading-6 text-muted-foreground">
               Esta venta ya fue cobrada y no puede modificarse.
             </p>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
+
+            <TicketActionsBar
+              clienteNombre={venta.clienteNombre}
+              currency={currency}
+              descuento={venta.descuento}
+              descuentoMembresia={venta.descuentoMembresia}
+              descuentoPromocion={venta.descuentoPromocion}
+              lineasMembresias={lineasMembresias}
+              lineasPaquetes={lineasPaquetes}
+              lineasProductos={lineasProductos}
+              lineasServicios={lineasServicios}
+              pagos={pagos}
+              propina={venta.propina}
+              subtotal={venta.subtotal}
+              total={venta.total}
+              ventaId={venta.id}
+            />
+
+            <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-success/20">
               {modo !== "inline" ? (
                 <Link
-                  className="inline-flex min-h-10 items-center rounded-xl border border-success/30 bg-card px-4 text-sm font-medium text-success"
+                  className="inline-flex min-h-10 items-center rounded-xl border border-success/30 bg-card px-4 text-sm font-medium text-success hover:bg-success/5 transition-colors"
                   href={returnTo}
                 >
-                  ← Volver
+                  ← Volver a Cobrar
                 </Link>
               ) : null}
               {puedeCancelar ? (

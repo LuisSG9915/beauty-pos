@@ -2437,11 +2437,6 @@ export async function cobrarAnticipo(_previousState: ActionState, formData: Form
           .where(and(eq(catMediosPago.id, input.medioPagoId), eq(catMediosPago.organizacionId, input.organizacionId), eq(catMediosPago.activo, true)))
           .limit(1);
         if (!medio) return actionError("El medio de pago no es válido.");
-        if (medio.categoria !== "efectivo" && !input.referencia) {
-          return actionError(`El medio "${medio.nombre}" requiere referencia.`, {
-            fieldErrors: { referencia: ["Captura el folio o autorización."] },
-          });
-        }
 
         const [[sucursalRow], [corteAbierto]] = await Promise.all([
           tx

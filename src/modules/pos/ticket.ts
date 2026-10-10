@@ -379,7 +379,7 @@ async function loadCatalogosTicket(organizacionId: string, sucursalId: string): 
  * catálogos llaman `revalidateCatalogos(org)`; los 60 s son el respaldo ante
  * escrituras que no pasen por las actions (p. ej. edición directa en BD).
  */
-const catalogosTicketCached = (organizacionId: string, sucursalId: string) =>
+export const catalogosTicketCached = (organizacionId: string, sucursalId: string) =>
   unstable_cache(
     async () => loadCatalogosTicket(organizacionId, sucursalId),
     ["ticket-catalogos", organizacionId, sucursalId],

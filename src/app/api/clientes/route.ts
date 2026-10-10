@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 
 import { getDatabase } from "@/db/client";
 import { clientes } from "@/db/schema/core";
-import { requireAuthenticatedUser } from "@/lib/auth/access";
+import { getApiSessionUser } from "@/lib/auth/access";
 import { hasPermission, resolveAccessSafe } from "@/lib/auth/authorization";
 
 const LIMITE = 20;
@@ -21,7 +21,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ items: [] });
   }
 
-  const { user } = await requireAuthenticatedUser();
+  const user = await getApiSessionUser();
+  if (!user) {
+    return NextResponse.json({ items: [] }, { status: 401 });
+  }
+
   const access = await resolveAccessSafe(organizationId, user);
   if (
     !access ||
@@ -90,3 +94,111 @@ export async function GET(request: NextRequest) {
     })),
   });
 }
+
+/**
+ * Registro ágil de cliente para agenda y mostrador.
+ * Permite dar de alta a un cliente en segundos sin salir del modal de cita.
+ * Divide inteligentemente el nombre en paterno/materno para mantener el esquema core.
+ */
+export async function POST(request: NextRequest) {
+  const user = await getApiSessionUser();
+  if (!user) {
+    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Datos inválidos" }, { status: 400 });
+  }
+
+  const { organizationId, nombreCompleto, telefono, correo, notasOperativas } = body as {
+    organizationId?: string;
+    nombreCompleto?: string;
+    telefono?: string;
+    correo?: string;
+    notasOperativas?: string;
+  };
+
+  if (!organizationId) {
+    return NextResponse.json({ error: "Organización requerida" }, { status: 400 });
+  }
+
+  const access = await resolveAccessSafe(organizationId, user);
+  if (
+    !access ||
+    (!hasPermission(access, "clientes.editar") && !hasPermission(access, "agenda.editar"))
+  ) {
+    return NextResponse.json(
+      { error: "No tienes permiso para registrar clientes" },
+      { status: 403 },
+    );
+  }
+
+  const nombreLimpio = nombreCompleto?.trim() ?? "";
+  if (nombreLimpio.length < 2) {
+    return NextResponse.json(
+      { error: "El nombre debe tener al menos 2 letras" },
+      { status: 400 },
+    );
+  }
+
+  // Separación inteligente de nombres hispanos
+  const partes = nombreLimpio.split(/\s+/).filter(Boolean);
+  let nombre = partes[0] ?? "";
+  let apellidoPaterno: string | null = null;
+  let apellidoMaterno: string | null = null;
+
+  if (partes.length === 2) {
+    apellidoPaterno = partes[1];
+  } else if (partes.length >= 3) {
+    apellidoMaterno = partes[partes.length - 1];
+    apellidoPaterno = partes[partes.length - 2];
+    nombre = partes.slice(0, -2).join(" ");
+  }
+
+  const telLimpio = telefono?.trim() || null;
+  const telNorm = telLimpio ? telLimpio.toLowerCase().replace(/\s+/g, "") : null;
+  const correoLimpio = correo?.trim() || null;
+  const correoNorm = correoLimpio ? correoLimpio.toLowerCase().replace(/\s+/g, "") : null;
+  const notas = notasOperativas?.trim() || null;
+
+  const db = getDatabase();
+
+  const [nuevoCliente] = await db
+    .insert(clientes)
+    .values({
+      organizacionId: organizationId,
+      nombre,
+      apellidoPaterno,
+      apellidoMaterno,
+      telefono: telLimpio,
+      telefonoNormalizado: telNorm,
+      correo: correoLimpio,
+      correoNormalizado: correoNorm,
+      notasOperativas: notas,
+    })
+    .returning({
+      id: clientes.id,
+      nombre: clientes.nombre,
+      apellidoPaterno: clientes.apellidoPaterno,
+      apellidoMaterno: clientes.apellidoMaterno,
+      telefono: clientes.telefono,
+    });
+
+  const nombreMostrado = [
+    nuevoCliente.nombre,
+    nuevoCliente.apellidoPaterno,
+    nuevoCliente.apellidoMaterno,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return NextResponse.json({
+    item: {
+      value: nuevoCliente.id,
+      label: nombreMostrado,
+      description: nuevoCliente.telefono ?? undefined,
+    },
+  });
+}
+

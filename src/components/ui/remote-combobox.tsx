@@ -2,7 +2,7 @@
 
 import { Combobox as ComboboxPrimitive } from "@base-ui/react/combobox";
 import { Check, ChevronDown, Loader2, X } from "lucide-react";
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import type { ComboboxItem } from "@/components/ui/combobox";
@@ -23,6 +23,8 @@ export type RemoteComboboxProps = {
   required?: boolean;
   disabled?: boolean;
   className?: string;
+  /** Ítem seleccionado externamente (para selección reactiva o creación rápida). */
+  selectedItem?: ComboboxItem | null;
   onValueChange?: (value: string | null, item: ComboboxItem | null) => void;
   "aria-describedby"?: string;
 };
@@ -35,6 +37,7 @@ export type RemoteComboboxProps = {
 export function RemoteCombobox({
   searchUrl,
   initialItem = null,
+  selectedItem,
   name,
   label,
   placeholder = "Escribe para buscar",
@@ -50,18 +53,26 @@ export function RemoteCombobox({
   const inputId = useId();
   const [items, setItems] = useState<ComboboxItem[]>(initialItem ? [initialItem] : []);
   const [defaultItems, setDefaultItems] = useState<ComboboxItem[]>(initialItem ? [initialItem] : []);
-  const [seleccion, setSeleccion] = useState<ComboboxItem | null>(initialItem);
+  const [internalSelection, setInternalSelection] = useState<ComboboxItem | null>(initialItem);
+  const seleccion = selectedItem !== undefined ? selectedItem : internalSelection;
   const [buscando, setBuscando] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Asegurar que la selección vigente siempre esté visible en la lista de opciones
+  const itemsConSeleccion = useMemo(() => {
+    if (!seleccion) return items;
+    if (items.some((it) => it.value === seleccion.value)) return items;
+    return [seleccion, ...items];
+  }, [items, seleccion]);
 
   // Carga inicial de opciones para que el selector no esté vacío al abrirlo
   useEffect(() => {
     let activo = true;
     const controller = new AbortController();
-    setBuscando(true);
 
     async function cargarIniciales() {
+      setBuscando(true);
       try {
         const res = await fetch(searchUrl, { signal: controller.signal });
         if (!res.ok) return;
@@ -99,7 +110,7 @@ export function RemoteCombobox({
       if (timerRef.current) clearTimeout(timerRef.current);
 
       const limpio = termino.trim();
-      if (!limpio) {
+      if (!limpio || (minQuery > 0 && limpio.length < minQuery)) {
         setItems(defaultItems.length > 0 ? defaultItems : (seleccion ? [seleccion] : []));
         setBuscando(false);
         return;
@@ -133,7 +144,7 @@ export function RemoteCombobox({
         }
       }, 200);
     },
-    [defaultItems, searchUrl, seleccion],
+    [defaultItems, minQuery, searchUrl, seleccion],
   );
 
   useEffect(() => {
@@ -156,13 +167,15 @@ export function RemoteCombobox({
         disabled={disabled}
         filter={() => true}
         isItemEqualToValue={(a, b) => a.value === b.value}
-        items={items}
+        items={itemsConSeleccion}
         itemToStringLabel={(item) => item.label}
         itemToStringValue={(item) => item.value}
         name={name}
         onInputValueChange={(valor) => buscar(valor)}
         onValueChange={(item) => {
-          setSeleccion(item ?? null);
+          if (selectedItem === undefined) {
+            setInternalSelection(item ?? null);
+          }
           onValueChange?.(item?.value ?? null, item ?? null);
         }}
         required={required}

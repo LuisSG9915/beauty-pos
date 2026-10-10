@@ -8,6 +8,7 @@ import { saveCita, type CitaActionState } from "@/app/admin/agenda/actions";
 import type { AgendaBloqueo, AgendaCita, AgendaHorario } from "@/app/admin/agenda/agenda-types";
 import { MediaThumb } from "@/components/media-thumb";
 import { Button } from "@/components/ui/button";
+import type { ComboboxItem } from "@/components/ui/combobox";
 import { RemoteCombobox } from "@/components/ui/remote-combobox";
 import {
   Field,
@@ -95,6 +96,51 @@ export function CitaForm({
   const [inicio, setInicio] = useState(() => toBranchDateTimeInput(initial?.fechaHora ?? "", timeZone));
   const [duracionManual, setDuracionManual] = useState<number>(initial?.duracionMinutos ?? 60);
   const [usuarioId, setUsuarioId] = useState(initial?.usuarioId ?? "");
+
+  // Alta rápida de clientes sin perder selección previa de la cita
+  const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevoTelefono, setNuevoTelefono] = useState("");
+  const [nuevasNotas, setNuevasNotas] = useState("");
+  const [guardandoCliente, setGuardandoCliente] = useState(false);
+  const [clienteSeleccionadoItem, setClienteSeleccionadoItem] = useState<ComboboxItem | null>(null);
+
+  async function handleCrearClienteRapido() {
+    const nombreLimpio = nuevoNombre.trim();
+    if (!nombreLimpio || nombreLimpio.length < 2) {
+      toast.error("Ingresa el nombre del cliente (mínimo 2 letras).");
+      return;
+    }
+    setGuardandoCliente(true);
+    try {
+      const res = await fetch("/api/clientes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId,
+          nombreCompleto: nombreLimpio,
+          telefono: nuevoTelefono.trim() || undefined,
+          notasOperativas: nuevasNotas.trim() || undefined,
+        }),
+      });
+      const data = (await res.json()) as { item?: ComboboxItem; error?: string };
+      if (!res.ok || !data.item) {
+        toast.error(data.error ?? "No se pudo registrar el cliente.");
+        return;
+      }
+      setClienteId(data.item.value);
+      setClienteSeleccionadoItem(data.item);
+      setMostrarNuevoCliente(false);
+      setNuevoNombre("");
+      setNuevoTelefono("");
+      setNuevasNotas("");
+      toast.success(`Cliente «${data.item.label}» registrado y seleccionado.`);
+    } catch {
+      toast.error("No se pudo conectar para registrar el cliente.");
+    } finally {
+      setGuardandoCliente(false);
+    }
+  }
 
   const handledState = useRef<CitaActionState | null>(null);
   useEffect(() => {
@@ -291,22 +337,95 @@ export function CitaForm({
 
       {/* Flujo lineal sin pestañas: cliente → servicios → cuándo/quién →
           extras plegados. Una sola acción primaria al final. */}
-      <RemoteCombobox
-        initialItem={
-          initial?.clienteId
-            ? {
-                value: initial.clienteId,
-                label: initial.clienteNombre ?? "Cliente",
-                description: initial.clienteTelefono ?? undefined,
-              }
-            : null
-        }
-        label="Cliente"
-        name="clienteId"
-        onValueChange={(val) => setClienteId(val ?? "")}
-        placeholder="Buscar cliente o dejar sin registrar"
-        searchUrl={`/api/clientes?organizationId=${organizationId}`}
-      />
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-foreground">
+            Cliente
+          </label>
+          <button
+            className="flex items-center gap-1 text-xs font-semibold text-primary transition-colors hover:underline"
+            onClick={() => setMostrarNuevoCliente((v) => !v)}
+            type="button"
+          >
+            {mostrarNuevoCliente ? "Cancelar registro" : "+ Nuevo cliente"}
+          </button>
+        </div>
+
+        {mostrarNuevoCliente ? (
+          <div className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-3.5 anim-entrada">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold text-foreground">Alta rápida de cliente</p>
+              <span className="text-[11px] text-muted-foreground">Sin salir de la cita</span>
+            </div>
+            <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+              <Field>
+                <FieldLabel required>Nombre completo</FieldLabel>
+                <Input
+                  autoFocus
+                  onChange={(e) => setNuevoNombre(e.target.value)}
+                  placeholder="ej. Mariana Solís"
+                  value={nuevoNombre}
+                />
+              </Field>
+              <Field>
+                <FieldLabel>Teléfono</FieldLabel>
+                <Input
+                  onChange={(e) => setNuevoTelefono(e.target.value)}
+                  placeholder="ej. 55 1234 5678"
+                  type="tel"
+                  value={nuevoTelefono}
+                />
+              </Field>
+            </div>
+            <Field>
+              <FieldLabel>Notas para el servicio (opcional)</FieldLabel>
+              <Input
+                onChange={(e) => setNuevasNotas(e.target.value)}
+                placeholder="ej. Tinte sin amoniaco, piel sensible"
+                value={nuevasNotas}
+              />
+            </Field>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <Button
+                onClick={() => setMostrarNuevoCliente(false)}
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                Cancelar
+              </Button>
+              <Button
+                disabled={guardandoCliente || nuevoNombre.trim().length < 2}
+                onClick={handleCrearClienteRapido}
+                size="sm"
+                type="button"
+              >
+                {guardandoCliente ? "Guardando…" : "Guardar y seleccionar"}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        <RemoteCombobox
+          initialItem={
+            initial?.clienteId
+              ? {
+                  value: initial.clienteId,
+                  label: initial.clienteNombre ?? "Cliente",
+                  description: initial.clienteTelefono ?? undefined,
+                }
+              : null
+          }
+          name="clienteId"
+          onValueChange={(val, item) => {
+            setClienteId(val ?? "");
+            setClienteSeleccionadoItem(item);
+          }}
+          placeholder="Buscar cliente o dejar sin registrar"
+          searchUrl={`/api/clientes?organizationId=${organizationId}`}
+          selectedItem={clienteSeleccionadoItem}
+        />
+      </div>
 
       <div className="space-y-2">
         <p className="text-sm font-medium text-foreground">Servicios de la cita</p>

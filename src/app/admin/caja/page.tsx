@@ -1,4 +1,5 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { AperturaCajaForm } from "@/app/admin/caja/apertura-caja-form";
@@ -232,60 +233,121 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
           </AdminCard>
         )}
 
-        <AdminCard className="self-start" description="Diferencias esperado vs. contado por medio de pago." title="Cortes recientes">
+        <AdminCard className="self-start" description="Auditoría de arqueo ciego: esperado vs. contado físico por medio de pago." title="Cortes recientes">
           {historial.length === 0 ? (
-            <EmptyState description="Aquí aparecerán los cortes cerrados con su reporte de discrepancias." title="Sin cortes aún" />
+            <EmptyState description="Aquí aparecerán los cortes cerrados con su reporte de discrepancias y arqueo." title="Sin cortes aún" />
           ) : (
             <ul className="space-y-4">
-              {historial.map((corte) => {
+              {historial.map((corte, index) => {
                 const tot = ventasPorCorte.get(corte.id);
-                const diferenciaTotal = (detallesPorCorte.get(corte.id) ?? []).reduce((s, d) => s + num(d.diferencia), 0);
+                const detallesList = detallesPorCorte.get(corte.id) ?? [];
+                const diferenciaTotal = detallesList.reduce((s, d) => s + num(d.diferencia), 0);
+                const esCuadrado = Math.abs(diferenciaTotal) < 0.01;
+                const esFaltante = diferenciaTotal <= -0.01;
+
                 return (
-                  <li className="rounded-xl border border-border p-4" key={corte.id}>
+                  <li
+                    className={`rounded-2xl border p-4 transition-colors ${
+                      index === 0 ? "border-primary/30 bg-card shadow-xs" : "border-border bg-card"
+                    }`}
+                    key={corte.id}
+                  >
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-sm font-semibold text-foreground">
-                        {formatDate(corte.createdAt, { timeZone })} · {formatTime(corte.createdAt, { timeZone })} →{" "}
-                        {corte.cerradoAt ? formatTime(corte.cerradoAt, { timeZone }) : "—"}
-                      </p>
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                          Math.abs(diferenciaTotal) < 0.005 ? "bg-success-soft text-success-soft-foreground" : "bg-destructive-soft text-destructive-soft-foreground"
-                        }`}
-                      >
-                        {Math.abs(diferenciaTotal) < 0.005 ? "Cuadrado" : `Diferencia ${fmt(diferenciaTotal)}`}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground">
+                          {formatDate(corte.createdAt, { timeZone })} · {formatTime(corte.createdAt, { timeZone })} →{" "}
+                          {corte.cerradoAt ? formatTime(corte.cerradoAt, { timeZone }) : "—"}
+                        </p>
+                        {index === 0 ? (
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                            Último corte
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {esCuadrado ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-0.5 text-xs font-semibold text-success-soft-foreground">
+                          <CheckCircle2 className="size-3.5 text-success" />
+                          Arqueo cuadrado
+                        </span>
+                      ) : esFaltante ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-destructive-soft px-2.5 py-0.5 text-xs font-semibold text-destructive-soft-foreground">
+                          <AlertCircle className="size-3.5 text-destructive" />
+                          Faltante de -{fmt(Math.abs(diferenciaTotal))}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-0.5 text-xs font-semibold text-warning-soft-foreground">
+                          <AlertTriangle className="size-3.5 text-warning" />
+                          Sobrante de +{fmt(diferenciaTotal)}
+                        </span>
+                      )}
                     </div>
+
                     <p className="mt-1 text-xs text-muted-foreground">
-                      {corte.abiertoPor ?? "—"} · {tot?.ventasCount ?? 0} venta(s) · {fmt(tot?.total)} ventas ·{" "}
+                      Responsable: {corte.abiertoPor ?? "—"} · Fondo inicial: {fmt(corte.fondoInicial)} · {tot?.ventasCount ?? 0} venta(s) cobrada(s) ({fmt(tot?.total)}) ·{" "}
                       {fmt(tot?.propinas)} propinas · {fmt(comisionesPorCorte.get(corte.id))} comisiones
                     </p>
-                    <table className="mt-3 w-full text-left text-sm">
-                      <thead className="text-xs uppercase tracking-wide text-muted-foreground">
-                        <tr>
-                          <th className="py-1 pr-3 font-medium">Medio</th>
-                          <th className="py-1 pr-3 text-right font-medium">Esperado</th>
-                          <th className="py-1 pr-3 text-right font-medium">Contado</th>
-                          <th className="py-1 text-right font-medium">Dif.</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(detallesPorCorte.get(corte.id) ?? []).map((d, i) => (
-                          <tr className="border-t border-border" key={i}>
-                            <td className="py-1.5 pr-3">{d.medioNombre}</td>
-                            <td className="py-1.5 pr-3 text-right tabular-nums">{fmt(d.esperado)}</td>
-                            <td className="py-1.5 pr-3 text-right tabular-nums">{fmt(d.contado)}</td>
-                            <td
-                              className={`py-1.5 text-right font-medium tabular-nums ${
-                                Math.abs(num(d.diferencia)) < 0.005 ? "text-success" : "text-destructive"
-                              }`}
-                            >
-                              {fmt(d.diferencia)}
-                            </td>
+
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead className="text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                          <tr>
+                            <th className="py-1.5 pr-3 font-semibold">Medio de pago</th>
+                            <th className="py-1.5 pr-3 text-right font-semibold">Esperado</th>
+                            <th className="py-1.5 pr-3 text-right font-semibold">Contado</th>
+                            <th className="py-1.5 pr-3 text-right font-semibold">Diferencia</th>
+                            <th className="py-1.5 text-right font-semibold">Resultado</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    {corte.notas ? <p className="mt-2 text-xs text-muted-foreground">Notas: {corte.notas}</p> : null}
+                        </thead>
+                        <tbody className="divide-y divide-border/60">
+                          {detallesList.map((d, i) => {
+                            const dif = num(d.diferencia);
+                            const itemCuadrado = Math.abs(dif) < 0.01;
+                            const itemFaltante = dif <= -0.01;
+
+                            return (
+                              <tr className="hover:bg-muted/30 transition-colors" key={i}>
+                                <td className="py-2 pr-3 font-medium text-foreground">{d.medioNombre}</td>
+                                <td className="py-2 pr-3 text-right tabular-nums text-muted-foreground">{fmt(d.esperado)}</td>
+                                <td className="py-2 pr-3 text-right tabular-nums font-semibold text-foreground">{fmt(d.contado)}</td>
+                                <td
+                                  className={`py-2 pr-3 text-right font-semibold tabular-nums ${
+                                    itemCuadrado
+                                      ? "text-success"
+                                      : itemFaltante
+                                      ? "text-destructive"
+                                      : "text-warning"
+                                  }`}
+                                >
+                                  {itemCuadrado ? "$0.00" : (dif > 0 ? "+" : "") + fmt(dif)}
+                                </td>
+                                <td className="py-2 text-right">
+                                  {itemCuadrado ? (
+                                    <span className="rounded-md bg-success-soft/60 px-1.5 py-0.5 text-[11px] font-medium text-success">
+                                      Cuadrado
+                                    </span>
+                                  ) : itemFaltante ? (
+                                    <span className="rounded-md bg-destructive-soft/60 px-1.5 py-0.5 text-[11px] font-medium text-destructive">
+                                      Faltante
+                                    </span>
+                                  ) : (
+                                    <span className="rounded-md bg-warning-soft/60 px-1.5 py-0.5 text-[11px] font-medium text-warning">
+                                      Sobrante
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {corte.notas ? (
+                      <p className="mt-2.5 rounded-lg bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
+                        <span className="font-semibold text-foreground">Notas de cierre:</span> {corte.notas}
+                      </p>
+                    ) : null}
                   </li>
                 );
               })}

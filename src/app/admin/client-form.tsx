@@ -2,7 +2,6 @@
 
 import {
   Cake,
-  Mail,
   MessageCircle,
   Phone,
   ReceiptText,

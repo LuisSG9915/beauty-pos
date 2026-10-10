@@ -75,10 +75,12 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
 
         <section className={cardClass}>
           <div className={iconClass}><FlaskConical aria-hidden="true" className="size-5" /></div>
-          <h2 className="mt-4 font-semibold text-foreground">Práctica</h2>
+          <div className="mt-4 flex items-center gap-2">
+            <h2 className="font-semibold text-foreground">Práctica Interactiva</h2>
+            <StatusBadge tone="neutral">Simulador seguro</StatusBadge>
+          </div>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Recorrido con datos de ejemplo: agenda una cita, cóbrala y ve el ticket.
-            No toca tus ventas, tu caja ni tu inventario, y puedes repetirlo las veces que quieras.
+            Simulador en memoria para capacitación de personal: agenda una cita, asigna estilista, practica venta sugerida y cobro con cambio en efectivo. No altera tu contabilidad real.
           </p>
           <Button className="mt-4" nativeButton={false} render={<Link href={practicaHref} />} variant="outline">
             Empezar práctica

@@ -98,14 +98,13 @@ describe("resolverCobroPagos", () => {
     if (!r.ok) expect(r.error).toContain("debe ser exacto");
   });
 
-  it("medio no efectivo sin referencia se rechaza", () => {
+  it("medio no efectivo sin referencia se acepta como opcional", () => {
     const r = resolverCobroPagos({
       pagos: [{ medioPagoId: "tr", monto: 500 }],
       aCubrir: 500,
       mediosPorId: medios,
     });
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toContain("referencia");
+    expect(r.ok).toBe(true);
   });
 
   it("medio desconocido se rechaza", () => {

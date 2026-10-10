@@ -91,8 +91,7 @@ export function CobroForm({
 
   const pagosCompletos = pagos.every((pago) => {
     const medio = medioPorId.get(pago.medioPagoId);
-    if (!medio || !(Number(pago.monto) > 0)) return false;
-    return medio.categoria === "efectivo" || pago.referencia.trim().length > 0;
+    return Boolean(medio && Number(pago.monto) > 0);
   });
   const puedeCobrar = !pending && cubre && (cubiertoPorAnticipo || pagosCompletos) && (cubiertoPorAnticipo || aCubrir > 0);
 
@@ -369,7 +368,7 @@ export function CobroForm({
                   onChange={(event) =>
                     updatePago(index, { referencia: event.target.value })
                   }
-                  placeholder={`Referencia de ${medio.nombre} (folio o autorización)`}
+                  placeholder={`Referencia o autorización de ${medio.nombre} (opcional)`}
                   type="text"
                   value={pago.referencia}
                 />
@@ -408,7 +407,7 @@ export function CobroForm({
         )}
         {cubre && !pagosCompletos ? (
           <p className="mt-2 text-xs font-medium text-warning animate-in fade-in">
-            Completa medio, monto y referencia de cada pago.
+            Completa el medio y monto de cada pago.
           </p>
         ) : null}
       </div>
