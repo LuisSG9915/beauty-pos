@@ -161,6 +161,17 @@ export async function getAdminContext(
       null;
   }
 
+  let effectiveSucursalId = branch?.id;
+  if (!effectiveSucursalId && !(options.loadBranches ?? true)) {
+    const preferidaId = await leerSucursalCookie(organization.id);
+    const candidateId = requestedSucursalId ?? preferidaId;
+    if (candidateId && (access.esPlataforma || access.sucursalesActivas.some((s) => s.id === candidateId))) {
+      effectiveSucursalId = candidateId;
+    } else {
+      effectiveSucursalId = access.sucursalesActivas[0]?.id;
+    }
+  }
+
   return {
     user,
     organizations,
@@ -168,7 +179,7 @@ export async function getAdminContext(
     organizationId: organization.id,
     branches,
     branch,
-    sucursalId: branch?.id,
+    sucursalId: effectiveSucursalId,
     access,
     timeZone: resolveTimeZone(branch?.zonaHoraria, organization.zonaHoraria),
     currency: organization.moneda || "MXN",

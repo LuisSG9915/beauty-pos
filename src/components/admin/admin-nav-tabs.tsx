@@ -17,9 +17,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
-import { buildAdminHref } from "@/lib/url-context";
+import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { cn } from "@/lib/utils";
 
 export type AdminNavTabItem = {
@@ -42,6 +42,9 @@ export function AdminNavTabs({
   className?: string;
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const effectiveOrganizationId = organizationId ?? firstParam(searchParams.get("organizationId"));
+  const effectiveSucursalId = sucursalId ?? firstParam(searchParams.get("sucursalId"));
 
   return (
     <nav
@@ -67,8 +70,8 @@ export function AdminNavTabs({
                 : "text-muted-foreground hover:bg-card/40 hover:text-foreground",
             )}
             href={buildAdminHref(tab.path, {
-              organizationId,
-              sucursalId,
+              organizationId: effectiveOrganizationId,
+              sucursalId: effectiveSucursalId,
             })}
             key={tab.path}
           >

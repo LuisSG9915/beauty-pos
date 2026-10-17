@@ -7,6 +7,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -22,6 +23,7 @@ import { BrandWordmark } from "@/components/brand-mark";
 import { ThemeModeSelector } from "@/components/theme-mode-selector";
 import { ToastProvider } from "@/components/ui/toast";
 import { PoseTimerBar } from "@/components/pose-timer-bar";
+import { getClientSucursalCookie, setClientSucursalCookie } from "@/lib/sucursal-cookie-client";
 import { trackPerformance } from "@/lib/telemetry/cliente";
 import { buildAdminHref, buildHref, firstParam } from "@/lib/url-context";
 
@@ -194,10 +196,12 @@ function OrganizationSelector({
 function BranchSelector({
   organizations,
   sucursalPreferidaPorOrg,
+  onSucursalChange,
   variant = "compact",
 }: {
   organizations: AdminShellOrganization[];
   sucursalPreferidaPorOrg: Record<string, string>;
+  onSucursalChange?: (orgId: string, sucursalId: string) => void;
   variant?: "compact" | "sidebar";
 }) {
   const pathname = usePathname();
@@ -218,7 +222,8 @@ function BranchSelector({
   }
 
   const urlSucursalId = firstParam(searchParams.get("sucursalId"));
-  const preferidaId = sucursalPreferidaPorOrg[organization.id];
+  const clientCookieSucursalId = organization.id ? getClientSucursalCookie(organization.id) : undefined;
+  const preferidaId = sucursalPreferidaPorOrg[organization.id] ?? clientCookieSucursalId;
   const currentId =
     (urlSucursalId && branches.some((branch) => branch.id === urlSucursalId)
       ? urlSucursalId
@@ -267,7 +272,14 @@ function BranchSelector({
           id={selectId}
           key={`${organization.id}:${currentId}`}
           name="sucursalId"
-          onChange={(event) => event.currentTarget.form?.requestSubmit()}
+          onChange={(event) => {
+            const nuevaSucursalId = event.target.value;
+            if (organization.id) {
+              onSucursalChange?.(organization.id, nuevaSucursalId);
+              setClientSucursalCookie(organization.id, nuevaSucursalId);
+            }
+            event.currentTarget.form?.requestSubmit();
+          }}
         >
           {branches.map((branch) => (
             <option key={branch.id} value={branch.id}>
@@ -287,15 +299,18 @@ function BranchSelector({
 function MobileBranchRow({
   organizations,
   sucursalPreferidaPorOrg,
+  onSucursalChange,
 }: {
   organizations: AdminShellOrganization[];
   sucursalPreferidaPorOrg: Record<string, string>;
+  onSucursalChange?: (orgId: string, sucursalId: string) => void;
 }) {
   const organization = useEffectiveOrganization(organizations);
   if (!organization || (organization.sucursales ?? []).length === 0) return null;
   return (
     <div className="border-t border-sidebar-border px-4 py-2">
       <BranchSelector
+        onSucursalChange={onSucursalChange}
         organizations={organizations}
         sucursalPreferidaPorOrg={sucursalPreferidaPorOrg}
       />
@@ -327,7 +342,10 @@ function useNavWiring({
   const organizationId = organization?.id;
   const branches = organization?.sucursales ?? [];
   const urlSucursalId = firstParam(searchParams.get("sucursalId"));
-  const preferidaId = organizationId ? sucursalPreferidaPorOrg[organizationId] : undefined;
+  const clientCookieSucursalId = organizationId ? getClientSucursalCookie(organizationId) : undefined;
+  const preferidaId = organizationId
+    ? (sucursalPreferidaPorOrg[organizationId] ?? clientCookieSucursalId)
+    : undefined;
   const sucursalId =
     (urlSucursalId && branches.some((branch) => branch.id === urlSucursalId)
       ? urlSucursalId
@@ -384,12 +402,13 @@ function initials(name: string) {
     .join("") || "·";
 }
 
-const NAVIGATION_TIMEOUT_MS = 10_000;
+const NAVIGATION_TIMEOUT_MS = 6_000;
 
 /**
  * Barra de progreso persistente para navegaciones del App Router. El shell no
  * se desmonta entre rutas, así que puede confirmar el toque aunque el destino
- * tarde en resolver sus datos.
+ * tarde en resolver sus datos. Si la navegación cliente tarda más de 6 s o
+ * el usuario reintenta activamente, se ejecuta navegación nativa de rescate.
  */
 function NavigationActivity() {
   const pathname = usePathname();
@@ -399,6 +418,7 @@ function NavigationActivity() {
   const startedAt = useRef<number | null>(null);
   const targetPath = useRef<string | null>(null);
   const targetKey = useRef<string | null>(null);
+  const targetHref = useRef<string | null>(null);
   const tapTimes = useRef(new WeakMap<HTMLAnchorElement, number>());
   const timeoutRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
@@ -407,6 +427,7 @@ function NavigationActivity() {
   const finish = useCallback((completed: boolean) => {
     if (startedAt.current === null) return;
     const elapsed = performance.now() - startedAt.current;
+    const destination = targetHref.current;
     trackPerformance(
       completed ? "nav_complete_ms" : "nav_timeout_ms",
       elapsed,
@@ -415,11 +436,19 @@ function NavigationActivity() {
     startedAt.current = null;
     targetPath.current = null;
     targetKey.current = null;
+    targetHref.current = null;
     setPendingLabel(null);
     if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
     if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
     timeoutRef.current = null;
     frameRef.current = null;
+
+    // Rescate automático: si la navegación del cliente se quedó colgada
+    // (RSC bloqueado, error o red inestable), forzar navegación completa directa
+    // (equivalente automático al F5 del usuario) para no dejar la pantalla trabada.
+    if (!completed && destination && typeof window !== "undefined" && destination !== window.location.href) {
+      window.location.assign(destination);
+    }
   }, []);
 
   useEffect(() => {
@@ -459,10 +488,21 @@ function NavigationActivity() {
       const key = `${url.pathname}${url.search}`;
       const now = Date.now();
       const lastGlobalTap = tapTimes.current.get(anchor) ?? 0;
-      if (
-        now - lastGlobalTap < 800 ||
-        (startedAt.current !== null && targetKey.current === key)
-      ) {
+
+      // Doble toque accidental muy rápido (< 500 ms): ignorar rebote
+      if (now - lastGlobalTap < 500) {
+        event.preventDefault();
+        return;
+      }
+
+      // Si el usuario vuelve a presionar el mismo enlace tras 1200 ms porque la
+      // navegación cliente sigue pendiente, forzar navegación directa inmediata.
+      if (startedAt.current !== null && targetKey.current === key && (now - lastGlobalTap >= 1200)) {
+        window.location.assign(anchor.href);
+        return;
+      }
+
+      if (startedAt.current !== null && targetKey.current === key) {
         // En capture todavía no corre el onClick de Next Link; prevenir aquí
         // evita que un segundo toque encole la misma navegación.
         event.preventDefault();
@@ -476,6 +516,7 @@ function NavigationActivity() {
       startedAt.current = performance.now();
       targetPath.current = url.pathname;
       targetKey.current = key;
+      targetHref.current = anchor.href;
       const label = anchor.textContent?.replace(/\s+/g, " ").trim().slice(0, 40) || "sección";
       setPendingLabel(label);
 
@@ -516,16 +557,45 @@ function NavigationActivity() {
   );
 }
 
-function HomeLink({ organizationId }: { organizationId?: string }) {
+function HomeLink({ organizationId, sucursalId }: { organizationId?: string; sucursalId?: string }) {
   return (
     <Link
       className="inline-flex rounded-lg outline-offset-4"
-      href={buildAdminHref("", { organizationId })}
+      href={buildAdminHref("", { organizationId, sucursalId })}
       prefetch={false}
     >
       <BrandWordmark markSize={34} />
     </Link>
   );
+}
+
+/** Logo → /admin conservando la organización y sucursal activas. */
+function SidebarHome({
+  organizations,
+  sucursalPreferidaPorOrg = {},
+}: {
+  organizations: AdminShellOrganization[];
+  sucursalPreferidaPorOrg?: Record<string, string>;
+}) {
+  const searchParams = useSearchParams();
+  const organization = useEffectiveOrganization(organizations);
+  const organizationId = organization?.id;
+  const branches = organization?.sucursales ?? [];
+  const urlSucursalId = firstParam(searchParams.get("sucursalId"));
+  const clientCookieSucursalId = organizationId ? getClientSucursalCookie(organizationId) : undefined;
+  const preferidaId = organizationId
+    ? (sucursalPreferidaPorOrg[organizationId] ?? clientCookieSucursalId)
+    : undefined;
+  const sucursalId =
+    (urlSucursalId && branches.some((branch) => branch.id === urlSucursalId)
+      ? urlSucursalId
+      : undefined) ??
+    (preferidaId && branches.some((branch) => branch.id === preferidaId)
+      ? preferidaId
+      : undefined) ??
+    branches[0]?.id;
+
+  return <HomeLink organizationId={organizationId} sucursalId={sucursalId} />;
 }
 
 /**
@@ -544,12 +614,25 @@ export function AdminShell({
   sucursalPreferidaPorOrg = {},
   children,
 }: AdminShellProps) {
+  const [sucursalOverrides, setSucursalOverrides] = useState<Record<string, string>>({});
+  const preferenciasSucursal = useMemo(
+    () => ({ ...sucursalPreferidaPorOrg, ...sucursalOverrides }),
+    [sucursalPreferidaPorOrg, sucursalOverrides],
+  );
+
+  const handleSucursalChange = useCallback((orgId: string, sucursalId: string) => {
+    setSucursalOverrides((prev) => ({
+      ...prev,
+      [orgId]: sucursalId,
+    }));
+  }, []);
+
   const wiring: NavWiring = {
     organizations,
     platformAdmin: isPlatformAdmin,
     permissionsByOrg,
     capacidadesFaltantesByOrg,
-    sucursalPreferidaPorOrg,
+    sucursalPreferidaPorOrg: preferenciasSucursal,
   };
   return (
     <ToastProvider>
@@ -568,7 +651,10 @@ export function AdminShell({
         <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
           <div className="px-5 pb-4 pt-5">
             <Suspense fallback={<BrandWordmark markSize={34} />}>
-              <SidebarHome organizations={organizations} />
+              <SidebarHome
+                organizations={organizations}
+                sucursalPreferidaPorOrg={preferenciasSucursal}
+              />
             </Suspense>
           </div>
           <div className="space-y-2.5 px-4 pb-4">
@@ -581,8 +667,9 @@ export function AdminShell({
             </Suspense>
             <Suspense fallback={null}>
               <BranchSelector
+                onSucursalChange={handleSucursalChange}
                 organizations={organizations}
-                sucursalPreferidaPorOrg={sucursalPreferidaPorOrg}
+                sucursalPreferidaPorOrg={preferenciasSucursal}
                 variant="sidebar"
               />
             </Suspense>
@@ -616,7 +703,10 @@ export function AdminShell({
           <header className="sticky top-0 z-40 border-b border-sidebar-border bg-card/95 backdrop-blur lg:hidden">
             <div className="flex items-center gap-3 px-4 py-3">
               <Suspense fallback={<BrandWordmark markSize={32} />}>
-                <SidebarHome organizations={organizations} />
+                <SidebarHome
+                  organizations={organizations}
+                  sucursalPreferidaPorOrg={preferenciasSucursal}
+                />
               </Suspense>
               <div className="ml-auto flex min-w-0 items-center gap-3">
                 <Suspense
@@ -630,8 +720,9 @@ export function AdminShell({
             </div>
             <Suspense fallback={null}>
               <MobileBranchRow
+                onSucursalChange={handleSucursalChange}
                 organizations={organizations}
-                sucursalPreferidaPorOrg={sucursalPreferidaPorOrg}
+                sucursalPreferidaPorOrg={preferenciasSucursal}
               />
             </Suspense>
           </header>
@@ -663,10 +754,4 @@ export function AdminShell({
       </div>
     </ToastProvider>
   );
-}
-
-/** Logo → /admin conservando la organización activa. */
-function SidebarHome({ organizations }: { organizations: AdminShellOrganization[] }) {
-  const organizationId = useEffectiveOrganization(organizations)?.id;
-  return <HomeLink organizationId={organizationId} />;
 }

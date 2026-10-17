@@ -219,6 +219,7 @@ export async function guardarSucursalPreferida(formData: FormData): Promise<void
   const valida = access ? await assertBranchScope(access, input.sucursalId) : false;
   if (valida) {
     await escribirSucursalCookie(input.organizacionId, input.sucursalId);
+    revalidatePath("/admin", "layout");
   }
 
   const qIndex = returnTo.indexOf("?");

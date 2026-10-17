@@ -12,14 +12,17 @@
  * `path=/admin` limita la cookie al panel y `max-age` la conserva 90 días.
  */
 import { cookies } from "next/headers";
+import {
+  SUCURSAL_COOKIE_MAX_AGE,
+  SUCURSAL_COOKIE_PREFIX,
+  sucursalCookieName,
+} from "./sucursal-cookie-client";
 
-export const SUCURSAL_COOKIE_PREFIX = "melena_sucursal_";
-/** 90 días, en segundos. */
-export const SUCURSAL_COOKIE_MAX_AGE = 60 * 60 * 24 * 90;
-
-export function sucursalCookieName(organizacionId: string): string {
-  return `${SUCURSAL_COOKIE_PREFIX}${organizacionId}`;
-}
+export {
+  SUCURSAL_COOKIE_MAX_AGE,
+  SUCURSAL_COOKIE_PREFIX,
+  sucursalCookieName,
+};
 
 /**
  * Lee la sucursal preferida de una organización. El valor NO es confiable:
@@ -40,7 +43,7 @@ export async function escribirSucursalCookie(
 ): Promise<void> {
   const store = await cookies();
   store.set(sucursalCookieName(organizacionId), sucursalId, {
-    httpOnly: true,
+    httpOnly: false,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/admin",

@@ -181,7 +181,7 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
         {corteAbierto ? (
           <div className="space-y-6 self-start">
             <AdminCard
-              description={`Abierta ${formatDate(corteAbierto.createdAt, { timeZone })} ${formatTime(corteAbierto.createdAt, { timeZone })} · Fondo ${fmt(corteAbierto.fondoInicial)} · ${ventasDelCorte.count} venta(s) cobrada(s)`}
+              description={`Abierta ${formatDate(corteAbierto.createdAt, { timeZone })} ${formatTime(corteAbierto.createdAt, { timeZone })} · Fondo ${fmt(corteAbierto.fondoInicial)} · ${ventasDelCorte?.count ?? 0} venta(s) cobrada(s)`}
               title="Caja abierta — conteo del turno"
             >
               <CierreCajaForm corteId={corteAbierto.id} medios={medios} organizationId={organization.id} />

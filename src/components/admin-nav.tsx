@@ -489,7 +489,7 @@ function navIconClasses(isActive: boolean) {
   return cn("size-4.5 shrink-0", isActive ? "text-sidebar-primary" : "text-muted-foreground");
 }
 
-const NAV_TAP_GUARD_MS = 800;
+const NAV_TAP_GUARD_MS = 500;
 
 /**
  * Guarda contra dobles toques táctiles: el primero inicia la navegación y los

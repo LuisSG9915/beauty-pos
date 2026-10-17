@@ -20,7 +20,7 @@ import { telemetriaEventos } from "@/db/schema/telemetry";
 import { getSessionOrRedirect, requirePlatformAdmin } from "@/lib/auth/access";
 import { redirect } from "next/navigation";
 import { canAccessBranch, hasPermission, resolveAccessSafe, resolveSessionContext } from "@/lib/auth/authorization";
-import { leerNombreSucursalOmitida } from "@/lib/sucursal-cookie";
+import { leerNombreSucursalOmitida, leerSucursalCookie } from "@/lib/sucursal-cookie";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { cargarAlertas, type AlertaOperativa } from "@/modules/alertas/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
@@ -48,6 +48,7 @@ function AccessError({ error }: { error?: string }) {
 function MemberDashboard({
   name,
   access,
+  activeAccess,
   alertasByOrg,
   error,
   permissionsByOrg,
@@ -56,6 +57,7 @@ function MemberDashboard({
 }: {
   name: string;
   access: Array<{ organization: string; branch: string; branchKey: string; organizationId: string; branchId: string }>;
+  activeAccess?: { organization: string; branch: string; branchKey: string; organizationId: string; branchId: string };
   alertasByOrg: Record<string, AlertaOperativa[]>;
   error?: string;
   permissionsByOrg: Record<string, string[]>;
@@ -63,14 +65,14 @@ function MemberDashboard({
   /** Tarjeta "¿Cómo se llama tu salón?" para la sucursal genérica única. */
   renombrar: { organizationId: string; sucursalId: string; nombreSugerido: string } | null;
 }) {
-  const first = access[0];
+  const current = activeAccess ?? access[0];
   return (
     <div className="space-y-6">
       <AccessError error={error} />
       <AdminPageHeader
         actions={
-          first ? (
-            <Button data-action-clave="1" nativeButton={false} render={<Link href={buildAdminHref("/agenda", { organizationId: first.organizationId, sucursalId: first.branchId })} />} size="lg">
+          current ? (
+            <Button data-action-clave="1" nativeButton={false} render={<Link href={buildAdminHref("/agenda", { organizationId: current.organizationId, sucursalId: current.branchId })} />} size="lg">
               Ir a la agenda
             </Button>
           ) : undefined
@@ -85,11 +87,11 @@ function MemberDashboard({
           sucursalId={renombrar.sucursalId}
         />
       ) : null}
-      {first && checklist ? (
+      {current && checklist ? (
         <GuiaChecklistCard
-          organizationId={first.organizationId}
+          organizationId={current.organizationId}
           resumen={checklist}
-          sucursalId={first.branchId}
+          sucursalId={current.branchId}
         />
       ) : null}
       {/* Tablero central de alertas: conteos accionables por organización,
@@ -136,34 +138,48 @@ function MemberDashboard({
         <EmptyState description="Tu cuenta todavía no tiene una sucursal asignada. Contacta al administrador." title="Sin sucursal asignada" />
       ) : (
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {access.map((item) => (
-            <Link
-              className="rounded-2xl border border-border bg-card p-5 shadow-sm transition-colors hover:border-accent-foreground/30 focus-visible:outline-2 focus-visible:outline-ring"
-              href={buildAdminHref("/agenda", { organizationId: item.organizationId, sucursalId: item.branchId })}
-              key={`${item.organizationId}-${item.branchId}`}
-            >
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{item.organization}</p>
-              <h2 className="mt-2 text-xl font-semibold text-foreground">{item.branch}</h2>
-              <p className="mt-3 text-sm text-muted-foreground">Toca para abrir la agenda de hoy</p>
-            </Link>
-          ))}
+          {access.map((item) => {
+            const isSelected = item.branchId === current?.branchId;
+            return (
+              <Link
+                className={`rounded-2xl border p-5 shadow-sm transition-colors focus-visible:outline-2 focus-visible:outline-ring ${
+                  isSelected
+                    ? "border-primary bg-primary/5 ring-1 ring-primary/20"
+                    : "border-border bg-card hover:border-accent-foreground/30"
+                }`}
+                href={buildAdminHref("/agenda", { organizationId: item.organizationId, sucursalId: item.branchId })}
+                key={`${item.organizationId}-${item.branchId}`}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{item.organization}</p>
+                  {isSelected ? (
+                    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-op-xs font-medium text-primary">
+                      Activa
+                    </span>
+                  ) : null}
+                </div>
+                <h2 className="mt-2 text-xl font-semibold text-foreground">{item.branch}</h2>
+                <p className="mt-3 text-sm text-muted-foreground">Toca para abrir la agenda de hoy</p>
+              </Link>
+            );
+          })}
         </div>
       )}
       {/* Acciones de hoy: verbos grandes y directos para el flujo diario; el
           resto de secciones queda en "Más opciones" de la navegación. */}
-      {first ? (
+      {current ? (
         <AdminCard title="¿Qué vas a hacer?">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
             {ACCIONES_HOY.filter(
               (accion) =>
-                tienePermisoNav(accion.permiso, permissionsByOrg[first.organizationId]),
+                tienePermisoNav(accion.permiso, permissionsByOrg[current.organizationId]),
             ).map((accion) => (
               <Link
                 className="flex min-h-20 flex-col items-start justify-between gap-2 rounded-2xl border border-border bg-card p-4 transition-colors hover:border-accent-foreground/30 hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-ring"
                 data-action-id={`inicio.accion.${accion.id}`}
                 href={buildAdminHref(accion.href, {
-                  organizationId: first.organizationId,
-                  sucursalId: first.branchId,
+                  organizationId: current.organizationId,
+                  sucursalId: current.branchId,
                   extra: accion.extra,
                 })}
                 key={accion.id}
@@ -261,16 +277,26 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       }
     }
 
-    // Checklist de primera configuración sobre la primera sucursal visible:
+    // Sucursal activa/preferida para checklist y accesos directos
+    const requestedSucursalId = firstParam(params.sucursalId);
+    let activeAccess = access[0];
+    if (access.length > 0) {
+      const orgId = access[0].organizationId;
+      const preferidaId = requestedSucursalId ?? (orgId ? await leerSucursalCookie(orgId) : undefined);
+      if (preferidaId) {
+        activeAccess = access.find((item) => item.branchId === preferidaId) ?? access[0];
+      }
+    }
+
+    // Checklist de primera configuración sobre la sucursal activa:
     // se muestra mientras queden pasos requeridos y la guía no esté omitida.
     let checklist: ResumenGuia | null = null;
-    const firstAccess = access[0];
-    if (firstAccess) {
-      const pasos = pasosParaPermisos(new Set(permissionsByOrg[firstAccess.organizationId] ?? []));
+    if (activeAccess) {
+      const pasos = pasosParaPermisos(new Set(permissionsByOrg[activeAccess.organizationId] ?? []));
       if (pasos.length > 0) {
         const [estadoNegocio, progreso] = await Promise.all([
-          cargarEstadoNegocio(db, firstAccess.organizationId, firstAccess.branchId),
-          cargarProgresoGuia(db, firstAccess.organizationId, user.id),
+          cargarEstadoNegocio(db, activeAccess.organizationId, activeAccess.branchId),
+          cargarProgresoGuia(db, activeAccess.organizationId, user.id),
         ]);
         const resumen = resumenGuia(evaluarPasos(pasos, estadoNegocio));
         if (!resumen.terminada && progreso?.estado !== "omitida") {
@@ -293,7 +319,18 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       renombrar = { organizationId: org.id, sucursalId: unica.id, nombreSugerido: org.nombre };
     }
 
-    return <MemberDashboard access={access} alertasByOrg={alertasByOrg} checklist={checklist} error={error} name={session.user.name} permissionsByOrg={permissionsByOrg} renombrar={renombrar} />;
+    return (
+      <MemberDashboard
+        access={access}
+        activeAccess={activeAccess}
+        alertasByOrg={alertasByOrg}
+        checklist={checklist}
+        error={error}
+        name={session.user.name}
+        permissionsByOrg={permissionsByOrg}
+        renombrar={renombrar}
+      />
+    );
   }
 
   const { session: platformSession } = await requirePlatformAdmin();
