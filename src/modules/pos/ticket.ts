@@ -1,50 +1,14 @@
-import { and, asc, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 
 import { getDatabase } from "@/db/client";
+import { relMiembrosRoles } from "@/db/schema/access";
+import { miembrosOrganizaciones } from "@/db/schema/core";
 import { catalogoTag } from "@/lib/catalogo-cache";
 import { todayDateInput } from "@/lib/format";
 import { anticiposAplicables } from "@/modules/pos/anticipos";
 import { membresiaVigente } from "@/modules/pos/membresias";
 import { promocionVigente } from "@/modules/pos/promociones";
-import { relMiembrosRoles } from "@/db/schema/access";
-import {
-  catCategoriasProductos,
-  catCategoriasServicios,
-  catMediosPago,
-  membresias,
-  paquetes,
-  productos,
-  promociones,
-  servicios,
-} from "@/db/schema/catalogs";
-import { medios } from "@/db/schema/media";
-import {
-  clientes,
-  miembrosOrganizaciones,
-  relUsuariosSucursales,
-  sucursales,
-  usuarios,
-} from "@/db/schema/core";
-import {
-  ajustesPagosVenta,
-  anticipos,
-  clienteMembresias,
-  clientePaquetes,
-  comprobantes,
-  detalleDevoluciones,
-  detalleVentasComisiones,
-  detalleVentasMediosPagos,
-  detalleVentasMembresias,
-  detalleVentasPaquetes,
-  detalleVentasProductos,
-  detalleVentasPropinas,
-  detalleVentasServicios,
-  devoluciones,
-  facturacionConfig,
-  paqueteUsos,
-  ventas,
-} from "@/db/schema/operations";
 
 export type TicketData = {
   venta: {
@@ -244,135 +208,99 @@ type CatalogosTicket = {
 
 async function loadCatalogosTicket(organizacionId: string, sucursalId: string): Promise<CatalogosTicket> {
   const db = getDatabase();
-  const [
-    catalogoMembresias,
-    catalogoServicios,
-    catalogoProductos,
-    catalogoPaquetes,
-    catalogoClientes,
-    mediosPago,
-    staff,
-    promocionesRows,
-  ] = await Promise.all([
-    db
-      .select({
-        id: membresias.id,
-        nombre: membresias.nombre,
-        precio: membresias.precio,
-        duracionDias: membresias.duracionDias,
-        descuentoPorcentaje: membresias.descuentoPorcentaje,
-        aplica: membresias.aplica,
-      })
-      .from(membresias)
-      .where(and(eq(membresias.organizacionId, organizacionId), eq(membresias.activo, true)))
-      .orderBy(asc(membresias.nombre)),
-    db
-      .select({
-        id: servicios.id,
-        nombre: servicios.nombre,
-        precio: servicios.precioBase,
-        duracionMinutos: servicios.duracionMinutos,
-        categoriaId: servicios.categoriaId,
-        categoriaNombre: catCategoriasServicios.nombre,
-        imagenClaveR2: medios.claveR2,
-      })
-      .from(servicios)
-      .leftJoin(catCategoriasServicios, eq(servicios.categoriaId, catCategoriasServicios.id))
-      .leftJoin(medios, eq(servicios.imagenPrincipalId, medios.id))
-      .where(and(eq(servicios.organizacionId, organizacionId), eq(servicios.activo, true)))
-      .orderBy(asc(servicios.nombre)),
-    db
-      .select({
-        id: productos.id,
-        nombre: productos.nombre,
-        sku: productos.sku,
-        precio: productos.precioVenta,
-        categoriaId: productos.categoriaId,
-        categoriaNombre: catCategoriasProductos.nombre,
-        imagenClaveR2: medios.claveR2,
-      })
-      .from(productos)
-      .leftJoin(catCategoriasProductos, eq(productos.categoriaId, catCategoriasProductos.id))
-      .leftJoin(medios, eq(productos.imagenPrincipalId, medios.id))
-      .where(
-        and(
-          eq(productos.organizacionId, organizacionId),
-          eq(productos.activo, true),
-          eq(productos.visiblePos, true),
-          or(eq(productos.tipo, "producto"), eq(productos.tipo, "ambos")),
-        ),
-      )
-      .orderBy(asc(productos.nombre)),
-    db
-      .select({
-        id: paquetes.id,
-        nombre: paquetes.nombre,
-        precio: paquetes.precio,
-        sesiones: paquetes.sesiones,
-        servicioId: paquetes.servicioId,
-        servicioNombre: servicios.nombre,
-      })
-      .from(paquetes)
-      .innerJoin(servicios, eq(paquetes.servicioId, servicios.id))
-      .where(and(eq(paquetes.organizacionId, organizacionId), eq(paquetes.activo, true)))
-      .orderBy(asc(paquetes.nombre)),
-    db
-      .select({ id: clientes.id, nombre: clientes.nombre, telefono: clientes.telefono })
-      .from(clientes)
-      .where(and(eq(clientes.organizacionId, organizacionId), eq(clientes.activo, true)))
-      .orderBy(desc(clientes.creadoEn))
-      .limit(100),
-    db
-      .select({ id: catMediosPago.id, nombre: catMediosPago.nombre, categoria: catMediosPago.categoria })
-      .from(catMediosPago)
-      .where(and(eq(catMediosPago.organizacionId, organizacionId), eq(catMediosPago.activo, true)))
-      .orderBy(asc(catMediosPago.nombre)),
-    db
-      .select({ id: usuarios.id, nombre: usuarios.nombre })
-      .from(relUsuariosSucursales)
-      .innerJoin(usuarios, eq(relUsuariosSucursales.usuarioId, usuarios.id))
-      .innerJoin(
-        miembrosOrganizaciones,
-        and(
-          eq(miembrosOrganizaciones.usuarioId, usuarios.id),
-          eq(miembrosOrganizaciones.organizacionId, organizacionId),
-          eq(miembrosOrganizaciones.estado, "activo"),
-        ),
-      )
-      .where(
-        and(
-          eq(relUsuariosSucursales.organizacionId, organizacionId),
-          eq(relUsuariosSucursales.sucursalId, sucursalId),
-          eq(usuarios.activo, true),
-        ),
-      )
-      .orderBy(asc(usuarios.nombre)),
-    db
-      .select({
-        id: promociones.id,
-        nombre: promociones.nombre,
-        tipo: promociones.tipo,
-        valor: promociones.valor,
-        aplica: promociones.aplica,
-        activo: promociones.activo,
-        vigenciaDesde: promociones.vigenciaDesde,
-        vigenciaHasta: promociones.vigenciaHasta,
-      })
-      .from(promociones)
-      .where(eq(promociones.organizacionId, organizacionId))
-      .orderBy(asc(promociones.nombre)),
-  ]);
-
-  return {
-    catalogoMembresias,
-    catalogoServicios,
-    catalogoProductos,
-    catalogoPaquetes,
-    catalogoClientes,
-    mediosPago,
-    staff,
-    promocionesRows,
-  };
+  // Una sola ronda SQL: cada catálogo viaja como subselect jsonb. Los 8
+  // selects en Promise.all de antes abrían 8 conexiones frías al pool
+  // (~60 ms de handshake c/u) en cada miss de cache.
+  const result = await db.execute<CatalogosTicket>(sql`
+    select
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', m.id, 'nombre', m.nombre, 'precio', m.precio::text,
+            'duracionDias', m.duracion_dias,
+            'descuentoPorcentaje', m.descuento_porcentaje::text, 'aplica', m.aplica
+          ) order by m.nombre)
+          from membresias m
+         where m.organizacion_id = ${organizacionId} and m.activo
+      ), '[]'::jsonb) as "catalogoMembresias",
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', s.id, 'nombre', s.nombre, 'precio', s.precio_base::text,
+            'duracionMinutos', s.duracion_minutos,
+            'categoriaId', s.categoria_id, 'categoriaNombre', cs.nombre,
+            'imagenClaveR2', me.clave_r2
+          ) order by s.nombre)
+          from servicios s
+          left join cat_categorias_servicios cs on s.categoria_id = cs.id
+          left join medios me on me.id = s.imagen_principal_id
+         where s.organizacion_id = ${organizacionId} and s.activo
+      ), '[]'::jsonb) as "catalogoServicios",
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', p.id, 'nombre', p.nombre, 'sku', p.sku,
+            'precio', p.precio_venta::text,
+            'categoriaId', p.categoria_id, 'categoriaNombre', cp.nombre,
+            'imagenClaveR2', me.clave_r2
+          ) order by p.nombre)
+          from productos p
+          left join cat_categorias_productos cp on p.categoria_id = cp.id
+          left join medios me on me.id = p.imagen_principal_id
+         where p.organizacion_id = ${organizacionId} and p.activo
+           and p.visible_pos and p.tipo in ('producto', 'ambos')
+      ), '[]'::jsonb) as "catalogoProductos",
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', pq.id, 'nombre', pq.nombre, 'precio', pq.precio::text,
+            'sesiones', pq.sesiones, 'servicioId', pq.servicio_id,
+            'servicioNombre', s.nombre
+          ) order by pq.nombre)
+          from paquetes pq
+          join servicios s on pq.servicio_id = s.id
+         where pq.organizacion_id = ${organizacionId} and pq.activo
+      ), '[]'::jsonb) as "catalogoPaquetes",
+      coalesce((
+        select jsonb_agg(jsonb_build_object('id', c.id, 'nombre', c.nombre, 'telefono', c.telefono) order by c.creado_en desc)
+          from (
+            select id, nombre, telefono, creado_en from clientes
+             where organizacion_id = ${organizacionId} and activo
+             order by creado_en desc limit 100
+          ) c
+      ), '[]'::jsonb) as "catalogoClientes",
+      coalesce((
+        select jsonb_agg(jsonb_build_object('id', mp.id, 'nombre', mp.nombre, 'categoria', mp.categoria) order by mp.nombre)
+          from cat_medios_pago mp
+         where mp.organizacion_id = ${organizacionId} and mp.activo
+      ), '[]'::jsonb) as "mediosPago",
+      coalesce((
+        select jsonb_agg(jsonb_build_object('id', u.id, 'nombre', u.nombre) order by u.nombre)
+          from rel_usuarios_sucursales rus
+          join usuarios u on rus.usuario_id = u.id
+          join miembros_organizaciones mo on mo.usuario_id = u.id
+            and mo.organizacion_id = ${organizacionId} and mo.estado = 'activo'
+         where rus.organizacion_id = ${organizacionId} and rus.sucursal_id = ${sucursalId}
+           and u.activo
+      ), '[]'::jsonb) as "staff",
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', pr.id, 'nombre', pr.nombre, 'tipo', pr.tipo,
+            'valor', pr.valor::text, 'aplica', pr.aplica, 'activo', pr.activo,
+            'vigenciaDesde', pr.vigencia_desde::text, 'vigenciaHasta', pr.vigencia_hasta::text
+          ) order by pr.nombre)
+          from promociones pr
+         where pr.organizacion_id = ${organizacionId}
+      ), '[]'::jsonb) as "promocionesRows"
+  `);
+  return (
+    result.rows[0] ?? {
+      catalogoMembresias: [],
+      catalogoServicios: [],
+      catalogoProductos: [],
+      catalogoPaquetes: [],
+      catalogoClientes: [],
+      mediosPago: [],
+      staff: [],
+      promocionesRows: [],
+    }
+  );
 }
 
 /**
@@ -388,6 +316,114 @@ export const catalogosTicketCached = (organizacionId: string, sucursalId: string
   )();
 
 /**
+ * Fila cruda de la consulta fusionada del ticket: numerics y fechas viajan
+ * como texto jsonb y se hidratan a string/Date al armar `TicketData`.
+ */
+type TicketDetallesRow = {
+  venta: {
+    id: string;
+    estado: string;
+    citaId: string | null;
+    sucursalId: string;
+    clienteId: string | null;
+    clienteNombre: string | null;
+    clienteTelefono: string | null;
+    clienteRfc: string | null;
+    clienteRazonSocial: string | null;
+    clienteRegimenFiscal: string | null;
+    clienteCodigoPostalFiscal: string | null;
+    clienteUsoCfdi: string | null;
+    subtotal: string;
+    descuento: string;
+    total: string;
+    propina: string;
+    promocionId: string | null;
+    promocionNombre: string | null;
+    descuentoPromocion: string;
+    membresiaId: string | null;
+    membresiaNombre: string | null;
+    descuentoMembresia: string;
+    sucursalZonaHoraria: string | null;
+  } | null;
+  lineasServicios: Array<{
+    id: string;
+    servicioId: string;
+    nombre: string;
+    precio: string;
+    cantidad: number;
+    usuarioId: string | null;
+  }>;
+  lineasProductos: Array<{ id: string; nombre: string; precio: string; cantidad: number }>;
+  lineasPaquetes: Array<{ id: string; paqueteId: string; nombre: string; precio: string; cantidad: number }>;
+  lineasMembresias: Array<{ id: string; membresiaId: string; nombre: string; precio: string; cantidad: number }>;
+  membresiasClienteRows: Array<{
+    id: string;
+    nombre: string;
+    descuentoPorcentaje: string;
+    aplica: string;
+    estado: string;
+    vigenciaDesde: string;
+    vigenciaHasta: string;
+  }>;
+  paquetesClienteRows: Array<{
+    id: string;
+    nombre: string;
+    servicioId: string;
+    servicioNombre: string | null;
+    sesionesTotal: number;
+    sesionesRestantes: number;
+  }>;
+  usosRows: Array<{ detalleVentaServicioId: string; paqueteNombre: string }>;
+  pagos: Array<{
+    id: string;
+    medioPagoId: string;
+    nombre: string;
+    monto: string;
+    recibido: string;
+    cambio: string;
+    ajustes: Array<{
+      id: string;
+      destinoNombre: string | null;
+      monto: string;
+      motivo: string;
+      createdAt: string;
+    }>;
+  }>;
+  propinas: Array<{ usuarioNombre: string; monto: string }>;
+  comisiones: Array<{ usuarioNombre: string; monto: string }>;
+  devolucionesRows: Array<{
+    id: string;
+    monto: string;
+    motivo: string;
+    createdAt: string;
+    usuarioNombre: string | null;
+    lineas: Array<{ tipo: string; detalleId: string | null; cantidad: string; monto: string; nombre: string }>;
+  }>;
+  devueltoPorDetalle: Record<string, number>;
+  anticipoRows: Array<{
+    id: string;
+    ventaId: string | null;
+    monto: string;
+    estado: string;
+    createdAt: string;
+    medioNombre: string | null;
+  }>;
+  comprobante: {
+    id: string;
+    estado: string;
+    serie: string | null;
+    folio: number | null;
+    uuid: string | null;
+    receptorRfc: string;
+    receptorNombre: string;
+    total: string;
+    error: string | null;
+    timbradoAt: string | null;
+  } | null;
+  facturacionConfigurada: boolean;
+};
+
+/**
  * Arma el ticket completo de una venta (líneas, catálogos POS, medios de pago,
  * pagos registrados, staff de la sucursal y comisiones/propinas devengadas).
  * Lo usan la página `/admin/pos` y la action `cargarTicket` del cobro inline.
@@ -398,299 +434,205 @@ export async function getTicketData(
 ): Promise<TicketData | null> {
   const db = getDatabase();
 
-  const [venta] = await db
-    .select({
-      id: ventas.id,
-      estado: ventas.estado,
-      citaId: ventas.citaId,
-      sucursalId: ventas.sucursalId,
-      clienteId: ventas.clienteId,
-      clienteNombre: clientes.nombre,
-      clienteTelefono: clientes.telefono,
-      clienteRfc: clientes.rfc,
-      clienteRazonSocial: clientes.razonSocial,
-      clienteRegimenFiscal: clientes.regimenFiscal,
-      clienteCodigoPostalFiscal: clientes.codigoPostalFiscal,
-      clienteUsoCfdi: clientes.usoCfdi,
-      subtotal: ventas.subtotal,
-      descuento: ventas.descuento,
-      total: ventas.total,
-      propina: ventas.propina,
-      promocionId: ventas.promocionId,
-      promocionNombre: promociones.nombre,
-      descuentoPromocion: ventas.descuentoPromocion,
-      membresiaId: ventas.membresiaId,
-      membresiaNombre: membresias.nombre,
-      descuentoMembresia: ventas.descuentoMembresia,
-      sucursalZonaHoraria: sucursales.zonaHoraria,
-    })
-    .from(ventas)
-    .leftJoin(clientes, eq(ventas.clienteId, clientes.id))
-    .leftJoin(promociones, eq(ventas.promocionId, promociones.id))
-    .leftJoin(membresias, eq(ventas.membresiaId, membresias.id))
-    .innerJoin(sucursales, eq(ventas.sucursalId, sucursales.id))
-    .where(and(eq(ventas.id, ventaId), eq(ventas.organizacionId, organizacionId), eq(ventas.activo, true)))
-    .limit(1);
-  if (!venta) return null;
+  // Una sola ronda SQL: la venta viaja como CTE `v` (vacía si no existe) y
+  // cada lista del ticket como subselect jsonb correlacionado con ella.
+  // Las ~17 consultas en Promise.all de antes abrían una conexión fría al
+  // pool (~60 ms de handshake + ~100 ms de RT a Cockroach) por cada una.
+  const result = await db.execute<TicketDetallesRow>(sql`
+    with v as (
+      select v.id, v.estado,
+        v.cita_id as "citaId", v.sucursal_id as "sucursalId", v.cliente_id as "clienteId",
+        cl.nombre as "clienteNombre", cl.telefono as "clienteTelefono",
+        cl.rfc as "clienteRfc", cl.razon_social as "clienteRazonSocial",
+        cl.regimen_fiscal as "clienteRegimenFiscal",
+        cl.codigo_postal_fiscal as "clienteCodigoPostalFiscal", cl.uso_cfdi as "clienteUsoCfdi",
+        v.subtotal::text as subtotal, v.descuento::text as descuento,
+        v.total::text as total, v.propina::text as propina,
+        v.promocion_id as "promocionId", pr.nombre as "promocionNombre",
+        v.descuento_promocion::text as "descuentoPromocion",
+        v.membresia_id as "membresiaId", mb.nombre as "membresiaNombre",
+        v.descuento_membresia::text as "descuentoMembresia",
+        su.zona_horaria as "sucursalZonaHoraria"
+      from ventas v
+      left join clientes cl on v.cliente_id = cl.id
+      left join promociones pr on v.promocion_id = pr.id
+      left join membresias mb on v.membresia_id = mb.id
+      join sucursales su on v.sucursal_id = su.id
+      where v.id = ${ventaId} and v.organizacion_id = ${organizacionId} and v.activo
+    )
+    select
+      (select to_jsonb(v) from v) as venta,
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', dvs.id, 'servicioId', dvs.servicio_id,
+            -- Snapshot con fallback al catálogo (líneas históricas sin snapshot).
+            'nombre', coalesce(dvs.nombre, s.nombre),
+            'precio', dvs.precio::text, 'cantidad', dvs.cantidad,
+            'usuarioId', dvs.usuario_id))
+          from detalle_ventas_servicios dvs
+          join servicios s on dvs.servicio_id = s.id
+         where dvs.venta_id = (select id from v) and dvs.activo
+      ), '[]'::jsonb) as "lineasServicios",
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', dvp.id, 'nombre', coalesce(dvp.nombre, p.nombre),
+            'precio', dvp.precio::text, 'cantidad', dvp.cantidad))
+          from detalle_ventas_productos dvp
+          join productos p on dvp.producto_id = p.id
+         where dvp.venta_id = (select id from v) and dvp.activo
+      ), '[]'::jsonb) as "lineasProductos",
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', dvq.id, 'paqueteId', dvq.paquete_id,
+            'nombre', coalesce(dvq.nombre, pq.nombre),
+            'precio', dvq.precio::text, 'cantidad', dvq.cantidad))
+          from detalle_ventas_paquetes dvq
+          join paquetes pq on dvq.paquete_id = pq.id
+         where dvq.venta_id = (select id from v) and dvq.activo
+      ), '[]'::jsonb) as "lineasPaquetes",
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', dvm.id, 'membresiaId', dvm.membresia_id,
+            'nombre', coalesce(dvm.nombre, mb.nombre),
+            'precio', dvm.precio::text, 'cantidad', dvm.cantidad))
+          from detalle_ventas_membresias dvm
+          join membresias mb on dvm.membresia_id = mb.id
+         where dvm.venta_id = (select id from v) and dvm.activo
+      ), '[]'::jsonb) as "lineasMembresias",
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', cm.id, 'nombre', mb.nombre,
+            'descuentoPorcentaje', mb.descuento_porcentaje::text, 'aplica', mb.aplica,
+            'estado', cm.estado,
+            'vigenciaDesde', cm.vigencia_desde::text, 'vigenciaHasta', cm.vigencia_hasta::text
+          ) order by cm.created_at)
+          from cliente_membresias cm
+          join membresias mb on cm.membresia_id = mb.id
+         where cm.organizacion_id = ${organizacionId}
+           and cm.cliente_id = (select "clienteId" from v)
+           and cm.activo and cm.estado = 'vigente'
+      ), '[]'::jsonb) as "membresiasClienteRows",
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', cp.id, 'nombre', pq.nombre, 'servicioId', pq.servicio_id,
+            'servicioNombre', s.nombre,
+            'sesionesTotal', cp.sesiones_total, 'sesionesRestantes', cp.sesiones_restantes
+          ) order by cp.created_at)
+          from cliente_paquetes cp
+          join paquetes pq on cp.paquete_id = pq.id
+          join servicios s on pq.servicio_id = s.id
+         where cp.organizacion_id = ${organizacionId}
+           and cp.cliente_id = (select "clienteId" from v)
+           and cp.estado = 'vigente' and cp.activo and cp.sesiones_restantes > 0
+      ), '[]'::jsonb) as "paquetesClienteRows",
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'detalleVentaServicioId', pu.detalle_venta_servicio_id,
+            'paqueteNombre', pq.nombre))
+          from paquete_usos pu
+          join cliente_paquetes cp on pu.cliente_paquete_id = cp.id
+          join paquetes pq on cp.paquete_id = pq.id
+         where pu.venta_id = (select id from v) and pu.activo
+      ), '[]'::jsonb) as "usosRows",
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', dvp.id, 'medioPagoId', dvp.medio_pago_id, 'nombre', mp.nombre,
+            'monto', dvp.monto::text, 'recibido', dvp.recibido::text, 'cambio', dvp.cambio::text,
+            'ajustes', coalesce((
+              select jsonb_agg(jsonb_build_object(
+                  'id', apv.id, 'destinoNombre', mpd.nombre,
+                  'monto', apv.monto::text, 'motivo', apv.motivo,
+                  'createdAt', to_char(apv.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+                ) order by apv.created_at)
+                from ajustes_pagos_venta apv
+                left join cat_medios_pago mpd on apv.medio_pago_destino_id = mpd.id
+               where apv.detalle_venta_medio_pago_id = dvp.id
+                 and apv.venta_id = (select id from v)
+                 and apv.organizacion_id = ${organizacionId}
+            ), '[]'::jsonb)))
+          from detalle_ventas_medios_pagos dvp
+          join cat_medios_pago mp on dvp.medio_pago_id = mp.id
+         where dvp.venta_id = (select id from v) and dvp.activo
+      ), '[]'::jsonb) as "pagos",
+      coalesce((
+        select jsonb_agg(jsonb_build_object('usuarioNombre', u.nombre, 'monto', dvp.monto::text))
+          from detalle_ventas_propinas dvp
+          join usuarios u on dvp.usuario_id = u.id
+         where dvp.venta_id = (select id from v) and dvp.activo
+      ), '[]'::jsonb) as "propinas",
+      coalesce((
+        select jsonb_agg(jsonb_build_object('usuarioNombre', u.nombre, 'monto', dvc.monto::text))
+          from detalle_ventas_comisiones dvc
+          join usuarios u on dvc.usuario_id = u.id
+         where dvc.venta_id = (select id from v) and dvc.activo
+      ), '[]'::jsonb) as "comisiones",
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', d.id, 'monto', d.monto::text, 'motivo', d.motivo,
+            'createdAt', to_char(d.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+            'usuarioNombre', u.nombre,
+            'lineas', coalesce((
+              select jsonb_agg(jsonb_build_object(
+                  'tipo', dd.tipo, 'detalleId', dd.detalle_id,
+                  'cantidad', dd.cantidad::text, 'monto', dd.monto::text,
+                  'nombre', coalesce(s.nombre, p.nombre, dvq.nombre, dvm.nombre, 'Línea')))
+                from detalle_devoluciones dd
+                left join detalle_ventas_servicios dvs on dd.detalle_id = dvs.id and dd.tipo = 'servicio'
+                left join servicios s on dvs.servicio_id = s.id
+                left join detalle_ventas_productos dvp2 on dd.detalle_id = dvp2.id and dd.tipo = 'producto'
+                left join productos p on dvp2.producto_id = p.id
+                left join detalle_ventas_paquetes dvq on dd.detalle_id = dvq.id and dd.tipo = 'paquete'
+                left join detalle_ventas_membresias dvm on dd.detalle_id = dvm.id and dd.tipo = 'membresia'
+               where dd.devolucion_id = d.id
+            ), '[]'::jsonb)) order by d.created_at)
+          from devoluciones d
+          left join usuarios u on d.usuario_id = u.id
+         where d.venta_id = (select id from v)
+      ), '[]'::jsonb) as "devolucionesRows",
+      coalesce((
+        select jsonb_object_agg(dd.detalle_id::text, sum(dd.cantidad)::float8)
+          from detalle_devoluciones dd
+          join devoluciones dv on dd.devolucion_id = dv.id
+         where dv.venta_id = (select id from v) and dd.detalle_id is not null
+      ), '{}'::jsonb) as "devueltoPorDetalle",
+      -- Anticipos aplicados a esta venta + vigentes de la cita (se aplican al cobrar).
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', a.id, 'ventaId', a.venta_id, 'monto', a.monto::text,
+            'estado', a.estado,
+            'createdAt', to_char(a.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+            'medioNombre', mp.nombre) order by a.created_at)
+          from anticipos a
+          left join cat_medios_pago mp on a.medio_pago_id = mp.id
+         where a.organizacion_id = ${organizacionId} and a.activo
+           and a.estado in ('vigente', 'aplicado') and a.monto > 0
+           and (
+             a.cita_id = (select "citaId" from v)
+             or ((select "citaId" from v) is null and a.venta_id = (select id from v))
+           )
+      ), '[]'::jsonb) as "anticipoRows",
+      -- Comprobante fiscal activo más reciente de la venta (si se emitió).
+      (select jsonb_build_object(
+          'id', c.id, 'estado', c.estado, 'serie', c.serie, 'folio', c.folio,
+          'uuid', c.uuid, 'receptorRfc', c.receptor_rfc, 'receptorNombre', c.receptor_nombre,
+          'total', c.total::text, 'error', c.error,
+          'timbradoAt', case when c.timbrado_at is null then null
+            else to_char(c.timbrado_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') end)
+        from comprobantes c
+       where c.venta_id = (select id from v) and c.organizacion_id = ${organizacionId} and c.activo
+       order by c.created_at desc limit 1) as comprobante,
+      exists(
+        select 1 from facturacion_config fc
+         where fc.organizacion_id = ${organizacionId} and fc.activo
+      ) as "facturacionConfigurada"
+  `);
 
-  const [
-    lineasServicios,
-    lineasProductos,
-    lineasPaquetes,
-    lineasMembresias,
-    catalogos,
-    membresiasClienteRows,
-    paquetesClienteRows,
-    usosRows,
-    pagos,
-    ajustesPagoRows,
-    propinas,
-    comisiones,
-    devolucionesRows,
-    detalleDevolucionesRows,
-    anticipoRows,
-    comprobanteRows,
-    facturacionConfigRows,
-  ] = await Promise.all([
-    db
-      .select({
-        id: detalleVentasServicios.id,
-        servicioId: detalleVentasServicios.servicioId,
-        // Snapshot con fallback al catálogo (líneas históricas sin snapshot).
-        nombre: sql<string>`coalesce(${detalleVentasServicios.nombre}, ${servicios.nombre})`,
-        precio: detalleVentasServicios.precio,
-        cantidad: detalleVentasServicios.cantidad,
-        usuarioId: detalleVentasServicios.usuarioId,
-      })
-      .from(detalleVentasServicios)
-      .innerJoin(servicios, eq(detalleVentasServicios.servicioId, servicios.id))
-      .where(and(eq(detalleVentasServicios.ventaId, venta.id), eq(detalleVentasServicios.activo, true))),
-    db
-      .select({
-        id: detalleVentasProductos.id,
-        nombre: sql<string>`coalesce(${detalleVentasProductos.nombre}, ${productos.nombre})`,
-        precio: detalleVentasProductos.precio,
-        cantidad: detalleVentasProductos.cantidad,
-      })
-      .from(detalleVentasProductos)
-      .innerJoin(productos, eq(detalleVentasProductos.productoId, productos.id))
-      .where(and(eq(detalleVentasProductos.ventaId, venta.id), eq(detalleVentasProductos.activo, true))),
-    db
-      .select({
-        id: detalleVentasPaquetes.id,
-        paqueteId: detalleVentasPaquetes.paqueteId,
-        nombre: sql<string>`coalesce(${detalleVentasPaquetes.nombre}, ${paquetes.nombre})`,
-        precio: detalleVentasPaquetes.precio,
-        cantidad: detalleVentasPaquetes.cantidad,
-      })
-      .from(detalleVentasPaquetes)
-      .innerJoin(paquetes, eq(detalleVentasPaquetes.paqueteId, paquetes.id))
-      .where(and(eq(detalleVentasPaquetes.ventaId, venta.id), eq(detalleVentasPaquetes.activo, true))),
-    db
-      .select({
-        id: detalleVentasMembresias.id,
-        membresiaId: detalleVentasMembresias.membresiaId,
-        nombre: sql<string>`coalesce(${detalleVentasMembresias.nombre}, ${membresias.nombre})`,
-        precio: detalleVentasMembresias.precio,
-        cantidad: detalleVentasMembresias.cantidad,
-      })
-      .from(detalleVentasMembresias)
-      .innerJoin(membresias, eq(detalleVentasMembresias.membresiaId, membresias.id))
-      .where(and(eq(detalleVentasMembresias.ventaId, venta.id), eq(detalleVentasMembresias.activo, true))),
-    // Catálogos del POS cacheados por org+sucursal (tag `catalogos:{org}`).
-    catalogosTicketCached(organizacionId, venta.sucursalId),
-    venta.clienteId
-      ? db
-          .select({
-            id: clienteMembresias.id,
-            nombre: membresias.nombre,
-            descuentoPorcentaje: membresias.descuentoPorcentaje,
-            aplica: membresias.aplica,
-            estado: clienteMembresias.estado,
-            vigenciaDesde: clienteMembresias.vigenciaDesde,
-            vigenciaHasta: clienteMembresias.vigenciaHasta,
-          })
-          .from(clienteMembresias)
-          .innerJoin(membresias, eq(clienteMembresias.membresiaId, membresias.id))
-          .where(
-            and(
-              eq(clienteMembresias.organizacionId, organizacionId),
-              eq(clienteMembresias.clienteId, venta.clienteId),
-              eq(clienteMembresias.activo, true),
-              eq(clienteMembresias.estado, "vigente"),
-            ),
-          )
-          .orderBy(asc(clienteMembresias.createdAt))
-      : Promise.resolve([]),
-    venta.clienteId
-      ? db
-          .select({
-            id: clientePaquetes.id,
-            nombre: paquetes.nombre,
-            servicioId: paquetes.servicioId,
-            servicioNombre: servicios.nombre,
-            sesionesTotal: clientePaquetes.sesionesTotal,
-            sesionesRestantes: clientePaquetes.sesionesRestantes,
-          })
-          .from(clientePaquetes)
-          .innerJoin(paquetes, eq(clientePaquetes.paqueteId, paquetes.id))
-          .innerJoin(servicios, eq(paquetes.servicioId, servicios.id))
-          .where(
-            and(
-              eq(clientePaquetes.organizacionId, organizacionId),
-              eq(clientePaquetes.clienteId, venta.clienteId),
-              eq(clientePaquetes.estado, "vigente"),
-              eq(clientePaquetes.activo, true),
-              gt(clientePaquetes.usosRestantes, 0),
-            ),
-          )
-          .orderBy(asc(clientePaquetes.createdAt))
-      : Promise.resolve([]),
-    db
-      .select({
-        detalleVentaServicioId: paqueteUsos.detalleVentaServicioId,
-        paqueteNombre: paquetes.nombre,
-      })
-      .from(paqueteUsos)
-      .innerJoin(clientePaquetes, eq(paqueteUsos.clientePaqueteId, clientePaquetes.id))
-      .innerJoin(paquetes, eq(clientePaquetes.paqueteId, paquetes.id))
-      .where(and(eq(paqueteUsos.ventaId, venta.id), eq(paqueteUsos.activo, true))),
-    db
-      .select({
-        id: detalleVentasMediosPagos.id,
-        medioPagoId: detalleVentasMediosPagos.medioPagoId,
-        nombre: catMediosPago.nombre,
-        monto: detalleVentasMediosPagos.monto,
-        recibido: detalleVentasMediosPagos.recibido,
-        cambio: detalleVentasMediosPagos.cambio,
-      })
-      .from(detalleVentasMediosPagos)
-      .innerJoin(catMediosPago, eq(detalleVentasMediosPagos.medioPagoId, catMediosPago.id))
-      .where(and(eq(detalleVentasMediosPagos.ventaId, venta.id), eq(detalleVentasMediosPagos.activo, true))),
-    db
-      .select({
-        pagoId: ajustesPagosVenta.detalleVentaMedioPagoId,
-        id: ajustesPagosVenta.id,
-        destinoNombre: catMediosPago.nombre,
-        monto: ajustesPagosVenta.monto,
-        motivo: ajustesPagosVenta.motivo,
-        createdAt: ajustesPagosVenta.createdAt,
-      })
-      .from(ajustesPagosVenta)
-      .leftJoin(catMediosPago, eq(ajustesPagosVenta.medioPagoDestinoId, catMediosPago.id))
-      .where(and(eq(ajustesPagosVenta.ventaId, venta.id), eq(ajustesPagosVenta.organizacionId, organizacionId)))
-      .orderBy(asc(ajustesPagosVenta.createdAt)),
-    db
-      .select({ usuarioNombre: usuarios.nombre, monto: detalleVentasPropinas.monto })
-      .from(detalleVentasPropinas)
-      .innerJoin(usuarios, eq(detalleVentasPropinas.usuarioId, usuarios.id))
-      .where(and(eq(detalleVentasPropinas.ventaId, venta.id), eq(detalleVentasPropinas.activo, true))),
-    db
-      .select({ usuarioNombre: usuarios.nombre, monto: detalleVentasComisiones.monto })
-      .from(detalleVentasComisiones)
-      .innerJoin(usuarios, eq(detalleVentasComisiones.usuarioId, usuarios.id))
-      .where(and(eq(detalleVentasComisiones.ventaId, venta.id), eq(detalleVentasComisiones.activo, true))),
-    db
-      .select({
-        id: devoluciones.id,
-        monto: devoluciones.monto,
-        motivo: devoluciones.motivo,
-        createdAt: devoluciones.createdAt,
-        usuarioNombre: usuarios.nombre,
-      })
-      .from(devoluciones)
-      .leftJoin(usuarios, eq(devoluciones.usuarioId, usuarios.id))
-      .where(eq(devoluciones.ventaId, venta.id))
-      .orderBy(asc(devoluciones.createdAt)),
-    db
-      .select({
-        devolucionId: detalleDevoluciones.devolucionId,
-        tipo: detalleDevoluciones.tipo,
-        detalleId: detalleDevoluciones.detalleId,
-        cantidad: detalleDevoluciones.cantidad,
-        monto: detalleDevoluciones.monto,
-        nombreServicio: sql<string | null>`${servicios.nombre}`,
-        nombreProducto: sql<string | null>`${productos.nombre}`,
-        nombrePaquete: sql<string | null>`${detalleVentasPaquetes.nombre}`,
-        nombreMembresia: sql<string | null>`${detalleVentasMembresias.nombre}`,
-      })
-      .from(detalleDevoluciones)
-      .innerJoin(devoluciones, eq(detalleDevoluciones.devolucionId, devoluciones.id))
-      .leftJoin(detalleVentasServicios, and(eq(detalleDevoluciones.detalleId, detalleVentasServicios.id), eq(detalleDevoluciones.tipo, "servicio")))
-      .leftJoin(servicios, eq(detalleVentasServicios.servicioId, servicios.id))
-      .leftJoin(detalleVentasProductos, and(eq(detalleDevoluciones.detalleId, detalleVentasProductos.id), eq(detalleDevoluciones.tipo, "producto")))
-      .leftJoin(productos, eq(detalleVentasProductos.productoId, productos.id))
-      .leftJoin(detalleVentasPaquetes, and(eq(detalleDevoluciones.detalleId, detalleVentasPaquetes.id), eq(detalleDevoluciones.tipo, "paquete")))
-      .leftJoin(detalleVentasMembresias, and(eq(detalleDevoluciones.detalleId, detalleVentasMembresias.id), eq(detalleDevoluciones.tipo, "membresia")))
-      .where(eq(devoluciones.ventaId, venta.id)),
-    // Anticipos aplicados a esta venta + vigentes de la cita (se aplican al cobrar).
-    venta.citaId
-      ? db
-          .select({
-            id: anticipos.id,
-            ventaId: anticipos.ventaId,
-            monto: anticipos.monto,
-            estado: anticipos.estado,
-            createdAt: anticipos.createdAt,
-            medioNombre: catMediosPago.nombre,
-          })
-          .from(anticipos)
-          .leftJoin(catMediosPago, eq(anticipos.medioPagoId, catMediosPago.id))
-          .where(
-            and(
-              eq(anticipos.citaId, venta.citaId),
-              eq(anticipos.organizacionId, organizacionId),
-              eq(anticipos.activo, true),
-              inArray(anticipos.estado, ["vigente", "aplicado"]),
-              gt(anticipos.monto, "0"),
-            ),
-          )
-          .orderBy(asc(anticipos.createdAt))
-      : db
-          .select({
-            id: anticipos.id,
-            ventaId: anticipos.ventaId,
-            monto: anticipos.monto,
-            estado: anticipos.estado,
-            createdAt: anticipos.createdAt,
-            medioNombre: catMediosPago.nombre,
-          })
-          .from(anticipos)
-          .leftJoin(catMediosPago, eq(anticipos.medioPagoId, catMediosPago.id))
-          .where(
-            and(
-              eq(anticipos.ventaId, venta.id),
-              eq(anticipos.organizacionId, organizacionId),
-              eq(anticipos.activo, true),
-              inArray(anticipos.estado, ["vigente", "aplicado"]),
-              gt(anticipos.monto, "0"),
-            ),
-          )
-          .orderBy(asc(anticipos.createdAt)),
-    // Comprobante fiscal activo más reciente de la venta (si se emitió).
-    db
-      .select({
-        id: comprobantes.id,
-        estado: comprobantes.estado,
-        serie: comprobantes.serie,
-        folio: comprobantes.folio,
-        uuid: comprobantes.uuid,
-        receptorRfc: comprobantes.receptorRfc,
-        receptorNombre: comprobantes.receptorNombre,
-        total: comprobantes.total,
-        error: comprobantes.error,
-        timbradoAt: comprobantes.timbradoAt,
-      })
-      .from(comprobantes)
-      .where(and(eq(comprobantes.ventaId, venta.id), eq(comprobantes.organizacionId, organizacionId), eq(comprobantes.activo, true)))
-      .orderBy(desc(comprobantes.createdAt))
-      .limit(1),
-    db
-      .select({ id: facturacionConfig.id })
-      .from(facturacionConfig)
-      .where(and(eq(facturacionConfig.organizacionId, organizacionId), eq(facturacionConfig.activo, true)))
-      .limit(1),
-  ]);
+  const row = result.rows[0];
+  const venta = row?.venta;
+  if (!row || !venta) return null;
+
+  // Catálogos del POS cacheados por org+sucursal (tag `catalogos:{org}`).
+  const catalogos = await catalogosTicketCached(organizacionId, venta.sucursalId);
 
   const {
     sucursalZonaHoraria,
@@ -716,71 +658,44 @@ export async function getTicketData(
     .filter((p) => promocionVigente(p, hoySucursal))
     .map(({ id, nombre, tipo, valor, aplica }) => ({ id, nombre, tipo, valor, aplica }));
 
-  const devueltoPorDetalle: Record<string, number> = {};
-  const lineasPorDevolucion = new Map<string, NonNullable<TicketData["devoluciones"]>[number]["lineas"]>();
-  for (const linea of detalleDevolucionesRows) {
-    if (linea.detalleId) {
-      devueltoPorDetalle[linea.detalleId] = (devueltoPorDetalle[linea.detalleId] ?? 0) + Number(linea.cantidad);
-    }
-    const list = lineasPorDevolucion.get(linea.devolucionId) ?? [];
-    list.push({
-      tipo: linea.tipo,
-      detalleId: linea.detalleId,
-      cantidad: linea.cantidad,
-      monto: linea.monto,
-      nombre: linea.nombreServicio ?? linea.nombreProducto ?? linea.nombrePaquete ?? linea.nombreMembresia ?? "Línea",
-    });
-    lineasPorDevolucion.set(linea.devolucionId, list);
-  }
-
-  const usoPorDetalle = new Map(usosRows.map((u) => [u.detalleVentaServicioId, u.paqueteNombre]));
-  const ajustesPorPago = new Map<string, TicketData["pagos"][number]["ajustes"]>();
-  for (const ajuste of ajustesPagoRows) {
-    const list = ajustesPorPago.get(ajuste.pagoId) ?? [];
-    list.push({
-      id: ajuste.id,
-      destinoNombre: ajuste.destinoNombre,
-      monto: ajuste.monto,
-      motivo: ajuste.motivo,
-      createdAt: ajuste.createdAt,
-    });
-    ajustesPorPago.set(ajuste.pagoId, list);
-  }
-  const pagosConAjustes = pagos.map((pago) => ({
-    ...pago,
-    ajustes: ajustesPorPago.get(pago.id) ?? [],
-  }));
+  const usoPorDetalle = new Map(row.usosRows.map((u) => [u.detalleVentaServicioId, u.paqueteNombre]));
+  // Hidratación de fechas (viajan como ISO texto desde jsonb).
+  const anticipoRows = row.anticipoRows.map((a) => ({ ...a, createdAt: new Date(a.createdAt) }));
+  const devoluciones = row.devolucionesRows.map((d) => ({ ...d, createdAt: new Date(d.createdAt) }));
+  const comprobante = row.comprobante
+    ? { ...row.comprobante, timbradoAt: row.comprobante.timbradoAt ? new Date(row.comprobante.timbradoAt) : null }
+    : null;
 
   return {
     venta: { ...ventaData, sucursalId: venta.sucursalId ?? "" },
     promocionesDisponibles,
-    lineasServicios: lineasServicios.map((linea) => ({
+    lineasServicios: row.lineasServicios.map((linea) => ({
       ...linea,
       paqueteUsado: usoPorDetalle.has(linea.id),
       paqueteNombre: usoPorDetalle.get(linea.id) ?? null,
     })),
-    lineasProductos,
-    lineasPaquetes,
-    lineasMembresias,
+    lineasProductos: row.lineasProductos,
+    lineasPaquetes: row.lineasPaquetes,
+    lineasMembresias: row.lineasMembresias,
     catalogoMembresias: catalogos.catalogoMembresias,
-    membresiasCliente: membresiasClienteRows
+    membresiasCliente: row.membresiasClienteRows
       .filter((m) => membresiaVigente(m, hoySucursal))
       .map(({ id, nombre, descuentoPorcentaje, aplica, vigenciaHasta }) => ({ id, nombre, descuentoPorcentaje, aplica, vigenciaHasta })),
     catalogoPaquetes: catalogos.catalogoPaquetes,
-    paquetesCliente: paquetesClienteRows,
+    paquetesCliente: row.paquetesClienteRows,
     catalogoClientes: catalogos.catalogoClientes,
     catalogoServicios: catalogos.catalogoServicios,
     catalogoProductos: catalogos.catalogoProductos,
     mediosPago: catalogos.mediosPago,
-    pagos: pagosConAjustes,
-    staff: catalogos.staff,
-    propinas,
-    comisiones,
-    devoluciones: devolucionesRows.map((row) => ({
-      ...row,
-      lineas: lineasPorDevolucion.get(row.id) ?? [],
+    pagos: row.pagos.map((pago) => ({
+      ...pago,
+      ajustes: pago.ajustes.map((a) => ({ ...a, createdAt: new Date(a.createdAt) })),
     })),
-    devueltoPorDetalle,
+    staff: catalogos.staff,
+    propinas: row.propinas,
+    comisiones: row.comisiones,
+    devoluciones,
+    devueltoPorDetalle: row.devueltoPorDetalle,
     // Solo los vigentes (se aplicarán al cobrar) o los ya aplicados a esta venta.
     anticipos: anticipoRows
       .filter((a) => a.estado === "vigente" || a.ventaId === venta.id)
@@ -800,9 +715,9 @@ export async function getTicketData(
       anticipoRows.filter((a) => a.estado === "vigente"),
       Number(venta.total),
     ).suma,
-    comprobante: comprobanteRows[0] ?? null,
+    comprobante,
     clienteFiscal,
-    facturacionConfigurada: facturacionConfigRows.length > 0,
+    facturacionConfigurada: row.facturacionConfigurada,
   };
 }
 

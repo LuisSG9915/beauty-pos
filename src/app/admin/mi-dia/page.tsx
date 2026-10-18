@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, lt, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import Link from "next/link";
 
 import { MiDiaBoard, type MiDiaCita } from "@/app/admin/mi-dia/mi-dia-board";
@@ -6,22 +6,13 @@ import { AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
-import { clientes } from "@/db/schema/core";
-import { servicios } from "@/db/schema/catalogs";
-import {
-  citas,
-  detalleCitasServicios,
-  detalleVentasComisiones,
-  detalleVentasPropinas,
-  ventas,
-} from "@/db/schema/operations";
 import { getAdminContext } from "@/lib/admin-context";
-import { requireAccessPermission } from "@/lib/auth/authorization";
+import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { todayDateInput } from "@/lib/format";
 import { GLOSARIO } from "@/lib/glosario";
 import { buildAdminHref } from "@/lib/url-context";
 import { dayBoundsUtc } from "@/modules/agenda";
-import { alergiasPorCliente, conAlergias } from "@/modules/expedientes/alergias";
+import { conAlergias } from "@/modules/expedientes/alergias";
 
 export const dynamic = "force-dynamic";
 
@@ -83,125 +74,119 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
   }
 
   const db = getDatabase();
+  const puedeVerAlergias = hasPermission(context.access, "expedientes.alergias_ver");
+  const puedeAlergiaPrivada = hasPermission(context.access, "expedientes.privado");
 
-  // Las citas y los agregados monetarios son independientes: lanzarlos juntos
-  // evita dos idas y vueltas extra a Postgres antes de que la pantalla exista.
-  const fechaVenta = sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`;
-  const [citaRows, propinaRows, comisionRows] = await Promise.all([
-    db
-      .select({
-        id: citas.id,
-        fechaHora: citas.fechaHora,
-        duracionMinutos: citas.duracionMinutos,
-        estado: citas.estado,
-        notas: citas.notas,
-        totalEstimado: citas.totalEstimado,
-        version: citas.version,
-        clienteId: clientes.id,
-        clienteNombre: clientes.nombre,
-        clienteNotas: clientes.notasOperativas,
-        ventaId: ventas.id,
-        ventaEstado: ventas.estado,
-      })
-      .from(citas)
-      .leftJoin(clientes, eq(citas.clienteId, clientes.id))
-      .leftJoin(ventas, and(eq(ventas.citaId, citas.id), eq(ventas.activo, true)))
-      .where(
-        and(
-          eq(citas.organizacionId, organization.id),
-          eq(citas.sucursalId, branch.id),
-          eq(citas.usuarioId, user.id),
-          eq(citas.activo, true),
-          gte(citas.fechaHora, bounds.iniciaAt),
-          lt(citas.fechaHora, bounds.terminaAt),
-        ),
-      )
-      .orderBy(asc(citas.fechaHora)),
-    db
-      .select({ total: sql<string>`coalesce(sum(${detalleVentasPropinas.monto}), 0)` })
-      .from(detalleVentasPropinas)
-      .innerJoin(ventas, eq(detalleVentasPropinas.ventaId, ventas.id))
-      .where(
-        and(
-          eq(detalleVentasPropinas.usuarioId, user.id),
-          eq(detalleVentasPropinas.activo, true),
-          eq(ventas.organizacionId, organization.id),
-          eq(ventas.sucursalId, branch.id),
-          eq(ventas.activo, true),
-          gte(fechaVenta, bounds.iniciaAt),
-          lt(fechaVenta, bounds.terminaAt),
-        ),
-      ),
-    db
-      .select({ total: sql<string>`coalesce(sum(${detalleVentasComisiones.monto}), 0)` })
-      .from(detalleVentasComisiones)
-      .innerJoin(ventas, eq(detalleVentasComisiones.ventaId, ventas.id))
-      .where(
-        and(
-          eq(detalleVentasComisiones.usuarioId, user.id),
-          eq(detalleVentasComisiones.activo, true),
-          eq(ventas.organizacionId, organization.id),
-          eq(ventas.sucursalId, branch.id),
-          eq(ventas.activo, true),
-          gte(fechaVenta, bounds.iniciaAt),
-          lt(fechaVenta, bounds.terminaAt),
-        ),
-      ),
-  ]);
+  // Una sola ronda SQL: citas del día del usuario con sus servicios y alergias
+  // anidados en jsonb + totales de propinas y comisiones como subselects
+  // escalares. Antes eran 5 consultas en 2 rondas; cada una abría una
+  // conexión fría al pool (~60 ms handshake + ~100 ms RT). El gate de
+  // expedientes.alergias_ver/privado se evalúa aquí, no en la BD.
+  type MiDiaRow = {
+    citas: Array<{
+      id: string;
+      fechaHora: string;
+      duracionMinutos: number;
+      estado: string;
+      notas: string | null;
+      totalEstimado: string;
+      version: number;
+      clienteId: string | null;
+      clienteNombre: string | null;
+      clienteNotas: string | null;
+      ventaId: string | null;
+      ventaEstado: string | null;
+      servicios: string[];
+      alergias: string | null;
+    }>;
+    propinasTotal: string;
+    comisionesTotal: string;
+  };
+  const result = await db.execute<MiDiaRow>(sql`
+    select
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', c.id,
+            'fechaHora', to_char(c.fecha_hora at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+            'duracionMinutos', c.duracion_minutos,
+            'estado', c.estado,
+            'notas', c.notas,
+            'totalEstimado', c.total_estimado::text,
+            'version', c.version,
+            'clienteId', c.cliente_id,
+            'clienteNombre', cl.nombre,
+            'clienteNotas', cl.notas_operativas,
+            'ventaId', v.id,
+            'ventaEstado', v.estado,
+            'servicios', coalesce((
+              select jsonb_agg(s.nombre)
+                from detalle_citas_servicios dcs
+                join servicios s on dcs.servicio_id = s.id
+               where dcs.cita_id = c.id and dcs.activo
+            ), '[]'::jsonb),
+            'alergias', case when ${puedeVerAlergias} then (
+              select string_agg(coalesce(f.notas, f.formula), ' · ')
+                from clientes_fichas_tecnicas f
+               where f.organizacion_id = ${organization.id} and f.tipo = 'alergia'
+                 and f.activo and f.cliente_id = c.cliente_id
+                 and (not f.privada or ${puedeAlergiaPrivada})
+            ) end
+          ) order by c.fecha_hora)
+          from citas c
+          left join clientes cl on c.cliente_id = cl.id
+          left join ventas v on v.cita_id = c.id and v.activo
+         where c.organizacion_id = ${organization.id}
+           and c.sucursal_id = ${branch.id}
+           and c.usuario_id = ${user.id}
+           and c.activo
+           and c.fecha_hora >= ${bounds.iniciaAt}
+           and c.fecha_hora < ${bounds.terminaAt}
+      ), '[]'::jsonb) as citas,
+      (select coalesce(sum(dvp.monto), 0)::text
+        from detalle_ventas_propinas dvp
+        join ventas v on dvp.venta_id = v.id
+       where dvp.usuario_id = ${user.id} and dvp.activo
+         and v.organizacion_id = ${organization.id}
+         and v.sucursal_id = ${branch.id}
+         and v.activo
+         and coalesce(v.cobrada_at, v.created_at) >= ${bounds.iniciaAt}
+         and coalesce(v.cobrada_at, v.created_at) < ${bounds.terminaAt}
+      ) as "propinasTotal",
+      (select coalesce(sum(dvc.monto), 0)::text
+        from detalle_ventas_comisiones dvc
+        join ventas v on dvc.venta_id = v.id
+       where dvc.usuario_id = ${user.id} and dvc.activo
+         and v.organizacion_id = ${organization.id}
+         and v.sucursal_id = ${branch.id}
+         and v.activo
+         and coalesce(v.cobrada_at, v.created_at) >= ${bounds.iniciaAt}
+         and coalesce(v.cobrada_at, v.created_at) < ${bounds.terminaAt}
+      ) as "comisionesTotal"
+  `);
 
-  const citaIds = citaRows.map((row) => row.id);
-  const clienteIdsVisibles = [
-    ...new Set(citaRows.map((row) => row.clienteId).filter((id): id is string => Boolean(id))),
-  ];
-  const [detalles, alergias] = await Promise.all([
-    citaIds.length > 0
-      ? db
-          .select({ citaId: detalleCitasServicios.citaId, nombre: servicios.nombre })
-          .from(detalleCitasServicios)
-          .innerJoin(servicios, eq(detalleCitasServicios.servicioId, servicios.id))
-          .where(
-            and(
-              inArray(detalleCitasServicios.citaId, citaIds),
-              eq(detalleCitasServicios.activo, true),
-            ),
-          )
-      : Promise.resolve([] as Array<{ citaId: string; nombre: string }>),
-    // Alergias del expediente — visibles solo con `expedientes.alergias_ver`.
-    alergiasPorCliente(db, organization.id, clienteIdsVisibles, context.access),
-  ]);
+  const citaRows = result.rows[0]?.citas ?? [];
 
-  const serviciosPorCita = new Map<string, string[]>();
-  for (const detalle of detalles) {
-    const list = serviciosPorCita.get(detalle.citaId) ?? [];
-    list.push(detalle.nombre);
-    serviciosPorCita.set(detalle.citaId, list);
-  }
+  const propinas = Number(result.rows[0]?.propinasTotal ?? 0);
+  const comisiones = Number(result.rows[0]?.comisionesTotal ?? 0);
 
-  const propinas = Number(propinaRows[0]?.total ?? 0);
-  const comisiones = Number(comisionRows[0]?.total ?? 0);
-
-  const citasSerializadas: MiDiaCita[] = citaRows.map((row) => ({
-    id: row.id,
-    fechaHora: row.fechaHora.toISOString(),
-    duracionMinutos: row.duracionMinutos,
-    estado: row.estado,
-    notas: row.notas,
-    totalEstimado: row.totalEstimado,
-    clienteId: row.clienteId,
+  const citasSerializadas: MiDiaCita[] = citaRows.map(({ alergias, ...row }) => ({
+    ...row,
     clienteNombre: row.clienteNombre ?? GLOSARIO.clienteDePaso,
-    clienteNotas: conAlergias(row.clienteNotas, row.clienteId ? alergias.get(row.clienteId) : undefined),
-    ventaId: row.ventaId,
-    ventaEstado: row.ventaEstado,
-    version: row.version,
-    servicios: serviciosPorCita.get(row.id) ?? [],
+    clienteNotas: conAlergias(row.clienteNotas, alergias ?? undefined),
   }));
+
+  // Cuando hay citas operables, la acción primaria la marca el board (la
+  // siguiente cita del profesional); si no, la lleva "Ver agenda".
+  const hayAccionable = citasSerializadas.some((c) =>
+    ["pendiente", "confirmada", "en_proceso"].includes(c.estado),
+  );
 
   return (
     <div className="space-y-6">
       <AdminPageHeader
         actions={
           <Button
-            data-action-clave="1"
+            data-action-clave={hayAccionable ? undefined : "1"}
             data-action-id="mi_dia.agenda.abrir"
             nativeButton={false}
             render={<Link href={buildAdminHref("/agenda", { organizationId: organization.id, sucursalId: branch.id })} />}

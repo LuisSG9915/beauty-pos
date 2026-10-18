@@ -28,7 +28,7 @@ const TABS: Array<{ value: CatalogoTab; label: string; icon: typeof Scissors }> 
 
 function chipClass(tone: string, selected: boolean) {
   return cn(
-    "inline-flex min-h-8 items-center rounded-full border px-3 text-xs font-medium transition-all",
+    "inline-flex min-h-8 items-center rounded-full border px-3 text-op-xs font-medium transition-all",
     tone,
     selected ? "font-semibold shadow-sm" : "opacity-70 hover:opacity-100",
   );
@@ -160,7 +160,7 @@ export function CatalogoSelector({
               <button
                 aria-pressed={activo}
                 className={cn(
-                  "inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-xs font-medium whitespace-nowrap transition-all duration-150 sm:px-4 active:scale-95 cursor-pointer",
+                  "inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-op-xs font-medium whitespace-nowrap transition-all duration-150 sm:px-4 active:scale-[0.98] cursor-pointer",
                   activo
                     ? "bg-card text-primary shadow-xs font-semibold"
                     : "text-muted-foreground hover:text-foreground",
@@ -222,7 +222,7 @@ export function CatalogoSelector({
       ) : null}
 
       {(tab === "paquetes" || tab === "membresias") && !hasCliente ? (
-        <p className="rounded-xl bg-accent/70 px-4 py-3 text-xs text-primary">
+        <p className="rounded-xl bg-accent/70 px-4 py-3 text-op-xs text-primary">
           Asigna un cliente a la venta para vender {tab === "paquetes" ? "paquetes: el saldo" : "membresías: la vigencia"} se crea a su nombre al cobrar.
         </p>
       ) : null}
@@ -239,7 +239,7 @@ export function CatalogoSelector({
         </p>
       ) : (
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4">
-          {filtrados.map((item) => {
+          {filtrados.map((item, index) => {
             const tone = categoryTone("categoriaId" in item ? item.categoriaId : null);
             const imagenClave = "imagenClaveR2" in item ? item.imagenClaveR2 : null;
             const esAgregado = agregadoId === item.id;
@@ -247,16 +247,18 @@ export function CatalogoSelector({
               <button
                 aria-label={`Agregar ${item.nombre} al ticket`}
                 className={cn(
-                  "group relative flex min-h-16 flex-col gap-2 rounded-2xl border p-2.5 text-left transition-all duration-200",
+                  "group relative flex min-h-16 flex-col gap-2 rounded-2xl border p-2.5 text-left transition-all duration-200 anim-entrada",
                   "hover:-translate-y-1 hover:shadow-md hover:border-primary/40",
-                  "active:scale-[0.96] active:shadow-xs",
+                  "active:scale-[0.98] active:shadow-xs",
                   "focus-visible:outline-2 focus-visible:outline-ring cursor-pointer select-none",
-                  esAgregado && "ring-2 ring-primary ring-offset-2 ring-offset-background scale-[0.98]",
+                  esAgregado && "anim-pulso ring-2 ring-primary ring-offset-2 ring-offset-background scale-[0.98]",
                   tone.card,
                 )}
+                data-action-id="pos.catalogo.agregar"
                 disabled={pending}
                 key={item.id}
                 onClick={() => agregar(item)}
+                style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
                 type="button"
               >
                 <span
@@ -277,7 +279,7 @@ export function CatalogoSelector({
                     item.nombre.trim().charAt(0).toUpperCase()
                   )}
                   {esAgregado ? (
-                    <span className="absolute inset-0 flex items-center justify-center bg-primary/85 text-xs font-bold text-primary-foreground backdrop-blur-xs animate-in fade-in zoom-in-90 duration-150">
+                    <span className="absolute inset-0 flex items-center justify-center bg-primary/85 text-op-xs font-bold text-primary-foreground backdrop-blur-xs anim-entrada">
                       ✓ Agregado
                     </span>
                   ) : null}
@@ -289,7 +291,7 @@ export function CatalogoSelector({
                   <span className="text-sm font-bold tabular-nums text-primary">
                     {formatCurrency(item.precio, { currency })}
                   </span>
-                  <span className="truncate text-xs tabular-nums text-muted-foreground">
+                  <span className="truncate text-op-xs tabular-nums text-muted-foreground">
                     {"duracionMinutos" in item
                       ? `${item.duracionMinutos} min`
                       : "sesiones" in item

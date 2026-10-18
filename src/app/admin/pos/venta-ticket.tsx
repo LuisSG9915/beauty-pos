@@ -189,14 +189,14 @@ function TicketLine({
   return (
     <div
       className={cn(
-        "group rounded-2xl border border-border/80 bg-card p-3 sm:px-4 text-sm shadow-xs transition-all duration-200 hover:border-border hover:shadow-sm animate-in fade-in slide-in-from-right-3 duration-200",
+        "group rounded-2xl border border-border/80 bg-card p-3 sm:px-4 text-sm shadow-xs transition-all duration-200 hover:border-border hover:shadow-sm anim-entrada",
         pending && "opacity-60",
       )}
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="min-w-0 flex-1 basis-44">
           <p className="truncate font-medium text-foreground">{line.nombre}</p>
-          <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+          <p className="mt-0.5 text-op-xs tabular-nums text-muted-foreground">
             {formatCurrency(line.precio, { currency })} c/u
             {paquete?.usado ? " · cubierto por paquete" : ""}
             {!editable && profesionalNombre ? ` · ${profesionalNombre}` : ""}
@@ -211,7 +211,7 @@ function TicketLine({
             >
               <button
                 aria-label="Reducir cantidad"
-                className="flex size-8 items-center justify-center text-muted-foreground transition-all duration-100 hover:bg-muted hover:text-foreground active:scale-90 disabled:opacity-40"
+                className="flex size-8 items-center justify-center text-muted-foreground transition-all duration-100 hover:bg-muted hover:text-foreground active:scale-[0.98] disabled:opacity-40"
                 disabled={pending}
                 onClick={() => run(cambiarCantidadLinea, { tipo, delta: "-1" })}
                 type="button"
@@ -220,13 +220,13 @@ function TicketLine({
               </button>
               <span
                 aria-live="polite"
-                className="w-8 text-center text-xs font-bold tabular-nums text-foreground"
+                className="w-8 text-center text-op-xs font-bold tabular-nums text-foreground"
               >
                 {line.cantidad}
               </span>
               <button
                 aria-label="Aumentar cantidad"
-                className="flex size-8 items-center justify-center text-muted-foreground transition-all duration-100 hover:bg-muted hover:text-foreground active:scale-90 disabled:opacity-40"
+                className="flex size-8 items-center justify-center text-muted-foreground transition-all duration-100 hover:bg-muted hover:text-foreground active:scale-[0.98] disabled:opacity-40"
                 disabled={pending}
                 onClick={() => run(cambiarCantidadLinea, { tipo, delta: "1" })}
                 type="button"
@@ -239,7 +239,7 @@ function TicketLine({
             </span>
             <Button
               aria-label={`Quitar ${line.nombre}`}
-              className="text-muted-foreground transition-all duration-150 hover:bg-destructive-soft hover:text-destructive active:scale-95"
+              className="text-muted-foreground transition-all duration-150 hover:bg-destructive-soft hover:text-destructive active:scale-[0.98]"
               disabled={pending}
               onClick={() => run(removeAction, {})}
               size="icon-sm"
@@ -251,7 +251,7 @@ function TicketLine({
           </>
         ) : (
           <>
-            <span className="text-xs tabular-nums text-muted-foreground">
+            <span className="text-op-xs tabular-nums text-muted-foreground">
               {line.cantidad} × {formatCurrency(line.precio, { currency })}
             </span>
             <span className="w-24 text-right font-bold tabular-nums text-foreground">
@@ -263,14 +263,14 @@ function TicketLine({
       {esServicio && editable ? (
         <div className="mt-1.5 flex items-center gap-2">
           <label
-            className="shrink-0 text-xs text-muted-foreground"
+            className="shrink-0 text-op-xs text-muted-foreground"
             htmlFor={`profesional-${line.id}`}
           >
             Profesional
           </label>
           <select
             aria-label={`Profesional para ${line.nombre}`}
-            className="h-8 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-xs outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 disabled:opacity-60 sm:max-w-52"
+            className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-op-xs outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 disabled:opacity-60 sm:max-w-52"
             defaultValue={usuarioId ?? ""}
             disabled={pending}
             id={`profesional-${line.id}`}
@@ -297,12 +297,12 @@ function TicketLine({
         <div className="mt-1.5 flex items-center gap-2">
           {paquete.usado ? (
             <>
-              <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-1 text-xs font-medium text-success-soft-foreground">
+              <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-1 text-op-xs font-medium text-success-soft-foreground">
                 <PackageCheck aria-hidden="true" className="size-3.5" />
                 Paquete{paquete.nombre ? ` · ${paquete.nombre}` : ""}
               </span>
               <button
-                className="text-xs text-primary underline underline-offset-2 hover:text-primary disabled:opacity-50"
+                className="inline-flex min-h-8 items-center rounded-lg px-2 text-op-xs font-medium text-primary underline underline-offset-2 transition-colors hover:bg-accent/70 hover:text-primary disabled:opacity-50"
                 disabled={pending}
                 onClick={() => run(quitarPaqueteDeLinea, {})}
                 type="button"
@@ -312,7 +312,7 @@ function TicketLine({
             </>
           ) : paquete.disponible > 0 ? (
             <button
-              className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-success/30 px-2.5 text-xs font-medium text-success transition-colors hover:bg-success/10 disabled:opacity-50"
+              className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2.5 text-op-xs font-medium bg-success-soft text-success-soft-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
               disabled={pending}
               onClick={() => run(usarPaqueteEnLinea, {})}
               type="button"

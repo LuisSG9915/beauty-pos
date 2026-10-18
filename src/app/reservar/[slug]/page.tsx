@@ -59,7 +59,7 @@ export default async function ReservarPage({
           <BrandMark size={40} />
           <div>
             <p className="font-semibold tracking-tight">{portal.organizacion.nombre}</p>
-            <p className="text-xs text-muted-foreground">Reserva tu cita en línea</p>
+            <p className="text-op-xs text-muted-foreground">Reserva tu cita en línea</p>
           </div>
         </div>
         <ThemeModeSelector iconOnly />

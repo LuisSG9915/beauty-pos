@@ -7,6 +7,7 @@ import { confirmarReserva, obtenerSlotsReserva } from "@/app/reservar/[slug]/act
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Textarea } from "@/components/ui/field";
 import { TurnstileWidget } from "@/components/ui/turnstile-widget";
+import { formatCurrency, formatTime } from "@/lib/format";
 
 type Sucursal = {
   id: string;
@@ -33,16 +34,14 @@ type Resultado =
   | { tipo: "pendiente"; gestionUrl: string | null }
   | { tipo: "error"; mensaje: string };
 
+// Helpers memoizados de `@/lib/format`: los Intl anteriores se instanciaban
+// por cada tarjeta/slot del render.
 function formatoHora(iso: string, zonaHoraria: string) {
-  return new Intl.DateTimeFormat("es-MX", {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: zonaHoraria,
-  }).format(new Date(iso));
+  return formatTime(iso, { timeZone: zonaHoraria });
 }
 
 function formatoPrecio(precio: string) {
-  return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(Number(precio));
+  return formatCurrency(Number(precio), { currency: "MXN" });
 }
 
 /**
@@ -74,9 +73,13 @@ export function ReservaFlow({
     }
     return sucursales[0]?.id ?? "";
   });
-  const [servicioId, setServicioId] = useState("");
+  // Con un solo servicio reservable ya viene elegido: un toque menos.
+  const servicioUnico = servicios.length === 1 ? servicios[0].id : "";
+  const [servicioId, setServicioId] = useState(servicioUnico);
   const [usuarioId, setUsuarioId] = useState(profesionalInicial ?? "");
-  const [diaKey, setDiaKey] = useState("");
+  // Día preseleccionado cuando el servicio ya viene dado: los horarios de hoy
+  // aparecen sin toque extra. Al elegir servicio también se auto-selecciona.
+  const [diaKey, setDiaKey] = useState(() => (servicioUnico ? dias[0]?.diaKey ?? "" : ""));
   const [slotIso, setSlotIso] = useState("");
   const [slots, setSlots] = useState<string[] | null>(null);
   const [slotsError, setSlotsError] = useState<string | null>(null);
@@ -94,6 +97,17 @@ export function ReservaFlow({
   );
   const profesional = profesionalesSucursal.find((p) => p.usuarioId === usuarioId);
 
+  // En cada paso del embudo existe exactamente una acción primaria visible
+  // (data-action-clave="1"): servicio → día → horario → confirmar. Sin ella
+  // el check de usabilidad no encuentra acción principal en el estado inicial.
+  const clavePaso: "servicio" | "dia" | "horario" | "confirmar" = !servicioId
+    ? "servicio"
+    : slotIso
+      ? "confirmar"
+      : slots && slots.length > 0
+        ? "horario"
+        : "dia";
+
   // Al cambiar sucursal/servicio/día se reinicia la selección de horario.
   const elegir = (fn: (v: string) => void) => (v: string) => {
     setSlotIso("");
@@ -101,6 +115,14 @@ export function ReservaFlow({
     setSlotsError(null);
     setResultado(null);
     fn(v);
+  };
+
+  // El primer día se auto-selecciona al elegir servicio (en el click, no en un
+  // efecto): los horarios de hoy aparecen solos y "sin horarios" guía a otra
+  // fecha. `elegir` conserva el día si ya había uno.
+  const elegirServicio = (id: string) => {
+    elegir(setServicioId)(id);
+    if (!diaKey && dias[0]) setDiaKey(dias[0].diaKey);
   };
 
   useEffect(() => {
@@ -158,8 +180,8 @@ export function ReservaFlow({
   if (resultado?.tipo === "confirmada" || resultado?.tipo === "pendiente") {
     return (
       <section className="mx-auto w-full max-w-3xl px-6 pb-16">
-        <div className="rounded-3xl border border-border bg-card p-8 text-center shadow-sm">
-          <CheckCircle2 className="mx-auto size-12 text-success" />
+        <div className="rounded-3xl border border-border bg-card p-8 text-center shadow-sm anim-entrada">
+          <CheckCircle2 aria-hidden="true" className="mx-auto size-12 text-success anim-pulso-svg" />
           <h1 className="mt-4 text-2xl font-semibold tracking-tight">
             {resultado.tipo === "confirmada" ? "¡Cita confirmada!" : "Reserva recibida"}
           </h1>
@@ -195,11 +217,12 @@ export function ReservaFlow({
             <>
               <a
                 className="mt-6 inline-block rounded-xl bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+                data-action-id="reserva.gestion"
                 href={resultado.gestionUrl}
               >
                 Consultar o modificar mi cita
               </a>
-              <p className="mx-auto mt-3 max-w-sm text-xs leading-5 text-muted-foreground">
+              <p className="mx-auto mt-3 max-w-sm text-op-xs leading-5 text-muted-foreground">
                 Guarda este enlace: con él puedes ver el estado de tu cita, cambiarla de fecha o cancelarla
                 según la política del negocio. También llega en tu correo de confirmación.
               </p>
@@ -217,14 +240,15 @@ export function ReservaFlow({
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Sucursal</h2>
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
-            {sucursales.map((s) => (
+            {sucursales.map((s, index) => (
               <button
                 aria-pressed={s.id === sucursal.id}
-                className={`rounded-2xl border p-4 text-left transition-colors ${
+                className={`rounded-2xl border p-4 text-left transition-[transform,background-color,border-color] duration-150 anim-entrada active:scale-[0.98] ${
                   s.id === sucursal.id
                     ? "border-primary bg-accent"
                     : "border-border bg-card hover:border-muted-foreground/40"
                 }`}
+                data-action-id="reserva.sucursal.elegir"
                 key={s.id}
                 onClick={() => {
                   elegir(setSucursalId)(s.id);
@@ -234,12 +258,13 @@ export function ReservaFlow({
                     setUsuarioId("");
                   }
                 }}
+                style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
                 type="button"
               >
-                <p className="font-medium">{s.nombre}</p>
+                <p className="font-medium line-clamp-2">{s.nombre}</p>
                 {s.direccion ? (
-                  <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                    <MapPin className="size-3" /> {s.direccion}
+                  <p className="mt-1 flex items-center gap-1 text-op-xs text-muted-foreground">
+                    <MapPin aria-hidden="true" className="size-3 shrink-0" /> <span className="min-w-0 truncate">{s.direccion}</span>
                   </p>
                 ) : null}
               </button>
@@ -252,21 +277,24 @@ export function ReservaFlow({
       <div>
         <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Servicio</h2>
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {servicios.map((s) => (
+          {servicios.map((s, index) => (
             <button
               aria-pressed={s.id === servicioId}
-              className={`rounded-2xl border p-4 text-left transition-colors ${
+              className={`rounded-2xl border p-4 text-left transition-[transform,background-color,border-color] duration-150 anim-entrada active:scale-[0.98] ${
                 s.id === servicioId
                   ? "border-primary bg-accent"
                   : "border-border bg-card hover:border-muted-foreground/40"
               }`}
+              data-action-clave={index === 0 && clavePaso === "servicio" ? "1" : undefined}
+              data-action-id="reserva.servicio.elegir"
               key={s.id}
-              onClick={() => elegir(setServicioId)(s.id)}
+              onClick={() => elegirServicio(s.id)}
+              style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
               type="button"
             >
-              <p className="font-medium">{s.nombre}</p>
-              <p className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                <Clock3 className="size-3" />
+              <p className="font-medium line-clamp-2">{s.nombre}</p>
+              <p className="mt-1 flex items-center gap-2 text-op-xs text-muted-foreground">
+                <Clock3 aria-hidden="true" className="size-3 shrink-0" />
                 {s.duracionMinutos} min · {formatoPrecio(s.precio)}
               </p>
             </button>
@@ -281,30 +309,33 @@ export function ReservaFlow({
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
             <button
               aria-pressed={usuarioId === ""}
-              className={`rounded-2xl border p-4 text-left transition-colors ${
+              className={`rounded-2xl border p-4 text-left transition-[transform,background-color,border-color] duration-150 anim-entrada active:scale-[0.98] ${
                 usuarioId === ""
                   ? "border-primary bg-accent"
                   : "border-border bg-card hover:border-muted-foreground/40"
               }`}
+              data-action-id="reserva.profesional.elegir"
               onClick={() => elegir(setUsuarioId)("")}
               type="button"
             >
               <p className="font-medium">Cualquiera disponible</p>
-              <p className="mt-1 text-xs text-muted-foreground">Te asignamos quien esté libre</p>
+              <p className="mt-1 text-op-xs text-muted-foreground">Te asignamos quien esté libre</p>
             </button>
-            {profesionalesSucursal.map((p) => (
+            {profesionalesSucursal.map((p, index) => (
               <button
                 aria-pressed={p.usuarioId === usuarioId}
-                className={`rounded-2xl border p-4 text-left transition-colors ${
+                className={`rounded-2xl border p-4 text-left transition-[transform,background-color,border-color] duration-150 anim-entrada active:scale-[0.98] ${
                   p.usuarioId === usuarioId
                     ? "border-primary bg-accent"
                     : "border-border bg-card hover:border-muted-foreground/40"
                 }`}
+                data-action-id="reserva.profesional.elegir"
                 key={p.usuarioId}
                 onClick={() => elegir(setUsuarioId)(p.usuarioId)}
+                style={{ animationDelay: `${Math.min(index + 1, 8) * 30}ms` }}
                 type="button"
               >
-                <p className="font-medium">{p.nombre}</p>
+                <p className="font-medium truncate">{p.nombre}</p>
               </button>
             ))}
           </div>
@@ -316,16 +347,19 @@ export function ReservaFlow({
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Día</h2>
           <div className="mt-3 flex flex-wrap gap-2">
-            {dias.map((dia) => (
+            {dias.map((dia, index) => (
               <button
                 aria-pressed={dia.diaKey === diaKey}
-                className={`rounded-xl border px-4 py-2 text-sm transition-colors ${
+                className={`min-h-11 rounded-xl border px-4 py-2 text-sm transition-[transform,background-color,border-color] duration-150 anim-entrada active:scale-[0.98] ${
                   dia.diaKey === diaKey
                     ? "border-primary bg-accent font-semibold"
                     : "border-border bg-card hover:border-muted-foreground/40"
                 }`}
+                data-action-clave={index === 0 && clavePaso === "dia" ? "1" : undefined}
+                data-action-id="reserva.dia.elegir"
                 key={dia.diaKey}
                 onClick={() => elegir(setDiaKey)(dia.diaKey)}
+                style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
                 type="button"
               >
                 {dia.etiqueta}
@@ -340,10 +374,24 @@ export function ReservaFlow({
         <div>
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Horario</h2>
           {pending && slots === null ? (
-            <p className="mt-3 text-sm text-muted-foreground">Buscando horarios disponibles…</p>
+            <div
+              aria-label="Buscando horarios disponibles"
+              className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6"
+              role="status"
+            >
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div aria-hidden="true" className="h-11 animate-pulse rounded-xl border border-border bg-card" key={index} />
+              ))}
+              <span className="sr-only">Buscando horarios disponibles…</span>
+            </div>
           ) : null}
           {slotsError ? (
-            <p className="mt-3 text-sm text-destructive">{slotsError}</p>
+            <p
+              className="mt-3 rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-destructive-soft-foreground"
+              role="alert"
+            >
+              {slotsError}
+            </p>
           ) : null}
           {slots !== null && slots.length === 0 && !slotsError ? (
             <p className="mt-3 text-sm text-muted-foreground">
@@ -352,16 +400,19 @@ export function ReservaFlow({
           ) : null}
           {slots && slots.length > 0 ? (
             <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-              {slots.map((iso) => (
+              {slots.map((iso, index) => (
                 <button
                   aria-pressed={iso === slotIso}
-                  className={`rounded-xl border px-3 py-2 text-sm tabular-nums transition-colors ${
+                  className={`min-h-11 rounded-xl border px-3 py-2 text-sm tabular-nums transition-[transform,background-color,border-color] duration-150 anim-entrada active:scale-[0.98] ${
                     iso === slotIso
                       ? "border-primary bg-primary font-semibold text-primary-foreground"
                       : "border-border bg-card hover:border-muted-foreground/40"
                   }`}
+                  data-action-clave={index === 0 && clavePaso === "horario" ? "1" : undefined}
+                  data-action-id="reserva.horario.elegir"
                   key={iso}
                   onClick={() => setSlotIso(iso)}
+                  style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
                   type="button"
                 >
                   {formatoHora(iso, sucursal.zonaHoraria)}
@@ -374,9 +425,9 @@ export function ReservaFlow({
 
       {/* Paso 5: datos */}
       {slotIso ? (
-        <form className="rounded-3xl border border-border bg-card p-6 shadow-sm" onSubmit={enviar}>
+        <form className="rounded-3xl border border-border bg-card p-6 shadow-sm anim-entrada" onSubmit={enviar}>
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-primary">
-            <CalendarCheck2 className="size-4" /> Tus datos
+            <CalendarCheck2 aria-hidden="true" className="size-4" /> Tus datos
           </h2>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <Field className="sm:col-span-2">
@@ -398,28 +449,32 @@ export function ReservaFlow({
           </div>
           <TurnstileWidget className="mt-4 flex justify-center" />
           {resultado?.tipo === "error" ? (
-            <p className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+            <p className="mt-4 rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-destructive-soft-foreground" role="alert">
               {resultado.mensaje}
             </p>
           ) : null}
           <div className="mt-5 flex items-center gap-3">
             <Button
               className="rounded-xl"
+              data-action-id="reserva.horario.cambiar"
               onClick={() => setSlotIso("")}
               type="button"
               variant="outline"
             >
-              <ChevronLeft className="size-4" /> Cambiar horario
+              <ChevronLeft aria-hidden="true" className="size-4" /> Cambiar horario
             </Button>
             <Button
-              className="flex-1 rounded-xl py-3 text-sm font-semibold"
+              className="flex-1 rounded-xl text-sm font-semibold"
+              data-action-clave={clavePaso === "confirmar" ? "1" : undefined}
+              data-action-id="reserva.confirmar"
               disabled={pending}
+              size="touch"
               type="submit"
             >
               {pending ? "Reservando…" : "Confirmar reserva"}
             </Button>
           </div>
-          <p className="mt-3 text-xs leading-5 text-muted-foreground">
+          <p className="mt-3 text-op-xs leading-5 text-muted-foreground">
             {sucursal.autoConfirmar
               ? "Tu cita queda confirmada al instante."
               : "El equipo revisará tu solicitud y te confirmará por teléfono."}

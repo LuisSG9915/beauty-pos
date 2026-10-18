@@ -50,7 +50,7 @@ export function MovimientoCajaForm({
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_9rem]">
         <Field>
-          <FieldLabel className="text-xs">Tipo</FieldLabel>
+          <FieldLabel className="text-op-xs">Tipo</FieldLabel>
           <select
             className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30"
             name="tipo"
@@ -65,7 +65,7 @@ export function MovimientoCajaForm({
           </select>
         </Field>
         <Field>
-          <FieldLabel className="text-xs">Medio (efectivo)</FieldLabel>
+          <FieldLabel className="text-op-xs">Medio (efectivo)</FieldLabel>
           <select
             className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30"
             name="medioPagoId"
@@ -78,7 +78,7 @@ export function MovimientoCajaForm({
           </select>
         </Field>
         <Field>
-          <FieldLabel className="text-xs">Monto</FieldLabel>
+          <FieldLabel className="text-op-xs">Monto</FieldLabel>
           <Input
             inputMode="decimal"
             min={tipo === "ajuste" ? undefined : "0.01"}
@@ -91,7 +91,7 @@ export function MovimientoCajaForm({
       </div>
 
       <Field>
-        <FieldLabel className="text-xs">
+        <FieldLabel className="text-op-xs">
           Nota{notaRequerida ? " (obligatoria)" : ""}
         </FieldLabel>
         <Input
@@ -112,7 +112,7 @@ export function MovimientoCajaForm({
       </Field>
 
       <ActionFeedback state={state} />
-      <Button className="rounded-xl" size="lg" data-action-id="caja.movimiento.registrar" disabled={pending} type="submit" variant="outline">
+      <Button className="rounded-xl" data-action-id="caja.movimiento.registrar" disabled={pending} size="touch" type="submit" variant="outline">
         {pending ? "Registrando…" : "Registrar movimiento"}
       </Button>
     </form>

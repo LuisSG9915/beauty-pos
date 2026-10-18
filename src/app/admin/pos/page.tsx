@@ -9,6 +9,7 @@ import { VentaDirectaSubmit } from "@/app/admin/pos/venta-directa-submit";
 import { VentaTicket } from "@/app/admin/pos/venta-ticket";
 import { AdminNavTabs, CAJA_VENTAS_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
@@ -210,6 +211,7 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button
+              data-action-id="pos.venta.offline"
               nativeButton={false}
               render={
                 <Link
@@ -224,6 +226,7 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
               Venta sin conexión
             </Button>
             <Button
+              data-action-id="pos.venta.nueva"
               nativeButton={false}
               render={
                 <Link
@@ -239,6 +242,7 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
               Nueva venta rápida
             </Button>
             <Button
+              data-action-id="pos.ventas.historial"
               nativeButton={false}
               render={<Link href={buildAdminHref("/ventas", { organizationId, sucursalId })} />}
               variant="outline"
@@ -285,17 +289,19 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
         >
           <div className="space-y-2">
             {ventasHoy.length === 0 ? (
-              <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">Sin ventas hoy en esta sucursal.</p>
+              <EmptyState description="Aún no se han registrado ventas hoy en esta sucursal." title="Sin ventas hoy" />
             ) : null}
-            {ventasHoy.map((venta) => (
+            {ventasHoy.map((venta, index) => (
               <Link
-                className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-border px-4 py-2.5 text-sm transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-ring"
+                className="flex min-h-11 items-center justify-between gap-3 rounded-xl border border-border px-4 py-2.5 text-sm transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-ring anim-entrada"
+                data-action-id="pos.venta_hoy.abrir"
                 href={buildAdminHref("/pos", {
                   organizationId,
                   sucursalId,
                   extra: { ventaId: venta.id, returnTo: currentHref },
                 })}
                 key={venta.id}
+                style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
               >
                 <span className="min-w-0 truncate">
                   {venta.clienteNombre ?? GLOSARIO.clienteDePaso} · {formatTime(venta.fecha, { timeZone: context.timeZone })}

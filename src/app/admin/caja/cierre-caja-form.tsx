@@ -7,6 +7,7 @@ import { cerrarCaja, type CajaActionState } from "@/app/admin/caja/actions";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Textarea } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
+import { formatCurrency } from "@/lib/format";
 
 const initialState: CajaActionState = {};
 
@@ -22,10 +23,12 @@ const DENOMINACIONES_MONEDAS = [20, 10, 5, 2, 1, 0.5];
  */
 export function CierreCajaForm({
   corteId,
+  currency,
   medios,
   organizationId,
 }: {
   corteId: string;
+  currency: string;
   medios: MedioPago[];
   organizationId: string;
 }) {
@@ -97,7 +100,7 @@ export function CierreCajaForm({
 
       <div className="flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm text-foreground">
         <ShieldCheck className="size-5 shrink-0 text-primary mt-0.5" />
-        <div className="space-y-1 text-xs sm:text-sm">
+        <div className="space-y-1 text-op-xs sm:text-sm">
           <p className="font-semibold text-foreground">Arqueo Ciego de Seguridad</p>
           <p className="text-muted-foreground leading-relaxed">
             Cuenta el dinero físico y los vouchers de tus terminales bancarias sin ver los números esperados por el sistema.
@@ -116,7 +119,8 @@ export function CierreCajaForm({
               </FieldLabel>
             </div>
             <button
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline self-start sm:self-auto cursor-pointer"
+              className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-op-xs font-medium text-primary hover:bg-primary/10 hover:underline self-start sm:self-auto"
+              data-action-id="caja.cierre.toggle_desglose"
               onClick={() => setMostrarDesglose(!mostrarDesglose)}
               type="button"
             >
@@ -143,13 +147,14 @@ export function CierreCajaForm({
           </div>
 
           {mostrarDesglose ? (
-            <div className="rounded-xl border border-border/70 bg-muted/30 p-3.5 space-y-4 pt-4">
+            <div className="rounded-xl border border-border/70 bg-muted/30 p-3.5 space-y-4 pt-4 anim-entrada">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <span className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Desglose de efectivo
                 </span>
                 <button
-                  className="text-xs text-muted-foreground hover:text-foreground underline"
+                  className="inline-flex min-h-8 items-center rounded-md px-1.5 text-op-xs text-muted-foreground underline hover:text-foreground"
+                  data-action-id="caja.cierre.reiniciar_desglose"
                   onClick={limpiarDesglose}
                   type="button"
                 >
@@ -158,9 +163,9 @@ export function CierreCajaForm({
               </div>
 
               <div>
-                <p className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                <p className="flex items-center gap-1.5 text-op-xs font-medium text-foreground mb-2">
                   <Banknote className="size-3.5 text-success" />
-                  Billetes (Subtotal: ${totalBilletes.toLocaleString("es-MX", { minimumFractionDigits: 2 })})
+                  Billetes (Subtotal: {formatCurrency(totalBilletes, { currency })})
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {DENOMINACIONES_BILLETES.map((denom) => (
@@ -168,12 +173,12 @@ export function CierreCajaForm({
                       className="flex items-center justify-between gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5"
                       key={denom}
                     >
-                      <span className="text-xs font-semibold text-foreground tabular-nums">${denom}</span>
+                      <span className="text-op-xs font-semibold text-foreground tabular-nums">${denom}</span>
                       <div className="flex items-center gap-1">
-                        <span className="text-xs text-muted-foreground">×</span>
+                        <span className="text-op-xs text-muted-foreground">×</span>
                         <input
                           aria-label={`Cantidad de billetes de $${denom}`}
-                          className="w-14 rounded-md border border-input bg-background px-2 py-1 text-right text-xs font-semibold tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
+                          className="h-9 w-14 rounded-md border border-input bg-background px-2 text-right text-op-xs font-semibold tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
                           inputMode="numeric"
                           min="0"
                           onChange={(e) => actualizarBillete(denom, e.target.value)}
@@ -188,9 +193,9 @@ export function CierreCajaForm({
               </div>
 
               <div>
-                <p className="flex items-center gap-1.5 text-xs font-medium text-foreground mb-2">
+                <p className="flex items-center gap-1.5 text-op-xs font-medium text-foreground mb-2">
                   <Coins className="size-3.5 text-amber-500" />
-                  Monedas (Subtotal: ${totalMonedas.toLocaleString("es-MX", { minimumFractionDigits: 2 })})
+                  Monedas (Subtotal: {formatCurrency(totalMonedas, { currency })})
                 </p>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {DENOMINACIONES_MONEDAS.map((denom) => (
@@ -198,12 +203,12 @@ export function CierreCajaForm({
                       className="flex items-center justify-between gap-1 rounded-lg border border-border bg-card px-2.5 py-1.5"
                       key={denom}
                     >
-                      <span className="text-xs font-semibold text-foreground tabular-nums">${denom.toFixed(denom < 1 ? 2 : 0)}</span>
+                      <span className="text-op-xs font-semibold text-foreground tabular-nums">${denom.toFixed(denom < 1 ? 2 : 0)}</span>
                       <div className="flex items-center gap-1">
-                        <span className="text-xs text-muted-foreground">×</span>
+                        <span className="text-op-xs text-muted-foreground">×</span>
                         <input
                           aria-label={`Cantidad de monedas de $${denom}`}
-                          className="w-14 rounded-md border border-input bg-background px-2 py-1 text-right text-xs font-semibold tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
+                          className="h-9 w-14 rounded-md border border-input bg-background px-2 text-right text-op-xs font-semibold tabular-nums focus:outline-none focus:ring-1 focus:ring-primary"
                           inputMode="numeric"
                           min="0"
                           onChange={(e) => actualizarMoneda(denom, e.target.value)}
@@ -217,10 +222,10 @@ export function CierreCajaForm({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between border-t border-border pt-2 text-xs">
+              <div className="flex items-center justify-between border-t border-border pt-2 text-op-xs">
                 <span className="font-medium text-muted-foreground">Total desglosado:</span>
                 <span className="text-sm font-bold text-foreground tabular-nums">
-                  ${totalDesglose.toLocaleString("es-MX", { minimumFractionDigits: 2 })}
+                  {formatCurrency(totalDesglose, { currency })}
                 </span>
               </div>
             </div>
@@ -234,7 +239,7 @@ export function CierreCajaForm({
             <CreditCard className="size-4 text-muted-foreground" />
             <h3 className="text-sm font-semibold text-foreground">Terminales y otros medios de pago</h3>
           </div>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-op-xs text-muted-foreground">
             Ingresa el importe total acumulado en el voucher o resumen de cierre de cada terminal bancaria / pasarela.
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 pt-1">

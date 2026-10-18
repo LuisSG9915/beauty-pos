@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { AlertCircle, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { notFound } from "next/navigation";
 
@@ -10,15 +10,6 @@ import { AdminNavTabs, CAJA_VENTAS_TABS } from "@/components/admin/admin-nav-tab
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { getDatabase } from "@/db/client";
-import { catMediosPago } from "@/db/schema/catalogs";
-import { sucursales, usuarios } from "@/db/schema/core";
-import {
-  cortesCaja,
-  detalleCortes,
-  detalleVentasComisiones,
-  movimientosCaja,
-  ventas,
-} from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate, formatTime } from "@/lib/format";
@@ -37,121 +28,158 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
 
   const db = getDatabase();
 
-  // Independientes entre sí: una sola ronda en paralelo (~1 RT en vez de 4).
-  const [[sucursalRow], [corteAbierto], medios, historial] = await Promise.all([
-    db
-      .select({ exigirCorteParaCobrar: sucursales.exigirCorteParaCobrar })
-      .from(sucursales)
-      .where(eq(sucursales.id, branch.id))
-      .limit(1),
-    db
-      .select({ id: cortesCaja.id, fondoInicial: cortesCaja.fondoInicial, createdAt: cortesCaja.createdAt, notas: cortesCaja.notas })
-      .from(cortesCaja)
-      .where(and(eq(cortesCaja.sucursalId, branch.id), eq(cortesCaja.estado, "abierto"), eq(cortesCaja.activo, true)))
-      .limit(1),
-    db
-      .select({ id: catMediosPago.id, nombre: catMediosPago.nombre, categoria: catMediosPago.categoria })
-      .from(catMediosPago)
-      .where(and(eq(catMediosPago.organizacionId, organization.id), eq(catMediosPago.activo, true)))
-      .orderBy(catMediosPago.nombre),
-    db
-      .select({
-        id: cortesCaja.id,
-        fondoInicial: cortesCaja.fondoInicial,
-        createdAt: cortesCaja.createdAt,
-        cerradoAt: cortesCaja.cerradoAt,
-        notas: cortesCaja.notas,
-        abiertoPor: usuarios.nombre,
-      })
-      .from(cortesCaja)
-      .leftJoin(usuarios, eq(cortesCaja.usuarioId, usuarios.id))
-      .where(and(eq(cortesCaja.sucursalId, branch.id), eq(cortesCaja.estado, "cerrado"), eq(cortesCaja.activo, true)))
-      .orderBy(desc(cortesCaja.cerradoAt))
-      .limit(10),
-  ]);
+  // Una sola ronda SQL para toda la pantalla: antes eran 9 consultas en dos
+  // Promise.all (~4 conexiones frías + RTs). El CTE `corte_abierto` evita
+  // repetir el subselect del turno vigente; el historial lleva sus detalles
+  // y totales anidados en jsonb por corte.
+  // En corte abierto solo contamos ventas: mostrar importes rompería el cierre
+  // ciego. Los movimientos del turno se listan (el cajero los registró) sin
+  // sumarlos al esperado visible — el esperado solo se revela al confirmar.
+  type CajaRow = {
+    exigirCorteParaCobrar: boolean | null;
+    corteAbierto: {
+      id: string;
+      fondoInicial: string;
+      createdAt: string;
+      notas: string | null;
+    } | null;
+    medios: Array<{ id: string; nombre: string; categoria: string }>;
+    historial: Array<{
+      id: string;
+      fondoInicial: string;
+      createdAt: string;
+      cerradoAt: string | null;
+      notas: string | null;
+      abiertoPor: string | null;
+      detalles: Array<{
+        medioNombre: string;
+        esperado: string;
+        contado: string;
+        diferencia: string;
+      }>;
+      ventasCount: number;
+      ventasTotal: string;
+      propinas: string;
+      comisionesTotal: string;
+    }>;
+    ventasDelCorte: number;
+    movimientosTurno: Array<{
+      id: string;
+      tipo: string;
+      monto: string;
+      notas: string | null;
+      createdAt: string;
+      medioNombre: string;
+      usuarioNombre: string;
+    }>;
+  };
+  const result = await db.execute<CajaRow>(sql`
+    with corte_abierto as materialized (
+      select cc.id, cc.fondo_inicial, cc.created_at, cc.notas
+        from cortes_caja cc
+       where cc.sucursal_id = ${branch.id}
+         and cc.estado = 'abierto'
+         and cc.activo
+       limit 1
+    ),
+    -- Materializa los 10 cortes recientes ANTES de los agregados: sin esto,
+    -- Cockroach evalúa los subselects de ventas sobre todo el historial de
+    -- cortes de la sucursal y aplica el top-k al final.
+    ultimos_cortes as materialized (
+      select cc.id, cc.fondo_inicial, cc.created_at, cc.cerrado_at, cc.notas,
+             u.nombre as abierto_por
+        from cortes_caja cc
+        left join usuarios u on cc.usuario_id = u.id
+       where cc.sucursal_id = ${branch.id}
+         and cc.estado = 'cerrado'
+         and cc.activo
+       order by cc.cerrado_at desc
+       limit 10
+    )
+    select
+      (select s.exigir_corte_para_cobrar from sucursales s
+        where s.id = ${branch.id}) as "exigirCorteParaCobrar",
+      (select jsonb_build_object(
+          'id', ca.id,
+          'fondoInicial', ca.fondo_inicial::text,
+          'createdAt', to_char(ca.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+          'notas', ca.notas)
+        from corte_abierto ca) as "corteAbierto",
+      coalesce((
+        select jsonb_agg(jsonb_build_object('id', mp.id, 'nombre', mp.nombre, 'categoria', mp.categoria)
+          order by mp.nombre)
+          from cat_medios_pago mp
+         where mp.organizacion_id = ${organization.id} and mp.activo
+      ), '[]'::jsonb) as medios,
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            uc.id,
+            uc.fondo_inicial::text as "fondoInicial",
+            to_char(uc.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt",
+            case when uc.cerrado_at is null then null
+                 else to_char(uc.cerrado_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') end as "cerradoAt",
+            uc.notas,
+            uc.abierto_por as "abiertoPor",
+            coalesce((
+              select jsonb_agg(jsonb_build_object(
+                  'medioNombre', mp.nombre,
+                  'esperado', dc.esperado::text,
+                  'contado', dc.contado::text,
+                  'diferencia', dc.diferencia::text))
+                from detalle_cortes dc
+                join cat_medios_pago mp on dc.medio_pago_id = mp.id
+               where dc.corte_id = uc.id
+            ), '[]'::jsonb) as detalles,
+            agg."ventasCount",
+            agg."ventasTotal",
+            agg.propinas,
+            (select coalesce(sum(dvc.monto), 0)::text
+               from detalle_ventas_comisiones dvc
+               join ventas v on dvc.venta_id = v.id
+              where v.corte_id = uc.id and dvc.activo) as "comisionesTotal"
+          from ultimos_cortes uc
+          -- Una sola pasada por ventas por corte: antes eran 3 subselects
+          -- correlacionados que el optimizador encadenaba como 3 lookup joins.
+          cross join lateral (
+            select count(*)::int as "ventasCount",
+                   coalesce(sum(v.total), 0)::text as "ventasTotal",
+                   coalesce(sum(v.propina), 0)::text as propinas
+              from ventas v
+             where v.corte_id = uc.id and v.estado = 'completada' and v.activo
+          ) agg
+          order by uc.cerrado_at desc
+        ) t
+      ), '[]'::jsonb) as historial,
+      coalesce((
+        select count(*)::int from ventas v
+         where v.corte_id = (select id from corte_abierto)
+           and v.estado = 'completada' and v.activo
+      ), 0) as "ventasDelCorte",
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+            'id', mc.id,
+            'tipo', mc.tipo,
+            'monto', mc.monto::text,
+            'notas', mc.notas,
+            'createdAt', to_char(mc.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
+            'medioNombre', mp.nombre,
+            'usuarioNombre', u.nombre)
+          order by mc.created_at desc)
+          from movimientos_caja mc
+          join cat_medios_pago mp on mc.medio_pago_id = mp.id
+          join usuarios u on mc.usuario_id = u.id
+         where mc.corte_id = (select id from corte_abierto)
+      ), '[]'::jsonb) as "movimientosTurno"
+  `);
 
-  const corteIds = historial.map((c) => c.id);
-  const hayCorteIds = corteIds.length > 0;
-  const emptyDetalles: {
-    corteId: string;
-    medioNombre: string;
-    esperado: string;
-    contado: string;
-    diferencia: string;
-  }[] = [];
-
-  // Segunda ronda: ventas/movimientos del corte abierto y detalles del
-  // historial van juntos en paralelo.
-  // En corte abierto solo contamos ventas: mostrar importes rompería el cierre ciego.
-  // Movimientos del turno: se listan (el cajero los registró) sin sumarlos al
-  // esperado visible — el esperado solo se revela al confirmar el cierre.
-  const [[ventasDelCorte], movimientosTurno, detalles, totalesVentas, totalesComisiones] = await Promise.all([
-    corteAbierto
-      ? db
-          .select({ count: sql<number>`count(*)::int` })
-          .from(ventas)
-          .where(and(eq(ventas.corteId, corteAbierto.id), eq(ventas.estado, "completada"), eq(ventas.activo, true)))
-      : Promise.resolve([{ count: 0 }]),
-    corteAbierto
-      ? db
-          .select({
-            id: movimientosCaja.id,
-            tipo: movimientosCaja.tipo,
-            monto: movimientosCaja.monto,
-            notas: movimientosCaja.notas,
-            createdAt: movimientosCaja.createdAt,
-            medioNombre: catMediosPago.nombre,
-            usuarioNombre: usuarios.nombre,
-          })
-          .from(movimientosCaja)
-          .innerJoin(catMediosPago, eq(movimientosCaja.medioPagoId, catMediosPago.id))
-          .innerJoin(usuarios, eq(movimientosCaja.usuarioId, usuarios.id))
-          .where(eq(movimientosCaja.corteId, corteAbierto.id))
-          .orderBy(desc(movimientosCaja.createdAt))
-      : Promise.resolve([]),
-    hayCorteIds
-      ? db
-          .select({
-            corteId: detalleCortes.corteId,
-            medioNombre: catMediosPago.nombre,
-            esperado: detalleCortes.esperado,
-            contado: detalleCortes.contado,
-            diferencia: detalleCortes.diferencia,
-          })
-          .from(detalleCortes)
-          .innerJoin(catMediosPago, eq(detalleCortes.medioPagoId, catMediosPago.id))
-          .where(inArray(detalleCortes.corteId, corteIds))
-      : Promise.resolve(emptyDetalles),
-    hayCorteIds
-      ? db
-          .select({
-            corteId: ventas.corteId,
-            ventasCount: sql<number>`count(*)::int`,
-            total: sql<string>`coalesce(sum(${ventas.total}), 0)`,
-            propinas: sql<string>`coalesce(sum(${ventas.propina}), 0)`,
-          })
-          .from(ventas)
-          .where(and(inArray(ventas.corteId, corteIds), eq(ventas.estado, "completada"), eq(ventas.activo, true)))
-          .groupBy(ventas.corteId)
-      : Promise.resolve([]),
-    hayCorteIds
-      ? db
-          .select({ corteId: ventas.corteId, total: sql<string>`coalesce(sum(${detalleVentasComisiones.monto}), 0)` })
-          .from(detalleVentasComisiones)
-          .innerJoin(ventas, eq(detalleVentasComisiones.ventaId, ventas.id))
-          .where(and(inArray(ventas.corteId, corteIds), eq(detalleVentasComisiones.activo, true)))
-          .groupBy(ventas.corteId)
-      : Promise.resolve([]),
-  ]);
-
-  const detallesPorCorte = new Map<string, typeof detalles>();
-  for (const d of detalles) {
-    const list = detallesPorCorte.get(d.corteId) ?? [];
-    list.push(d);
-    detallesPorCorte.set(d.corteId, list);
-  }
-  const ventasPorCorte = new Map(totalesVentas.map((t) => [t.corteId, t]));
-  const comisionesPorCorte = new Map(totalesComisiones.map((t) => [t.corteId, num(t.total)]));
+  const data = result.rows[0];
+  const sucursalRow = { exigirCorteParaCobrar: data?.exigirCorteParaCobrar ?? false };
+  const corteAbierto = data?.corteAbierto ?? null;
+  const medios = data?.medios ?? [];
+  const historial = data?.historial ?? [];
+  const movimientosTurno = data?.movimientosTurno ?? [];
+  const ventasDelCorte = { count: data?.ventasDelCorte ?? 0 };
 
   const fmt = (v: string | number | null | undefined) => formatCurrency(num(v), { currency });
 
@@ -181,13 +209,15 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
         {corteAbierto ? (
           <div className="space-y-6 self-start">
             <AdminCard
-              description={`Abierta ${formatDate(corteAbierto.createdAt, { timeZone })} ${formatTime(corteAbierto.createdAt, { timeZone })} · Fondo ${fmt(corteAbierto.fondoInicial)} · ${ventasDelCorte?.count ?? 0} venta(s) cobrada(s)`}
+              animate
+              description={`Abierta ${formatDate(corteAbierto.createdAt, { timeZone })} ${formatTime(corteAbierto.createdAt, { timeZone })} · Fondo ${fmt(corteAbierto.fondoInicial)} · ${ventasDelCorte.count} venta(s) cobrada(s)`}
               title="Caja abierta — conteo del turno"
             >
-              <CierreCajaForm corteId={corteAbierto.id} medios={medios} organizationId={organization.id} />
+              <CierreCajaForm corteId={corteAbierto.id} currency={currency} medios={medios} organizationId={organization.id} />
             </AdminCard>
 
             <AdminCard
+              animate
               description="Entradas, retiros, gastos, depósitos y ajustes del turno (solo efectivo)."
               title="Movimientos de caja"
             >
@@ -198,14 +228,15 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
               />
               {movimientosTurno.length > 0 ? (
                 <ul className="mt-4 space-y-2">
-                  {movimientosTurno.map((mov) => (
+                  {movimientosTurno.map((mov, index) => (
                     <li
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border px-4 py-2.5 text-sm"
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border px-4 py-2.5 text-sm anim-entrada"
                       key={mov.id}
+                      style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
                     >
                       <div className="min-w-0">
                         <p className="font-medium capitalize text-foreground">{mov.tipo}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-op-xs text-muted-foreground">
                           {formatTime(mov.createdAt, { timeZone })} · {mov.medioNombre} · {mov.usuarioNombre}
                           {mov.notas ? ` · ${mov.notas}` : ""}
                         </p>
@@ -228,29 +259,29 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
             </AdminCard>
           </div>
         ) : (
-          <AdminCard className="self-start" description="Registra el fondo inicial para empezar a asociar ventas." title="Abrir caja">
+          <AdminCard animate className="self-start" description="Registra el fondo inicial para empezar a asociar ventas." title="Abrir caja">
             <AperturaCajaForm organizationId={organization.id} sucursalId={branch.id} />
           </AdminCard>
         )}
 
-        <AdminCard className="self-start" description="Auditoría de arqueo ciego: esperado vs. contado físico por medio de pago." title="Cortes recientes">
+        <AdminCard animate className="self-start" description="Auditoría de arqueo ciego: esperado vs. contado físico por medio de pago." title="Cortes recientes">
           {historial.length === 0 ? (
             <EmptyState description="Aquí aparecerán los cortes cerrados con su reporte de discrepancias y arqueo." title="Sin cortes aún" />
           ) : (
             <ul className="space-y-4">
               {historial.map((corte, index) => {
-                const tot = ventasPorCorte.get(corte.id);
-                const detallesList = detallesPorCorte.get(corte.id) ?? [];
+                const detallesList = corte.detalles;
                 const diferenciaTotal = detallesList.reduce((s, d) => s + num(d.diferencia), 0);
                 const esCuadrado = Math.abs(diferenciaTotal) < 0.01;
                 const esFaltante = diferenciaTotal <= -0.01;
 
                 return (
                   <li
-                    className={`rounded-2xl border p-4 transition-colors ${
+                    className={`rounded-2xl border p-4 transition-colors anim-entrada ${
                       index === 0 ? "border-primary/30 bg-card shadow-xs" : "border-border bg-card"
                     }`}
                     key={corte.id}
+                    style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
@@ -266,26 +297,26 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                       </div>
 
                       {esCuadrado ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-0.5 text-xs font-semibold text-success-soft-foreground">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-0.5 text-op-xs font-semibold text-success-soft-foreground">
                           <CheckCircle2 className="size-3.5 text-success" />
                           Arqueo cuadrado
                         </span>
                       ) : esFaltante ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-destructive-soft px-2.5 py-0.5 text-xs font-semibold text-destructive-soft-foreground">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-destructive-soft px-2.5 py-0.5 text-op-xs font-semibold text-destructive-soft-foreground">
                           <AlertCircle className="size-3.5 text-destructive" />
                           Faltante de -{fmt(Math.abs(diferenciaTotal))}
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-0.5 text-xs font-semibold text-warning-soft-foreground">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-0.5 text-op-xs font-semibold text-warning-soft-foreground">
                           <AlertTriangle className="size-3.5 text-warning" />
                           Sobrante de +{fmt(diferenciaTotal)}
                         </span>
                       )}
                     </div>
 
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Responsable: {corte.abiertoPor ?? "—"} · Fondo inicial: {fmt(corte.fondoInicial)} · {tot?.ventasCount ?? 0} venta(s) cobrada(s) ({fmt(tot?.total)}) ·{" "}
-                      {fmt(tot?.propinas)} propinas · {fmt(comisionesPorCorte.get(corte.id))} comisiones
+                    <p className="mt-1 text-op-xs text-muted-foreground">
+                      Responsable: {corte.abiertoPor ?? "—"} · Fondo inicial: {fmt(corte.fondoInicial)} · {corte.ventasCount} venta(s) cobrada(s) ({fmt(corte.ventasTotal)}) ·{" "}
+                      {fmt(corte.propinas)} propinas · {fmt(corte.comisionesTotal)} comisiones
                     </p>
 
                     {/* Móvil: desglose como lista (la tabla de 5 columnas
@@ -311,7 +342,7 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                                 {itemCuadrado ? "Cuadrado" : itemFaltante ? "Faltante" : "Sobrante"}
                               </span>
                             </div>
-                            <div className="mt-1 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                            <div className="mt-1 flex items-center justify-between gap-3 text-op-xs text-muted-foreground">
                               <span>
                                 Esperado <span className="tabular-nums">{fmt(d.esperado)}</span> · Contado{" "}
                                 <span className="tabular-nums font-semibold text-foreground">{fmt(d.contado)}</span>
@@ -380,7 +411,7 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                     </div>
 
                     {corte.notas ? (
-                      <p className="mt-2.5 rounded-lg bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
+                      <p className="mt-2.5 rounded-lg bg-muted/40 px-3 py-1.5 text-op-xs text-muted-foreground">
                         <span className="font-semibold text-foreground">Notas de cierre:</span> {corte.notas}
                       </p>
                     ) : null}

@@ -158,7 +158,7 @@ export function CobroForm({
 
   const chipPagoClass = (seleccionado: boolean) =>
     cn(
-      "min-h-10 rounded-xl border px-3.5 text-xs font-medium transition-all duration-150 active:scale-95 cursor-pointer select-none",
+      "min-h-10 rounded-xl border px-3.5 text-op-xs font-medium transition-all duration-150 active:scale-[0.98] cursor-pointer select-none",
       seleccionado
         ? "border-primary bg-accent/80 text-primary font-semibold ring-2 ring-primary/20 shadow-xs"
         : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
@@ -203,7 +203,7 @@ export function CobroForm({
         </p>
       </div>
       {propina > 0 || anticipo > 0 ? (
-        <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+        <p className="mt-0.5 text-op-xs tabular-nums text-muted-foreground">
           {formatCurrency(total)}
           {anticipo > 0 ? ` − ${formatCurrency(anticipo)} anticipo` : ""}
           {propina > 0 ? ` + ${formatCurrency(propina)} propina` : ""}
@@ -211,17 +211,18 @@ export function CobroForm({
       ) : null}
 
       <div className="mt-4">
-        <p className="text-xs font-medium text-muted-foreground">Propina</p>
+        <p className="text-op-xs font-medium text-muted-foreground">Propina</p>
         <div aria-label="Propina" className="mt-1.5 flex flex-wrap gap-1.5" role="group">
           {PROPINA_OPCIONES.map((opcion) => (
             <button
               aria-pressed={propinaOpcion === opcion.value}
               className={cn(
-                "min-h-9 rounded-xl border px-3 text-xs font-medium transition-all duration-150 active:scale-95 cursor-pointer",
+                "min-h-9 rounded-xl border px-3 text-op-xs font-medium transition-all duration-150 active:scale-[0.98] cursor-pointer",
                 propinaOpcion === opcion.value
                   ? "border-primary bg-accent/70 text-primary font-semibold ring-2 ring-primary/20 shadow-xs"
                   : "border-border bg-card text-muted-foreground hover:border-accent-foreground/30 hover:text-primary",
               )}
+              data-action-id="pos.cobro.propina"
               key={opcion.value}
               onClick={() => seleccionarPropina(opcion.value)}
               type="button"
@@ -261,12 +262,13 @@ export function CobroForm({
 
       <div className={cubiertoPorAnticipo ? "hidden" : "mt-5 space-y-3"}>
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-medium text-muted-foreground">
+          <p className="text-op-xs font-medium text-muted-foreground">
             Pagos{pagos.length > 1 ? ` (${pagos.length})` : ""}
           </p>
           {pagos.length < MAX_PAGOS && mediosPago.length > 0 ? (
             <button
-              className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-xs font-medium text-primary transition-colors hover:bg-accent/70 cursor-pointer active:scale-95"
+              className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-op-xs font-medium text-primary transition-colors hover:bg-accent/70 cursor-pointer active:scale-[0.98]"
+              data-action-id="pos.cobro.agregar_pago"
               onClick={agregarPago}
               type="button"
             >
@@ -301,6 +303,7 @@ export function CobroForm({
                   <button
                     aria-pressed={pago.medioPagoId === item.id}
                     className={chipPagoClass(pago.medioPagoId === item.id)}
+                    data-action-id="pos.cobro.medio_pago"
                     key={item.id}
                     onClick={() => updatePago(index, { medioPagoId: item.id })}
                     type="button"
@@ -316,11 +319,12 @@ export function CobroForm({
                   {quickCashOptions.map((opt) => (
                     <button
                       className={cn(
-                        "inline-flex min-h-7 items-center rounded-lg border px-2.5 text-xs font-semibold tabular-nums transition-all duration-150 active:scale-95 cursor-pointer select-none",
+                        "inline-flex min-h-9 items-center rounded-lg border px-2.5 text-op-xs font-semibold tabular-nums transition-all duration-150 active:scale-[0.98] cursor-pointer select-none any-pointer-coarse:min-h-10",
                         Math.abs((Number(pago.monto) || 0) - opt) < 0.005
                           ? "border-primary bg-primary text-primary-foreground shadow-xs"
                           : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground",
                       )}
+                      data-action-id="pos.cobro.billete_rapido"
                       key={opt}
                       onClick={() => updatePago(index, { monto: opt.toFixed(2) })}
                       type="button"
@@ -344,7 +348,7 @@ export function CobroForm({
                   value={pago.monto}
                 />
                 <button
-                  className="min-h-10 rounded-xl border border-border bg-card px-3 text-xs font-medium text-primary transition-all hover:bg-accent/70 active:scale-95 disabled:opacity-50 cursor-pointer"
+                  className="min-h-10 rounded-xl border border-border bg-card px-3 text-op-xs font-medium text-primary transition-all hover:bg-accent/70 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   disabled={resto <= 0}
                   onClick={() => updatePago(index, { monto: resto.toFixed(2) })}
                   type="button"
@@ -354,7 +358,7 @@ export function CobroForm({
                 {pagos.length > 1 ? (
                   <button
                     aria-label={`Quitar pago ${index + 1}`}
-                    className="flex size-10 items-center justify-center rounded-xl text-destructive transition-all hover:bg-destructive-soft active:scale-90 cursor-pointer"
+                    className="flex size-10 items-center justify-center rounded-xl text-destructive transition-all hover:bg-destructive-soft active:scale-[0.98] cursor-pointer"
                     onClick={() => quitarPago(index)}
                     type="button"
                   >
@@ -383,14 +387,14 @@ export function CobroForm({
         {cubiertoPorAnticipo ? null : cubre ? (
           <div
             className={cn(
-              "rounded-2xl border p-3.5 transition-all duration-200 animate-in fade-in zoom-in-95",
+              "rounded-2xl border p-3.5 anim-entrada",
               cambio > 0.005
-                ? "border-success/40 bg-success-soft/70 text-success-soft-foreground shadow-xs"
+                ? "border-success/40 bg-success-soft text-success-soft-foreground shadow-xs"
                 : "border-success/30 bg-success-soft text-success-soft-foreground",
             )}
           >
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider">
+              <span className="text-op-xs font-bold uppercase tracking-wider">
                 {cambio > 0.005 ? "Cambio a entregar" : "Monto cubierto"}
               </span>
               <span className="text-lg font-extrabold tabular-nums">
@@ -399,35 +403,39 @@ export function CobroForm({
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-warning/40 bg-warning-soft/70 p-3.5 text-warning-soft-foreground shadow-xs animate-in fade-in">
+          <div className="rounded-2xl border border-warning/40 bg-warning-soft p-3.5 text-warning-soft-foreground shadow-xs anim-entrada">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider">Falta por cubrir</span>
+              <span className="text-op-xs font-bold uppercase tracking-wider">Falta por cubrir</span>
               <span className="text-lg font-extrabold tabular-nums">{formatCurrency(faltante)}</span>
             </div>
           </div>
         )}
         {cubre && !pagosCompletos ? (
-          <p className="mt-2 text-xs font-medium text-warning animate-in fade-in">
+          <p className="mt-2 text-op-xs font-medium text-warning anim-entrada">
             Completa el medio y monto de cada pago.
           </p>
         ) : null}
       </div>
 
-      <ActionFeedback className="mt-3" state={state} />
+      {/* CTA pegado al fondo del formulario: al llegar a esta sección en
+          móvil, "Cobrar" queda siempre a un toque sin llegar al final. */}
+      <div className="sticky bottom-0 z-30 -mx-5 -mb-5 mt-4 border-t border-border/60 bg-card/95 px-5 pb-4 pt-3 backdrop-blur-sm sm:-mx-6 sm:-mb-6 sm:px-6 sm:pb-6">
+        <ActionFeedback className="mb-3" state={state} />
 
-      <Button
-        className={cn(
-          "mt-4 w-full rounded-2xl font-bold shadow-sm transition-all duration-200 active:scale-[0.98]",
-          puedeCobrar && "bg-primary text-primary-foreground hover:brightness-105 hover:shadow-md",
-        )}
-        data-action-clave="1"
-        data-action-id="pos.cobro.confirmar"
-        disabled={!puedeCobrar}
-        size="lg"
-        type="submit"
-      >
-        {pending ? "Procesando cobro…" : cubiertoPorAnticipo ? (anticipo > 0 ? "Completar venta (anticipo)" : "Completar venta") : `Cobrar ${formatCurrency(aCubrir)}`}
-      </Button>
+        <Button
+          className={cn(
+            "w-full rounded-2xl font-bold shadow-sm transition-all duration-200 active:scale-[0.98]",
+            puedeCobrar && "bg-primary text-primary-foreground hover:brightness-105 hover:shadow-md",
+          )}
+          data-action-clave="1"
+          data-action-id="pos.cobro.confirmar"
+          disabled={!puedeCobrar}
+          size="lg"
+          type="submit"
+        >
+          {pending ? "Procesando cobro…" : cubiertoPorAnticipo ? (anticipo > 0 ? "Completar venta (anticipo)" : "Completar venta") : `Cobrar ${formatCurrency(aCubrir)}`}
+        </Button>
+      </div>
     </form>
   );
 }

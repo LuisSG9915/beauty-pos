@@ -27,6 +27,10 @@ import { clickByHref, clickByText, waitForPath } from "./lib/dom";
 import { BASE_URL } from "./lib/e2e";
 import { printFindings, writeArtifact, type Finding } from "./lib/report";
 
+// Portal público de reservas de la organización E2E (sucursal principal con
+// reservas_online=true). Override: PERF_RESERVA_SLUG=<slug>.
+const E2E_RESERVA_SLUG = process.env.PERF_RESERVA_SLUG ?? "estetica-prueba-e2e";
+
 const PAGES = [
   "/admin",
   "/admin/agenda",
@@ -62,6 +66,7 @@ const PAGES = [
   "/admin/guia",
   "/admin/practica",
   "/admin/ventas",
+  `/reservar/${E2E_RESERVA_SLUG}`,
 ];
 
 const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"];

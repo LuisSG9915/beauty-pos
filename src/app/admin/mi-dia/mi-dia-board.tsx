@@ -11,12 +11,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useOptimistic, useRef, useState, useTransition } from "react";
 
 import { updateCitaEstado } from "@/app/admin/agenda/actions";
 import { CitaStatusBadge } from "@/app/admin/agenda/cita-side-panel";
 import { FichaForm } from "@/app/admin/clientes/ficha-form";
 import { iniciarVentaDeCita } from "@/app/admin/pos/actions";
+import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,6 +31,7 @@ import { initialActionState, type ActionState } from "@/lib/action-state";
 import { formatCurrency, formatDate, formatTime } from "@/lib/format";
 import { buildAdminHref } from "@/lib/url-context";
 import { cn } from "@/lib/utils";
+import { TRANSICION_LABEL } from "@/modules/agenda/estados";
 
 export type MiDiaCita = {
   id: string;
@@ -82,12 +84,29 @@ export function MiDiaBoard({
   const [pending, startTransition] = useTransition();
   const [pendingAction, setPendingAction] = useState<string | null>(null);
   const [citaFicha, setCitaFicha] = useState<MiDiaCita | null>(null);
+  // La cita resaltada con `anim-pulso` tras confirmarse el cambio de estado.
+  const [resaltadaId, setResaltadaId] = useState<string | null>(null);
+  const resaltadaTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cambio de estado optimista: la fila refleja el nuevo estado al instante;
+  // si el servidor falla revierte solo al cerrarse la transición.
+  const [citasOptimistas, setCitaOptimista] = useOptimistic(
+    citas,
+    (current, update: { id: string; estado: string }) =>
+      current.map((c) => (c.id === update.id ? { ...c, estado: update.estado } : c)),
+  );
 
   const runCitaAction = (cita: MiDiaCita, action: string, work: () => Promise<void>) => {
     const key = `${cita.id}:${action}`;
     if (pending && pendingAction?.startsWith(`${cita.id}:`)) return;
     setPendingAction(key);
     startTransition(work);
+  };
+
+  const marcarResaltada = (citaId: string) => {
+    setResaltadaId(citaId);
+    if (resaltadaTimer.current) clearTimeout(resaltadaTimer.current);
+    resaltadaTimer.current = setTimeout(() => setResaltadaId(null), 700);
   };
 
   const cambiarEstado = (cita: MiDiaCita, estado: string, action: string) => {
@@ -97,9 +116,11 @@ export function MiDiaBoard({
     data.set("estado", estado);
     if (cita.version !== undefined) data.set("version", String(cita.version));
     runCitaAction(cita, action, async () => {
+      setCitaOptimista({ id: cita.id, estado });
       const result = await updateCitaEstado(data);
       if (result.success) {
         toast.success(result.message ?? "Estado actualizado.");
+        marcarResaltada(cita.id);
         router.refresh();
       } else {
         toast.error(result.error ?? "No se pudo actualizar la cita.");
@@ -140,44 +161,37 @@ export function MiDiaBoard({
       },
     });
 
+  // Acción primaria del profesional: la primera cita aún operable del día.
+  // Si no hay ninguna, el "Ver agenda" del header es la acción clave.
+  const primeraAccionableId = citasOptimistas.find((cita) =>
+    ["pendiente", "confirmada", "en_proceso"].includes(cita.estado),
+  )?.id;
+
   return (
     <div className="space-y-5">
       <section
         aria-label="Resumen del día"
         className="grid grid-cols-2 gap-3 sm:grid-cols-4"
       >
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Scissors aria-hidden="true" className="size-3.5 text-primary" /> Completadas
-          </p>
-          <p className="mt-1.5 text-2xl font-bold tabular-nums text-foreground">
-            {resumen.completadas}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <ClipboardList aria-hidden="true" className="size-3.5 text-primary" /> Por atender
-          </p>
-          <p className="mt-1.5 text-2xl font-bold tabular-nums text-foreground">
-            {resumen.pendientes}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Coins aria-hidden="true" className="size-3.5 text-primary" /> Propinas
-          </p>
-          <p className="mt-1.5 text-2xl font-bold tabular-nums text-success">
-            {formatCurrency(resumen.propinas, { currency })}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
-            <Wallet aria-hidden="true" className="size-3.5 text-primary" /> Comisiones
-          </p>
-          <p className="mt-1.5 text-2xl font-bold tabular-nums text-success">
-            {formatCurrency(resumen.comisiones, { currency })}
-          </p>
-        </div>
+        {[
+          { icon: Scissors, label: "Completadas", value: resumen.completadas, valueClass: "text-foreground" },
+          { icon: ClipboardList, label: "Por atender", value: resumen.pendientes, valueClass: "text-foreground" },
+          { icon: Coins, label: "Propinas", value: formatCurrency(resumen.propinas, { currency }), valueClass: "text-success" },
+          { icon: Wallet, label: "Comisiones", value: formatCurrency(resumen.comisiones, { currency }), valueClass: "text-success" },
+        ].map((card, index) => (
+          <div
+            className="rounded-2xl border border-border bg-card p-4 shadow-sm anim-entrada"
+            key={card.label}
+            style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
+          >
+            <p className="flex items-center gap-1.5 text-op-xs font-medium text-muted-foreground">
+              <card.icon aria-hidden="true" className="size-3.5 text-primary" /> {card.label}
+            </p>
+            <p className={cn("mt-1.5 text-2xl font-bold tabular-nums", card.valueClass)}>
+              {card.value}
+            </p>
+          </div>
+        ))}
       </section>
 
       <p className="text-sm text-muted-foreground">
@@ -186,24 +200,24 @@ export function MiDiaBoard({
       </p>
 
       {citas.length === 0 ? (
-        <section className="rounded-2xl border border-dashed border-border bg-card px-6 py-14 text-center shadow-sm">
-          <p className="text-base font-medium text-foreground">Sin citas asignadas hoy</p>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            Cuando la recepción te asigne una cita aparecerá aquí.
-          </p>
-          <Button
-            className="mt-6"
-            data-action-id="mi_dia.agenda.abrir"
-            nativeButton={false}
-            render={<Link href={buildAdminHref("/agenda", { organizationId, sucursalId })} />}
-            size="touch"
-          >
-            Ver agenda
-          </Button>
-        </section>
+        <EmptyState
+          action={
+            <Button
+              data-action-id="mi_dia.agenda.abrir"
+              nativeButton={false}
+              render={<Link href={buildAdminHref("/agenda", { organizationId, sucursalId })} />}
+              size="touch"
+            >
+              Ver agenda
+            </Button>
+          }
+          description="Cuando la recepción te asigne una cita aparecerá aquí."
+          icon={Scissors}
+          title="Sin citas asignadas hoy"
+        />
       ) : (
         <ol className="space-y-3">
-          {citas.map((cita) => {
+          {citasOptimistas.map((cita, index) => {
             const ventaAbierta = cita.ventaId != null && cita.ventaEstado === "en_proceso";
             const ventaCobrada = cita.ventaId != null && cita.ventaEstado === "completada";
             const enCurso = cita.estado === "en_proceso";
@@ -214,10 +228,12 @@ export function MiDiaBoard({
               <li
                 aria-busy={citaBusy}
                 className={cn(
-                  "rounded-2xl border bg-card p-4 shadow-sm sm:p-5",
+                  "rounded-2xl border bg-card p-4 shadow-sm sm:p-5 anim-entrada",
                   enCurso ? "border-warning/60" : "border-border",
+                  resaltadaId === cita.id && "anim-pulso",
                 )}
                 key={cita.id}
+                style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
                   <div className="min-w-0">
@@ -243,10 +259,10 @@ export function MiDiaBoard({
                       {cita.servicios.join(" · ") || "Sin servicios"}
                     </p>
                     {cita.notas ? (
-                      <p className="mt-1 text-xs text-muted-foreground">Nota: {cita.notas}</p>
+                      <p className="mt-1 text-op-xs text-muted-foreground">Nota: {cita.notas}</p>
                     ) : null}
                     {cita.clienteNotas ? (
-                      <p className="mt-1.5 rounded-lg bg-warning-soft px-2.5 py-1.5 text-xs font-medium text-warning-soft-foreground">
+                      <p className="mt-1.5 rounded-lg bg-warning-soft px-2.5 py-1.5 text-op-xs font-medium text-warning-soft-foreground">
                         {cita.clienteNotas}
                       </p>
                     ) : null}
@@ -262,6 +278,7 @@ export function MiDiaBoard({
                 <div className="mt-4 flex flex-wrap gap-2">
                   {puedeCheckIn ? (
                     <Button
+                      data-action-clave={cita.id === primeraAccionableId ? "1" : undefined}
                       data-action-id="mi_dia.cita.check_in"
                       disabled={citaBusy}
                       onClick={() => cambiarEstado(cita, "en_proceso", "check_in")}
@@ -269,13 +286,14 @@ export function MiDiaBoard({
                       type="button"
                     >
                       <CirclePlay aria-hidden="true" />
-                      {accionBusy("check_in") ? "Registrando…" : "Cliente en silla"}
+                      {accionBusy("check_in") ? "Registrando…" : TRANSICION_LABEL.en_proceso}
                     </Button>
                   ) : null}
                   {enCurso ? (
                     <>
                       {ventaAbierta ? (
                         <Button
+                          data-action-clave={cita.id === primeraAccionableId ? "1" : undefined}
                           data-action-id="mi_dia.cita.abrir_cobro"
                           nativeButton={false}
                           render={<Link href={ticketHref(cita.ventaId!)} />}
@@ -285,6 +303,7 @@ export function MiDiaBoard({
                         </Button>
                       ) : (
                         <Button
+                          data-action-clave={cita.id === primeraAccionableId ? "1" : undefined}
                           data-action-id="mi_dia.cita.cobrar"
                           disabled={citaBusy}
                           onClick={() => cobrar(cita)}
@@ -296,6 +315,7 @@ export function MiDiaBoard({
                       )}
                       {!ventaAbierta ? (
                         <Button
+                          data-action-id="mi_dia.cita.completar"
                           disabled={citaBusy}
                           onClick={() => cambiarEstado(cita, "completada", "completar")}
                           size="touch"
@@ -303,13 +323,14 @@ export function MiDiaBoard({
                           variant="outline"
                         >
                           <CheckCircle2 aria-hidden="true" />
-                          {accionBusy("completar") ? "Finalizando…" : "Terminado"}
+                          {accionBusy("completar") ? "Finalizando…" : TRANSICION_LABEL.completada}
                         </Button>
                       ) : null}
                     </>
                   ) : null}
                   {ventaCobrada && cita.estado === "completada" ? (
                     <Button
+                      data-action-id="mi_dia.cita.ver_ticket"
                       nativeButton={false}
                       render={<Link href={ticketHref(cita.ventaId!)} />}
                       size="touch"
