@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { confirmarReserva, obtenerSlotsReserva } from "@/app/reservar/[slug]/actions";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Textarea } from "@/components/ui/field";
+import { TurnstileWidget } from "@/components/ui/turnstile-widget";
 
 type Sucursal = {
   id: string;
@@ -130,6 +131,7 @@ export function ReservaFlow({
   function enviar(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const data = new FormData(event.currentTarget);
+    const turnstileToken = (data.get("cf-turnstile-response") as string | null) || null;
     startTransition(async () => {
       const res = await confirmarReserva({
         organizacionId: organizacion.id,
@@ -141,6 +143,7 @@ export function ReservaFlow({
         telefono: String(data.get("telefono") ?? ""),
         correo: String(data.get("correo") ?? ""),
         notas: String(data.get("notas") ?? ""),
+        turnstileToken,
       });
       setResultado(
         res.ok
@@ -387,6 +390,7 @@ export function ReservaFlow({
               <Textarea maxLength={2000} name="notas" rows={2} />
             </Field>
           </div>
+          <TurnstileWidget className="mt-4 flex justify-center" />
           {resultado?.tipo === "error" ? (
             <p className="mt-4 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
               {resultado.mensaje}

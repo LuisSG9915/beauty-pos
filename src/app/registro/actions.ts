@@ -1,7 +1,7 @@
 "use server";
 
 import { eq } from "drizzle-orm";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
@@ -9,7 +9,10 @@ import { user as authUsers } from "@/db/schema/auth";
 import { organizaciones } from "@/db/schema/core";
 import { telemetriaEventos } from "@/db/schema/telemetry";
 import { createAuth } from "@/lib/auth/server";
+import { getClientIp } from "@/lib/client-ip";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { getRuntimeEnv } from "@/lib/runtime-env";
+import { verificarTurnstileToken } from "@/lib/turnstile";
 import { provisionarOrganizacionTrial } from "@/modules/billing/service";
 
 const registroSchema = z.object({
@@ -57,6 +60,20 @@ export async function registrarNegocio(
   _previousState: RegistroState,
   formData: FormData,
 ): Promise<RegistroState> {
+  const headerList = await headers();
+  const ip = getClientIp(headerList);
+
+  const rateLimit = await checkRateLimit("registro:" + ip, { max: 5, windowMs: 15 * 60 * 1000 });
+  if (!rateLimit.success) {
+    return { error: "Demasiados intentos de registro. Espera unos minutos antes de intentar de nuevo." };
+  }
+
+  const turnstileToken = formData.get("cf-turnstile-response") as string | null;
+  const turnstileValido = await verificarTurnstileToken(turnstileToken, ip);
+  if (!turnstileValido) {
+    return { error: "Verificación de seguridad fallida. Por favor, inténtalo de nuevo." };
+  }
+
   const input = registroSchema.safeParse({
     negocio: formData.get("negocio"),
     nombre: formData.get("nombre"),
@@ -145,3 +162,5 @@ export async function registrarNegocio(
 
   return { ok: true, verificacionPendiente: correoConfigurado };
 }
+
+export const registrarSalonAction = registrarNegocio;

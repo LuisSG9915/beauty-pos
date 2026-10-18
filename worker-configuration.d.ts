@@ -7,6 +7,10 @@ interface __BaseEnv_Env {
 	HYPERDRIVE: Hyperdrive;
 	AI: Ai;
 	ASSETS: Fetcher;
+	PUBLIC_RATE_LIMITER: {
+		limit(options: { key: string }): Promise<{ success: boolean }>;
+	};
+	TELEMETRY_AE: AnalyticsEngineDataset;
 }
 declare namespace Cloudflare {
 	interface Env extends __BaseEnv_Env {}

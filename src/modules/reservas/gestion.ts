@@ -21,6 +21,7 @@ import {
   type AgendaDb,
 } from "@/modules/agenda/service";
 import { resolveTimeZone, dayBoundsUtc } from "@/modules/agenda/timezone";
+import { enviarAvisoDiferido } from "@/lib/email/aviso-email";
 import { encolarAvisoCita } from "@/modules/notificaciones/service";
 import { TIPO_CAMBIO, TIPO_CANCELACION } from "@/modules/notificaciones/rules";
 import {
@@ -397,68 +398,82 @@ export async function cancelarReservaPublica(token: string, telefono?: string): 
   const ahora = new Date();
   const tokenHash = hashTokenGestion(token);
 
+  let avisoDiferido: {
+    organizacionId: string;
+    citaId: string;
+    tipo: typeof TIPO_CANCELACION;
+  } | null = null;
+
   try {
-    return await withDbRetry(() =>
+    const resultado = await withDbRetry(() =>
       db.transaction(async (tx): Promise<GestionResult> => {
-      const row = await reservaPorHash(tx, tokenHash);
-      if (!row || row.revocadoAt) return { ok: false, error: "Enlace inválido o revocado." };
+        const row = await reservaPorHash(tx, tokenHash);
+        if (!row || row.revocadoAt) return { ok: false, error: "Enlace inválido o revocado." };
 
-      const excede = await excedeRateLimit(tx, {
-        bucket: "reserva_manage",
-        clave: `token:${tokenHash.slice(0, 24)}`,
-        ...LIMITES_RESERVAS.gestionPorTokenHora,
-      }, ahora);
-      if (excede) return { ok: false, error: "Demasiados cambios en poco tiempo. Comunícate con el negocio." };
-      if (!telefonoCoincide(row, telefono)) {
-        return { ok: false, error: "El teléfono no coincide con el registrado en la reserva." };
-      }
+        const excede = await excedeRateLimit(tx, {
+          bucket: "reserva_manage",
+          clave: `token:${tokenHash.slice(0, 24)}`,
+          ...LIMITES_RESERVAS.gestionPorTokenHora,
+        }, ahora);
+        if (excede) return { ok: false, error: "Demasiados cambios en poco tiempo. Comunícate con el negocio." };
+        if (!telefonoCoincide(row, telefono)) {
+          return { ok: false, error: "El teléfono no coincide con el registrado en la reserva." };
+        }
 
-      const gestion = puedeGestionarCita(row.cita, politicaDe(row), ahora);
-      if (!gestion.puede) return { ok: false, error: gestion.motivo };
+        const gestion = puedeGestionarCita(row.cita, politicaDe(row), ahora);
+        if (!gestion.puede) return { ok: false, error: gestion.motivo };
 
-      await lockSucursalAgenda(tx, row.cita.organizacionId, row.cita.sucursalId);
-      // Relectura bajo el lock por si cambió entre la consulta y la mutación.
-      const [actual] = await tx
-        .select({ estado: citas.estado, activo: citas.activo, fechaHora: citas.fechaHora, version: citas.version })
-        .from(citas)
-        .where(eq(citas.id, row.cita.id))
-        .limit(1);
-      if (!actual) return { ok: false, error: "La cita ya no existe." };
-      const revalida = puedeGestionarCita(
-        { fechaHora: actual.fechaHora, estado: actual.estado, activo: actual.activo },
-        politicaDe(row),
-        ahora,
-      );
-      if (!revalida.puede) return { ok: false, error: revalida.motivo };
+        await lockSucursalAgenda(tx, row.cita.organizacionId, row.cita.sucursalId);
+        // Relectura bajo el lock por si cambió entre la consulta y la mutación.
+        const [actual] = await tx
+          .select({ estado: citas.estado, activo: citas.activo, fechaHora: citas.fechaHora, version: citas.version })
+          .from(citas)
+          .where(eq(citas.id, row.cita.id))
+          .limit(1);
+        if (!actual) return { ok: false, error: "La cita ya no existe." };
+        const revalida = puedeGestionarCita(
+          { fechaHora: actual.fechaHora, estado: actual.estado, activo: actual.activo },
+          politicaDe(row),
+          ahora,
+        );
+        if (!revalida.puede) return { ok: false, error: revalida.motivo };
 
-      await tx
-        .update(citas)
-        .set({ estado: "cancelada", version: actual.version + 1 })
-        .where(eq(citas.id, row.cita.id));
-      await registrarHistorialCita(tx, {
-        citaId: row.cita.id,
-        organizacionId: row.cita.organizacionId,
-        usuarioId: null,
-        accion: "estado",
-        detalle: { de: actual.estado, a: "cancelada", origen: "web" },
-      });
-      await auditEvent(tx, {
-        organizacionId: row.cita.organizacionId,
-        sucursalId: row.cita.sucursalId,
-        usuarioId: null,
-        accion: "cita.cancelada_web",
-        entidad: "cita",
-        entidadId: row.cita.id,
-        detalle: { estadoPrevio: actual.estado },
-      });
-      await encolarAvisoCita(tx, {
-        organizacionId: row.cita.organizacionId,
-        citaId: row.cita.id,
-        tipo: TIPO_CANCELACION,
-      });
-      return { ok: true };
-    }),
+        await tx
+          .update(citas)
+          .set({ estado: "cancelada", version: actual.version + 1 })
+          .where(eq(citas.id, row.cita.id));
+        await registrarHistorialCita(tx, {
+          citaId: row.cita.id,
+          organizacionId: row.cita.organizacionId,
+          usuarioId: null,
+          accion: "estado",
+          detalle: { de: actual.estado, a: "cancelada", origen: "web" },
+        });
+        await auditEvent(tx, {
+          organizacionId: row.cita.organizacionId,
+          sucursalId: row.cita.sucursalId,
+          usuarioId: null,
+          accion: "cita.cancelada_web",
+          entidad: "cita",
+          entidadId: row.cita.id,
+          detalle: { estadoPrevio: actual.estado },
+        });
+        avisoDiferido = {
+          organizacionId: row.cita.organizacionId,
+          citaId: row.cita.id,
+          tipo: TIPO_CANCELACION,
+        };
+        return { ok: true };
+      }),
     );
+
+    if (resultado.ok && avisoDiferido) {
+      enviarAvisoDiferido(async () => {
+        await encolarAvisoCita(getDatabase(), avisoDiferido!);
+      });
+    }
+
+    return resultado;
   } catch (error) {
     console.error("cancelarReservaPublica", error);
     return { ok: false, error: "No se pudo cancelar la cita. Inténtalo de nuevo." };
@@ -481,8 +496,16 @@ export async function reagendarReservaPublica(
   const ahora = new Date();
   const tokenHash = hashTokenGestion(token);
 
+  let avisoDiferido: {
+    organizacionId: string;
+    citaId: string;
+    tipo: typeof TIPO_CAMBIO;
+    fechaHoraPrevia: Date;
+    gestionUrl?: string | null;
+  } | null = null;
+
   try {
-    return await withDbRetry(() =>
+    const resultado = await withDbRetry(() =>
       db.transaction(async (tx): Promise<GestionResult> => {
       const row = await reservaPorHash(tx, tokenHash);
       if (!row || row.revocadoAt) return { ok: false, error: "Enlace inválido o revocado." };
@@ -564,16 +587,24 @@ export async function reagendarReservaPublica(
         entidadId: row.cita.id,
         detalle: { fechaHoraDe: actual.fechaHora.toISOString(), fechaHoraA: fechaHora.toISOString() },
       });
-      await encolarAvisoCita(tx, {
-        organizacionId: row.cita.organizacionId,
-        citaId: row.cita.id,
-        tipo: TIPO_CAMBIO,
-        fechaHoraPrevia: actual.fechaHora,
-        gestionUrl: urlGestion(token),
-      });
-      return { ok: true };
-    }),
+        avisoDiferido = {
+          organizacionId: row.cita.organizacionId,
+          citaId: row.cita.id,
+          tipo: TIPO_CAMBIO,
+          fechaHoraPrevia: actual.fechaHora,
+          gestionUrl: urlGestion(token),
+        };
+        return { ok: true };
+      }),
     );
+
+    if (resultado.ok && avisoDiferido) {
+      enviarAvisoDiferido(async () => {
+        await encolarAvisoCita(getDatabase(), avisoDiferido!);
+      });
+    }
+
+    return resultado;
   } catch (error) {
     console.error("reagendarReservaPublica", error);
     return { ok: false, error: "No se pudo reagendar la cita. Inténtalo de nuevo." };

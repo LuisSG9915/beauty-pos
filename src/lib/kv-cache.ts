@@ -57,6 +57,43 @@ export async function kvReadThrough<T>(
   return value;
 }
 
+/**
+ * Obtiene y deserializa un JSON desde KV; `null` si no existe, expiró o no hay binding.
+ */
+export async function kvGetJson<T>(key: string): Promise<T | null> {
+  const kv = getCacheKv();
+  if (!kv) return null;
+  try {
+    const cached = (await kv.get(key, { type: "json" })) as { v: T } | null;
+    if (cached && typeof cached === "object" && "v" in cached) return cached.v;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Serializa y guarda un JSON en KV con TTL opcional. Falla silenciosamente.
+ */
+export async function kvPutJson<T>(
+  key: string,
+  value: T,
+  options?: { expirationTtl?: number },
+): Promise<void> {
+  const kv = getCacheKv();
+  if (!kv) return;
+  try {
+    await kv.put(key, JSON.stringify({ v: value ?? null }), options);
+  } catch {
+    // Silencioso: la degradación es segura
+  }
+}
+
+/** Elimina una clave de KV; no lanza si el binding no existe o falla. */
+export async function kvDelete(key: string): Promise<void> {
+  return kvInvalidate(key);
+}
+
 /** Invalida una clave de caché; no lanza si KV no está disponible. */
 export async function kvInvalidate(key: string): Promise<void> {
   const kv = getCacheKv();
@@ -67,3 +104,4 @@ export async function kvInvalidate(key: string): Promise<void> {
     // La clave expira por TTL de todos modos.
   }
 }
+

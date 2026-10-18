@@ -125,6 +125,8 @@ export const getSuscripcionActualCache = cache(
     ),
 );
 
+export const obtenerEstadoSuscripcion = getSuscripcionActualCache;
+
 /**
  * `true` cuando la organización puede operar: sin suscripción se considera
  * vigente (organizaciones históricas/manuales no se bloquean retroactivamente)

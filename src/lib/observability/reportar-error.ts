@@ -88,3 +88,31 @@ export function iniciarCapturaErrores() {
     reportarErrorCliente({ error: evento.reason });
   });
 }
+
+/**
+ * Extrae los headers cf-ray y cf-ipcountry (si existen en el request o headers actuales)
+ * para inyectarlos en el objeto contexto antes de guardar en incidentes_error.
+ */
+export function extraerHeadersCloudflare(
+  headersSource?: Headers | Record<string, string | string[] | undefined> | null,
+): { "cf-ray"?: string; "cf-ipcountry"?: string } {
+  if (!headersSource) return {};
+  if (typeof (headersSource as Headers).get === "function") {
+    const h = headersSource as Headers;
+    const cfRay = h.get("cf-ray");
+    const cfIpCountry = h.get("cf-ipcountry");
+    return {
+      ...(cfRay ? { "cf-ray": cfRay } : {}),
+      ...(cfIpCountry ? { "cf-ipcountry": cfIpCountry } : {}),
+    };
+  }
+  const rec = headersSource as Record<string, string | string[] | undefined>;
+  const rawRay = rec["cf-ray"];
+  const rawCountry = rec["cf-ipcountry"];
+  const cfRay = Array.isArray(rawRay) ? rawRay[0] : rawRay;
+  const cfIpCountry = Array.isArray(rawCountry) ? rawCountry[0] : rawCountry;
+  return {
+    ...(cfRay ? { "cf-ray": cfRay } : {}),
+    ...(cfIpCountry ? { "cf-ipcountry": cfIpCountry } : {}),
+  };
+}

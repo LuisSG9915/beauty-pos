@@ -40,6 +40,13 @@ export function iniciarSentry() {
             blockAllMedia: true,
           }),
         ],
+        transport: (opts) =>
+          modulo.makeFetchTransport(opts, (url, requestOptions) =>
+            fetch(url, {
+              ...requestOptions,
+              signal: AbortSignal.timeout(4000),
+            }),
+          ),
       });
       sentry = modulo;
     })

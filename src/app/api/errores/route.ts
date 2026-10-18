@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDatabase } from "@/db/client";
 import { createAuth } from "@/lib/auth/server";
 import { registrarError } from "@/lib/observability/error-core";
+import { extraerHeadersCloudflare } from "@/lib/observability/reportar-error";
 
 const reporteSchema = z.object({
   tipo: z.string().max(80).default("Error"),
@@ -23,7 +24,8 @@ const reporteSchema = z.object({
   rastro: z.array(z.string().max(100)).max(8).optional(),
 });
 
-import { registrarYVerificarRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/client-ip";
+import { checkRateLimit, registrarYVerificarRateLimit } from "@/lib/rate-limit";
 
 async function limitePorClave(clave: string): Promise<boolean> {
   // Máx. 60 reportes/hora por clave (sid o IP): evita inundar incidentes sin tocar CockroachDB.
@@ -42,6 +44,17 @@ async function limitePorClave(clave: string): Promise<boolean> {
  * a ella — nadie puede inflar el contador de otra organización.
  */
 export async function POST(request: NextRequest) {
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (contentLength > 16384) {
+    return NextResponse.json({ error: "Payload demasiado grande" }, { status: 413 });
+  }
+
+  const ip = getClientIp(request.headers);
+  const rateLimit = await checkRateLimit("errores:" + ip, { max: 15, windowMs: 60_000 });
+  if (!rateLimit.success) {
+    return NextResponse.json({ error: "Demasiadas peticiones" }, { status: 429 });
+  }
+
   const parsed = reporteSchema.safeParse(
     await request.json().catch(() => null),
   );
@@ -99,6 +112,8 @@ export async function POST(request: NextRequest) {
       organizacionId = null;
     }
 
+    const cfContexto = extraerHeadersCloudflare(request.headers);
+
     await registrarError(db, {
       fuente: "client",
       tipo: data.tipo,
@@ -115,6 +130,7 @@ export async function POST(request: NextRequest) {
       dispositivo: data.dispositivo ?? null,
       release: data.release ?? null,
       rastro: data.rastro,
+      contexto: cfContexto,
     });
   } catch (error) {
     console.error("errores POST", error);

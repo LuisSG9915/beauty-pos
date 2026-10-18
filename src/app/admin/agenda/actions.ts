@@ -21,7 +21,6 @@ import { servicios } from "@/db/schema/catalogs";
 import { auditEvent } from "@/lib/audit";
 import {
   assertBranchScope,
-  canAccessBranch,
   checkPermission,
   type ResolvedAccess,
 } from "@/lib/auth/authorization";
@@ -44,14 +43,16 @@ import {
   recursosDeCita,
   registrarHistorialCita,
   validarDisponibilidadCita,
+  verificarColisionEstilista,
   versionCoincide,
   violacionesAError,
 } from "@/modules/agenda/service";
 import { parseFechaHoraInput } from "@/modules/agenda/timezone";
 import { requiereCapacidad } from "@/modules/billing/queries";
 import { emitirTokenGestion } from "@/modules/reservas/gestion";
+import { enviarAvisoDiferido } from "@/lib/email/aviso-email";
 import { encolarAvisoCita } from "@/modules/notificaciones/service";
-import { TIPO_CAMBIO, TIPO_CANCELACION, TIPO_CONFIRMACION } from "@/modules/notificaciones/rules";
+import { TIPO_CAMBIO, TIPO_CANCELACION, TIPO_CONFIRMACION, type TipoNotificacion } from "@/modules/notificaciones/rules";
 
 const CITA_ESTADOS = ["pendiente", "confirmada", "en_proceso", "completada", "cancelada", "no_asistio"] as const;
 
@@ -62,12 +63,26 @@ export type CitaActionState = {
   citaId?: string;
   /** ISO 8601: próximos horarios libres cuando hubo conflicto de disponibilidad. */
   sugerencias?: string[];
+  avisoDiferido?: {
+    organizacionId: string;
+    citaId: string;
+    tipo: TipoNotificacion;
+    fechaHoraPrevia?: Date;
+    gestionUrl?: string | null;
+  } | null;
 };
 export type CitaMutationResult = {
   success: boolean;
   message?: string;
   error?: string;
   sugerencias?: string[];
+  avisoDiferido?: {
+    organizacionId: string;
+    citaId: string;
+    tipo: TipoNotificacion;
+    fechaHoraPrevia?: Date;
+    gestionUrl?: string | null;
+  } | null;
 };
 
 const citaSchema = z.object({
@@ -211,7 +226,7 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
       const sucursal = await lockSucursalAgenda(tx, input.organizacionId, input.sucursalId);
       if (!sucursal) return { error: "La sucursal no existe o no pertenece a la organización." };
       if (!sucursal.activo) return { error: "La sucursal está inactiva." };
-      if (!canAccessBranch(access, input.sucursalId)) {
+      if (!(await assertBranchScope(access, input.sucursalId))) {
         return { error: "No tienes acceso a esta sucursal." };
       }
 
@@ -257,6 +272,9 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
       if (input.id) {
         previa = await getCita(tx, input.organizacionId, input.id);
         if (!previa || !previa.activo) return { error: "La cita no existe." };
+        if (!(await assertBranchScope(access, previa.sucursalId))) {
+          return { error: "No tienes acceso a esta sucursal." };
+        }
         if (!isCitaEditable(previa.estado)) {
           return { error: "Una cita cancelada, completada o no asistida solo puede reagendarse." };
         }
@@ -289,6 +307,19 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
           recursoIds,
         });
         return { error: violacionesAError(disponibilidad), sugerencias };
+      }
+
+      if (input.usuarioId) {
+        const colision = await verificarColisionEstilista(tx, {
+          sucursalId: input.sucursalId,
+          usuarioId: input.usuarioId,
+          inicio: fechaHora,
+          fin: new Date(fechaHora.getTime() + input.duracionMinutos * 60_000),
+          ignoreCitaId: input.id || null,
+        });
+        if (colision) {
+          return { error: "El estilista ya tiene una cita en ese horario." };
+        }
       }
 
       const values = {
@@ -343,6 +374,13 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
             : {}),
         },
       });
+      let avisoDiferido: {
+        organizacionId: string;
+        citaId: string;
+        tipo: TipoNotificacion;
+        fechaHoraPrevia?: Date;
+        gestionUrl?: string | null;
+      } | null = null;
       if (!previa) {
         // El cliente puede autogestionar la cita: el enlace llega en el correo
         // de confirmación (mismo canal que las reservas web).
@@ -350,25 +388,31 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
           organizacionId: input.organizacionId,
           citaId,
         });
-        await encolarAvisoCita(tx, {
+        avisoDiferido = {
           organizacionId: input.organizacionId,
           citaId,
           tipo: TIPO_CONFIRMACION,
           gestionUrl: gestion?.url ?? null,
-        });
+        };
       } else if (fechaHora.getTime() !== previa.fechaHora.getTime()) {
-        await encolarAvisoCita(tx, {
+        avisoDiferido = {
           organizacionId: input.organizacionId,
           citaId,
           tipo: TIPO_CAMBIO,
           fechaHoraPrevia: previa.fechaHora,
-        });
+        };
       }
-      return { success: true, message: "Cita guardada correctamente.", citaId };
+      return { success: true, message: "Cita guardada correctamente.", citaId, avisoDiferido };
     }),
     );
 
     if (outcome.success) {
+      if (outcome.avisoDiferido) {
+        const aviso = outcome.avisoDiferido;
+        enviarAvisoDiferido(async () => {
+          await encolarAvisoCita(getDatabase(), aviso);
+        });
+      }
       revalidatePath("/admin/agenda");
       revalidatePath("/admin/pos");
     }
@@ -405,7 +449,7 @@ export async function toggleServicioCita(formData: FormData): Promise<CitaMutati
       db.transaction(async (tx): Promise<CitaMutationResult> => {
       const cita = await getCita(tx, input.organizacionId, input.citaId);
       if (!cita || !cita.activo) return { success: false, error: "La cita no existe." };
-      if (!canAccessBranch(access, cita.sucursalId)) {
+      if (!(await assertBranchScope(access, cita.sucursalId))) {
         return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
       }
       if (!isCitaEditable(cita.estado)) {
@@ -497,7 +541,7 @@ export async function updateCitaEstado(formData: FormData): Promise<CitaMutation
       db.transaction(async (tx): Promise<CitaMutationResult> => {
       const referencia = await getCita(tx, input.organizacionId, input.citaId);
       if (!referencia || !referencia.activo) return { success: false, error: "La cita no existe." };
-      if (!canAccessBranch(access, referencia.sucursalId)) {
+      if (!(await assertBranchScope(access, referencia.sucursalId))) {
         return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
       }
       const sucursal = await lockSucursalAgenda(tx, input.organizacionId, referencia.sucursalId);
@@ -568,8 +612,16 @@ export async function updateCitaEstado(formData: FormData): Promise<CitaMutation
             : {}),
         },
       });
+      let avisoDiferido: {
+        organizacionId: string;
+        citaId: string;
+        tipo: TipoNotificacion;
+        fechaHoraPrevia?: Date;
+        gestionUrl?: string | null;
+      } | null = null;
+
       if (input.estado === "cancelada") {
-        await encolarAvisoCita(tx, { organizacionId: input.organizacionId, citaId: cita.id, tipo: TIPO_CANCELACION });
+        avisoDiferido = { organizacionId: input.organizacionId, citaId: cita.id, tipo: TIPO_CANCELACION };
       } else if (input.estado === "confirmada") {
         // Citas sin token (legadas o internas) reciben su enlace de
         // autogestión en el correo de confirmación.
@@ -577,25 +629,31 @@ export async function updateCitaEstado(formData: FormData): Promise<CitaMutation
           organizacionId: input.organizacionId,
           citaId: cita.id,
         });
-        await encolarAvisoCita(tx, {
+        avisoDiferido = {
           organizacionId: input.organizacionId,
           citaId: cita.id,
           tipo: TIPO_CONFIRMACION,
           gestionUrl: gestion?.url ?? null,
-        });
+        };
       } else if (input.estado === "pendiente" && fechaHora.getTime() !== cita.fechaHora.getTime()) {
-        await encolarAvisoCita(tx, {
+        avisoDiferido = {
           organizacionId: input.organizacionId,
           citaId: cita.id,
           tipo: TIPO_CAMBIO,
           fechaHoraPrevia: cita.fechaHora,
-        });
+        };
       }
-      return { success: true, message: "Estado actualizado." };
+      return { success: true, message: "Estado actualizado.", avisoDiferido };
     }),
     );
 
     if (outcome.success) {
+      if (outcome.avisoDiferido) {
+        const aviso = outcome.avisoDiferido;
+        enviarAvisoDiferido(async () => {
+          await encolarAvisoCita(getDatabase(), aviso);
+        });
+      }
       revalidatePath("/admin/agenda");
       revalidatePath("/admin/pos");
     }
@@ -628,7 +686,7 @@ export async function toggleCitaActiva(formData: FormData): Promise<CitaMutation
     .where(and(eq(citas.id, id), eq(citas.organizacionId, organizationId)))
     .limit(1);
   if (!cita) return { success: false, error: "La cita no existe." };
-  if (!canAccessBranch(access, cita.sucursalId)) {
+  if (!(await assertBranchScope(access, cita.sucursalId))) {
     return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
   }
   if (!versionCoincide(cita, parsed.data.version)) {
@@ -646,11 +704,13 @@ export async function toggleCitaActiva(formData: FormData): Promise<CitaMutation
       usuarioId: user.id,
       accion: active ? "ocultada" : "reactivada",
     });
-    if (active) {
-      await encolarAvisoCita(tx, { organizacionId: organizationId, citaId: id, tipo: TIPO_CANCELACION });
-    }
   }),
   );
+  if (active) {
+    enviarAvisoDiferido(async () => {
+      await encolarAvisoCita(getDatabase(), { organizacionId: organizationId, citaId: id, tipo: TIPO_CANCELACION });
+    });
+  }
   revalidatePath("/admin/agenda");
   revalidatePath("/admin/pos");
   return { success: true, message: active ? "Cita desactivada." : "Cita reactivada." };
@@ -674,7 +734,7 @@ async function moverCitaEnTx(
   const userId = access.user.id;
   const referencia = await getCita(tx, input.organizacionId, input.citaId);
   if (!referencia || !referencia.activo) return { success: false, error: "La cita no existe." };
-  if (!canAccessBranch(access, referencia.sucursalId)) {
+  if (!(await assertBranchScope(access, referencia.sucursalId))) {
     return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
   }
   const sucursal = await lockSucursalAgenda(tx, input.organizacionId, referencia.sucursalId);
@@ -731,6 +791,19 @@ async function moverCitaEnTx(
     return { success: false, error: violacionesAError(disponibilidad), sugerencias };
   }
 
+  if (usuarioId) {
+    const colision = await verificarColisionEstilista(tx, {
+      sucursalId: cita.sucursalId,
+      usuarioId,
+      inicio: fechaHora,
+      fin: new Date(fechaHora.getTime() + cita.duracionMinutos * 60_000),
+      ignoreCitaId: cita.id,
+    });
+    if (colision) {
+      return { success: false, error: "El estilista ya tiene una cita en ese horario." };
+    }
+  }
+
   await tx
     .update(citas)
     .set({
@@ -754,6 +827,13 @@ async function moverCitaEnTx(
       ...(opts.reactivarAPendiente ? { estadoDe: cita.estado } : {}),
     },
   });
+  let avisoDiferido: {
+    organizacionId: string;
+    citaId: string;
+    tipo: TipoNotificacion;
+    fechaHoraPrevia?: Date;
+    gestionUrl?: string | null;
+  } | null = null;
   if (fechaHora.getTime() !== cita.fechaHora.getTime()) {
     // Si la cita aún no tiene enlace de autogestión (legada), el correo de
     // cambio lo entrega; si ya lo tiene, el enlace original sigue vigente.
@@ -761,15 +841,19 @@ async function moverCitaEnTx(
       organizacionId: input.organizacionId,
       citaId: cita.id,
     });
-    await encolarAvisoCita(tx, {
+    avisoDiferido = {
       organizacionId: input.organizacionId,
       citaId: cita.id,
       tipo: TIPO_CAMBIO,
       fechaHoraPrevia: cita.fechaHora,
       gestionUrl: gestion?.url ?? null,
-    });
+    };
   }
-  return { success: true, message: opts.reactivarAPendiente ? "Cita reagendada a pendiente." : "Cita movida." };
+  return {
+    success: true,
+    message: opts.reactivarAPendiente ? "Cita reagendada a pendiente." : "Cita movida.",
+    avisoDiferido,
+  };
 }
 
 /** Mueve la cita a otra fecha/hora (y opcionalmente a otro profesional) conservando su estado. */
@@ -786,6 +870,12 @@ export async function moveCita(formData: FormData): Promise<CitaMutationResult> 
       db.transaction((tx) => moverCitaEnTx(tx, input, formData, access, { reactivarAPendiente: false })),
     );
     if (outcome.success) {
+      if (outcome.avisoDiferido) {
+        const aviso = outcome.avisoDiferido;
+        enviarAvisoDiferido(async () => {
+          await encolarAvisoCita(getDatabase(), aviso);
+        });
+      }
       revalidatePath("/admin/agenda");
       revalidatePath("/admin/pos");
     }
@@ -814,6 +904,12 @@ export async function rescheduleCita(formData: FormData): Promise<CitaMutationRe
       db.transaction((tx) => moverCitaEnTx(tx, input, formData, access, { reactivarAPendiente: true })),
     );
     if (outcome.success) {
+      if (outcome.avisoDiferido) {
+        const aviso = outcome.avisoDiferido;
+        enviarAvisoDiferido(async () => {
+          await encolarAvisoCita(getDatabase(), aviso);
+        });
+      }
       revalidatePath("/admin/agenda");
       revalidatePath("/admin/pos");
     }
@@ -859,7 +955,7 @@ export async function cambiarDuracionCita(formData: FormData): Promise<CitaMutat
       if (!referencia || !referencia.activo) {
         return { success: false, error: "La cita no existe." };
       }
-      if (!canAccessBranch(access, referencia.sucursalId)) {
+      if (!(await assertBranchScope(access, referencia.sucursalId))) {
         return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
       }
       const sucursal = await lockSucursalAgenda(tx, input.organizacionId, referencia.sucursalId);
@@ -1085,7 +1181,7 @@ export async function saveBloqueoAgenda(formData: FormData): Promise<CitaMutatio
         const sucursal = await lockSucursalAgenda(tx, input.organizacionId, input.sucursalId);
       if (!sucursal) return { success: false, error: "La sucursal no existe o no pertenece a la organización." };
       if (!sucursal.activo) return { success: false, error: "La sucursal está inactiva." };
-      if (!canAccessBranch(access, input.sucursalId)) {
+      if (!(await assertBranchScope(access, input.sucursalId))) {
         return { success: false, error: "No tienes acceso a esta sucursal." };
       }
       const inicia = parseFechaHoraInput(input.iniciaAt, sucursal.zonaHoraria);
@@ -1364,7 +1460,7 @@ export async function getCitaHistorial(formData: FormData): Promise<{
   const db = getDatabase();
   const cita = await getCita(db, input.organizacionId, input.citaId);
   if (!cita) return { success: false, error: "La cita no existe." };
-  if (!canAccessBranch(access, cita.sucursalId)) {
+  if (!(await assertBranchScope(access, cita.sucursalId))) {
     return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
   }
   const rows = await db
@@ -1509,7 +1605,7 @@ export async function toggleRecursoCita(formData: FormData): Promise<CitaMutatio
       db.transaction(async (tx): Promise<CitaMutationResult> => {
         const cita = await getCita(tx, input.organizacionId, input.citaId);
       if (!cita || !cita.activo) return { success: false, error: "La cita no existe." };
-      if (!canAccessBranch(access, cita.sucursalId)) {
+      if (!(await assertBranchScope(access, cita.sucursalId))) {
         return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
       }
       if (!isCitaEditable(cita.estado)) {
@@ -1595,3 +1691,6 @@ export async function toggleRecursoCita(formData: FormData): Promise<CitaMutatio
     return { success: false, error: "No se pudo actualizar los recursos." };
   }
 }
+
+export const crearCitaAction = saveCita;
+export const moverCitaAction = moveCita;

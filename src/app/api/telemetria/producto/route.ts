@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 import { and, eq, sql } from "drizzle-orm";
 import { z } from "zod";
 
@@ -8,7 +8,10 @@ import {
   telemetriaSesiones,
 } from "@/db/schema/telemetry";
 import { createAuth } from "@/lib/auth/server";
-import { registrarYVerificarRateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/client-ip";
+import { checkRateLimit, registrarYVerificarRateLimit } from "@/lib/rate-limit";
+import { writeProductTelemetry } from "@/lib/telemetry/analytics-engine";
+import { moduloDeRuta } from "@/lib/telemetry/ruta";
 
 const LOTE_MAX = 50;
 const EVENTO_TIPOS = [
@@ -67,131 +70,179 @@ async function limitePorSesion(sid: string) {
 }
 
 /**
- * Lote de eventos de producto del colector del navegador. Upsert de la sesión
- * por `sid` y append de eventos. Siempre responde 204 (válido o no) porque la
- * telemetría es best-effort y el cliente nunca reintenta. La membresía a la
- * organización declarada se verifica para que nadie ensucie métricas ajenas.
+ * Lote de eventos de producto del colector del navegador.
+ *
+ * En producción sobre Cloudflare Workers, envía los eventos a Analytics Engine y
+ * responde 204 inmediatamente sin tocar CockroachDB.
+ * En desarrollo local o fallback sin binding, ejecuta el upsert de sesión y eventos en after().
  */
 export async function POST(request: NextRequest) {
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  if (contentLength > 8192) {
+    return NextResponse.json({ error: "Payload demasiado grande" }, { status: 413 });
+  }
+
+  const ip = getClientIp(request.headers);
+  const rateLimit = await checkRateLimit("telemetria_producto:" + ip, { max: 60, windowMs: 60_000 });
+  if (!rateLimit.success) {
+    return NextResponse.json({ error: "Demasiadas peticiones" }, { status: 429 });
+  }
+
   const parsed = loteSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return new NextResponse(null, { status: 204 });
   }
 
-  try {
-    const db = getDatabase();
-    const { sesion, eventos } = parsed.data;
+  const { sesion, eventos } = parsed.data;
 
-    if (await limitePorSesion(sesion.sid)) {
-      return new NextResponse(null, { status: 204 });
-    }
+  if (await limitePorSesion(sesion.sid)) {
+    return new NextResponse(null, { status: 204 });
+  }
 
-    // Identidad: la sesión auth (si existe) fija usuario y plataforma; la org
-    // declarada por el cliente solo se acepta si el usuario pertenece a ella.
-    let usuarioId: string | null = null;
-    let esPlataforma = false;
-    const authSession = await createAuth().api.getSession({
-      headers: request.headers,
-    });
-    if (authSession) {
-      const { usuarios, miembrosOrganizaciones } = await import(
-        "@/db/schema/core"
-      );
-      const [usuario] = await db
-        .select({
-          id: usuarios.id,
-          esAdministradorPlataforma: usuarios.esAdministradorPlataforma,
-        })
-        .from(usuarios)
-        .where(eq(usuarios.authUsuarioId, authSession.user.id))
-        .limit(1);
-      usuarioId = usuario?.id ?? null;
-      esPlataforma = usuario?.esAdministradorPlataforma ?? false;
-      if (
-        usuarioId &&
-        sesion.organizacionId &&
-        !esPlataforma
-      ) {
-        const [miembro] = await db
-          .select({ id: miembrosOrganizaciones.id })
-          .from(miembrosOrganizaciones)
-          .where(
-            and(
-              eq(miembrosOrganizaciones.organizacionId, sesion.organizacionId),
-              eq(miembrosOrganizaciones.usuarioId, usuarioId),
-              eq(miembrosOrganizaciones.estado, "activo"),
-            ),
-          )
-          .limit(1);
-        if (!miembro) sesion.organizacionId = null;
+  // 1. Intento de descarga síncrona a Analytics Engine en Cloudflare Edge
+  let escritoEnAe = false;
+  if (sesion.organizacionId) {
+    if (eventos.length > 0) {
+      for (const evento of eventos) {
+        const modulo = moduloDeRuta(evento.ruta ?? null) ?? "general";
+        const ok = writeProductTelemetry({
+          evento: evento.actionId ?? evento.tipo,
+          modulo,
+          organizacionId: sesion.organizacionId,
+          sucursalId: sesion.sucursalId ?? null,
+          duracionMs: evento.valor ?? null,
+        });
+        if (ok) escritoEnAe = true;
       }
-    }
-
-    const ahora = new Date();
-    const vid = request.cookies.get("bp_vid")?.value ?? null;
-    const engaged =
-      sesion.tiempoActivoMs > 10_000 ||
-      sesion.paginas >= 2 ||
-      sesion.accionesClave > 0;
-
-    const [fila] = await db
-      .insert(telemetriaSesiones)
-      .values({
-        sid: sesion.sid,
-        vid,
-        usuarioId,
-        organizacionId: sesion.organizacionId ?? null,
+    } else {
+      escritoEnAe = writeProductTelemetry({
+        evento: "sesion",
+        modulo: "sesion",
+        organizacionId: sesion.organizacionId,
         sucursalId: sesion.sucursalId ?? null,
-        entradaRuta: sesion.entradaRuta ?? sesion.salidaRuta ?? null,
-        salidaRuta: sesion.salidaRuta ?? null,
-        iniciaAt: new Date(sesion.iniciaAt),
-        ultimaActividadAt: ahora,
-        paginas: sesion.paginas,
-        acciones: sesion.acciones,
-        tiempoActivoMs: Math.round(sesion.tiempoActivoMs),
-        engaged,
-        dispositivo: sesion.dispositivo ?? null,
-        navegador: sesion.navegador ?? null,
-        release: sesion.release ?? null,
-      })
-      .onConflictDoUpdate({
-        target: telemetriaSesiones.sid,
-        set: {
-          usuarioId: sql`coalesce(excluded.usuario_id, telemetria_sesiones.usuario_id)`,
-          organizacionId: sql`coalesce(excluded.organizacion_id, telemetria_sesiones.organizacion_id)`,
-          sucursalId: sql`coalesce(excluded.sucursal_id, telemetria_sesiones.sucursal_id)`,
-          salidaRuta: sql`coalesce(excluded.salida_ruta, telemetria_sesiones.salida_ruta)`,
+        duracionMs: sesion.tiempoActivoMs,
+      });
+    }
+  }
+
+  if (escritoEnAe) {
+    return new NextResponse(null, { status: 204 });
+  }
+
+  // 2. Fallback a CockroachDB diferido fuera del camino crítico vía after()
+  const headers = request.headers;
+  const vid = request.cookies.get("bp_vid")?.value ?? null;
+
+  after(async () => {
+    try {
+      const db = getDatabase();
+
+      // Identidad: la sesión auth (si existe) fija usuario y plataforma; la org
+      // declarada por el cliente solo se acepta si el usuario pertenece a ella.
+      let usuarioId: string | null = null;
+      let esPlataforma = false;
+      const authSession = await createAuth().api.getSession({
+        headers,
+      });
+      if (authSession) {
+        const { usuarios, miembrosOrganizaciones } = await import(
+          "@/db/schema/core"
+        );
+        const [usuario] = await db
+          .select({
+            id: usuarios.id,
+            esAdministradorPlataforma: usuarios.esAdministradorPlataforma,
+          })
+          .from(usuarios)
+          .where(eq(usuarios.authUsuarioId, authSession.user.id))
+          .limit(1);
+        usuarioId = usuario?.id ?? null;
+        esPlataforma = usuario?.esAdministradorPlataforma ?? false;
+        if (
+          usuarioId &&
+          sesion.organizacionId &&
+          !esPlataforma
+        ) {
+          const [miembro] = await db
+            .select({ id: miembrosOrganizaciones.id })
+            .from(miembrosOrganizaciones)
+            .where(
+              and(
+                eq(miembrosOrganizaciones.organizacionId, sesion.organizacionId),
+                eq(miembrosOrganizaciones.usuarioId, usuarioId),
+                eq(miembrosOrganizaciones.estado, "activo"),
+              ),
+            )
+            .limit(1);
+          if (!miembro) sesion.organizacionId = null;
+        }
+      }
+
+      const ahora = new Date();
+      const engaged =
+        sesion.tiempoActivoMs > 10_000 ||
+        sesion.paginas >= 2 ||
+        sesion.accionesClave > 0;
+
+      const [fila] = await db
+        .insert(telemetriaSesiones)
+        .values({
+          sid: sesion.sid,
+          vid,
+          usuarioId,
+          organizacionId: sesion.organizacionId ?? null,
+          sucursalId: sesion.sucursalId ?? null,
+          entradaRuta: sesion.entradaRuta ?? sesion.salidaRuta ?? null,
+          salidaRuta: sesion.salidaRuta ?? null,
+          iniciaAt: new Date(sesion.iniciaAt),
           ultimaActividadAt: ahora,
           paginas: sesion.paginas,
           acciones: sesion.acciones,
           tiempoActivoMs: Math.round(sesion.tiempoActivoMs),
           engaged,
-        },
-      })
-      .returning({ id: telemetriaSesiones.id });
+          dispositivo: sesion.dispositivo ?? null,
+          navegador: sesion.navegador ?? null,
+          release: sesion.release ?? null,
+        })
+        .onConflictDoUpdate({
+          target: telemetriaSesiones.sid,
+          set: {
+            usuarioId: sql`coalesce(excluded.usuario_id, telemetria_sesiones.usuario_id)`,
+            organizacionId: sql`coalesce(excluded.organizacion_id, telemetria_sesiones.organizacion_id)`,
+            sucursalId: sql`coalesce(excluded.sucursal_id, telemetria_sesiones.sucursal_id)`,
+            salidaRuta: sql`coalesce(excluded.salida_ruta, telemetria_sesiones.salida_ruta)`,
+            ultimaActividadAt: ahora,
+            paginas: sesion.paginas,
+            acciones: sesion.acciones,
+            tiempoActivoMs: Math.round(sesion.tiempoActivoMs),
+            engaged,
+          },
+        })
+        .returning({ id: telemetriaSesiones.id });
 
-    if (eventos.length > 0 && fila) {
-      await db.insert(telemetriaProductoEventos).values(
-        eventos.map((evento) => ({
-          sesionId: fila.id,
-          sid: sesion.sid,
-          usuarioId,
-          organizacionId: sesion.organizacionId ?? null,
-          sucursalId: sesion.sucursalId ?? null,
-          tipo: evento.tipo,
-          ruta: evento.ruta ?? null,
-          actionId: evento.actionId ?? null,
-          accionClave: evento.accionClave ?? false,
-          metrica: evento.metrica ?? null,
-          valor: evento.valor !== undefined ? String(evento.valor) : null,
-          clientAt: evento.clientAt ? new Date(evento.clientAt) : null,
-        })),
-      );
+      if (eventos.length > 0 && fila) {
+        await db.insert(telemetriaProductoEventos).values(
+          eventos.map((evento) => ({
+            sesionId: fila.id,
+            sid: sesion.sid,
+            usuarioId,
+            organizacionId: sesion.organizacionId ?? null,
+            sucursalId: sesion.sucursalId ?? null,
+            tipo: evento.tipo,
+            ruta: evento.ruta ?? null,
+            actionId: evento.actionId ?? null,
+            accionClave: evento.accionClave ?? false,
+            metrica: evento.metrica ?? null,
+            valor: evento.valor !== undefined ? String(evento.valor) : null,
+            clientAt: evento.clientAt ? new Date(evento.clientAt) : null,
+          })),
+        );
+      }
+    } catch (error) {
+      // Telemetría best-effort: log y no reintentar
+      console.error("telemetria/producto POST", error);
     }
-  } catch (error) {
-    // Telemetría best-effort: log y 204, nunca un 500 hacia el cliente.
-    console.error("telemetria/producto POST", error);
-  }
+  });
 
   return new NextResponse(null, { status: 204 });
 }

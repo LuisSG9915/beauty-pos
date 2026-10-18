@@ -20,7 +20,7 @@ import {
 } from "@/db/schema/plano";
 import { recursos } from "@/db/schema/operations";
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
-import { auditEvent } from "@/lib/audit";
+import { auditEvent, registrarAuditoria } from "@/lib/audit";
 import { assertBranchScope, checkPermission } from "@/lib/auth/authorization";
 import type { ToggleActivoResult } from "@/components/admin/toggle-activo";
 import {
@@ -114,7 +114,7 @@ export async function guardarPiso(
         .update(pisos)
         .set({ nombre: input.nombre, columnas: input.columnas, filas: input.filas, updatedBy: access.user.id })
         .where(eq(pisos.id, pisoId));
-      await auditEvent(db, {
+      await registrarAuditoria({
         organizacionId: input.organizacionId,
         sucursalId: input.sucursalId,
         usuarioId: access.user.id,
@@ -198,7 +198,7 @@ export async function desactivarPiso(formData: FormData): Promise<ToggleActivoRe
       .update(pisos)
       .set({ activo: input.activar, updatedBy: access.user.id })
       .where(eq(pisos.id, piso.id));
-    await auditEvent(db, {
+    await registrarAuditoria({
       organizacionId: input.organizacionId,
       sucursalId: piso.sucursalId,
       usuarioId: access.user.id,
@@ -325,7 +325,7 @@ export async function guardarUbicacion(
         .update(ubicaciones)
         .set({ tipo: input.tipo, nombre: input.nombre, updatedBy: access.user.id })
         .where(eq(ubicaciones.id, ubicacionId));
-      await auditEvent(db, {
+      await registrarAuditoria({
         organizacionId: input.organizacionId,
         sucursalId: input.sucursalId,
         usuarioId: access.user.id,
@@ -424,7 +424,7 @@ export async function desactivarUbicacion(formData: FormData): Promise<ToggleAct
       .update(ubicaciones)
       .set({ activo: input.activar, updatedBy: access.user.id })
       .where(eq(ubicaciones.id, ubicacion.id));
-    await auditEvent(db, {
+    await registrarAuditoria({
       organizacionId: input.organizacionId,
       sucursalId: ubicacion.sucursalId,
       usuarioId: access.user.id,
@@ -526,7 +526,7 @@ export async function moverElemento(formData: FormData): Promise<PlanoMutationRe
         .set({ x: input.x, y: input.y, ancho: input.ancho, alto: input.alto, updatedBy: access.user.id })
         .where(eq(mobiliario.id, elemento.id));
     }
-    await auditEvent(db, {
+    await registrarAuditoria({
       organizacionId: input.organizacionId,
       sucursalId: sucursalElemento,
       usuarioId: access.user.id,
@@ -656,7 +656,7 @@ export async function guardarMobiliario(
           updatedBy: access.user.id,
         })
         .where(eq(mobiliario.id, mobiliarioId));
-      await auditEvent(db, {
+      await registrarAuditoria({
         organizacionId: input.organizacionId,
         sucursalId: input.sucursalId,
         usuarioId: access.user.id,
@@ -747,7 +747,7 @@ export async function cambiarEstadoMobiliario(formData: FormData): Promise<Plano
       .update(mobiliario)
       .set({ estado: input.estado, updatedBy: access.user.id })
       .where(eq(mobiliario.id, mueble.id));
-    await auditEvent(db, {
+    await registrarAuditoria({
       organizacionId: input.organizacionId,
       sucursalId: mueble.sucursalId,
       usuarioId: access.user.id,
@@ -792,7 +792,7 @@ export async function desactivarMobiliario(formData: FormData): Promise<ToggleAc
       .update(mobiliario)
       .set({ activo: input.activar, updatedBy: access.user.id })
       .where(eq(mobiliario.id, mueble.id));
-    await auditEvent(db, {
+    await registrarAuditoria({
       organizacionId: input.organizacionId,
       sucursalId: mueble.sucursalId,
       usuarioId: access.user.id,
@@ -874,7 +874,7 @@ export async function fijarCantidadUbicacion(formData: FormData): Promise<PlanoM
           set: { cantidad: input.cantidad.toFixed(3), updatedBy: access.user.id },
         });
     }
-    await auditEvent(db, {
+    await registrarAuditoria({
       organizacionId: input.organizacionId,
       sucursalId: ubicacion.sucursalId,
       usuarioId: access.user.id,

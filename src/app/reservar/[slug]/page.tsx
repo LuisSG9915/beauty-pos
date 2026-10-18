@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { ReservaFlow } from "@/app/reservar/[slug]/reserva-flow";
 import { BrandMark } from "@/components/brand-mark";
 import { ThemeModeSelector } from "@/components/theme-mode-selector";
-import { getPortalReservas, getProfesionalesReservables, getServiciosReservables } from "@/modules/reservas/queries";
+import { obtenerReservaMeta } from "@/modules/reservas/queries";
 import { dayKey } from "@/modules/agenda/timezone";
 
 export const dynamic = "force-dynamic";
@@ -29,14 +29,10 @@ export default async function ReservarPage({
 }) {
   const { slug } = await params;
   const { p } = await searchParams;
-  const portal = await getPortalReservas(slug);
-  if (!portal || portal.sucursales.length === 0) notFound();
+  const meta = await obtenerReservaMeta(slug);
+  if (!meta || meta.portal.sucursales.length === 0 || meta.servicios.length === 0) notFound();
 
-  const [servicios, profesionales] = await Promise.all([
-    getServiciosReservables(portal.organizacion.id),
-    getProfesionalesReservables(portal.organizacion.id),
-  ]);
-  if (servicios.length === 0) notFound();
+  const { portal, servicios, profesionales } = meta;
 
   // Enlace directo del profesional (/reservar/slug?p=usuarioId): solo se
   // respeta si sigue siendo reservable en alguna sucursal.

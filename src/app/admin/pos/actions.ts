@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { withDbRetry } from "@/db/retry";
-import { catMediosPago, comisiones, membresias, paquetes, productos, promociones, relServiciosInsumos, servicios } from "@/db/schema/catalogs";
+import { catMediosPago, membresias, paquetes, productos, promociones, servicios } from "@/db/schema/catalogs";
 import { clientes, miembrosOrganizaciones, sucursales, usuarios } from "@/db/schema/core";
 import {
   ajustesPagosVenta,
@@ -47,13 +47,13 @@ import { contextoSuscripcion, requiereCapacidad, tieneCapacidad } from "@/module
 import { applyInventoryMovement, type InventoryDb } from "@/modules/inventory";
 import { motivoBloqueoCancelacion } from "@/modules/pos/cancelacion";
 import { anticiposAplicables } from "@/modules/pos/anticipos";
-import { calcularDescuentoMembresia, membresiaVigente, sumarDias } from "@/modules/pos/membresias";
+import { calcularDescuentoMembresia, membresiaVigente } from "@/modules/pos/membresias";
 import { resolverLineasDevolucion } from "@/modules/pos/devoluciones";
 import { resolverCobroPagos } from "@/modules/pos/pagos";
 import { elegirPaqueteParaServicio, estadoTrasUso, restarSesiones } from "@/modules/pos/paquetes";
-import { calcularComisiones, repartirPropina } from "@/modules/pos/comisiones";
 import { calcularDescuentoPromocion, promocionVigente } from "@/modules/pos/promociones";
-import { getRolesPorUsuario, getTicketData, type TicketData } from "@/modules/pos/ticket";
+import { ejecutarVentaTransaccional } from "@/modules/pos/service";
+import { getTicketData, type TicketData } from "@/modules/pos/ticket";
 
 type PosDb = InventoryDb;
 
@@ -256,58 +256,6 @@ async function registrarRetiroDevolucion(
     usuarioId: input.userId,
     createdBy: input.userId,
   });
-}
-
-async function descontarInventarioVenta(db: PosDb, venta: typeof ventas.$inferSelect, userId: string | null) {
-  const lineasProductos = await db
-    .select({ productoId: detalleVentasProductos.productoId, cantidad: detalleVentasProductos.cantidad })
-    .from(detalleVentasProductos)
-    .where(and(eq(detalleVentasProductos.ventaId, venta.id), eq(detalleVentasProductos.activo, true)));
-  const lineasServicios = await db
-    .select({ servicioId: detalleVentasServicios.servicioId, cantidad: detalleVentasServicios.cantidad })
-    .from(detalleVentasServicios)
-    .where(and(eq(detalleVentasServicios.ventaId, venta.id), eq(detalleVentasServicios.activo, true)));
-
-  for (const linea of lineasProductos) {
-    const outcome = await applyInventoryMovement(db, {
-      organizacionId: venta.organizacionId,
-      sucursalId: venta.sucursalId,
-      productoId: linea.productoId,
-      ventaId: venta.id,
-      tipo: "venta",
-      cantidad: linea.cantidad,
-      userId,
-    });
-    if (!outcome.success) throw new PosOperationError(outcome.error ?? "No se pudo descontar el producto.");
-  }
-
-  const servicioIds = lineasServicios.map((linea) => linea.servicioId);
-  const insumos = servicioIds.length > 0
-    ? await db
-        .select({ servicioId: relServiciosInsumos.servicioId, productoId: relServiciosInsumos.productoId, cantidad: relServiciosInsumos.cantidad })
-        .from(relServiciosInsumos)
-        .where(and(inArray(relServiciosInsumos.servicioId, servicioIds), eq(relServiciosInsumos.activo, true)))
-    : [];
-  const porServicio = new Map<string, number>();
-  for (const linea of lineasServicios) porServicio.set(linea.servicioId, (porServicio.get(linea.servicioId) ?? 0) + linea.cantidad);
-  const consumo = new Map<string, number>();
-  for (const insumo of insumos) {
-    const veces = porServicio.get(insumo.servicioId) ?? 0;
-    consumo.set(insumo.productoId, (consumo.get(insumo.productoId) ?? 0) + Number(insumo.cantidad) * veces);
-  }
-  for (const [productoId, cantidad] of consumo) {
-    const outcome = await applyInventoryMovement(db, {
-      organizacionId: venta.organizacionId,
-      sucursalId: venta.sucursalId,
-      productoId,
-      ventaId: venta.id,
-      tipo: "consumo",
-      cantidad,
-      notas: "Consumo por servicio vendido",
-      userId,
-    });
-    if (!outcome.success) throw new PosOperationError(outcome.error ?? "No se pudo descontar el insumo.");
-  }
 }
 
 export async function getOrCreateVentaDeCita(organizacionId: string, citaId: string): Promise<string | null> {
@@ -685,6 +633,7 @@ const cobroSchema = z.object({
   // Clave generada por el formulario de cobro; un reenvío con la misma clave
   // devuelve el resultado original sin duplicar pagos ni movimientos.
   idempotencia: z.string().uuid().optional().or(z.literal("")),
+  idempotencyKey: z.string().uuid().optional().or(z.literal("")),
   modo: z.enum(["inline"]).optional().or(z.literal("")),
   returnTo: z.string().trim().max(500).optional().or(z.literal("")),
 });
@@ -832,161 +781,69 @@ export async function cobrarVenta(_previousState: CobroActionState, formData: Fo
         return actionError(cobro.error, { fieldErrors: { pagos: [cobro.detalle ?? cobro.error] } });
       }
 
-      // El `monto` persistido es lo aplicado a la venta y `recibido` lo
-      // entregado; el cambio solo existe en pagos en efectivo.
-      for (const linea of cobro.lineas) {
-        await tx.insert(detalleVentasMediosPagos).values({
-          ventaId: venta.id,
+      const [lineasProductos, lineasServicio] = await Promise.all([
+        tx
+          .select({
+            id: detalleVentasProductos.id,
+            productoId: detalleVentasProductos.productoId,
+            precio: detalleVentasProductos.precio,
+            cantidad: detalleVentasProductos.cantidad,
+          })
+          .from(detalleVentasProductos)
+          .where(and(eq(detalleVentasProductos.ventaId, venta.id), eq(detalleVentasProductos.activo, true))),
+        tx
+          .select({
+            id: detalleVentasServicios.id,
+            servicioId: detalleVentasServicios.servicioId,
+            usuarioId: detalleVentasServicios.usuarioId,
+            precio: detalleVentasServicios.precio,
+            cantidad: detalleVentasServicios.cantidad,
+          })
+          .from(detalleVentasServicios)
+          .where(and(eq(detalleVentasServicios.ventaId, venta.id), eq(detalleVentasServicios.activo, true))),
+      ]);
+
+      const resultadoVenta = await ejecutarVentaTransaccional(tx, {
+        organizacionId: input.organizacionId,
+        sucursalId: venta.sucursalId,
+        ventaId: venta.id,
+        corteId: corteAbierto?.id ?? null,
+        idempotencyKey: input.idempotencyKey || input.idempotencia || undefined,
+        subtotal,
+        total,
+        propina,
+        pagos: cobro.lineas.map((linea) => ({
           medioPagoId: linea.medioPagoId,
-          monto: linea.aplicado.toFixed(2),
-          recibido: linea.recibido.toFixed(2),
-          cambio: linea.cambio.toFixed(2),
+          monto: linea.aplicado,
+          recibido: linea.recibido,
+          cambio: linea.cambio,
           referencia: linea.referencia,
-          createdBy: user.id,
-        });
-      }
-      // Los anticipos quedan ligados a esta venta; si se cancela vuelven a
-      // "vigente" para re-cobro o devolución.
-      if (anticiposAplicados.length > 0) {
-        await tx
-          .update(anticipos)
-          .set({ estado: "aplicado", ventaId: venta.id, updatedBy: user.id })
-          .where(inArray(anticipos.id, anticiposAplicados));
-      }
+        })),
+        anticiposAplicados,
+        paquetes: lineasPaquetes.map((l) => ({ paqueteId: l.paqueteId, cantidad: l.cantidad })),
+        membresias: lineasMembresias.map((l) => ({ membresiaId: l.membresiaId, cantidad: l.cantidad })),
+        zonaHoraria: sucursalRow?.zonaHoraria ?? undefined,
+        servicios: lineasServicio.map((l) => ({
+          id: l.id,
+          servicioId: l.servicioId,
+          usuarioId: l.usuarioId,
+          precio: Number(l.precio),
+          cantidad: l.cantidad,
+        })),
+        productos: lineasProductos.map((l) => ({
+          id: l.id,
+          productoId: l.productoId,
+          precio: Number(l.precio),
+          cantidad: l.cantidad,
+        })),
+        citaId: venta.citaId,
+        clienteId: venta.clienteId,
+        usuarioId: venta.usuarioId,
+        userId: user.id,
+      });
 
-      // `corteAbierto` ya se resolvió arriba (política de corte exigido).
-      await tx
-        .update(ventas)
-        .set({
-          estado: "completada",
-          cobradaAt: new Date(),
-          corteId: corteAbierto?.id ?? null,
-          subtotal: subtotal.toFixed(2),
-          total: total.toFixed(2),
-          propina: propina.toFixed(2),
-          updatedBy: user.id,
-        })
-        .where(eq(ventas.id, venta.id));
-
-      // Paquetes vendidos: generan saldo de sesiones para el cliente.
-      if (lineasPaquetes.length > 0 && venta.clienteId) {
-        const paqueteIds = [...new Set(lineasPaquetes.map((l) => l.paqueteId))];
-        const defs = await tx
-          .select({ id: paquetes.id, sesiones: paquetes.sesiones })
-          .from(paquetes)
-          .where(inArray(paquetes.id, paqueteIds));
-        const sesionesPorPaquete = new Map(defs.map((d) => [d.id, d.sesiones]));
-        for (const linea of lineasPaquetes) {
-          const sesiones = sesionesPorPaquete.get(linea.paqueteId) ?? 0;
-          for (let i = 0; i < linea.cantidad && sesiones > 0; i++) {
-            await tx.insert(clientePaquetes).values({
-              organizacionId: input.organizacionId,
-              sucursalId: venta.sucursalId,
-              clienteId: venta.clienteId,
-              paqueteId: linea.paqueteId,
-              ventaId: venta.id,
-              sesionesTotal: sesiones,
-              sesionesRestantes: sesiones,
-              estado: "vigente",
-              createdBy: user.id,
-            });
-          }
-        }
-      }
-
-      // Membresías vendidas: vigencia desde hoy (zona de la sucursal) por
-      // `duracion_dias` del catálogo, una membresía de cliente por unidad.
-      if (lineasMembresias.length > 0 && venta.clienteId) {
-        const membresiaIds = [...new Set(lineasMembresias.map((l) => l.membresiaId))];
-        const defs = await tx
-          .select({ id: membresias.id, duracionDias: membresias.duracionDias })
-          .from(membresias)
-          .where(inArray(membresias.id, membresiaIds));
-        const duracionPorMembresia = new Map(defs.map((d) => [d.id, d.duracionDias]));
-        const hoy = todayDateInput(sucursalRow?.zonaHoraria ?? undefined);
-        for (const linea of lineasMembresias) {
-          const duracion = duracionPorMembresia.get(linea.membresiaId) ?? 0;
-          for (let i = 0; i < linea.cantidad && duracion > 0; i++) {
-            await tx.insert(clienteMembresias).values({
-              organizacionId: input.organizacionId,
-              sucursalId: venta.sucursalId,
-              clienteId: venta.clienteId,
-              membresiaId: linea.membresiaId,
-              ventaId: venta.id,
-              vigenciaDesde: hoy,
-              vigenciaHasta: sumarDias(hoy, duracion),
-              estado: "vigente",
-              createdBy: user.id,
-            });
-          }
-        }
-      }
-
-      // Comisiones y reparto de propina por profesional.
-      const lineasServicio = await tx
-        .select({
-          detalleId: detalleVentasServicios.id,
-          servicioId: detalleVentasServicios.servicioId,
-          usuarioId: detalleVentasServicios.usuarioId,
-          precio: detalleVentasServicios.precio,
-          cantidad: detalleVentasServicios.cantidad,
-        })
-        .from(detalleVentasServicios)
-        .where(and(eq(detalleVentasServicios.ventaId, venta.id), eq(detalleVentasServicios.activo, true)));
-
-      const servicioIds = [...new Set(lineasServicio.map((l) => l.servicioId))];
-      const reglas = servicioIds.length > 0
-        ? await tx
-            .select({ id: comisiones.id, servicioId: comisiones.servicioId, rolId: comisiones.rolId, tipo: comisiones.tipo, valor: comisiones.valor })
-            .from(comisiones)
-            .where(and(inArray(comisiones.servicioId, servicioIds), eq(comisiones.organizacionId, input.organizacionId), eq(comisiones.activo, true)))
-        : [];
-      const usuarioIds = [...new Set(lineasServicio.map((l) => l.usuarioId).filter((u): u is string => Boolean(u)))];
-      const rolesPorUsuario = await getRolesPorUsuario(input.organizacionId, usuarioIds);
-
-      const comisionesCalc = calcularComisiones(
-        lineasServicio.map((l) => ({ ...l, precio: Number(l.precio) })),
-        reglas.map((r) => ({ ...r, tipo: r.tipo as "porcentaje" | "monto_fijo", valor: Number(r.valor) })),
-        rolesPorUsuario,
-      );
-      for (const c of comisionesCalc) {
-        await tx.insert(detalleVentasComisiones).values({
-          ventaId: venta.id,
-          detalleVentaServicioId: c.detalleVentaServicioId,
-          usuarioId: c.usuarioId,
-          comisionId: c.comisionId,
-          tipo: c.tipo,
-          valor: String(c.valor),
-          base: c.base.toFixed(2),
-          monto: c.monto.toFixed(2),
-          createdBy: user.id,
-        });
-      }
-
-      const propinasCalc = repartirPropina(propina, lineasServicio.map((l) => ({ ...l, precio: Number(l.precio) })), venta.usuarioId);
-      for (const p of propinasCalc) {
-        await tx.insert(detalleVentasPropinas).values({
-          ventaId: venta.id,
-          usuarioId: p.usuarioId,
-          monto: p.monto.toFixed(2),
-          createdBy: user.id,
-        });
-      }
-
-      await descontarInventarioVenta(tx, venta, user.id);
-
-      if (venta.citaId) {
-        const [cita] = await tx
-          .select({ id: citas.id, estado: citas.estado })
-          .from(citas)
-          .where(and(eq(citas.id, venta.citaId), eq(citas.organizacionId, input.organizacionId)))
-          .limit(1);
-        if (cita && cita.estado !== "completada") {
-          if (!canTransitionEstado(cita.estado, "completada")) {
-            throw new PosOperationError(`La cita está en estado "${cita.estado}" y no puede completarse.`);
-          }
-          await tx.update(citas).set({ estado: "completada", updatedBy: user.id }).where(eq(citas.id, cita.id));
-        }
+      if (resultadoVenta.yaProcesada) {
+        return actionSuccess("Venta cobrada correctamente.", { ventaId: resultadoVenta.ventaId });
       }
       await auditEvent(tx, {
         organizacionId: input.organizacionId,
@@ -2635,3 +2492,5 @@ export async function devolverAnticipo(_previousState: ActionState, formData: Fo
   }
   return outcome;
 }
+
+export const registrarVentaAction = cobrarVenta;

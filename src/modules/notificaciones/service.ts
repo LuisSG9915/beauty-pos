@@ -264,132 +264,142 @@ export async function procesarNotificaciones(ahora = new Date()): Promise<Result
     .orderBy(notificacionesEnvios.programadoPara)
     .limit(LOTE_DRAIN);
 
-  for (const aviso of pendientes) {
-    // Reclamo atómico: solo un worker lo toma.
-    const [claim] = await db
-      .update(notificacionesEnvios)
-      .set({
-        estado: "enviando",
-        leaseHasta: new Date(ahora.getTime() + LEASE_MINUTOS * 60_000),
-        intentos: aviso.intentos + 1,
-      })
-      .where(and(eq(notificacionesEnvios.id, aviso.id), eq(notificacionesEnvios.estado, "pendiente")))
-      .returning({ id: notificacionesEnvios.id });
-    if (!claim) continue;
-
-    const [cita] = await db
-      .select({
-        id: citas.id,
-        fechaHora: citas.fechaHora,
-        estado: citas.estado,
-        activo: citas.activo,
-        version: citas.version,
-        sucursalId: citas.sucursalId,
-        correoCliente: clientes.correo,
-        nombreCliente: clientes.nombre,
-        sucursalNombre: sucursales.nombre,
-        sucursalZonaHoraria: sucursales.zonaHoraria,
-      })
-      .from(citas)
-      .leftJoin(clientes, eq(citas.clienteId, clientes.id))
-      .innerJoin(sucursales, eq(citas.sucursalId, sucursales.id))
-      .where(eq(citas.id, aviso.citaId))
-      .limit(1);
-
-    const ctx = contextos.get(aviso.organizacionId);
-    const horasAntes = ctx?.horasAntes ?? 24;
-    const decision = ctx?.permitido
-      ? decidirAviso(aviso, cita ?? null, { ahora, horasAntes, margenMinutos: MARGEN_MINUTOS })
-      : { accion: "omitir" as const, motivo: "La suscripción no incluye avisos por correo." };
-
-    if (decision.accion === "omitir") {
-      await db
-        .update(notificacionesEnvios)
-        .set({ estado: "omitido", error: decision.motivo, leaseHasta: null })
-        .where(eq(notificacionesEnvios.id, aviso.id));
-      resultado.omitidos += 1;
-      continue;
-    }
-
-    if (decision.accion === "reprogramar") {
-      // La cita se movió: este aviso queda obsoleto y se encola el
-      // recordatorio correcto para la nueva versión (idempotente).
-      await db
-        .update(notificacionesEnvios)
-        .set({ estado: "omitido", error: "Reprogramado por reagenda.", leaseHasta: null })
-        .where(eq(notificacionesEnvios.id, aviso.id));
-      await db
-        .insert(notificacionesEnvios)
-        .values({
-          organizacionId: aviso.organizacionId,
-          citaId: aviso.citaId,
-          tipo: aviso.tipo,
-          correoDestino: aviso.correoDestino,
-          fechaHoraSnapshot: decision.fechaHoraSnapshot,
-          versionCita: decision.versionCita,
-          programadoPara: decision.programadoPara,
-        })
-        .onConflictDoNothing({
-          target: [notificacionesEnvios.citaId, notificacionesEnvios.tipo, notificacionesEnvios.versionCita],
-        });
-      resultado.omitidos += 1;
-      continue;
-    }
-
-    // Enviar.
-    try {
-      const [detalle] = await db
-        .select({ nombre: servicios.nombre })
-        .from(detalleCitasServicios)
-        .innerJoin(servicios, eq(detalleCitasServicios.servicioId, servicios.id))
-        .where(and(eq(detalleCitasServicios.citaId, aviso.citaId), eq(detalleCitasServicios.activo, true)))
-        .limit(1);
-
-      const zonaHoraria = resolveTimeZone(cita!.sucursalZonaHoraria, ctx?.zonaHoraria);
-      const detalleAviso = (aviso.detalle ?? null) as AvisoDetalle;
-      const { proveedorId } = await sendAvisoCita(aviso.tipo, {
-        to: aviso.correoDestino,
-        nombreCliente: cita!.nombreCliente ?? "cliente",
-        nombreNegocio: ctx?.nombre ?? "el negocio",
-        sucursalNombre: cita!.sucursalNombre,
-        fechaHoraTexto: formatoFechaHora(cita!.fechaHora, zonaHoraria),
-        fechaHoraPreviaTexto: detalleAviso?.fechaHoraPrevia
-          ? formatoFechaHora(new Date(detalleAviso.fechaHoraPrevia), zonaHoraria)
-          : null,
-        servicioNombre: detalle?.nombre ?? null,
-        gestionUrl: detalleAviso?.gestionUrl ?? null,
-      });
-
-      await db
-        .update(notificacionesEnvios)
-        .set({ estado: "enviado", enviadoAt: new Date(), proveedorId, leaseHasta: null, error: null })
-        .where(eq(notificacionesEnvios.id, aviso.id));
-      resultado.enviados += 1;
-    } catch (error) {
-      const mensaje = sanitizarError(error);
-      if (alcanzoMaximoIntentos(aviso.intentos + 1)) {
-        await db
-          .update(notificacionesEnvios)
-          .set({ estado: "fallido", error: mensaje, leaseHasta: null })
-          .where(eq(notificacionesEnvios.id, aviso.id));
-        resultado.fallidos += 1;
-      } else {
-        await db
+  // 4. Drenaje: avisos vencidos. Procesamos en lotes de 5 en paralelo con Promise.allSettled.
+  const CHUNK_SIZE = 5;
+  for (let i = 0; i < pendientes.length; i += CHUNK_SIZE) {
+    const chunk = pendientes.slice(i, i + CHUNK_SIZE);
+    await Promise.allSettled(
+      chunk.map(async (aviso) => {
+        // Reclamo atómico: solo un worker lo toma.
+        const [claim] = await db
           .update(notificacionesEnvios)
           .set({
-            estado: "pendiente",
-            proximoIntento: new Date(ahora.getTime() + backoffMs(aviso.intentos + 1)),
-            error: mensaje,
-            leaseHasta: null,
+            estado: "enviando",
+            leaseHasta: new Date(ahora.getTime() + LEASE_MINUTOS * 60_000),
+            intentos: aviso.intentos + 1,
           })
-          .where(eq(notificacionesEnvios.id, aviso.id));
-        resultado.reintentos += 1;
-      }
-    }
+          .where(and(eq(notificacionesEnvios.id, aviso.id), eq(notificacionesEnvios.estado, "pendiente")))
+          .returning({ id: notificacionesEnvios.id });
+        if (!claim) return;
+
+        const [cita] = await db
+          .select({
+            id: citas.id,
+            fechaHora: citas.fechaHora,
+            estado: citas.estado,
+            activo: citas.activo,
+            version: citas.version,
+            sucursalId: citas.sucursalId,
+            correoCliente: clientes.correo,
+            nombreCliente: clientes.nombre,
+            sucursalNombre: sucursales.nombre,
+            sucursalZonaHoraria: sucursales.zonaHoraria,
+          })
+          .from(citas)
+          .leftJoin(clientes, eq(citas.clienteId, clientes.id))
+          .innerJoin(sucursales, eq(citas.sucursalId, sucursales.id))
+          .where(eq(citas.id, aviso.citaId))
+          .limit(1);
+
+        const ctx = contextos.get(aviso.organizacionId);
+        const horasAntes = ctx?.horasAntes ?? 24;
+        const decision = ctx?.permitido
+          ? decidirAviso(aviso, cita ?? null, { ahora, horasAntes, margenMinutos: MARGEN_MINUTOS })
+          : { accion: "omitir" as const, motivo: "La suscripción no incluye avisos por correo." };
+
+        if (decision.accion === "omitir") {
+          await db
+            .update(notificacionesEnvios)
+            .set({ estado: "omitido", error: decision.motivo, leaseHasta: null })
+            .where(eq(notificacionesEnvios.id, aviso.id));
+          resultado.omitidos += 1;
+          return;
+        }
+
+        if (decision.accion === "reprogramar") {
+          // La cita se movió: este aviso queda obsoleto y se encola el
+          // recordatorio correcto para la nueva versión (idempotente).
+          await db
+            .update(notificacionesEnvios)
+            .set({ estado: "omitido", error: "Reprogramado por reagenda.", leaseHasta: null })
+            .where(eq(notificacionesEnvios.id, aviso.id));
+          await db
+            .insert(notificacionesEnvios)
+            .values({
+              organizacionId: aviso.organizacionId,
+              citaId: aviso.citaId,
+              tipo: aviso.tipo,
+              correoDestino: aviso.correoDestino,
+              fechaHoraSnapshot: decision.fechaHoraSnapshot,
+              versionCita: decision.versionCita,
+              programadoPara: decision.programadoPara,
+            })
+            .onConflictDoNothing({
+              target: [notificacionesEnvios.citaId, notificacionesEnvios.tipo, notificacionesEnvios.versionCita],
+            });
+          resultado.omitidos += 1;
+          return;
+        }
+
+        // Enviar.
+        try {
+          const [detalle] = await db
+            .select({ nombre: servicios.nombre })
+            .from(detalleCitasServicios)
+            .innerJoin(servicios, eq(detalleCitasServicios.servicioId, servicios.id))
+            .where(and(eq(detalleCitasServicios.citaId, aviso.citaId), eq(detalleCitasServicios.activo, true)))
+            .limit(1);
+
+          const zonaHoraria = resolveTimeZone(cita!.sucursalZonaHoraria, ctx?.zonaHoraria);
+          const detalleAviso = (aviso.detalle ?? null) as AvisoDetalle;
+          const { proveedorId } = await sendAvisoCita(aviso.tipo, {
+            to: aviso.correoDestino,
+            nombreCliente: cita!.nombreCliente ?? "cliente",
+            nombreNegocio: ctx?.nombre ?? "el negocio",
+            sucursalNombre: cita!.sucursalNombre,
+            fechaHoraTexto: formatoFechaHora(cita!.fechaHora, zonaHoraria),
+            fechaHoraPreviaTexto: detalleAviso?.fechaHoraPrevia
+              ? formatoFechaHora(new Date(detalleAviso.fechaHoraPrevia), zonaHoraria)
+              : null,
+            servicioNombre: detalle?.nombre ?? null,
+            gestionUrl: detalleAviso?.gestionUrl ?? null,
+          });
+
+          await db
+            .update(notificacionesEnvios)
+            .set({ estado: "enviado", enviadoAt: new Date(), proveedorId, leaseHasta: null, error: null })
+            .where(eq(notificacionesEnvios.id, aviso.id));
+          resultado.enviados += 1;
+        } catch (error) {
+          const mensaje = sanitizarError(error);
+          if (alcanzoMaximoIntentos(aviso.intentos + 1)) {
+            await db
+              .update(notificacionesEnvios)
+              .set({ estado: "fallido", error: mensaje, leaseHasta: null })
+              .where(eq(notificacionesEnvios.id, aviso.id));
+            resultado.fallidos += 1;
+          } else {
+            await db
+              .update(notificacionesEnvios)
+              .set({
+                estado: "pendiente",
+                proximoIntento: new Date(ahora.getTime() + backoffMs(aviso.intentos + 1)),
+                error: mensaje,
+                leaseHasta: null,
+              })
+              .where(eq(notificacionesEnvios.id, aviso.id));
+            resultado.reintentos += 1;
+          }
+        }
+      }),
+    );
   }
 
   return resultado;
 }
+
+/** Alias semántico para procesarNotificaciones */
+export const procesarRecordatoriosPendientes = procesarNotificaciones;
 
 /** Aviso serializado para el panel operativo (fechas en ISO). */
 export type AvisoReciente = {

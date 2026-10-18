@@ -6,7 +6,7 @@ import { z } from "zod";
 import { getDatabase } from "@/db/client";
 import { withDbRetry } from "@/db/retry";
 import { actionError, parseWithSchema, type ActionState } from "@/lib/action-state";
-import { auditEvent } from "@/lib/audit";
+import { registrarAuditoria } from "@/lib/audit";
 import { assertBranchScope, checkPermission } from "@/lib/auth/authorization";
 import { applyInventoryMovement, type InventoryMovementResult } from "@/modules/inventory";
 
@@ -51,7 +51,7 @@ export async function registrarMovimiento(
     );
 
     if (!outcome.success) return outcome;
-    await auditEvent(db, {
+    await registrarAuditoria({
       organizacionId: input.organizacionId,
       sucursalId: input.sucursalId,
       usuarioId: user.id,

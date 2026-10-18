@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { productos, relServiciosInsumos, servicios } from "@/db/schema/catalogs";
-import { checkPermission } from "@/lib/auth/authorization";
+import { assertBranchScope, checkPermission } from "@/lib/auth/authorization";
 
 export async function addServicioInsumo(formData: FormData) {
   const organizationId = String(formData.get("organizacionId") ?? "");
@@ -20,6 +20,9 @@ export async function addServicioInsumo(formData: FormData) {
 
   const access = await checkPermission(organizationId, "catalogos.editar");
   if (!access) return;
+  const sucursalId = String(formData.get("sucursalId") ?? "").trim();
+  if (sucursalId && !(await assertBranchScope(access, sucursalId))) return;
+
   const { user } = access;
   const db = getDatabase();
 
@@ -45,6 +48,9 @@ export async function removeServicioInsumo(formData: FormData) {
 
   const access = await checkPermission(organizationId, "catalogos.editar");
   if (!access) return;
+  const sucursalId = String(formData.get("sucursalId") ?? "").trim();
+  if (sucursalId && !(await assertBranchScope(access, sucursalId))) return;
+
   const { user } = access;
   const db = getDatabase();
   await db.update(relServiciosInsumos).set({ activo: false, updatedBy: user.id }).where(and(eq(relServiciosInsumos.id, insumoRelId), eq(relServiciosInsumos.organizacionId, organizationId)));

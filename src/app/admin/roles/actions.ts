@@ -7,7 +7,7 @@ import { z } from "zod";
 import { getDatabase } from "@/db/client";
 import { catPermisos, catRoles, relMiembrosRoles, relRolesPermisos } from "@/db/schema/access";
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
-import { auditEvent } from "@/lib/audit";
+import { auditEvent, registrarAuditoria } from "@/lib/audit";
 import { checkPermission, hasPermission } from "@/lib/auth/authorization";
 import { claveDisponible } from "@/lib/clave";
 
@@ -57,7 +57,7 @@ export async function createRole(
     return actionError("No se pudo crear el rol. La clave puede estar repetida.");
   }
 
-  await auditEvent(db, {
+  await registrarAuditoria({
     organizacionId: input.organizacionId,
     usuarioId: user.id,
     accion: "rol.creado",
@@ -194,7 +194,7 @@ export async function toggleRole(
     .update(catRoles)
     .set({ activo })
     .where(eq(catRoles.id, role.id));
-  await auditEvent(db, {
+  await registrarAuditoria({
     organizacionId: input.organizacionId,
     usuarioId: user.id,
     accion: activo ? "rol.activado" : "rol.desactivado",

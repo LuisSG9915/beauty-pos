@@ -393,6 +393,13 @@
       "when": 1791516358012,
       "tag": "0055_mysterious_joshua_kane",
       "breakpoints": true
+    },
+    {
+      "idx": 56,
+      "version": "7",
+      "when": 1792190000000,
+      "tag": "0056_idempotencia_ventas_indices",
+      "breakpoints": true
     }
   ]
 }

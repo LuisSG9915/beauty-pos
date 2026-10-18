@@ -3,7 +3,7 @@
  * vive aquí; las reglas puras están en `rules.ts` y no conocen la base.
  */
 
-import { and, eq, gt, inArray, lt, notInArray } from "drizzle-orm";
+import { and, eq, gt, inArray, lt, ne, notInArray, sql } from "drizzle-orm";
 import type { ExtractTablesWithRelations } from "drizzle-orm";
 import type { NodePgDatabase, NodePgTransaction } from "drizzle-orm/node-postgres";
 
@@ -347,4 +347,38 @@ export async function validarDisponibilidadCita(
     ignoreCitaId: params.ignoreCitaId,
     capacidadSinAsignar: params.capacidadSinAsignar,
   });
+}
+
+/**
+ * Consulta de colisión directa de horario para un estilista dentro de una transacción SERIALIZABLE.
+ * Bloquea contra double-booking concurrente disparando fallo 40001 si hay traslape con otra tx.
+ */
+export async function verificarColisionEstilista(
+  db: AgendaDb,
+  params: {
+    sucursalId: string;
+    usuarioId: string;
+    inicio: Date;
+    fin: Date;
+    ignoreCitaId?: string | null;
+  },
+): Promise<boolean> {
+  const condiciones = [
+    eq(citas.sucursalId, params.sucursalId),
+    eq(citas.usuarioId, params.usuarioId),
+    eq(citas.activo, true),
+    notInArray(citas.estado, ["cancelada", "no_asistio"]),
+    lt(citas.fechaHora, params.fin),
+    sql`${citas.fechaHora} + (${citas.duracionMinutos} * interval '1 minute') > ${params.inicio}`,
+  ];
+  if (params.ignoreCitaId) {
+    condiciones.push(ne(citas.id, params.ignoreCitaId));
+  }
+  const colisiones = await db
+    .select({ id: citas.id })
+    .from(citas)
+    .where(and(...condiciones))
+    .limit(1);
+
+  return colisiones.length > 0;
 }

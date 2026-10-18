@@ -92,6 +92,7 @@ export async function solicitarCambioPlan(_previousState: ActionState, formData:
   });
 
   revalidatePath("/admin/suscripcion");
+  revalidatePath("/admin", "layout");
   return actionSuccess(`Solicitud enviada: ${plan.nombre} (${input.periodicidad}). Te contactamos para confirmar el pago y aplicar el cambio.`);
 }
 
@@ -147,5 +148,6 @@ export async function solicitarCancelacion(_previousState: ActionState, formData
   await invalidarSuscripcionCache(input.organizacionId);
 
   revalidatePath("/admin/suscripcion");
+  revalidatePath("/admin", "layout");
   return actionSuccess("Cancelación registrada. Conservas el acceso hasta el fin del periodo ya cubierto; no habrá más cobros.");
 }

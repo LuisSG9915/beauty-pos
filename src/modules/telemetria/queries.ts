@@ -5,15 +5,59 @@ import {
   telemetriaProductoEventos,
   telemetriaSesiones,
 } from "@/db/schema/telemetry";
+import { getRuntimeEnv } from "@/lib/runtime-env";
+import { queryAnalyticsEngine } from "@/lib/telemetry/analytics-engine";
 
 /**
  * Consultas del panel de telemetría de producto (solo administradores de
  * plataforma). Agregan sobre `telemetria_sesiones` y
  * `telemetria_producto_eventos`; ninguna expone datos personales porque el
  * colector nunca los captura.
+ *
+ * Si están configuradas CF_ACCOUNT_ID y CF_API_TOKEN_ANALYTICS, consulta
+ * prioritariamente la SQL API de Cloudflare Workers Analytics Engine; de lo
+ * contrario degrada con elegancia a las tablas de CockroachDB.
  */
 
+function isAeConfigured(): boolean {
+  const env = getRuntimeEnv();
+  return Boolean(
+    (env.CF_ACCOUNT_ID ?? process.env.CF_ACCOUNT_ID) &&
+      (env.CF_API_TOKEN_ANALYTICS ?? process.env.CF_API_TOKEN_ANALYTICS),
+  );
+}
+
 export async function resumenSesiones(dias: number) {
+  if (isAeConfigured()) {
+    const rows = await queryAnalyticsEngine<{
+      sesiones: number | string;
+      paginasTotales: number | string;
+      usuariosUnicos: number | string;
+    }>(`
+      SELECT
+        toUInt32(count()) as sesiones,
+        toUInt32(sum(_sample_interval)) as paginasTotales,
+        toUInt32(count(distinct index1)) as usuariosUnicos
+      FROM melena_telemetry
+      WHERE timestamp >= NOW() - INTERVAL '${dias}' DAY
+    `);
+    if (rows && rows.length > 0 && Number(rows[0].sesiones) > 0) {
+      const r = rows[0];
+      const sesiones = Number(r.sesiones);
+      const paginasTotales = Number(r.paginasTotales);
+      const usuariosUnicos = Number(r.usuariosUnicos);
+      return {
+        sesiones,
+        engaged: sesiones,
+        paginasTotales,
+        promedioPaginas: sesiones > 0 ? Number((paginasTotales / sesiones).toFixed(1)) : 0,
+        promedioActivoSeg: 0,
+        usuariosUnicos,
+        tasaRebote: 0,
+      };
+    }
+  }
+
   const db = getDatabase();
   const corte = new Date(Date.now() - dias * 24 * 60 * 60_000);
   const [fila] = await db
@@ -35,6 +79,31 @@ export async function resumenSesiones(dias: number) {
 }
 
 export async function paginasMasVistas(dias: number, limite = 20) {
+  if (isAeConfigured()) {
+    const rows = await queryAnalyticsEngine<{
+      ruta: string;
+      vistas: number | string;
+      sesiones: number | string;
+    }>(`
+      SELECT
+        blob2 as ruta,
+        toUInt32(sum(_sample_interval)) as vistas,
+        toUInt32(count(distinct index1)) as sesiones
+      FROM melena_telemetry
+      WHERE blob1 = 'nav' AND timestamp >= NOW() - INTERVAL '${dias}' DAY
+      GROUP BY ruta
+      ORDER BY vistas DESC
+      LIMIT ${limite}
+    `);
+    if (rows && rows.length > 0) {
+      return rows.map((r) => ({
+        ruta: r.ruta,
+        vistas: Number(r.vistas),
+        sesiones: Number(r.sesiones),
+      }));
+    }
+  }
+
   const db = getDatabase();
   const corte = new Date(Date.now() - dias * 24 * 60 * 60_000);
   return db
@@ -56,6 +125,31 @@ export async function paginasMasVistas(dias: number, limite = 20) {
 }
 
 export async function accionesMasUsadas(dias: number, limite = 20) {
+  if (isAeConfigured()) {
+    const rows = await queryAnalyticsEngine<{
+      actionId: string;
+      total: number | string;
+      clave: number | string;
+    }>(`
+      SELECT
+        blob2 as actionId,
+        toUInt32(sum(_sample_interval)) as total,
+        toUInt32(sum(if(blob3 = 'clave' or double2 = 1, 1, 0))) as clave
+      FROM melena_telemetry
+      WHERE blob1 = 'prod' AND timestamp >= NOW() - INTERVAL '${dias}' DAY
+      GROUP BY actionId
+      ORDER BY total DESC
+      LIMIT ${limite}
+    `);
+    if (rows && rows.length > 0) {
+      return rows.map((r) => ({
+        actionId: r.actionId,
+        total: Number(r.total),
+        clave: Number(r.clave),
+      }));
+    }
+  }
+
   const db = getDatabase();
   const corte = new Date(Date.now() - dias * 24 * 60 * 60_000);
   return db

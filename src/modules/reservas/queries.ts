@@ -1,8 +1,10 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
 import { miembrosOrganizaciones, organizaciones, relUsuariosSucursales, sucursales, usuarios } from "@/db/schema/core";
 import { servicios } from "@/db/schema/catalogs";
+import { horariosSucursales } from "@/db/schema/operations";
+import { kvDelete, kvGetJson, kvPutJson } from "@/lib/kv-cache";
 import { contextoSuscripcion, tieneCapacidad } from "@/modules/billing/queries";
 import { resolveTimeZone } from "@/modules/agenda/timezone";
 
@@ -215,3 +217,76 @@ export async function getSucursalReservable(organizacionId: string, sucursalId: 
     zonaHoraria: resolveTimeZone(row.zonaHoraria, row.orgZonaHoraria),
   };
 }
+
+export type HorarioSucursalMeta = {
+  id: string;
+  sucursalId: string;
+  diaSemana: number;
+  iniciaMinutos: number;
+  terminaMinutos: number;
+};
+
+export type ReservaMetadata = {
+  portal: PortalReservas;
+  servicios: ServicioReservable[];
+  profesionales: ProfesionalReservable[];
+  horarios: HorarioSucursalMeta[];
+};
+
+/**
+ * Cachea los datos estáticos del salón por slug (organización, sucursales activas,
+ * servicios públicos, estilistas y horarios de sucursal — nunca citas ocupadas)
+ * bajo la llave `reserva_meta:${slug}` con expirationTtl de 300s (5 minutos).
+ */
+export async function obtenerReservaMeta(slug: string): Promise<ReservaMetadata | null> {
+  const cacheKey = `reserva_meta:${slug}`;
+  const cached = await kvGetJson<ReservaMetadata | null>(cacheKey);
+  if (cached !== null) return cached;
+
+  const portal = await getPortalReservas(slug);
+  if (!portal || portal.sucursales.length === 0) return null;
+
+  const db = getDatabase();
+  const branchIds = portal.sucursales.map((s) => s.id);
+
+  const [serviciosRows, profesionalesRows, horariosRows] = await Promise.all([
+    getServiciosReservables(portal.organizacion.id),
+    getProfesionalesReservables(portal.organizacion.id),
+    branchIds.length > 0
+      ? db
+          .select({
+            id: horariosSucursales.id,
+            sucursalId: horariosSucursales.sucursalId,
+            diaSemana: horariosSucursales.diaSemana,
+            iniciaMinutos: horariosSucursales.iniciaMinutos,
+            terminaMinutos: horariosSucursales.terminaMinutos,
+          })
+          .from(horariosSucursales)
+          .where(
+            and(
+              eq(horariosSucursales.organizacionId, portal.organizacion.id),
+              inArray(horariosSucursales.sucursalId, branchIds),
+              eq(horariosSucursales.activo, true),
+            ),
+          )
+      : Promise.resolve([]),
+  ]);
+
+  const meta: ReservaMetadata = {
+    portal,
+    servicios: serviciosRows,
+    profesionales: profesionalesRows,
+    horarios: horariosRows,
+  };
+
+  await kvPutJson(cacheKey, meta, { expirationTtl: 300 });
+  return meta;
+}
+
+/**
+ * Invalida los metadatos cacheados del portal de reservas en KV.
+ */
+export async function invalidarCacheReservaMeta(slug: string): Promise<void> {
+  await kvDelete(`reserva_meta:${slug}`);
+}
+

@@ -24,7 +24,8 @@
   "observability": {
     "enabled": true,
     "traces": {
-      "enabled": true
+      "enabled": true,
+      "head_sampling_rate": 0.1
     }
   },
   // Pooling de conexiones a PostgreSQL (CockroachDB us-east-2): reduce la
@@ -58,6 +59,22 @@
   // `src/lib/ia/cliente.ts` degrada a "no disponible" cuando el binding no
   // existe (desarrollo local con `pnpm dev`, sin wrangler).
   "ai": { "binding": "AI" },
+  "ratelimits": [
+    {
+      "name": "PUBLIC_RATE_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 20, "period": 60 }
+    }
+  ],
+  "analytics_engine_datasets": [
+    {
+      "binding": "TELEMETRY_AE",
+      "dataset": "melena_telemetry"
+    }
+  ],
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
   // AI Gateway `melena-ia` se crea a mano en el dashboard (ver "Pasos
   // manuales" del plan 08). Descomentar la var SOLO cuando el gateway exista:
   // si se apunta a un id inexistente, todas las llamadas a AI.run fallan.

@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, or, sql } from "drizzle-orm";
 import { unstable_cache } from "next/cache";
 
 import { getDatabase } from "@/db/client";
@@ -319,8 +319,8 @@ async function loadCatalogosTicket(organizacionId: string, sucursalId: string): 
       .select({ id: clientes.id, nombre: clientes.nombre, telefono: clientes.telefono })
       .from(clientes)
       .where(and(eq(clientes.organizacionId, organizacionId), eq(clientes.activo, true)))
-      .orderBy(asc(clientes.nombre))
-      .limit(500),
+      .orderBy(desc(clientes.updatedAt))
+      .limit(100),
     db
       .select({ id: catMediosPago.id, nombre: catMediosPago.nombre, categoria: catMediosPago.categoria })
       .from(catMediosPago)
@@ -515,6 +515,7 @@ export async function getTicketData(
               eq(clienteMembresias.organizacionId, organizacionId),
               eq(clienteMembresias.clienteId, venta.clienteId),
               eq(clienteMembresias.activo, true),
+              eq(clienteMembresias.estado, "vigente"),
             ),
           )
           .orderBy(asc(clienteMembresias.createdAt))
@@ -538,6 +539,7 @@ export async function getTicketData(
               eq(clientePaquetes.clienteId, venta.clienteId),
               eq(clientePaquetes.estado, "vigente"),
               eq(clientePaquetes.activo, true),
+              gt(clientePaquetes.sesionesRestantes, 0),
             ),
           )
           .orderBy(asc(clientePaquetes.createdAt))
@@ -638,6 +640,7 @@ export async function getTicketData(
               eq(anticipos.organizacionId, organizacionId),
               eq(anticipos.activo, true),
               inArray(anticipos.estado, ["vigente", "aplicado"]),
+              gt(anticipos.monto, "0"),
             ),
           )
           .orderBy(asc(anticipos.createdAt))
@@ -658,6 +661,7 @@ export async function getTicketData(
               eq(anticipos.organizacionId, organizacionId),
               eq(anticipos.activo, true),
               inArray(anticipos.estado, ["vigente", "aplicado"]),
+              gt(anticipos.monto, "0"),
             ),
           )
           .orderBy(asc(anticipos.createdAt)),

@@ -7,7 +7,7 @@ import { getDatabase } from "@/db/client";
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
 import { requireAuthenticatedUser } from "@/lib/auth/access";
 import { canAccessBranch, resolveAccessSafe } from "@/lib/auth/authorization";
-import { cargarEstadoNegocio } from "@/modules/onboarding/queries";
+import { cargarEstadoNegocio, invalidarCacheOnboarding } from "@/modules/onboarding/queries";
 import { evaluarPasos, pasosParaPermisos, resumenGuia } from "@/modules/onboarding/rules";
 import { registrarAccionGuia } from "@/modules/onboarding/service";
 
@@ -51,6 +51,7 @@ export async function actualizarGuia(formData: FormData): Promise<ActionState> {
       accion: input.accion,
       pasoActual,
     });
+    await invalidarCacheOnboarding(input.organizacionId);
   } catch (error) {
     console.error("actualizarGuia", error);
     return actionError("No se pudo actualizar la guía. Intenta de nuevo.");

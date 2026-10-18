@@ -58,3 +58,5 @@ export async function withDbRetry<T>(
   }
   throw lastError;
 }
+
+export const withRetry = withDbRetry;

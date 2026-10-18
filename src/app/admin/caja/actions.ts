@@ -17,7 +17,7 @@ import {
   ventas,
 } from "@/db/schema/operations";
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
-import { auditEvent } from "@/lib/audit";
+import { auditEvent, registrarAuditoria } from "@/lib/audit";
 import { assertBranchScope, canAccessBranch, checkPermission } from "@/lib/auth/authorization";
 import { calcularEsperadoMedio, medioDelFondo } from "@/modules/caja";
 
@@ -73,7 +73,7 @@ export async function abrirCaja(_previousState: CajaActionState, formData: FormD
     throw error;
   }
 
-  await auditEvent(db, {
+  await registrarAuditoria({
     organizacionId: input.organizacionId,
     sucursalId: input.sucursalId,
     usuarioId: user.id,
@@ -323,7 +323,7 @@ export async function updatePoliticaCaja(formData: FormData): Promise<ActionStat
     .update(sucursales)
     .set({ exigirCorteParaCobrar: input.exigirCorteParaCobrar, updatedBy: access.user.id })
     .where(and(eq(sucursales.id, input.sucursalId), eq(sucursales.organizacionId, input.organizacionId)));
-  await auditEvent(db, {
+  await registrarAuditoria({
     organizacionId: input.organizacionId,
     sucursalId: input.sucursalId,
     usuarioId: access.user.id,

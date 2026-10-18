@@ -12,6 +12,10 @@ export type RemoteComboboxProps = {
   searchUrl: string;
   /** Item ya seleccionado (edición) para mostrarlo sin una primera búsqueda. */
   initialItem?: ComboboxItem | null;
+  /** Opciones iniciales precargadas (ej. clientes recientes para evitar fetch inicial). */
+  defaultItems?: ComboboxItem[];
+  /** Clases CSS adicionales para el input group (ej. `h-8 text-xs`). */
+  inputClassName?: string;
   /** Nombre del input oculto que se envía en formularios/server actions. */
   name?: string;
   label?: string;
@@ -37,6 +41,8 @@ export type RemoteComboboxProps = {
 export function RemoteCombobox({
   searchUrl,
   initialItem = null,
+  defaultItems: initialDefaultItems,
+  inputClassName,
   selectedItem,
   name,
   label,
@@ -51,8 +57,13 @@ export function RemoteCombobox({
   "aria-describedby": ariaDescribedBy,
 }: RemoteComboboxProps) {
   const inputId = useId();
-  const [items, setItems] = useState<ComboboxItem[]>(initialItem ? [initialItem] : []);
-  const [defaultItems, setDefaultItems] = useState<ComboboxItem[]>(initialItem ? [initialItem] : []);
+  const initialItemsList = useMemo(() => {
+    if (initialDefaultItems && initialDefaultItems.length > 0) return initialDefaultItems;
+    return initialItem ? [initialItem] : [];
+  }, [initialDefaultItems, initialItem]);
+
+  const [items, setItems] = useState<ComboboxItem[]>(initialItemsList);
+  const [defaultItems, setDefaultItems] = useState<ComboboxItem[]>(initialItemsList);
   const [internalSelection, setInternalSelection] = useState<ComboboxItem | null>(initialItem);
   const seleccion = selectedItem !== undefined ? selectedItem : internalSelection;
   const [buscando, setBuscando] = useState(false);
@@ -68,6 +79,8 @@ export function RemoteCombobox({
 
   // Carga inicial de opciones para que el selector no esté vacío al abrirlo
   useEffect(() => {
+    if (initialDefaultItems && initialDefaultItems.length > 0) return;
+
     let activo = true;
     const controller = new AbortController();
 
@@ -102,7 +115,7 @@ export function RemoteCombobox({
       activo = false;
       controller.abort();
     };
-  }, [searchUrl, seleccion]);
+  }, [searchUrl, seleccion, initialDefaultItems]);
 
   const buscar = useCallback(
     (termino: string) => {
@@ -186,11 +199,15 @@ export function RemoteCombobox({
             "relative flex h-10 w-full items-center rounded-xl border bg-background transition-colors",
             "focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30",
             "border-input hover:border-muted-foreground/40",
+            inputClassName,
           )}
         >
           <ComboboxPrimitive.Input
             aria-describedby={ariaDescribedBy}
-            className="h-full w-full rounded-xl bg-transparent px-3 pr-16 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+            className={cn(
+              "h-full w-full rounded-xl bg-transparent px-3 pr-16 text-sm text-foreground outline-none placeholder:text-muted-foreground",
+              inputClassName?.includes("text-xs") && "text-xs",
+            )}
             id={inputId}
             placeholder={placeholder}
           />

@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
@@ -8,6 +8,7 @@ import { getDatabase } from "@/db/client";
 import { withDbRetry } from "@/db/retry";
 import { productos } from "@/db/schema/catalogs";
 import { compras, detalleCompras, proveedores } from "@/db/schema/compras";
+import { inventarioStock, movimientosInventario } from "@/db/schema/operations";
 import {
   actionError,
   actionSuccess,
@@ -22,7 +23,6 @@ import {
 } from "@/lib/auth/authorization";
 import { isValidDateInput } from "@/lib/format";
 import { normalizarTexto } from "@/lib/ia/borrador";
-import { applyInventoryMovement } from "@/modules/inventory";
 import {
   errorCancelacionCompra,
   errorEdicionCompra,
@@ -411,6 +411,66 @@ export async function recibirCompra(formData: FormData): Promise<ActionState> {
       });
 
       const notas = `Compra ${compra.folio ?? ""}`.trim();
+      const lineasConEntrada = plan.filter((p) => p.cantidadRecibida > 0 && p.linea.productoId);
+      const productoIds = [...new Set(lineasConEntrada.map((p) => p.linea.productoId!))];
+
+      const filasMovimientos: (typeof movimientosInventario.$inferInsert)[] = [];
+      const stockMap = new Map<string, { id: string; stockActual: string }>();
+      const costosUpdates = new Map<string, string>();
+
+      if (productoIds.length > 0) {
+        const prods = await tx
+          .select({ id: productos.id, activo: productos.activo })
+          .from(productos)
+          .where(
+            and(
+              inArray(productos.id, productoIds),
+              eq(productos.organizacionId, access.organizationId),
+            ),
+          );
+        const prodMap = new Map(prods.map((p) => [p.id, p]));
+        for (const pId of productoIds) {
+          if (!prodMap.has(pId)) {
+            throw new CompraActionError("Uno de los productos no existe o no pertenece a la organización.");
+          }
+        }
+
+        await tx
+          .insert(inventarioStock)
+          .values(
+            productoIds.map((pId) => ({
+              organizacionId: access.organizationId,
+              sucursalId: compra.sucursalId,
+              productoId: pId,
+              stockActual: "0",
+              createdBy: user.id,
+            })),
+          )
+          .onConflictDoNothing({
+            target: [inventarioStock.sucursalId, inventarioStock.productoId],
+          });
+
+        const stocks = await tx
+          .select({
+            id: inventarioStock.id,
+            productoId: inventarioStock.productoId,
+            stockActual: inventarioStock.stockActual,
+          })
+          .from(inventarioStock)
+          .where(
+            and(
+              eq(inventarioStock.organizacionId, access.organizationId),
+              eq(inventarioStock.sucursalId, compra.sucursalId),
+              inArray(inventarioStock.productoId, productoIds),
+            ),
+          )
+          .for("update");
+
+        for (const s of stocks) {
+          stockMap.set(s.productoId, s);
+        }
+      }
+
       for (const { linea, cantidadRecibida, observacion } of plan) {
         await tx
           .update(detalleCompras)
@@ -422,31 +482,50 @@ export async function recibirCompra(formData: FormData): Promise<ActionState> {
           .where(eq(detalleCompras.id, linea.id));
 
         if (cantidadRecibida > 0 && linea.productoId) {
-          const outcome = await applyInventoryMovement(tx, {
+          const stockRow = stockMap.get(linea.productoId);
+          if (!stockRow) {
+            throw new CompraActionError("No se pudo obtener el inventario del producto.");
+          }
+          const stockAnterior = Number(stockRow.stockActual);
+          const stockResultante = stockAnterior + cantidadRecibida;
+          stockRow.stockActual = stockResultante.toFixed(3);
+
+          filasMovimientos.push({
             organizacionId: access.organizationId,
             sucursalId: compra.sucursalId,
             productoId: linea.productoId,
             compraId: compra.id,
             tipo: "entrada",
-            cantidad: cantidadRecibida,
+            cantidad: cantidadRecibida.toFixed(3),
+            stockResultante: stockResultante.toFixed(3),
             notas,
-            userId: user.id,
+            createdBy: user.id,
           });
-          // Error → abortar: el throw revierte toda la recepción.
-          if (!outcome.success) {
-            throw new CompraActionError(outcome.error ?? "No se pudo dar entrada al inventario.");
-          }
+
           if (actualizarCostos) {
-            await tx
-              .update(productos)
-              .set({ costo: linea.costoUnitario, updatedBy: user.id })
-              .where(
-                and(
-                  eq(productos.id, linea.productoId),
-                  eq(productos.organizacionId, access.organizationId),
-                ),
-              );
+            costosUpdates.set(linea.productoId, linea.costoUnitario);
           }
+        }
+      }
+
+      for (const stockRow of stockMap.values()) {
+        await tx
+          .update(inventarioStock)
+          .set({ stockActual: stockRow.stockActual, updatedBy: user.id })
+          .where(eq(inventarioStock.id, stockRow.id));
+      }
+
+      if (actualizarCostos && costosUpdates.size > 0) {
+        for (const [prodId, costo] of costosUpdates) {
+          await tx
+            .update(productos)
+            .set({ costo, updatedBy: user.id })
+            .where(
+              and(
+                eq(productos.id, prodId),
+                eq(productos.organizacionId, access.organizationId),
+              ),
+            );
         }
       }
 
@@ -475,6 +554,10 @@ export async function recibirCompra(formData: FormData): Promise<ActionState> {
           updatedBy: user.id,
         })
         .where(eq(compras.id, compra.id));
+
+      if (filasMovimientos.length > 0) {
+        await tx.insert(movimientosInventario).values(filasMovimientos);
+      }
 
       await auditEvent(tx, {
         organizacionId: access.organizationId,
@@ -591,3 +674,5 @@ export async function cancelarCompra(formData: FormData): Promise<ActionState> {
     return actionError("No se pudo cancelar la compra. Intenta de nuevo.");
   }
 }
+
+export const recibirCompraAction = recibirCompra;

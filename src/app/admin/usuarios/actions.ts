@@ -8,7 +8,7 @@ import { getDatabase } from "@/db/client";
 import { catRoles, invitacionesUsuarios, relMiembrosRoles } from "@/db/schema/access";
 import { miembrosOrganizaciones } from "@/db/schema/core";
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
-import { auditEvent } from "@/lib/audit";
+import { auditEvent, registrarAuditoria } from "@/lib/audit";
 import { assertBranchScope, checkPermission } from "@/lib/auth/authorization";
 import { revalidateCatalogos } from "@/lib/catalogo-cache";
 import { issueInvitation } from "@/lib/invitations";
@@ -48,7 +48,7 @@ export async function inviteMember(
   }
   if (issued.error) return actionError(issued.error);
 
-  await auditEvent(getDatabase(), {
+  await registrarAuditoria({
     organizacionId: input.organizacionId,
     sucursalId: input.sucursalId,
     usuarioId: user.id,
@@ -197,7 +197,7 @@ export async function toggleMember(
     .update(miembrosOrganizaciones)
     .set({ estado: input.estado, updatedBy: user.id })
     .where(eq(miembrosOrganizaciones.id, member.id));
-  await auditEvent(db, {
+  await registrarAuditoria({
     organizacionId: input.organizacionId,
     usuarioId: user.id,
     accion: input.estado === "activo" ? "miembro.reactivado" : "miembro.suspendido",
@@ -242,7 +242,7 @@ export async function cancelInvitation(
     .returning({ id: invitacionesUsuarios.id });
   if (!updated) return actionError("La invitación no existe o ya no está pendiente.");
 
-  await auditEvent(db, {
+  await registrarAuditoria({
     organizacionId: input.organizacionId,
     usuarioId: user.id,
     accion: "invitacion.cancelada",

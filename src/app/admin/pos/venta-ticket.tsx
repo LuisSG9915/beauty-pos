@@ -31,6 +31,7 @@ import { TicketActionsBar } from "@/app/admin/pos/printable-ticket";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
+import { RemoteCombobox } from "@/components/ui/remote-combobox";
 import { Field, FieldLabel, Input } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
 import { initialActionState, type ActionState } from "@/lib/action-state";
@@ -323,7 +324,7 @@ function TicketLine({
   );
 }
 
-/** Selector de cliente para ventas walk-in: habilita paquetes y expediente. */
+/** Selector de cliente para ventas walk-in: habilita paquetes y expediente con búsqueda remota. */
 function ClientePicker({
   clientes,
   onChanged,
@@ -337,18 +338,21 @@ function ClientePicker({
 }) {
   const toast = useToast();
   const [pending, startTransition] = useTransition();
+  const defaultItems = clientes.map((c) => ({
+    value: c.id,
+    label: c.nombre,
+    description: c.telefono ?? undefined,
+    keywords: [c.telefono ?? ""],
+  }));
+
   return (
-    <Combobox
+    <RemoteCombobox
       className="w-56"
+      defaultItems={defaultItems}
       disabled={pending}
       inputClassName="h-8 text-xs"
-      items={clientes.map((c) => ({
-        value: c.id,
-        label: c.nombre,
-        description: c.telefono ?? undefined,
-        keywords: [c.telefono ?? ""],
-      }))}
-      label="Cliente de la venta"
+      placeholder="Asignar cliente…"
+      searchUrl={`/api/clientes?organizationId=${organizationId}`}
       onValueChange={(value) => {
         if (!value) return;
         const data = new FormData();
@@ -365,7 +369,6 @@ function ClientePicker({
           }
         });
       }}
-      placeholder="Asignar cliente…"
     />
   );
 }
@@ -604,7 +607,7 @@ export function VentaTicket({
                 Cliente: {venta.clienteNombre ?? GLOSARIO.clienteDePaso}
                 {venta.citaId ? " · desde cita" : ""}
               </span>
-              {editable && catalogoClientes.length > 0 ? (
+              {editable ? (
                 <ClientePicker
                   clientes={catalogoClientes}
                   onChanged={onChanged}

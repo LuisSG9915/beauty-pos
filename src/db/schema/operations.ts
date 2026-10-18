@@ -57,6 +57,7 @@ export const citas = pgTable(
       .where(sql`${table.activo}`),
     index("citas_cliente_idx").on(table.clienteId),
     index("citas_usuario_idx").on(table.usuarioId),
+    index("citas_sucursal_usuario_fecha_idx").on(table.sucursalId, table.usuarioId, table.fechaHora),
     index("citas_estado_idx").on(table.estado),
   ],
 );
@@ -168,6 +169,7 @@ export const ventas = pgTable(
     descuentoMembresia: numeric("descuento_membresia", { precision: 12, scale: 2 }).default("0").notNull(),
     total: numeric("total", { precision: 12, scale: 2 }).default("0").notNull(),
     propina: numeric("propina", { precision: 12, scale: 2 }).default("0").notNull(),
+    idempotencyKey: text("idempotency_key"),
     notas: text("notas"),
     activo: boolean("activo").default(true).notNull(),
     ...opAuditColumns,
@@ -175,6 +177,7 @@ export const ventas = pgTable(
   (table) => [
     index("ventas_organizacion_idx").on(table.organizacionId),
     index("ventas_sucursal_idx").on(table.sucursalId),
+    uniqueIndex("ventas_sucursal_idempotency_uq").on(table.sucursalId, table.idempotencyKey),
     index("ventas_cita_idx").on(table.citaId),
     index("ventas_corte_idx").on(table.corteId),
     index("ventas_sucursal_cobrada_idx").on(table.sucursalId, table.cobradaAt),

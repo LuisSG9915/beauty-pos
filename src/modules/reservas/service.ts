@@ -7,10 +7,11 @@ import { clientes, sucursales } from "@/db/schema/core";
 import { citas, detalleCitasServicios } from "@/db/schema/operations";
 import { auditEvent } from "@/lib/audit";
 import { contextoSuscripcion, tieneCapacidad } from "@/modules/billing/queries";
-import { getOcupacionAgenda, lockSucursalAgenda, registrarHistorialCita } from "@/modules/agenda/service";
+import { getOcupacionAgenda, lockSucursalAgenda, registrarHistorialCita, verificarColisionEstilista } from "@/modules/agenda/service";
 import { validateCitaAvailability } from "@/modules/agenda/rules";
 import { getZonedParts } from "@/modules/agenda/timezone";
 import { intervalFromDates } from "@/modules/agenda/types";
+import { enviarAvisoDiferido } from "@/lib/email/aviso-email";
 import { encolarAvisoCita } from "@/modules/notificaciones/service";
 import { TIPO_CONFIRMACION, TIPO_SOLICITUD } from "@/modules/notificaciones/rules";
 import { emitirTokenGestion, verificarAbusoReserva } from "./gestion";
@@ -93,7 +94,7 @@ export async function crearReservaPublica(input: {
 
   const db = getDatabase();
   try {
-    return await withDbRetry(() =>
+    const resultado = await withDbRetry(() =>
       db.transaction(async (tx): Promise<ReservaResult> => {
       // El lock FOR UPDATE serializa reservas web y cambios de agenda de la
       // sucursal: dos clientes no pueden tomar el mismo horario a la vez.
@@ -190,6 +191,18 @@ export async function crearReservaPublica(input: {
         return { ok: false, error: "Ese horario acaba de ocuparse. Elige otro." };
       }
 
+      if (usuarioId) {
+        const colision = await verificarColisionEstilista(tx, {
+          sucursalId: input.sucursalId,
+          usuarioId,
+          inicio: input.fechaHora,
+          fin: new Date(candidato.terminaAtMs),
+        });
+        if (colision) {
+          return { ok: false, error: "El profesional ya tiene una cita en ese horario. Elige otro horario o estilista." };
+        }
+      }
+
       const clienteId = await findOrCreateCliente(tx, input.organizacionId, input.cliente);
 
       const [cita] = await tx
@@ -246,16 +259,22 @@ export async function crearReservaPublica(input: {
       });
       const gestionUrl = gestion?.url ?? null;
 
-      await encolarAvisoCita(tx, {
-        organizacionId: input.organizacionId,
-        citaId: cita.id,
-        tipo: autoConfirmar ? TIPO_CONFIRMACION : TIPO_SOLICITUD,
-        gestionUrl,
-      });
-
-      return { ok: true, citaId: cita.id, confirmada: autoConfirmar, gestionUrl };
+      return { ok: true as const, citaId: cita.id, confirmada: autoConfirmar, gestionUrl };
     }),
     );
+
+    if (resultado.ok) {
+      enviarAvisoDiferido(async () => {
+        await encolarAvisoCita(getDatabase(), {
+          organizacionId: input.organizacionId,
+          citaId: resultado.citaId,
+          tipo: resultado.confirmada ? TIPO_CONFIRMACION : TIPO_SOLICITUD,
+          gestionUrl: resultado.gestionUrl,
+        });
+      });
+    }
+
+    return resultado;
   } catch (error) {
     console.error("crearReservaPublica", error);
     return { ok: false, error: "No se pudo completar la reserva. Inténtalo de nuevo." };

@@ -2,6 +2,8 @@ import { createHash } from "node:crypto";
 
 import { and, countDistinct, eq, gt, sql } from "drizzle-orm";
 
+import { after } from "next/server";
+
 import { getDatabase } from "@/db/client";
 import {
   incidentesError,
@@ -9,6 +11,8 @@ import {
   type IncidenteFuente,
   type IncidentePrioridad,
 } from "@/db/schema/incidents";
+import { enviarAlertaIncidenteCritico } from "@/lib/email/alerta-email";
+import { getRuntimeEnv } from "@/lib/runtime-env";
 import { moduloDeRuta, normalizarRuta } from "@/lib/telemetry/ruta";
 
 const EMAIL_RE = /[\w.+-]+@[\w-]+\.[\w.]+/g;
@@ -157,10 +161,25 @@ export async function registrarError(db: Db, reporte: ErrorReporte): Promise<str
     const correlationId =
       reporte.correlationId ?? crypto.randomUUID().replaceAll("-", "").slice(0, 24);
 
+    let cfRay = (reporte.contexto?.["cf-ray"] ?? reporte.contexto?.cfRay) as string | undefined;
+    let cfIpCountry = (reporte.contexto?.["cf-ipcountry"] ?? reporte.contexto?.cfIpCountry) as string | undefined;
+    if (!cfRay || !cfIpCountry) {
+      try {
+        const { headers } = await import("next/headers");
+        const reqHeaders = await headers();
+        cfRay ??= reqHeaders.get("cf-ray") ?? undefined;
+        cfIpCountry ??= reqHeaders.get("cf-ipcountry") ?? undefined;
+      } catch {
+        // Fuera de contexto de request de Next.js (tests unitarios o scripts)
+      }
+    }
+
     const contexto = {
       digest: reporte.digest ?? null,
       stack,
       rastro: reporte.rastro?.slice(0, 8) ?? [],
+      ...(cfRay ? { "cf-ray": cfRay, cfRay } : {}),
+      ...(cfIpCountry ? { "cf-ipcountry": cfIpCountry, cfIpCountry } : {}),
       ...reporte.contexto,
     };
 
@@ -188,7 +207,12 @@ export async function registrarError(db: Db, reporte: ErrorReporte): Promise<str
             updatedAt: new Date(),
           },
         })
-        .returning({ id: incidentesError.id, estado: incidentesError.estado });
+        .returning({
+          id: incidentesError.id,
+          estado: incidentesError.estado,
+          ocurrencias: incidentesError.ocurrencias,
+          prioridad: incidentesError.prioridad,
+        });
 
       await tx.insert(incidentesOcurrencias).values({
         incidenteId: incidente.id,
@@ -221,6 +245,36 @@ export async function registrarError(db: Db, reporte: ErrorReporte): Promise<str
       .update(incidentesError)
       .set({ prioridad, organizacionesAfectadas: orgs })
       .where(eq(incidentesError.id, resultado.id));
+
+    // Si (severidad === "P0" || severidad === "P1") && ocurrencias === 1 y existe ALERT_EMAIL_TO / BREVO_SENDER_EMAIL
+    const sevUpper = prioridad.toUpperCase();
+    if ((sevUpper === "P0" || sevUpper === "P1") && resultado.ocurrencias === 1) {
+      const env = getRuntimeEnv();
+      const alertEmail = env.ALERT_EMAIL_TO || env.BREVO_SENDER_EMAIL || env.BREVO_FROM_EMAIL;
+      if (alertEmail && env.BREVO_API_KEY && env.BREVO_FROM_EMAIL) {
+        const cfRay = (contexto?.["cf-ray"] ?? contexto?.cfRay) as string | undefined;
+        const alertTask = async () => {
+          try {
+            await enviarAlertaIncidenteCritico({
+              to: alertEmail,
+              titulo,
+              ruta: ruta ?? "desconocida",
+              fingerprint,
+              cfRay,
+              prioridad: sevUpper,
+            });
+          } catch (err) {
+            console.error("[observability] Error enviando alerta crítica por correo:", err);
+          }
+        };
+
+        try {
+          after(alertTask);
+        } catch {
+          void alertTask();
+        }
+      }
+    }
 
     return resultado.id;
   } catch (error) {

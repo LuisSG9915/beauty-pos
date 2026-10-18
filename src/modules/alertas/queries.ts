@@ -1,6 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
+import { kvDelete, kvGetJson, kvPutJson } from "@/lib/kv-cache";
 
 /**
  * Tablero central de alertas operativas del negocio. Cada alerta es un
@@ -184,3 +185,42 @@ export async function cargarAlertas(
 
   return alertas;
 }
+
+const PERMISOS_ALERTAS_DEFAULT = new Set(["agenda.ver", "caja.ver", "inventario.ver"]);
+
+/**
+ * Obtiene las alertas operativas activas con caché de lectura en KV (TTL 60s).
+ */
+export async function obtenerAlertasActivas(
+  organizacionId: string,
+  sucursalId?: string | null,
+  permisos?: ReadonlySet<string>,
+): Promise<AlertaOperativa[]> {
+  const cacheKey = `alertas:${organizacionId}:${sucursalId ?? "all"}`;
+  const cached = await kvGetJson<AlertaOperativa[]>(cacheKey);
+  if (cached !== null) return cached;
+
+  const db = getDatabase();
+  const alertas = await cargarAlertas(db, {
+    organizacionId,
+    sucursalIds: sucursalId ? [sucursalId] : null,
+    permisos: permisos ?? PERMISOS_ALERTAS_DEFAULT,
+  });
+
+  await kvPutJson(cacheKey, alertas, { expirationTtl: 60 });
+  return alertas;
+}
+
+/**
+ * Invalida la caché de alertas de la sucursal o de toda la organización en KV.
+ */
+export async function invalidarCacheAlertas(
+  organizacionId: string,
+  sucursalId?: string,
+): Promise<void> {
+  await kvDelete(`alertas:${organizacionId}:${sucursalId ?? "all"}`);
+  if (sucursalId) {
+    await kvDelete(`alertas:${organizacionId}:all`);
+  }
+}
+

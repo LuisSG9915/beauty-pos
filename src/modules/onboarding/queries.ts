@@ -2,6 +2,7 @@ import { and, eq, sql } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
 import { progresoGuias } from "@/db/schema/onboarding";
+import { kvDelete, kvGetJson, kvPutJson } from "@/lib/kv-cache";
 import type { EstadoGuia, EstadoNegocio } from "./types";
 import { GUIA_CONFIGURACION, GUIA_VERSION } from "./types";
 
@@ -78,3 +79,43 @@ export async function cargarProgresoGuia(
   if (!row) return null;
   return { estado: row.estado as EstadoGuia, pasoActual: row.pasoActual };
 }
+
+export type ProgresoOnboarding = {
+  estadoNegocio: EstadoNegocio | null;
+  progresoGuia: ProgresoGuiaRow | null;
+};
+
+/**
+ * Obtiene el progreso de onboarding con caché KV (TTL 10 min).
+ */
+export async function obtenerProgresoOnboarding(
+  organizacionId: string,
+  sucursalId?: string | null,
+  usuarioId?: string | null,
+): Promise<ProgresoOnboarding> {
+  const cacheKey = `onboarding:${organizacionId}`;
+  const cached = await kvGetJson<ProgresoOnboarding>(cacheKey);
+  if (cached !== null) return cached;
+
+  const db = getDatabase();
+  const [estadoNegocio, progresoGuia] = await Promise.all([
+    sucursalId ? cargarEstadoNegocio(db, organizacionId, sucursalId) : Promise.resolve(null),
+    usuarioId ? cargarProgresoGuia(db, organizacionId, usuarioId) : Promise.resolve(null),
+  ]);
+
+  const resultado: ProgresoOnboarding = {
+    estadoNegocio,
+    progresoGuia,
+  };
+
+  await kvPutJson(cacheKey, resultado, { expirationTtl: 600 });
+  return resultado;
+}
+
+/**
+ * Invalida la caché de onboarding para una organización.
+ */
+export async function invalidarCacheOnboarding(organizacionId: string): Promise<void> {
+  await kvDelete(`onboarding:${organizacionId}`);
+}
+

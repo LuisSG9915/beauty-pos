@@ -2,6 +2,7 @@
 
 import { getDatabase } from "@/db/client";
 import { clientIp } from "@/lib/client-ip";
+import { verificarTurnstileToken } from "@/lib/turnstile";
 import { getOcupacionAgenda } from "@/modules/agenda/service";
 import { dayBoundsUtc } from "@/modules/agenda/timezone";
 import { esProfesionalReservable, getServiciosReservables, getSucursalReservable } from "@/modules/reservas/queries";
@@ -74,7 +75,15 @@ export async function confirmarReserva(input: {
   telefono: string;
   correo?: string;
   notas?: string;
+  turnstileToken?: string | null;
 }): Promise<{ ok: true; confirmada: boolean; gestionUrl: string | null } | { ok: false; error: string }> {
+  const ip = await clientIp();
+
+  const turnstileValido = await verificarTurnstileToken(input.turnstileToken, ip);
+  if (!turnstileValido) {
+    return { ok: false, error: "Verificación de seguridad fallida. Por favor intenta de nuevo." };
+  }
+
   const fechaHora = new Date(input.fechaHora);
   if (Number.isNaN(fechaHora.getTime())) {
     return { ok: false, error: "Horario inválido." };

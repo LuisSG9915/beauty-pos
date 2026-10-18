@@ -1,3 +1,5 @@
+import { after } from "next/server";
+
 import { BRAND, BRAND_COLORS } from "@/lib/brand";
 import { getRuntimeEnv } from "@/lib/runtime-env";
 
@@ -113,6 +115,7 @@ export async function sendAvisoCita(tipo: string, input: AvisoCitaInput): Promis
 
   const response = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
+    signal: AbortSignal.timeout(6000),
     headers: {
       accept: "application/json",
       "api-key": apiKey,
@@ -157,4 +160,25 @@ export async function sendAvisoCita(tipo: string, input: AvisoCitaInput): Promis
 
   const body = (await response.json().catch(() => null)) as { messageId?: string } | null;
   return { proveedorId: body?.messageId ?? null };
+}
+
+/**
+ * Despacha un aviso diferido usando `after()` fuera del tiempo de respuesta del request.
+ * Si se invoca fuera de un contexto de request de Next.js (tests o scripts), ejecuta
+ * la promesa directamente con un fallback seguro que captura errores.
+ */
+export function enviarAvisoDiferido(fn: () => Promise<unknown>): void {
+  try {
+    after(async () => {
+      try {
+        await fn();
+      } catch (e) {
+        console.error("[aviso-email]", e);
+      }
+    });
+  } catch {
+    fn().catch((e) => {
+      console.error("[aviso-email]", e);
+    });
+  }
 }

@@ -7,6 +7,7 @@ import { FormEvent, useState, useTransition } from "react";
 import { registrarNegocio } from "@/app/registro/actions";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input } from "@/components/ui/field";
+import { TurnstileWidget } from "@/components/ui/turnstile-widget";
 import { authClient } from "@/lib/auth/client";
 
 /**
@@ -133,6 +134,8 @@ export function RegistroForm() {
           {errorMessage}
         </p>
       ) : null}
+
+      <TurnstileWidget className="my-2 flex justify-center" />
 
       <Button
         className="w-full rounded-xl py-3 text-sm font-semibold"

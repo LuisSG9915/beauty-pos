@@ -1,14 +1,14 @@
 import { AdminShell } from "@/components/admin/admin-shell";
 import type { BillingBadge } from "@/components/admin/subscription-banner";
 import { OfflineSyncBadge } from "@/components/offline-sync";
-import { redirect } from "next/navigation";
 
-import { getSessionOrRedirect } from "@/lib/auth/access";
-import { resolveSessionContext } from "@/lib/auth/authorization";
+import { getAdminContext } from "@/lib/admin-context";
 import { leerSucursalesCookieMap } from "@/lib/sucursal-cookie";
+import { obtenerAlertasActivas } from "@/modules/alertas/queries";
 import { CAPACIDADES } from "@/modules/billing/capacidades";
-import { getSuscripcionActualCache } from "@/modules/billing/queries";
+import { obtenerEstadoSuscripcion } from "@/modules/billing/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
+import { obtenerProgresoOnboarding } from "@/modules/onboarding/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -18,15 +18,17 @@ export const dynamic = "force-dynamic";
  * resto). El shell es client component y conserva el estado entre rutas.
  */
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
-  const session = await getSessionOrRedirect();
-  // Usuario + organizaciones en la consulta de contexto única (compartida con
-  // la página vía React.cache cuando coincide la organización pedida).
-  const contextRow = await resolveSessionContext(session.user.id, null);
-  const user = contextRow.usuario;
-  if (!user) {
-    redirect("/login?error=account-not-configured");
-  }
-  const organizations = contextRow.organizaciones;
+  const context = await getAdminContext({});
+  const { user, organizations, organization, branch } = context;
+
+  // Ejecución en un único Promise.all paralelo inmediatamente después de getAdminContext()
+  const [suscripciones] = await Promise.all([
+    user.esAdministradorPlataforma
+      ? Promise.resolve([])
+      : Promise.all(organizations.map((org) => obtenerEstadoSuscripcion(org.id))),
+    organization ? obtenerAlertasActivas(organization.id, branch?.id ?? null) : Promise.resolve([]),
+    organization ? obtenerProgresoOnboarding(organization.id, branch?.id ?? null, user.id) : Promise.resolve(null),
+  ]);
 
   // Permisos por organización para filtrar la navegación del shell: ya viajan
   // embebidos en la consulta de contexto (sin una ronda extra por org).
@@ -36,9 +38,6 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const capacidadesFaltantesByOrg: Record<string, string[]> = {};
   if (!user.esAdministradorPlataforma) {
     permissionsByOrg = {};
-    const suscripciones = await Promise.all(
-      organizations.map((org) => getSuscripcionActualCache(org.id)),
-    );
     for (const [index, org] of organizations.entries()) {
       const suscripcion = suscripciones[index] ?? null;
       permissionsByOrg[org.id] = org.permisos ?? [];
@@ -74,8 +73,8 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
       organizations={organizations}
       permissionsByOrg={permissionsByOrg}
       sucursalPreferidaPorOrg={sucursalPreferidaPorOrg}
-      userEmail={session.user.email}
-      userName={session.user.name}
+      userEmail={user.correo ?? ""}
+      userName={user.nombre}
     >
       <OfflineSyncBadge />
       {children}

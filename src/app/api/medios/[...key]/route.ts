@@ -1,6 +1,6 @@
 import { and, desc, eq, isNull, ne } from "drizzle-orm";
 import { revalidateTag } from "next/cache";
-import { type NextRequest, NextResponse } from "next/server";
+import { after, type NextRequest, NextResponse } from "next/server";
 
 import { getDatabase } from "@/db/client";
 import { productos, servicios } from "@/db/schema/catalogs";
@@ -15,48 +15,87 @@ import { hashTokenGestion } from "@/modules/reservas/gestion";
 
 type RouteParams = { params: Promise<{ key: string[] }> };
 
+const PREFIJOS_PUBLICOS = new Set([
+  "productos",
+  "servicios",
+  "logos",
+  "organizaciones",
+  "portafolio",
+  "producto",
+  "servicio",
+  "logo",
+  "organizacion",
+]);
+
 /**
- * La llave viaja en el path (`/api/medios/{org}/{entidad}/{entidadId}/{uuid}.{ext}`),
- * así que necesita catch-all: los segmentos se reconstruyen con `/`.
+ * Parsea los segmentos de la llave.
+ * Soporta formato canónico de R2 `{prefijo}/{orgId}/...` y el formato
+ * estructurado `{orgId}/{entidad}/{entidadId}/{uuid}.{ext}`.
  */
-function claveDesdeParams(segments: string[] | undefined): string | null {
-  if (!segments || segments.length !== 4) return null;
+function parsearClaveMedio(segments: string[] | undefined): {
+  clave: string;
+  prefix: string;
+  organizacionId: string;
+  esPublico: boolean;
+} | null {
+  if (!segments || segments.length < 2) return null;
   const clave = decodeURIComponent(segments.join("/"));
-  // El primer segmento debe ser el uuid de la organización.
-  if (
-    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(segments[0] ?? "")
-  ) {
-    return null;
+
+  const isUuid = (val: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
+
+  let prefix: string;
+  let organizacionId: string;
+
+  if (isUuid(segments[0])) {
+    // Formato `{orgId}/{entidad}/{entidadId}/{uuid}.{ext}`
+    organizacionId = segments[0];
+    prefix = segments[1] ?? "";
+  } else {
+    // Formato `{prefijo}/{orgId}/...`
+    prefix = segments[0] ?? "";
+    organizacionId = segments[1] ?? "";
   }
-  return clave;
+
+  const esPublico = PREFIJOS_PUBLICOS.has(prefix.toLowerCase());
+  return { clave, prefix, organizacionId, esPublico };
 }
 
 /**
  * Sirve una imagen de R2.
- * Catálogo (producto/servicio): imágenes públicas con llave inmutable (UUID).
- * Se cachean en el edge (CDN) y el lookup de metadatos se lee de Cloudflare KV,
- * eliminando por completo las consultas a CockroachDB en navegación habitual.
- * Privados (fichas, compras): requieren sesión y membresía activa.
+ * Prefijos públicos: productos, servicios, logos, organizaciones, portafolio.
+ * Se cachean en `caches.default` de Cloudflare Edge y responden con Cache-Control inmutable.
+ * Prefijos privados: compras, clientes, expedientes (y cualquier otro no público).
+ * Requieren sesión activa y validación de membresía en la organización.
  */
 export async function GET(request: NextRequest, { params }: RouteParams) {
   const segments = (await params).key;
-  const clave = claveDesdeParams(segments);
-  if (!clave) return new Response(null, { status: 404 });
+  const parsed = parsearClaveMedio(segments);
+  if (!parsed) return new Response(null, { status: 404 });
 
-  // Sin binding (dev sin wrangler) la app no truena: 404 → la UI muestra el
-  // placeholder, sin tocar la BD.
-  if (!getMediaBucket()) return new Response(null, { status: 404 });
+  const { clave, prefix, organizacionId, esPublico } = parsed;
 
-  const entidad = segments[1];
-  const esCatalogo = entidad === "producto" || entidad === "servicio";
+  const cache = (globalThis as unknown as { caches?: { default?: Cache } }).caches?.default;
+  const cacheKey = new Request(request.url, { method: "GET" });
 
-  if (!esCatalogo) {
-    const user = await getApiSessionUser();
+  // 1. Si el prefijo es público: consultar primero la Cache API del edge
+  if (esPublico && cache) {
+    try {
+      const cached = await cache.match(cacheKey);
+      if (cached) return cached;
+    } catch {
+      // Degradar si la Cache API falla
+    }
+  }
+
+  // 2. Si el prefijo es privado: validar sesión y pertenencia a la organización
+  if (!esPublico) {
     let autorizado = false;
-    if (user) {
-      const access = await resolveAccessSafe(segments[0]!, user);
-      if (access) autorizado = true;
-    } else if (entidad === "ficha") {
+    const user = await getApiSessionUser();
+
+    // Soporte para acceso a fichas/expedientes con token seguro de cita (WhatsApp/email)
+    const entidadLower = prefix.toLowerCase();
+    if (entidadLower === "ficha" || entidadLower === "expedientes" || entidadLower === "expediente") {
       const token = request.nextUrl.searchParams.get("token");
       if (token && /^[0-9a-f]{64}$/i.test(token)) {
         const tokenHash = hashTokenGestion(token);
@@ -68,7 +107,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           .where(
             and(
               eq(reservasGestionTokens.tokenHash, tokenHash),
-              eq(citas.organizacionId, segments[0]!),
+              eq(citas.organizacionId, organizacionId),
               isNull(reservasGestionTokens.revocadoAt),
               eq(citas.activo, true),
             ),
@@ -79,9 +118,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     if (!autorizado) {
-      return new Response(null, { status: user ? 404 : 401 });
+      if (!user) {
+        return new Response(null, { status: 401 });
+      }
+      const access = await resolveAccessSafe(organizacionId, user);
+      if (!access) {
+        return new Response(null, { status: 403 });
+      }
     }
   }
+
+  // Sin binding de almacenamiento R2 (entornos sin Cloudflare), devolver 404
+  if (!getMediaBucket()) return new Response(null, { status: 404 });
 
   // Lectura de metadata amortiguada con Cloudflare KV (24h de TTL)
   const medio = await kvReadThrough<{ organizacionId: string; mime: string; activo: boolean } | null>(
@@ -102,30 +150,54 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     },
   );
 
-  // La fila debe existir, seguir activa y coincidir con la org de la key.
-  if (!medio || !medio.activo || medio.organizacionId !== segments[0]) {
+  // La fila debe estar activa y coincidir con la organización si existe registro
+  if (medio && (!medio.activo || medio.organizacionId !== organizacionId)) {
     return new Response(null, { status: 404 });
   }
 
   const objeto = await mediaGet(clave);
   if (!objeto) return new Response(null, { status: 404 });
 
-  const baseHeaders = {
-    "Cache-Control": esCatalogo
-      ? "public, max-age=31536000, immutable"
-      : "private, max-age=31536000, immutable",
-    ETag: objeto.httpEtag,
+  const cacheControl = esPublico
+    ? "public, max-age=31536000, immutable"
+    : "private, max-age=3600";
+
+  const baseHeaders = new Headers({
+    "Cache-Control": cacheControl,
     "X-Content-Type-Options": "nosniff",
-  };
-  if (request.headers.get("if-none-match") === objeto.httpEtag) {
+  });
+  if (objeto.httpEtag) {
+    baseHeaders.set("ETag", objeto.httpEtag);
+  }
+  if (objeto.httpEtag && request.headers.get("if-none-match") === objeto.httpEtag) {
     return new Response(null, { status: 304, headers: baseHeaders });
   }
 
-  const headers = new Headers(baseHeaders);
-  objeto.writeHttpMetadata?.(headers);
-  if (!headers.has("content-type")) headers.set("content-type", medio.mime);
-  headers.set("content-length", String(objeto.size));
-  return new Response(objeto.body as unknown as BodyInit, { headers });
+  objeto.writeHttpMetadata?.(baseHeaders);
+  if (!baseHeaders.has("content-type")) {
+    baseHeaders.set("content-type", medio?.mime ?? "image/webp");
+  }
+  baseHeaders.set("content-length", String(objeto.size));
+
+  const response = new Response(objeto.body as unknown as BodyInit, { headers: baseHeaders });
+
+  // Guardar en Cache API del edge para prefijos públicos
+  if (esPublico && cache) {
+    const responseToCache = response.clone();
+    try {
+      after(async () => {
+        try {
+          await cache.put(cacheKey, responseToCache);
+        } catch (e) {
+          console.error("[medios-cache-put]", e);
+        }
+      });
+    } catch {
+      cache.put(cacheKey, responseToCache).catch(() => {});
+    }
+  }
+
+  return response;
 }
 
 /**
@@ -134,10 +206,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
  * limpia `imagen_principal_id`). Las fotos de ficha quedan apuntando a llaves
  * inexistentes → el `<img>` devuelve 404 y se ve el hueco, sin tronar.
  */
-export async function DELETE(_request: NextRequest, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   const segments = (await params).key;
-  const clave = claveDesdeParams(segments);
-  if (!clave) return NextResponse.json({ error: "Imagen no encontrada." }, { status: 404 });
+  const parsed = parsearClaveMedio(segments);
+  if (!parsed) return NextResponse.json({ error: "Imagen no encontrada." }, { status: 404 });
+
+  const { clave, organizacionId } = parsed;
 
   const user = await getApiSessionUser();
   if (!user) {
@@ -157,7 +231,7 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
     .from(medios)
     .where(eq(medios.claveR2, clave))
     .limit(1);
-  if (!medio || !medio.activo || medio.organizacionId !== segments[0]) {
+  if (!medio || !medio.activo || medio.organizacionId !== organizacionId) {
     return NextResponse.json({ error: "Imagen no encontrada." }, { status: 404 });
   }
 
@@ -212,6 +286,8 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   // Best-effort: si R2 falla el objeto queda huérfano pero desreferenciado.
   await mediaDelete(clave).catch(() => {});
   await kvInvalidate(`medio:${clave}`).catch(() => {});
+  const cache = (globalThis as unknown as { caches?: { default?: Cache } }).caches?.default;
+  if (cache) cache.delete(new Request(request.url, { method: "GET" })).catch(() => {});
   if (esCatalogo) revalidateTag(catalogoTag(medio.organizacionId), "max");
   return NextResponse.json({ ok: true });
 }

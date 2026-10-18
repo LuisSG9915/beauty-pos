@@ -1,9 +1,16 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 import { getRuntimeEnv } from "@/lib/runtime-env";
 import { procesarNotificaciones } from "@/modules/notificaciones/service";
 
 export const dynamic = "force-dynamic";
+
+function timingSafeMatch(a: string, b: string): boolean {
+  const hashA = createHash("sha256").update(a).digest();
+  const hashB = createHash("sha256").update(b).digest();
+  return timingSafeEqual(hashA, hashB);
+}
 
 /**
  * Worker de avisos de cita por correo (confirmación, solicitud, cambio,
@@ -18,7 +25,8 @@ async function handler(request: Request) {
     return NextResponse.json({ error: "CRON_SECRET no configurado." }, { status: 503 });
   }
   const auth = request.headers.get("authorization") ?? "";
-  if (auth !== `Bearer ${secret}`) {
+  const expectedAuth = `Bearer ${secret}`;
+  if (!timingSafeMatch(auth, expectedAuth)) {
     return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   }
 

@@ -79,32 +79,53 @@ export function getDatabase() {
     if (existing && existing.connectionString === connectionString) {
       return drizzleFor(existing.pool);
     }
-    // max 8: las páginas lanzan lotes de hasta ~7 consultas en paralelo
-    // (agenda, alertas); con 5 la última se encolaba tras una conexión fría.
-    // Hyperdrive limita el origen a 20 y encola el excedente.
+    const isHyperdrive = Boolean(cloudflare.env?.HYPERDRIVE?.connectionString || process.env.HYPERDRIVE_CONNECTION_STRING);
+    // max 2 cuando proviene de HYPERDRIVE (Hyperdrive gestiona el pool en edge; abrir más sockets desperdicia descriptores).
+    // Fuera de Hyperdrive se permiten hasta 8 para consultas paralelas.
     const pool = new Pool({
       connectionString,
-      max: 8,
+      max: isHyperdrive ? 2 : 8,
       connectionTimeoutMillis: 5000,
+      query_timeout: 10000,
+      idleTimeoutMillis: 5000,
     });
     workerPools.set(cloudflare.ctx, { connectionString, pool });
     // `after` corre cuando la respuesta ya se envió: allí es seguro drenar el
     // pool sin cortar consultas en vuelo (pool.end espera a los clientes).
+    // Se silencia cualquier error de socket cerrado y se registra en ctx.waitUntil.
+    const ctx = cloudflare.ctx as { waitUntil?: (promise: Promise<unknown>) => void } | undefined;
+    const endPool = () => pool.end().catch(() => {});
     try {
       after(async () => {
-        await pool.end().catch(() => {});
+        const p = endPool();
+        if (typeof ctx?.waitUntil === "function") {
+          ctx.waitUntil(p);
+        }
+        await p;
       });
     } catch {
-      // Sin contexto de request (prerender de build): el pool muere con el proceso.
+      // Sin contexto de request (prerender de build): registrar en waitUntil si está disponible.
+      if (typeof ctx?.waitUntil === "function") {
+        ctx.waitUntil(endPool());
+      }
     }
     return drizzleFor(pool);
   }
 
   // Entorno local/scripts: pool global por cadena de conexión (los sockets sí
   // persisten entre requests del mismo proceso).
+  const isHyperdrive = Boolean(cloudflare?.env?.HYPERDRIVE?.connectionString || process.env.HYPERDRIVE_CONNECTION_STRING);
   const runtimeGlobal = globalThis as DatabaseGlobal;
   const pools = (runtimeGlobal.__beautyPosPools ??= new Map());
-  const pool = pools.get(connectionString) ?? new Pool({ connectionString, max: 5 });
+  const pool =
+    pools.get(connectionString) ??
+    new Pool({
+      connectionString,
+      max: isHyperdrive ? 2 : 5,
+      connectionTimeoutMillis: 5000,
+      query_timeout: 10000,
+      idleTimeoutMillis: 5000,
+    });
   pools.set(connectionString, pool);
 
   return drizzleFor(pool);

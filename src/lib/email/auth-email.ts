@@ -31,6 +31,7 @@ export async function sendAuthEmail({ to, subject, title, url }: AuthEmailInput)
   const safeUrl = escapeHtml(url);
   const response = await fetch("https://api.brevo.com/v3/smtp/email", {
     method: "POST",
+    signal: AbortSignal.timeout(6000),
     headers: {
       accept: "application/json",
       "api-key": apiKey,

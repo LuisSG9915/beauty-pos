@@ -8,7 +8,7 @@ import { getDatabase } from "@/db/client";
 import { miembrosOrganizaciones, relUsuariosSucursales, sucursales, usuarios } from "@/db/schema/core";
 import { horariosSucursales } from "@/db/schema/operations";
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
-import { auditEvent } from "@/lib/audit";
+import { auditEvent, registrarAuditoria } from "@/lib/audit";
 import type { ToggleActivoResult } from "@/components/admin/toggle-activo";
 import { requireAuthenticatedUser } from "@/lib/auth/access";
 import { canAccessBranch, checkPermission, resolveAccessSafe } from "@/lib/auth/authorization";
@@ -267,7 +267,7 @@ export async function actualizarSucursalAction(
     .returning({ id: sucursales.id });
   if (!actualizada) return actionError("La sucursal no pertenece al negocio.");
 
-  await auditEvent(db, {
+  await registrarAuditoria({
     organizacionId: input.organizacionId,
     sucursalId: input.sucursalId,
     usuarioId: user.id,
@@ -342,7 +342,7 @@ export async function setSucursalActivaAction(formData: FormData): Promise<Toggl
     .update(sucursales)
     .set({ activo: activar, updatedBy: user.id })
     .where(eq(sucursales.id, input.id));
-  await auditEvent(db, {
+  await registrarAuditoria({
     organizacionId: input.organizacionId,
     sucursalId: input.id,
     usuarioId: user.id,
@@ -390,7 +390,7 @@ export async function renombrarSucursalAction(
     .returning({ id: sucursales.id });
   if (!actualizada) return actionError("La sucursal no pertenece al negocio.");
 
-  await auditEvent(db, {
+  await registrarAuditoria({
     organizacionId: input.organizacionId,
     sucursalId: input.sucursalId,
     usuarioId: access.user.id,

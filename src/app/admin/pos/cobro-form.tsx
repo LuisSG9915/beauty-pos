@@ -194,6 +194,7 @@ export function CobroForm({
       <input name="pagos" type="hidden" value={pagosPayload} />
       <input name="propina" type="hidden" value={propina.toFixed(2)} />
       <input name="idempotencia" type="hidden" value={idempotencia} />
+      <input name="idempotencyKey" type="hidden" value={idempotencia} />
 
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="font-semibold text-foreground">Cobrar</h2>

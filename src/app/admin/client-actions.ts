@@ -16,8 +16,8 @@ import {
 } from "@/db/schema/operations";
 import { medios } from "@/db/schema/media";
 import { productos, servicios } from "@/db/schema/catalogs";
-import { auditEvent } from "@/lib/audit";
-import { checkPermission, hasPermission } from "@/lib/auth/authorization";
+import { registrarAuditoria } from "@/lib/audit";
+import { assertBranchScope, checkPermission, hasPermission } from "@/lib/auth/authorization";
 import { revalidateCatalogos } from "@/lib/catalogo-cache";
 import {
   fichaFotoDetalleSchema,
@@ -154,11 +154,14 @@ export async function saveFichaTecnica(
 
   if (input.citaId) {
     const [cita] = await db
-      .select({ id: citas.id })
+      .select({ id: citas.id, sucursalId: citas.sucursalId })
       .from(citas)
       .where(and(eq(citas.id, input.citaId), eq(citas.organizacionId, input.organizacionId)))
       .limit(1);
     if (!cita) return { error: "La cita asociada no existe." };
+    if (!(await assertBranchScope(access, cita.sucursalId))) {
+      return { error: "No tienes acceso a la sucursal de esta cita." };
+    }
   }
   if (input.servicioId) {
     const [servicio] = await db
@@ -295,7 +298,7 @@ export async function saveFichaTecnica(
   });
 
   // Las alergias/notas privadas son dato sensible: se audita el tipo sin el contenido.
-  await auditEvent(db, {
+  await registrarAuditoria({
     organizacionId: input.organizacionId,
     usuarioId: user.id,
     accion: "expediente.ficha_creada",
@@ -456,7 +459,7 @@ export async function saveConsentimiento(
     respuesta: input.respuesta,
     createdBy: user.id,
   });
-  await auditEvent(db, {
+  await registrarAuditoria({
     organizacionId: input.organizacionId,
     usuarioId: user.id,
     accion: "expediente.consentimiento",

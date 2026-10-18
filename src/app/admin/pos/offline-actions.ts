@@ -6,26 +6,14 @@ import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { withDbRetry } from "@/db/retry";
-import { catMediosPago, comisiones, productos, relServiciosInsumos, servicios } from "@/db/schema/catalogs";
+import { catMediosPago, productos, servicios } from "@/db/schema/catalogs";
 import { sucursales } from "@/db/schema/core";
-import {
-  clavesIdempotencia,
-  cortesCaja,
-  detalleVentasComisiones,
-  detalleVentasMediosPagos,
-  detalleVentasProductos,
-  detalleVentasServicios,
-  inventarioStock,
-  movimientosInventario,
-  ventas,
-} from "@/db/schema/operations";
+import { clavesIdempotencia, cortesCaja } from "@/db/schema/operations";
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
 import { auditEvent } from "@/lib/audit";
 import { canAccessBranch, checkPermission } from "@/lib/auth/authorization";
-import type { InventoryDb } from "@/modules/inventory";
 import { totalVentaOffline, validarPagosOffline } from "@/modules/offline/venta-offline";
-import { calcularComisiones } from "@/modules/pos/comisiones";
-import { getRolesPorUsuario } from "@/modules/pos/ticket";
+import { ejecutarVentaTransaccional } from "@/modules/pos/service";
 
 /**
  * Sincroniza una venta cobrada sin conexión. El dispositivo guardó el ticket
@@ -69,64 +57,6 @@ const ventaOfflineSchema = z
     message: "Agrega al menos un servicio o producto.",
   });
 
-type PosDb = InventoryDb;
-
-/**
- * Descuento de inventario tolerante a stock negativo: la venta física ya
- * ocurrió mientras el equipo estaba offline, así que el déficit queda
- * registrado (stock resultante < 0) en vez de bloquear la sincronización.
- * Mismo patrón FOR UPDATE que `applyInventoryMovement`.
- */
-async function movimientoInventarioOffline(
-  db: PosDb,
-  input: {
-    organizacionId: string;
-    sucursalId: string;
-    ventaId: string;
-    productoId: string;
-    tipo: "venta" | "consumo";
-    cantidad: number;
-    notas?: string;
-    userId: string | null;
-  },
-) {
-  await db
-    .insert(inventarioStock)
-    .values({
-      organizacionId: input.organizacionId,
-      sucursalId: input.sucursalId,
-      productoId: input.productoId,
-      stockActual: "0",
-      createdBy: input.userId,
-    })
-    .onConflictDoNothing({ target: [inventarioStock.sucursalId, inventarioStock.productoId] });
-  const [stock] = await db
-    .select({ id: inventarioStock.id, stockActual: inventarioStock.stockActual })
-    .from(inventarioStock)
-    .where(
-      and(
-        eq(inventarioStock.organizacionId, input.organizacionId),
-        eq(inventarioStock.sucursalId, input.sucursalId),
-        eq(inventarioStock.productoId, input.productoId),
-      ),
-    )
-    .limit(1)
-    .for("update");
-  if (!stock) throw new Error("No se pudo inicializar el stock del producto.");
-  const stockResultante = Number(stock.stockActual) - input.cantidad;
-  await db.update(inventarioStock).set({ stockActual: stockResultante.toFixed(3), updatedBy: input.userId }).where(eq(inventarioStock.id, stock.id));
-  await db.insert(movimientosInventario).values({
-    organizacionId: input.organizacionId,
-    sucursalId: input.sucursalId,
-    productoId: input.productoId,
-    ventaId: input.ventaId,
-    tipo: input.tipo,
-    cantidad: input.cantidad.toFixed(3),
-    stockResultante: stockResultante.toFixed(3),
-    notas: input.notas ?? null,
-    createdBy: input.userId,
-  });
-}
 
 export async function sincronizarVentaOffline(raw: unknown): Promise<ActionState<{ ventaId: string }>> {
   const parsed = parseWithSchema(ventaOfflineSchema, raw);
@@ -215,140 +145,49 @@ export async function sincronizarVentaOffline(raw: unknown): Promise<ActionState
           )
           .limit(1);
 
-        const [venta] = await tx
-          .insert(ventas)
-          .values({
-            organizacionId: input.organizacionId,
-            sucursalId: input.sucursalId,
-            usuarioId: user.id,
-            corteId: corteAbierto?.id ?? null,
-            estado: "completada",
-            cobradaAt: new Date(),
-            subtotal: subtotal.toFixed(2),
-            descuento: "0",
-            descuentoPromocion: "0",
-            descuentoMembresia: "0",
-            total: subtotal.toFixed(2),
-            propina: "0",
-            notas: `Venta registrada offline${input.notas ? ` — ${input.notas}` : ""}`,
-            createdBy: user.id,
-          })
-          .returning({ id: ventas.id });
-        if (!venta) return actionError("No se pudo registrar la venta.");
-
-        for (const linea of input.servicios) {
-          await tx.insert(detalleVentasServicios).values({
-            ventaId: venta.id,
-            servicioId: linea.id,
-            usuarioId: linea.usuarioId ?? null,
-            nombre: linea.nombre,
-            precio: Number(linea.precio).toFixed(2),
-            cantidad: linea.cantidad,
-            createdBy: user.id,
-          });
-        }
-        for (const linea of input.productos) {
-          await tx.insert(detalleVentasProductos).values({
-            ventaId: venta.id,
-            productoId: linea.id,
-            nombre: linea.nombre,
-            precio: Number(linea.precio).toFixed(2),
-            cantidad: linea.cantidad,
-            createdBy: user.id,
-          });
-        }
-
-        // Cambio imputado a pagos en efectivo (misma regla que cobrarVenta).
         const recibido = input.pagos.reduce((s, p) => s + Number(p.monto), 0);
         let cambioPendiente = Math.max(Math.round((recibido - subtotal) * 100) / 100, 0);
-        for (const pago of input.pagos) {
+        const pagosAjustados = input.pagos.map((pago) => {
           const esEfectivo = mediosPorId.get(pago.medioPagoId)?.categoria === "efectivo";
           const cambioPago = esEfectivo ? Math.min(Number(pago.monto), cambioPendiente) : 0;
           cambioPendiente = Math.round((cambioPendiente - cambioPago) * 100) / 100;
-          await tx.insert(detalleVentasMediosPagos).values({
-            ventaId: venta.id,
+          return {
             medioPagoId: pago.medioPagoId,
-            monto: (Number(pago.monto) - cambioPago).toFixed(2),
-            recibido: Number(pago.monto).toFixed(2),
-            cambio: cambioPago.toFixed(2),
+            monto: Number(pago.monto) - cambioPago,
+            recibido: Number(pago.monto),
+            cambio: cambioPago,
             referencia: pago.referencia || null,
-            createdBy: user.id,
-          });
-        }
+          };
+        });
 
-        // Comisiones por profesional (las reglas vigentes al sincronizar).
-        if (input.servicios.length > 0) {
-          const reglas =
-            servicioIds.length > 0
-              ? await tx
-                  .select({ id: comisiones.id, servicioId: comisiones.servicioId, rolId: comisiones.rolId, tipo: comisiones.tipo, valor: comisiones.valor })
-                  .from(comisiones)
-                  .where(and(inArray(comisiones.servicioId, servicioIds), eq(comisiones.organizacionId, input.organizacionId), eq(comisiones.activo, true)))
-              : [];
-          const usuarioIds = [...new Set(input.servicios.map((l) => l.usuarioId).filter((u): u is string => Boolean(u)))];
-          const rolesPorUsuario = await getRolesPorUsuario(input.organizacionId, usuarioIds);
-          const lineasPersistidas = await tx
-            .select({ detalleId: detalleVentasServicios.id, servicioId: detalleVentasServicios.servicioId, usuarioId: detalleVentasServicios.usuarioId, precio: detalleVentasServicios.precio, cantidad: detalleVentasServicios.cantidad })
-            .from(detalleVentasServicios)
-            .where(and(eq(detalleVentasServicios.ventaId, venta.id), eq(detalleVentasServicios.activo, true)));
-          const comisionesCalc = calcularComisiones(
-            lineasPersistidas.map((l) => ({ ...l, precio: Number(l.precio) })),
-            reglas.map((r) => ({ ...r, tipo: r.tipo as "porcentaje" | "monto_fijo", valor: Number(r.valor) })),
-            rolesPorUsuario,
-          );
-          for (const c of comisionesCalc) {
-            await tx.insert(detalleVentasComisiones).values({
-              ventaId: venta.id,
-              detalleVentaServicioId: c.detalleVentaServicioId,
-              usuarioId: c.usuarioId,
-              comisionId: c.comisionId,
-              tipo: c.tipo,
-              valor: String(c.valor),
-              base: c.base.toFixed(2),
-              monto: c.monto.toFixed(2),
-              createdBy: user.id,
-            });
-          }
-        }
+        const resultadoVenta = await ejecutarVentaTransaccional(tx, {
+          organizacionId: input.organizacionId,
+          sucursalId: input.sucursalId,
+          idempotencyKey: input.clave,
+          corteId: corteAbierto?.id ?? null,
+          subtotal,
+          total: subtotal,
+          propina: 0,
+          servicios: input.servicios.map((s) => ({
+            servicioId: s.id,
+            usuarioId: s.usuarioId ?? null,
+            nombre: s.nombre,
+            precio: Number(s.precio),
+            cantidad: s.cantidad,
+          })),
+          productos: input.productos.map((p) => ({
+            productoId: p.id,
+            nombre: p.nombre,
+            precio: Number(p.precio),
+            cantidad: p.cantidad,
+          })),
+          pagos: pagosAjustados,
+          notas: `Venta registrada offline${input.notas ? ` — ${input.notas}` : ""}`,
+          userId: user.id,
+        });
 
-        // Inventario: venta de productos + consumo de insumos por servicio,
-        // tolerante a stock negativo (la venta física ya ocurrió).
-        for (const linea of input.productos) {
-          await movimientoInventarioOffline(tx, {
-            organizacionId: input.organizacionId,
-            sucursalId: input.sucursalId,
-            ventaId: venta.id,
-            productoId: linea.id,
-            tipo: "venta",
-            cantidad: linea.cantidad,
-            userId: user.id,
-          });
-        }
-        const insumos =
-          servicioIds.length > 0
-            ? await tx
-                .select({ servicioId: relServiciosInsumos.servicioId, productoId: relServiciosInsumos.productoId, cantidad: relServiciosInsumos.cantidad })
-                .from(relServiciosInsumos)
-                .where(and(inArray(relServiciosInsumos.servicioId, servicioIds), eq(relServiciosInsumos.activo, true)))
-            : [];
-        const porServicio = new Map<string, number>();
-        for (const linea of input.servicios) porServicio.set(linea.id, (porServicio.get(linea.id) ?? 0) + linea.cantidad);
-        const consumo = new Map<string, number>();
-        for (const insumo of insumos) {
-          const veces = porServicio.get(insumo.servicioId) ?? 0;
-          consumo.set(insumo.productoId, (consumo.get(insumo.productoId) ?? 0) + Number(insumo.cantidad) * veces);
-        }
-        for (const [productoId, cantidad] of consumo) {
-          await movimientoInventarioOffline(tx, {
-            organizacionId: input.organizacionId,
-            sucursalId: input.sucursalId,
-            ventaId: venta.id,
-            productoId,
-            tipo: "consumo",
-            cantidad,
-            notas: "Consumo por servicio vendido offline",
-            userId: user.id,
-          });
+        if (resultadoVenta.yaProcesada) {
+          return actionSuccess("La venta ya estaba sincronizada.", { ventaId: resultadoVenta.ventaId });
         }
 
         await auditEvent(tx, {
@@ -357,14 +196,16 @@ export async function sincronizarVentaOffline(raw: unknown): Promise<ActionState
           usuarioId: user.id,
           accion: "venta.cobrada_offline",
           entidad: "venta",
-          entidadId: venta.id,
+          entidadId: resultadoVenta.ventaId,
           detalle: { clave: input.clave, cobradaAt: input.cobradaAt ?? null, total: subtotal, medios: input.pagos.length },
         });
-        await tx
-          .update(clavesIdempotencia)
-          .set({ resultado: { ventaId: venta.id } })
-          .where(eq(clavesIdempotencia.id, inserted.id));
-        return actionSuccess("Venta sincronizada.", { ventaId: venta.id });
+        if (inserted) {
+          await tx
+            .update(clavesIdempotencia)
+            .set({ resultado: { ventaId: resultadoVenta.ventaId } })
+            .where(eq(clavesIdempotencia.id, inserted.id));
+        }
+        return actionSuccess("Venta sincronizada.", { ventaId: resultadoVenta.ventaId });
       }),
     );
   } catch (error) {
@@ -379,3 +220,5 @@ export async function sincronizarVentaOffline(raw: unknown): Promise<ActionState
   }
   return outcome;
 }
+
+export const sincronizarVentaOfflineAction = sincronizarVentaOffline;
