@@ -4,11 +4,9 @@ import { OfflineSyncBadge } from "@/components/offline-sync";
 
 import { getAdminContext } from "@/lib/admin-context";
 import { leerSucursalesCookieMap } from "@/lib/sucursal-cookie";
-import { obtenerAlertasActivas } from "@/modules/alertas/queries";
 import { CAPACIDADES } from "@/modules/billing/capacidades";
 import { obtenerEstadoSuscripcion } from "@/modules/billing/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
-import { obtenerProgresoOnboarding } from "@/modules/onboarding/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -19,16 +17,15 @@ export const dynamic = "force-dynamic";
  */
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const context = await getAdminContext({});
-  const { user, organizations, organization, branch } = context;
+  const { user, organizations } = context;
 
-  // Ejecución en un único Promise.all paralelo inmediatamente después de getAdminContext()
-  const [suscripciones] = await Promise.all([
-    user.esAdministradorPlataforma
-      ? Promise.resolve([])
-      : Promise.all(organizations.map((org) => obtenerEstadoSuscripcion(org.id))),
-    organization ? obtenerAlertasActivas(organization.id, branch?.id ?? null) : Promise.resolve([]),
-    organization ? obtenerProgresoOnboarding(organization.id, branch?.id ?? null, user.id) : Promise.resolve(null),
-  ]);
+  // Solo la suscripción por organización alimenta el shell (badges de plan y
+  // capacidades). Las alertas y el progreso de onboarding viven en las páginas
+  // que los muestran: cargarlos aquí abría conexiones extra y consultas cuyo
+  // resultado se descartaba en cada request.
+  const suscripciones = user.esAdministradorPlataforma
+    ? []
+    : await Promise.all(organizations.map((org) => obtenerEstadoSuscripcion(org.id)));
 
   // Permisos por organización para filtrar la navegación del shell: ya viajan
   // embebidos en la consulta de contexto (sin una ronda extra por org).

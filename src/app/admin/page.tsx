@@ -19,12 +19,12 @@ import { ventas } from "@/db/schema/operations";
 import { telemetriaEventos } from "@/db/schema/telemetry";
 import { getSessionOrRedirect, requirePlatformAdmin } from "@/lib/auth/access";
 import { redirect } from "next/navigation";
-import { canAccessBranch, hasPermission, resolveAccessSafe, resolveSessionContext } from "@/lib/auth/authorization";
+import { accessFromContextRow, canAccessBranch, hasPermission, resolveAccessSafe, resolveSessionContext } from "@/lib/auth/authorization";
 import { leerNombreSucursalOmitida, leerSucursalCookie } from "@/lib/sucursal-cookie";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { cargarAlertas, type AlertaOperativa } from "@/modules/alertas/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
-import { cargarEstadoNegocio, cargarProgresoGuia } from "@/modules/onboarding/queries";
+import { cargarEstadoYProgresoGuia } from "@/modules/onboarding/queries";
 import { evaluarPasos, pasosParaPermisos, resumenGuia } from "@/modules/onboarding/rules";
 import type { ResumenGuia } from "@/modules/onboarding/types";
 
@@ -39,7 +39,7 @@ function AccessError({ error }: { error?: string }) {
   const message = error ? ERROR_MESSAGES[error] : undefined;
   if (!message) return null;
   return (
-    <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+    <p className="anim-entrada rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-destructive-soft-foreground" role="alert">
       {message}
     </p>
   );
@@ -119,7 +119,7 @@ function MemberDashboard({
                     >
                       <span className="text-sm font-medium text-foreground">{alerta.titulo}</span>
                       <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                        className={`rounded-full px-2.5 py-0.5 text-op-xs font-semibold ${
                           alerta.tono === "critico"
                             ? "bg-destructive-soft text-destructive-soft-foreground"
                             : "bg-accent/70 text-primary"
@@ -173,9 +173,9 @@ function MemberDashboard({
             {ACCIONES_HOY.filter(
               (accion) =>
                 tienePermisoNav(accion.permiso, permissionsByOrg[current.organizationId]),
-            ).map((accion) => (
+            ).map((accion, index) => (
               <Link
-                className="flex min-h-20 flex-col items-start justify-between gap-2 rounded-2xl border border-border bg-card p-4 transition-colors hover:border-accent-foreground/30 hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-ring"
+                className="anim-entrada flex min-h-20 flex-col items-start justify-between gap-2 rounded-2xl border border-border bg-card p-4 transition-colors hover:border-accent-foreground/30 hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-ring"
                 data-action-id={`inicio.accion.${accion.id}`}
                 href={buildAdminHref(accion.href, {
                   organizationId: current.organizationId,
@@ -183,10 +183,11 @@ function MemberDashboard({
                   extra: accion.extra,
                 })}
                 key={accion.id}
+                style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
               >
                 <accion.icon aria-hidden="true" className="size-5 text-primary" strokeWidth={1.9} />
                 <span className="text-sm font-semibold text-foreground">{accion.label}</span>
-                <span className="text-xs leading-4 text-muted-foreground">{accion.ayuda}</span>
+                <span className="text-op-xs leading-4 text-muted-foreground">{accion.ayuda}</span>
               </Link>
             ))}
           </div>
@@ -242,21 +243,56 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     const permissionsByOrg: Record<string, string[]> = {};
     const alertasByOrg: Record<string, AlertaOperativa[]> = {};
 
-    // Todas las organizaciones en paralelo: el acceso ya trae las sucursales
-    // activas embebidas, así que no hace falta consultar `sucursales` otra vez.
-    const porOrganizacion = await Promise.all(
-      organizations.map(async (org) => {
-        const resolved = await resolveAccessSafe(org.id, user);
-        const alertas = resolved
-          ? await cargarAlertas(db, {
-              organizacionId: org.id,
-              sucursalIds: resolved.branchIds ? [...resolved.branchIds] : null,
-              permisos: resolved.permissions,
-            })
-          : [];
-        return { org, resolved, alertas };
-      }),
+    // Todas las organizaciones en paralelo. La primera reutiliza el `acceso`
+    // que `resolveSessionContext` ya resolvió para `target_org` — solo es
+    // seguro cuando TODAS las organizaciones del usuario están activas (con
+    // una org inactiva, `organizations[0]` podría no ser el `target_org` del
+    // acceso embebido). En ese caso se cae a `resolveAccessSafe`.
+    const todasActivas = organizations.every((org) => org.activo);
+    const resolved0 =
+      todasActivas && contextRow.acceso
+        ? accessFromContextRow(user, organizations[0].id, contextRow.acceso)
+        : null;
+
+    // Lanzamiento optimista del checklist: con el acceso de la primera org ya
+    // en memoria (sin BD) sabemos qué sucursal mostrará el checklist — así la
+    // consulta de estado+guía corre en la MISMA ronda que acceso/alertas.
+    const orgPrincipal = organizations[0];
+    const sucursalesAccesibles0 = (resolved0?.sucursalesActivas ?? []).filter(
+      (sucursal) => resolved0?.branchIds == null || resolved0.branchIds.has(sucursal.id),
     );
+    const preferidaId0 =
+      firstParam(params.sucursalId) ??
+      (orgPrincipal ? await leerSucursalCookie(orgPrincipal.id) : undefined);
+    const sucursalChecklist0 =
+      sucursalesAccesibles0.find((sucursal) => sucursal.id === preferidaId0) ?? sucursalesAccesibles0[0];
+    const pasos0 = sucursalChecklist0
+      ? pasosParaPermisos(new Set(resolved0?.permissions ?? []))
+      : [];
+    const estadoYProgresoOptimista =
+      orgPrincipal && sucursalChecklist0 && pasos0.length > 0
+        ? cargarEstadoYProgresoGuia(db, orgPrincipal.id, sucursalChecklist0.id, user.id)
+        : null;
+
+    const [porOrganizacion, estadoYProgresoOpt] = await Promise.all([
+      Promise.all(
+        organizations.map(async (org, index) => {
+          const resolved =
+            index === 0 && resolved0
+              ? resolved0
+              : await resolveAccessSafe(org.id, user);
+          const alertas = resolved
+            ? await cargarAlertas(db, {
+                organizacionId: org.id,
+                sucursalIds: resolved.branchIds ? [...resolved.branchIds] : null,
+                permisos: resolved.permissions,
+              })
+            : [];
+          return { org, resolved, alertas };
+        }),
+      ),
+      estadoYProgresoOptimista ?? Promise.resolve(null),
+    ]);
 
     for (const { org, resolved, alertas } of porOrganizacion) {
       permissionsByOrg[org.id] = resolved ? [...resolved.permissions] : [];
@@ -290,16 +326,22 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
     // Checklist de primera configuración sobre la sucursal activa:
     // se muestra mientras queden pasos requeridos y la guía no esté omitida.
+    // Si la sucursal activa coincide con la calculada de forma optimista, la
+    // consulta ya venía hecha; si no (preferencia apuntando a otra org), se
+    // carga ahora — una sola consulta gracias a `cargarEstadoYProgresoGuia`.
     let checklist: ResumenGuia | null = null;
     if (activeAccess) {
       const pasos = pasosParaPermisos(new Set(permissionsByOrg[activeAccess.organizationId] ?? []));
       if (pasos.length > 0) {
-        const [estadoNegocio, progreso] = await Promise.all([
-          cargarEstadoNegocio(db, activeAccess.organizationId, activeAccess.branchId),
-          cargarProgresoGuia(db, activeAccess.organizationId, user.id),
-        ]);
+        const coincide =
+          estadoYProgresoOpt &&
+          activeAccess.organizationId === orgPrincipal?.id &&
+          activeAccess.branchId === sucursalChecklist0?.id;
+        const { estadoNegocio, progresoGuia } = coincide
+          ? estadoYProgresoOpt
+          : await cargarEstadoYProgresoGuia(db, activeAccess.organizationId, activeAccess.branchId, user.id);
         const resumen = resumenGuia(evaluarPasos(pasos, estadoNegocio));
-        if (!resumen.terminada && progreso?.estado !== "omitida") {
+        if (!resumen.terminada && progresoGuia?.estado !== "omitida") {
           checklist = resumen;
         }
       }

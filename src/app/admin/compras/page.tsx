@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { Truck } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,8 +10,7 @@ import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
-import { COMPRA_ESTADOS, compras, detalleCompras, proveedores, type CompraEstado } from "@/db/schema/compras";
-import { usuarios } from "@/db/schema/core";
+import { COMPRA_ESTADOS, type CompraEstado } from "@/db/schema/compras";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -50,53 +49,99 @@ export default async function ComprasPage({ searchParams }: { searchParams: Sear
     : undefined;
 
   const db = getDatabase();
-  const condiciones = [
-    eq(compras.organizacionId, organization.id),
-    eq(compras.sucursalId, branch.id),
-    eq(compras.activo, true),
-    ...(estadoValido ? [eq(compras.estado, estadoValido)] : []),
-  ];
+  const filtroEstado = estadoValido ? sql` and c.estado = ${estadoValido}` : sql``;
 
-  const [rows, conteos] = await Promise.all([
-    db
-      .select({
-        id: compras.id,
-        estado: compras.estado,
-        fechaCompra: compras.fechaCompra,
-        createdAt: compras.createdAt,
-        folio: compras.folio,
-        proveedorTexto: compras.proveedorTexto,
-        proveedorNombre: proveedores.nombre,
-        totalTicket: compras.totalTicket,
-        totalCalculado: compras.totalCalculado,
-        recibidaPor: usuarios.nombre,
-        numLineas: sql<number>`(
-          select count(*)::int from ${detalleCompras} d
-           where d.compra_id = ${compras.id} and d.activo
-        )`,
-      })
-      .from(compras)
-      .leftJoin(proveedores, eq(compras.proveedorId, proveedores.id))
-      .leftJoin(usuarios, eq(compras.recibidaPor, usuarios.id))
-      .where(and(...condiciones))
-      .orderBy(
-        // Con observación primero; el resto por fecha de captura.
-        desc(sql`case when ${compras.estado} = 'con_observacion' then 0 else 1 end`),
-        desc(compras.createdAt),
-      )
-      .limit(100),
-    db
-      .select({ estado: compras.estado, total: sql<number>`count(*)::int` })
-      .from(compras)
-      .where(
-        and(
-          eq(compras.organizacionId, organization.id),
-          eq(compras.sucursalId, branch.id),
-          eq(compras.activo, true),
-        ),
-      )
-      .groupBy(compras.estado),
-  ]);
+  type CompraRowJson = {
+    id: string;
+    estado: string;
+    fechaCompra: string | null;
+    createdAt: string;
+    folio: string | null;
+    proveedorTexto: string | null;
+    proveedorNombre: string | null;
+    totalTicket: string | null;
+    totalCalculado: string;
+    recibidaPor: string | null;
+    numLineas: number;
+  };
+  type ComprasSqlRow = {
+    compras: CompraRowJson[];
+    conteos: Array<{ estado: string; total: number }>;
+  };
+
+  // Listado de compras (con conteo de líneas acotado a la página) + conteo
+  // por estado en UNA sola consulta SQL con CTEs materializados.
+  const { rows: sqlRows } = await db.execute<ComprasSqlRow>(sql`
+    with compras_pagina as materialized (
+      select
+        c.id,
+        c.estado,
+        c.fecha_compra::text as "fechaCompra",
+        to_char(c.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt",
+        c.folio,
+        c.proveedor_texto as "proveedorTexto",
+        pr.nombre as "proveedorNombre",
+        c.total_ticket::text as "totalTicket",
+        c.total_calculado::text as "totalCalculado",
+        u.nombre as "recibidaPor",
+        row_number() over (
+          order by case when c.estado = 'con_observacion' then 0 else 1 end desc, c.created_at desc
+        ) as rn
+      from compras c
+      left join proveedores pr on pr.id = c.proveedor_id
+      left join usuarios u on u.id = c.recibida_por
+      where c.organizacion_id = ${organization.id}
+        and c.sucursal_id = ${branch.id}
+        and c.activo = true${filtroEstado}
+      order by case when c.estado = 'con_observacion' then 0 else 1 end desc, c.created_at desc
+      limit 100
+    ),
+    lineas_por_compra as materialized (
+      select d.compra_id, count(*)::int as num_lineas
+      from compras_pagina cp
+      join detalle_compras d on d.compra_id = cp.id and d.activo = true
+      group by d.compra_id
+    )
+    select
+      coalesce((
+        select jsonb_agg(
+          jsonb_build_object(
+            'id', cp.id,
+            'estado', cp.estado,
+            'fechaCompra', cp."fechaCompra",
+            'createdAt', cp."createdAt",
+            'folio', cp.folio,
+            'proveedorTexto', cp."proveedorTexto",
+            'proveedorNombre', cp."proveedorNombre",
+            'totalTicket', cp."totalTicket",
+            'totalCalculado', cp."totalCalculado",
+            'recibidaPor', cp."recibidaPor",
+            'numLineas', coalesce(lpc.num_lineas, 0)
+          )
+          order by cp.rn
+        )
+        from compras_pagina cp
+        left join lineas_por_compra lpc on lpc.compra_id = cp.id
+      ), '[]'::jsonb) as compras,
+      coalesce((
+        select jsonb_agg(jsonb_build_object('estado', estado, 'total', total))
+        from (
+          select c2.estado, count(*)::int as total
+          from compras c2
+          where c2.organizacion_id = ${organization.id}
+            and c2.sucursal_id = ${branch.id}
+            and c2.activo = true
+          group by c2.estado
+        ) t
+      ), '[]'::jsonb) as conteos
+  `);
+
+  const datos = sqlRows[0];
+  const rows = (datos?.compras ?? []).map((r) => ({
+    ...r,
+    createdAt: new Date(r.createdAt),
+  }));
+  const conteos = datos?.conteos ?? [];
 
   const conteoPorEstado = new Map(conteos.map((fila) => [fila.estado, Number(fila.total)]));
   const puedeEditar = hasPermission(context.access, "compras.editar");
@@ -156,7 +201,8 @@ export default async function ComprasPage({ searchParams }: { searchParams: Sear
       header: "",
       cell: (row) => (
         <Link
-          className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60"
+          className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60"
+          data-action-id="compras.ver"
           href={buildAdminHref(`/compras/${row.id}`, { organizationId, sucursalId: branch.id })}
         >
           Ver
@@ -190,7 +236,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Sear
       <div aria-label="Filtrar por estado" className="flex flex-wrap items-center gap-2" role="group">
         <Link
           aria-current={!estadoValido ? "true" : undefined}
-          className={`inline-flex min-h-6 items-center rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+          className={`inline-flex min-h-8 items-center rounded-full border px-3 py-1.5 text-op-xs font-medium transition ${
             !estadoValido
               ? "border-primary bg-accent text-accent-foreground"
               : "border-border text-muted-foreground hover:bg-muted/60"
@@ -203,7 +249,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Sear
         {COMPRA_ESTADOS.map((estado) => (
           <Link
             aria-current={estadoValido === estado ? "true" : undefined}
-            className={`inline-flex min-h-6 items-center rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+            className={`inline-flex min-h-8 items-center rounded-full border px-3 py-1.5 text-op-xs font-medium transition ${
               estadoValido === estado
                 ? "border-primary bg-accent text-accent-foreground"
                 : "border-border text-muted-foreground hover:bg-muted/60"
@@ -234,7 +280,8 @@ export default async function ComprasPage({ searchParams }: { searchParams: Sear
                   <RegistroCard
                     acciones={
                       <Link
-                        className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60"
+                        className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60"
+                        data-action-id="compras.ver"
                         href={buildAdminHref(`/compras/${row.id}`, { organizationId, sucursalId: branch.id })}
                       >
                         Ver compra

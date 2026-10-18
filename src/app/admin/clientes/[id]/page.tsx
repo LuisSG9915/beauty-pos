@@ -1,18 +1,20 @@
-import { and, desc, eq, ne, or, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { Calendar, CalendarHeart, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { CitaStatusBadge } from "@/app/admin/agenda/cita-side-panel";
 import { toggleConsentimientoActivo, toggleFichaTecnicaActiva } from "@/app/admin/client-actions";
 import { ConsentimientoForm } from "@/app/admin/clientes/consentimiento-form";
 import { FichaForm } from "@/app/admin/clientes/ficha-form";
 import { AntesDespuesSlider } from "@/components/antes-despues-slider";
 import { AdminPageHeader } from "@/components/admin/page-header";
+import { EmptyState } from "@/components/empty-state";
 import { FormTabs } from "@/components/form-tabs";
+import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
-import { clientes, usuarios } from "@/db/schema/core";
-import { citas, clientesConsentimientos, clientesFichasTecnicas, ventas } from "@/db/schema/operations";
-import { servicios } from "@/db/schema/catalogs";
+import type { FichaFotoDetalle, FichaInsumo } from "@/db/schema/operations";
 import { getAdminContext } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate, formatTime } from "@/lib/format";
@@ -38,7 +40,7 @@ const TIPO_LABEL: Record<string, string> = {
 const TIPO_TONE: Record<string, string> = {
   color: "bg-muted/60 text-muted-foreground",
   tratamiento: "bg-muted/60 text-muted-foreground",
-  alergia: "bg-destructive/10 text-destructive",
+  alergia: "bg-destructive-soft text-destructive-soft-foreground",
   nota: "bg-muted/60 text-muted-foreground",
 };
 
@@ -54,84 +56,177 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
   const puedeAlergias = hasPermission(context.access, "expedientes.alergias_ver");
 
   const db = getDatabase();
-  const [cliente] = await db
-    .select()
-    .from(clientes)
-    .where(and(eq(clientes.id, id), eq(clientes.organizacionId, organization.id), eq(clientes.activo, true)))
-    .limit(1);
-  if (!cliente) notFound();
 
-  // El contenido sensible se excluye a nivel de consulta: las entradas privadas
-  // requieren `expedientes.privado` y las alergias `expedientes.alergias_ver`.
-  const fichaWhere = [
-    eq(clientesFichasTecnicas.clienteId, cliente.id),
-    eq(clientesFichasTecnicas.organizacionId, organization.id),
-    eq(clientesFichasTecnicas.activo, true),
-  ];
-  if (!puedePrivado && !puedeAlergias) {
-    fichaWhere.push(or(and(eq(clientesFichasTecnicas.privada, false), ne(clientesFichasTecnicas.tipo, "alergia")))!);
-  } else if (!puedePrivado) {
-    fichaWhere.push(eq(clientesFichasTecnicas.privada, false));
-  } else if (!puedeAlergias) {
-    fichaWhere.push(or(eq(clientesFichasTecnicas.privada, true), ne(clientesFichasTecnicas.tipo, "alergia"))!);
-  }
+  // El contenido sensible se excluye a nivel de consulta: las entradas
+  // privadas requieren `expedientes.privado` y las alergias
+  // `expedientes.alergias_ver`. Es exactamente el mismo predicado que antes,
+  // ahora evaluado dentro del SQL fusionado.
+  const fichaFilter =
+    !puedePrivado && !puedeAlergias
+      ? sql` and not f.privada and f.tipo <> 'alergia'`
+      : !puedePrivado
+        ? sql` and not f.privada`
+        : !puedeAlergias
+          ? sql` and (f.privada or f.tipo <> 'alergia')`
+          : sql``;
 
-  const [citaRows, ventaRows, fichaRows, consentRows] = await Promise.all([
-    db
-      .select({ id: citas.id, fechaHora: citas.fechaHora, estado: citas.estado, total: citas.totalEstimado, notas: citas.notas })
-      .from(citas)
-      .where(and(eq(citas.clienteId, cliente.id), eq(citas.organizacionId, organization.id), eq(citas.activo, true)))
-      .orderBy(desc(citas.fechaHora))
-      .limit(50),
-    db
-      .select({ id: ventas.id, fecha: sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`, estado: ventas.estado, total: ventas.total, propina: ventas.propina })
-      .from(ventas)
-      .where(and(eq(ventas.clienteId, cliente.id), eq(ventas.organizacionId, organization.id), eq(ventas.activo, true)))
-      .orderBy(desc(sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`))
-      .limit(50),
-    db
-      .select({
-        id: clientesFichasTecnicas.id,
-        tipo: clientesFichasTecnicas.tipo,
-        formula: clientesFichasTecnicas.formula,
-        insumos: clientesFichasTecnicas.insumos,
-        tiempoPoseMinutos: clientesFichasTecnicas.tiempoPoseMinutos,
-        notas: clientesFichasTecnicas.notas,
-        privada: clientesFichasTecnicas.privada,
-        fotos: clientesFichasTecnicas.fotos,
-        fotosDetalle: clientesFichasTecnicas.fotosDetalle,
-        createdAt: clientesFichasTecnicas.createdAt,
-        servicioNombre: servicios.nombre,
-        autorNombre: usuarios.nombre,
-      })
-      .from(clientesFichasTecnicas)
-      .leftJoin(servicios, eq(clientesFichasTecnicas.servicioId, servicios.id))
-      .leftJoin(usuarios, eq(clientesFichasTecnicas.usuarioId, usuarios.id))
-      .where(and(...fichaWhere))
-      .orderBy(desc(clientesFichasTecnicas.createdAt)),
-    db
-      .select({
-        id: clientesConsentimientos.id,
-        titulo: clientesConsentimientos.titulo,
-        contenido: clientesConsentimientos.contenido,
-        firmadoPor: clientesConsentimientos.firmadoPor,
-        respuesta: clientesConsentimientos.respuesta,
-        createdAt: clientesConsentimientos.createdAt,
-        servicioNombre: servicios.nombre,
-        autorNombre: usuarios.nombre,
-      })
-      .from(clientesConsentimientos)
-      .leftJoin(servicios, eq(clientesConsentimientos.servicioId, servicios.id))
-      .leftJoin(usuarios, eq(clientesConsentimientos.usuarioId, usuarios.id))
-      .where(
-        and(
-          eq(clientesConsentimientos.clienteId, cliente.id),
-          eq(clientesConsentimientos.organizacionId, organization.id),
-          eq(clientesConsentimientos.activo, true),
-        ),
-      )
-      .orderBy(desc(clientesConsentimientos.createdAt)),
-  ]);
+  type ClienteJson = {
+    id: string;
+    nombre: string;
+    apellido_paterno: string | null;
+    apellido_materno: string | null;
+    telefono: string | null;
+    correo: string | null;
+    notas_operativas: string | null;
+    rfc: string | null;
+    regimen_fiscal: string | null;
+  };
+  type CitaExpediente = {
+    id: string;
+    fechaHora: string;
+    estado: string;
+    total: string;
+    notas: string | null;
+    ventaId: string | null;
+  };
+  type VentaExpediente = { id: string; fecha: string; estado: string; total: string; propina: string };
+  type FichaExpediente = {
+    id: string;
+    tipo: string;
+    formula: string | null;
+    insumos: FichaInsumo[];
+    tiempoPoseMinutos: number | null;
+    notas: string | null;
+    privada: boolean;
+    fotos: string[];
+    fotosDetalle: FichaFotoDetalle[];
+    createdAt: string;
+    servicioNombre: string | null;
+    autorNombre: string | null;
+  };
+  type ConsentimientoExpediente = {
+    id: string;
+    titulo: string;
+    contenido: string;
+    firmadoPor: string | null;
+    respuesta: string;
+    createdAt: string;
+    servicioNombre: string | null;
+    autorNombre: string | null;
+  };
+  type ExpedienteRow = {
+    cliente: ClienteJson | null;
+    citas: CitaExpediente[];
+    ventas: VentaExpediente[];
+    fichas: FichaExpediente[];
+    consentimientos: ConsentimientoExpediente[];
+  };
+
+  // Una sola ronda: la ficha del cliente + sus historiales como subselects
+  // jsonb (antes eran 5 consultas repartidas en 2 rondas secuenciales). El
+  // `ventaId` por cita sale de `ventas_cita_idx` vía join lateral limitado a 1.
+  const { rows } = await db.execute<ExpedienteRow>(sql`
+    select
+      to_jsonb(c) as cliente,
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            ci.id,
+            to_char(ci.fecha_hora at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "fechaHora",
+            ci.estado,
+            ci.total_estimado::text as total,
+            ci.notas,
+            vv.venta_id as "ventaId"
+          from citas ci
+          left join lateral (
+            select v.id as venta_id from ventas v
+             where v.cita_id = ci.id and v.activo and v.estado = 'completada'
+             order by v.cobrada_at desc nulls last
+             limit 1
+          ) vv on true
+          where ci.cliente_id = c.id and ci.organizacion_id = ${organization.id} and ci.activo
+          order by ci.fecha_hora desc
+          limit 50
+        ) t
+      ), '[]'::jsonb) as citas,
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            v.id,
+            to_char(coalesce(v.cobrada_at, v.created_at) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as fecha,
+            v.estado,
+            v.total::text as total,
+            v.propina::text as propina
+          from ventas v
+          where v.cliente_id = c.id and v.organizacion_id = ${organization.id} and v.activo
+          order by coalesce(v.cobrada_at, v.created_at) desc
+          limit 50
+        ) t
+      ), '[]'::jsonb) as ventas,
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            f.id,
+            f.tipo,
+            f.formula,
+            f.insumos,
+            f.tiempo_pose_minutos as "tiempoPoseMinutos",
+            f.notas,
+            f.privada,
+            f.fotos,
+            f.fotos_detalle as "fotosDetalle",
+            to_char(f.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt",
+            s.nombre as "servicioNombre",
+            u.nombre as "autorNombre"
+          from clientes_fichas_tecnicas f
+          left join servicios s on s.id = f.servicio_id
+          left join usuarios u on u.id = f.usuario_id
+          where f.cliente_id = c.id and f.organizacion_id = ${organization.id} and f.activo
+            ${fichaFilter}
+          order by f.created_at desc
+        ) t
+      ), '[]'::jsonb) as fichas,
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            co.id,
+            co.titulo,
+            co.contenido,
+            co.firmado_por as "firmadoPor",
+            co.respuesta,
+            to_char(co.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt",
+            s.nombre as "servicioNombre",
+            u.nombre as "autorNombre"
+          from clientes_consentimientos co
+          left join servicios s on s.id = co.servicio_id
+          left join usuarios u on u.id = co.usuario_id
+          where co.cliente_id = c.id and co.organizacion_id = ${organization.id} and co.activo
+          order by co.created_at desc
+        ) t
+      ), '[]'::jsonb) as consentimientos
+    from clientes c
+    where c.id = ${id} and c.organizacion_id = ${organization.id} and c.activo
+    limit 1
+  `);
+
+  const row = rows[0];
+  if (!row?.cliente) notFound();
+
+  const cliente = {
+    id: row.cliente.id,
+    nombre: row.cliente.nombre,
+    apellidoPaterno: row.cliente.apellido_paterno,
+    apellidoMaterno: row.cliente.apellido_materno,
+    telefono: row.cliente.telefono,
+    correo: row.cliente.correo,
+    notasOperativas: row.cliente.notas_operativas,
+    rfc: row.cliente.rfc,
+    regimenFiscal: row.cliente.regimen_fiscal,
+  };
+  const citaRows = row.citas ?? [];
+  const ventaRows = row.ventas ?? [];
+  const fichaRows = row.fichas ?? [];
+  const consentRows = row.consentimientos ?? [];
 
   const nombreCompleto =
     [cliente.nombre, cliente.apellidoPaterno, cliente.apellidoMaterno].filter(Boolean).join(" ") ||
@@ -149,7 +244,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
         ["Régimen fiscal", cliente.regimenFiscal],
       ].map(([label, value]) => (
         <div key={label}>
-          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
+          <dt className="text-op-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
           <dd className="mt-1 text-sm text-foreground">{value || "—"}</dd>
         </div>
       ))}
@@ -159,9 +254,13 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
   const historialTab = (
     <div className="space-y-6">
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Citas</h3>
+        <h3 className="text-op-xs font-semibold uppercase tracking-wide text-muted-foreground">Citas</h3>
         {citaRows.length === 0 ? (
-          <p className="mt-3 rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">Sin citas registradas.</p>
+          <EmptyState
+            className="mt-3 px-4 py-6"
+            description="Las citas que agendes para este cliente aparecerán aquí."
+            title="Sin citas registradas"
+          />
         ) : (
           <ul className="mt-3 divide-y divide-border rounded-xl border border-border">
             {citaRows.map((cita) => (
@@ -169,7 +268,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
                 <span className="tabular-nums text-muted-foreground">
                   {formatDate(cita.fechaHora, { timeZone })} · {formatTime(cita.fechaHora, { timeZone })}
                 </span>
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{cita.estado}</span>
+                <CitaStatusBadge estado={cita.estado} ventaId={cita.ventaId} />
                 <span className="font-semibold tabular-nums">{formatCurrency(cita.total, { currency })}</span>
               </li>
             ))}
@@ -177,15 +276,29 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
         )}
       </section>
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ventas</h3>
+        <h3 className="text-op-xs font-semibold uppercase tracking-wide text-muted-foreground">Ventas</h3>
         {ventaRows.length === 0 ? (
-          <p className="mt-3 rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">Sin ventas registradas.</p>
+          <EmptyState
+            className="mt-3 px-4 py-6"
+            description="Los cobros ligados a este cliente aparecerán aquí."
+            title="Sin ventas registradas"
+          />
         ) : (
           <ul className="mt-3 divide-y divide-border rounded-xl border border-border">
             {ventaRows.map((venta) => (
               <li className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm" key={venta.id}>
                 <span className="tabular-nums text-muted-foreground">{formatDate(venta.fecha, { timeZone })}</span>
-                <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{venta.estado}</span>
+                <StatusBadge
+                  tone={
+                    venta.estado === "en_proceso"
+                      ? "warning"
+                      : venta.estado === "cancelada"
+                        ? "destructive"
+                        : "success"
+                  }
+                >
+                  {venta.estado === "en_proceso" ? "En proceso" : venta.estado === "cancelada" ? "Cancelada" : "Completada"}
+                </StatusBadge>
                 <span className="font-semibold tabular-nums">
                   {formatCurrency(venta.total, { currency })}
                   {Number(venta.propina) > 0 ? ` (+${formatCurrency(venta.propina, { currency })} prop.)` : ""}
@@ -198,27 +311,27 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
     </div>
   );
 
-  const fichaList = (rows: typeof fichaRows, vacio: string) =>
+  const fichaList = (rows: typeof fichaRows, vacioTitulo: string, vacioDescripcion: string) =>
     rows.length === 0 ? (
-      <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">{vacio}</p>
+      <EmptyState className="px-4 py-6" description={vacioDescripcion} title={vacioTitulo} />
     ) : (
       <ul className="space-y-3">
         {rows.map((ficha) => (
           <li className="rounded-xl border border-border px-4 py-3" key={ficha.id}>
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${TIPO_TONE[ficha.tipo] ?? TIPO_TONE.nota}`}>
+              <span className={`rounded-full px-2.5 py-0.5 text-op-xs font-semibold ${TIPO_TONE[ficha.tipo] ?? TIPO_TONE.nota}`}>
                 {TIPO_LABEL[ficha.tipo] ?? ficha.tipo}
               </span>
               {ficha.privada ? (
-                <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground">Privada</span>
+                <span className="rounded-full bg-muted px-2.5 py-0.5 text-op-xs font-semibold text-muted-foreground">Privada</span>
               ) : null}
               {ficha.tiempoPoseMinutos != null ? (
-                <span className="text-xs font-medium text-warning">Pose {ficha.tiempoPoseMinutos} min</span>
+                <span className="text-op-xs font-medium text-warning">Pose {ficha.tiempoPoseMinutos} min</span>
               ) : null}
               {ficha.servicioNombre ? (
-                <span className="text-xs text-muted-foreground">· {ficha.servicioNombre}</span>
+                <span className="text-op-xs text-muted-foreground">· {ficha.servicioNombre}</span>
               ) : null}
-              <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+              <span className="ml-auto text-op-xs tabular-nums text-muted-foreground">
                 {formatDate(ficha.createdAt, { timeZone })}
                 {ficha.autorNombre ? ` · ${ficha.autorNombre}` : ""}
               </span>
@@ -226,7 +339,11 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
                 <input name="organizacionId" type="hidden" value={organization.id} />
                 <input name="id" type="hidden" value={ficha.id} />
                 <input name="activo" type="hidden" value="true" />
-                <button className="text-xs font-medium text-destructive hover:underline" type="submit">
+                <button
+                  className="inline-flex min-h-8 items-center rounded-lg px-2 text-op-xs font-medium text-destructive hover:bg-destructive-soft"
+                  data-action-id="cliente.ficha.desactivar"
+                  type="submit"
+                >
                   Desactivar
                 </button>
               </form>
@@ -238,7 +355,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {ficha.insumos.map((insumo) => (
                   <span
-                    className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-xs font-mono text-foreground shadow-2xs"
+                    className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-op-xs font-mono text-foreground shadow-2xs"
                     key={insumo.id}
                   >
                     <span className="font-semibold">{insumo.nombre}</span>
@@ -279,7 +396,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
                         src={`/api/medios/${encodeURI(clave)}`}
                       />
                       {detalle?.rol ? (
-                        <span className="absolute bottom-1 left-1 rounded bg-black/75 px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-white backdrop-blur-xs">
+                        <span className="absolute bottom-1 left-1 rounded bg-black/75 px-1.5 py-0.5 text-op-xs font-semibold uppercase tracking-wider text-white backdrop-blur-xs">
                           {detalle.rol}
                         </span>
                       ) : null}
@@ -317,12 +434,12 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
                 Radar de Retención Predictiva
               </span>
               <span
-                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                className={`rounded-full border px-2.5 py-0.5 text-op-xs font-semibold ${
                   retencionSugerida.estadoCiclo === "ventana_optima"
-                    ? "border border-amber-500/30 bg-amber-500/15 text-amber-700 dark:text-amber-300"
+                    ? "border-warning/30 bg-warning-soft text-warning-soft-foreground"
                     : retencionSugerida.estadoCiclo === "vencido"
-                    ? "border border-destructive/20 bg-destructive/10 text-destructive"
-                    : "border border-emerald-500/20 bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                    ? "border-destructive/30 bg-destructive-soft text-destructive-soft-foreground"
+                    : "border-success/30 bg-success-soft text-success-soft-foreground"
                 }`}
               >
                 {retencionSugerida.estadoCiclo === "ventana_optima"
@@ -335,7 +452,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
             <p className="text-sm font-semibold text-foreground">
               Próximo servicio sugerido: {retencionSugerida.tituloTratamiento}
             </p>
-            <p className="text-xs leading-relaxed text-muted-foreground">
+            <p className="text-op-xs leading-relaxed text-muted-foreground">
               {retencionSugerida.motivoExplicativo} · Fecha recomendada:{" "}
               <strong className="text-foreground">
                 {new Intl.DateTimeFormat("es-MX", { day: "numeric", month: "long" }).format(
@@ -348,7 +465,8 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
           <div className="flex flex-wrap items-center gap-2">
             {retencionSugerida.whatsappUrl ? (
               <a
-                className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 text-xs font-semibold text-white shadow-sm transition hover:bg-emerald-500"
+                className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-success-soft px-3.5 text-op-xs font-semibold text-success-soft-foreground shadow-sm transition hover:opacity-90"
+                data-action-id="cliente.retencion.whatsapp"
                 href={retencionSugerida.whatsappUrl}
                 rel="noopener noreferrer"
                 target="_blank"
@@ -358,7 +476,8 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
               </a>
             ) : null}
             <Link
-              className="inline-flex h-9 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-xs font-semibold text-foreground hover:bg-muted"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-op-xs font-semibold text-foreground hover:bg-muted"
+              data-action-id="cliente.retencion.agendar"
               href={buildAdminHref("/agenda", {
                 organizationId: organization.id,
                 extra: { nueva: "1", clienteId: cliente.id },
@@ -383,7 +502,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
             />
           </div>
         </section>
-        <div>{fichaList(fichasPorTipo(["color", "tratamiento"]), "Sin fórmulas registradas.")}</div>
+        <div>{fichaList(fichasPorTipo(["color", "tratamiento"]), "Sin fórmulas registradas", "Registra la primera fórmula para verla aquí.")}</div>
       </div>
     </div>
   );
@@ -396,7 +515,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
           <FichaForm clienteId={cliente.id} organizationId={organization.id} puedePrivada={puedePrivado} tipoDefault="alergia" />
         </div>
       </section>
-      <div>{fichaList(fichasPorTipo(["alergia", "nota"]).filter((ficha) => !ficha.privada), "Sin alergias ni notas registradas.")}</div>
+      <div>{fichaList(fichasPorTipo(["alergia", "nota"]).filter((ficha) => !ficha.privada), "Sin alergias ni notas", "Las alergias y notas públicas del expediente aparecerán aquí.")}</div>
     </div>
   );
 
@@ -404,14 +523,14 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h3 className="text-sm font-semibold text-foreground">Registrar nota privada</h3>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-op-xs text-muted-foreground">
           Solo visible para usuarios con permiso de expediente privado.
         </p>
         <div className="mt-4">
           <FichaForm clienteId={cliente.id} organizationId={organization.id} puedePrivada tipoDefault="nota" />
         </div>
       </section>
-      <div>{fichaList(fichaRows.filter((ficha) => ficha.privada), "Sin notas privadas registradas.")}</div>
+      <div>{fichaList(fichaRows.filter((ficha) => ficha.privada), "Sin notas privadas", "Las observaciones internas del expediente aparecerán aquí.")}</div>
     </div>
   );
 
@@ -419,7 +538,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h3 className="text-sm font-semibold text-foreground">Registrar consentimiento informado</h3>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-1 text-op-xs text-muted-foreground">
           Evidencia de que el cliente aceptó (o rechazó) el procedimiento tras informarse.
         </p>
         <div className="mt-4">
@@ -431,7 +550,11 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
         </div>
       </section>
       {consentRows.length === 0 ? (
-        <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">Sin consentimientos registrados.</p>
+        <EmptyState
+          className="px-4 py-6"
+          description="Los consentimientos firmados por el cliente aparecerán aquí."
+          title="Sin consentimientos registrados"
+        />
       ) : (
         <ul className="space-y-3">
           {consentRows.map((consent) => (
@@ -439,16 +562,18 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-semibold text-foreground">{consent.titulo}</span>
                 <span
-                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                    consent.respuesta === "aceptado" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
+                  className={`rounded-full px-2.5 py-0.5 text-op-xs font-semibold ${
+                    consent.respuesta === "aceptado"
+                      ? "bg-success-soft text-success-soft-foreground"
+                      : "bg-destructive-soft text-destructive-soft-foreground"
                   }`}
                 >
                   {consent.respuesta === "aceptado" ? "Aceptado" : "Rechazado"}
                 </span>
                 {consent.servicioNombre ? (
-                  <span className="text-xs text-muted-foreground">· {consent.servicioNombre}</span>
+                  <span className="text-op-xs text-muted-foreground">· {consent.servicioNombre}</span>
                 ) : null}
-                <span className="ml-auto text-xs tabular-nums text-muted-foreground">
+                <span className="ml-auto text-op-xs tabular-nums text-muted-foreground">
                   {formatDate(consent.createdAt, { timeZone })}
                   {consent.autorNombre ? ` · ${consent.autorNombre}` : ""}
                 </span>
@@ -456,7 +581,11 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
                   <input name="organizacionId" type="hidden" value={organization.id} />
                   <input name="id" type="hidden" value={consent.id} />
                   <input name="activo" type="hidden" value="true" />
-                  <button className="text-xs font-medium text-destructive hover:underline" type="submit">
+                  <button
+                    className="inline-flex min-h-8 items-center rounded-lg px-2 text-op-xs font-medium text-destructive hover:bg-destructive-soft"
+                    data-action-id="cliente.consentimiento.desactivar"
+                    type="submit"
+                  >
                     Desactivar
                   </button>
                 </form>
@@ -464,7 +593,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
               <p className="mt-2 whitespace-pre-wrap rounded-lg bg-muted/60 px-3 py-2 text-sm leading-6 text-foreground">
                 {consent.contenido}
               </p>
-              <p className="mt-2 text-xs font-medium text-muted-foreground">Firmado por: {consent.firmadoPor}</p>
+              <p className="mt-2 text-op-xs font-medium text-muted-foreground">Firmado por: {consent.firmadoPor}</p>
             </li>
           ))}
         </ul>
@@ -475,6 +604,41 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
   return (
     <div className="space-y-6">
       <AdminPageHeader
+        actions={
+          <>
+            <Button
+              data-action-id="cliente.editar"
+              nativeButton={false}
+              render={
+                <Link
+                  href={buildAdminHref("/clientes", { organizationId: organization.id, extra: { edit: cliente.id } })}
+                  prefetch={false}
+                />
+              }
+              size="lg"
+              variant="outline"
+            >
+              Editar datos
+            </Button>
+            <Button
+              data-action-clave="1"
+              data-action-id="cliente.cita.agendar"
+              nativeButton={false}
+              render={
+                <Link
+                  href={buildAdminHref("/agenda", {
+                    organizationId: organization.id,
+                    extra: { nueva: "1", clienteId: cliente.id },
+                  })}
+                />
+              }
+              size="lg"
+            >
+              <Calendar aria-hidden="true" />
+              Nueva cita
+            </Button>
+          </>
+        }
         breadcrumbs={[
           { label: "Clientes", href: buildAdminHref("/clientes", { organizationId: organization.id }) },
           { label: cliente.nombre },
@@ -494,11 +658,6 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
           ]}
         />
       </div>
-      <p className="text-xs text-muted-foreground">
-        <Link className="font-medium text-primary hover:underline" href={buildAdminHref("/clientes", { organizationId: organization.id, extra: { edit: cliente.id } })}>
-          Editar datos del cliente →
-        </Link>
-      </p>
     </div>
   );
 }

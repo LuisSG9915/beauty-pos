@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { buildAdminHref } from "@/lib/url-context";
-import { cargarEstadoNegocio, cargarProgresoGuia } from "@/modules/onboarding/queries";
+import { cargarEstadoYProgresoGuia } from "@/modules/onboarding/queries";
 import { evaluarPasos, pasosParaPermisos, resumenGuia } from "@/modules/onboarding/rules";
 
 import { actualizarGuia } from "./actions";
@@ -33,12 +33,15 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
 
   const pasos = pasosParaPermisos(access.esPlataforma ? null : access.permissions);
   const db = getDatabase();
-  const [estado, progreso] = await Promise.all([
-    cargarEstadoNegocio(db, organizationId, sucursalId),
-    cargarProgresoGuia(db, organizationId, user.id),
-  ]);
+  const { estadoNegocio: estado, progresoGuia: progreso } = await cargarEstadoYProgresoGuia(
+    db,
+    organizationId,
+    sucursalId,
+    user.id,
+  );
   const resumen = resumenGuia(evaluarPasos(pasos, estado));
   const omitida = progreso?.estado === "omitida";
+  const siguientePaso = resumen.pasos.find((paso) => !paso.hecho) ?? null;
 
   const camposContexto = (accion: "omitir" | "reanudar" | "reiniciar") => (
     <>
@@ -129,14 +132,14 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
               <p className="text-sm font-semibold text-foreground">
                 {resumen.completados} de {resumen.total} pasos listos
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-op-xs text-muted-foreground">
                 Detección automática en vivo según la base de datos de tu sucursal.
               </p>
             </div>
             {resumen.terminada ? (
               <StatusBadge tone="success">Configuración completa</StatusBadge>
             ) : (
-              <span className="text-xs font-medium text-muted-foreground">
+              <span className="text-op-xs font-medium text-muted-foreground">
                 {Math.round((resumen.completados / resumen.total) * 100)}% completado
               </span>
             )}
@@ -155,6 +158,27 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
             />
           </div>
         </div>
+
+        {siguientePaso ? (
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-op-xs font-semibold uppercase tracking-wider text-primary">
+                Siguiente paso recomendado
+              </p>
+              <p className="text-sm font-medium text-foreground">{siguientePaso.titulo}</p>
+            </div>
+            <Button
+              data-action-clave="1"
+              data-action-id="guia.paso.ir"
+              nativeButton={false}
+              render={<Link href={buildAdminHref(siguientePaso.href, { organizationId, sucursalId })} />}
+              size="touch"
+            >
+              Configurar ahora
+              <ArrowRight className="ml-1 size-4" />
+            </Button>
+          </div>
+        ) : null}
 
         <ol className="divide-y divide-border/60">
           {resumen.pasos.map((paso, index) => {
@@ -193,7 +217,7 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
                       {esSiguiente ? <StatusBadge tone="info">Paso recomendado ahora</StatusBadge> : null}
                       {paso.opcional ? <StatusBadge tone="neutral">Opcional</StatusBadge> : null}
                       {paso.hecho && paso.detalleDetectadoTexto ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2 py-0.5 text-op-xs font-medium text-success-soft-foreground">
                           <Sparkles className="size-3" />
                           {paso.detalleDetectadoTexto}
                         </span>
@@ -201,7 +225,7 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
                     </div>
                     <p className="text-sm text-muted-foreground">{paso.descripcion}</p>
                     {!paso.hecho && paso.detalleDetectadoTexto ? (
-                      <p className="text-xs text-muted-foreground/80 font-medium">
+                      <p className="text-op-xs font-medium text-muted-foreground/80">
                         Progreso actual: {paso.detalleDetectadoTexto}
                       </p>
                     ) : null}
@@ -209,11 +233,10 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
                 </div>
                 <div className="flex items-center justify-end shrink-0 pl-12 sm:pl-0">
                   <Button
-                    data-action-clave={esSiguiente ? "1" : undefined}
                     data-action-id={esSiguiente ? "guia.paso.ir" : undefined}
                     nativeButton={false}
                     render={<Link href={buildAdminHref(paso.href, { organizationId, sucursalId })} />}
-                    size={esSiguiente ? "default" : "sm"}
+                    size={esSiguiente ? "touch" : "sm"}
                     variant={paso.hecho ? "ghost" : esSiguiente ? "default" : "outline"}
                   >
                     {paso.hecho ? (

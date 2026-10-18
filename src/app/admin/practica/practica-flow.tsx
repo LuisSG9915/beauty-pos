@@ -129,31 +129,34 @@ export function PracticaFlow({
         role="status"
       >
         <div className="flex items-center gap-3">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-warning/20 text-warning">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-warning-soft text-warning-soft-foreground">
             <FlaskConical aria-hidden="true" className="size-5" />
           </span>
           <div>
             <p className="text-sm font-semibold">Simulador interactivo 100% en memoria</p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-op-xs text-muted-foreground">
               Todo lo que hagas aquí se ejecuta en tu navegador. Tus ventas reales, contabilidad, citas e inventarios están completamente a salvo.
             </p>
           </div>
         </div>
-        <Button
-          className="shrink-0 text-xs"
-          onClick={reiniciar}
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          <RotateCcw className="size-3.5 mr-1" />
-          Reiniciar prueba
-        </Button>
+        {paso > 0 ? (
+          <Button
+            className="shrink-0 text-op-xs"
+            data-action-id="practica.reiniciar"
+            onClick={reiniciar}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <RotateCcw className="size-3.5 mr-1" />
+            Reiniciar prueba
+          </Button>
+        ) : null}
       </div>
 
       {/* Indicador de progreso de los pasos */}
       <nav aria-label="Progreso de la práctica">
-        <ol className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <ol className="grid grid-cols-3 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
           {PASOS.map((nombre, index) => {
             const esActual = index === paso;
             const esPasado = index < paso;
@@ -161,7 +164,7 @@ export function PracticaFlow({
               <li
                 aria-current={esActual ? "step" : undefined}
                 className={cn(
-                  "flex items-center gap-2 rounded-xl border p-2.5 text-xs transition-colors",
+                  "flex items-center gap-2 rounded-xl border p-2 text-op-xs transition-colors",
                   esActual
                     ? "border-primary bg-primary/10 font-semibold text-primary"
                     : esPasado
@@ -172,7 +175,7 @@ export function PracticaFlow({
               >
                 <span
                   className={cn(
-                    "flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+                    "flex size-5 shrink-0 items-center justify-center rounded-full text-op-xs font-bold",
                     esActual
                       ? "bg-primary text-primary-foreground"
                       : esPasado
@@ -213,33 +216,33 @@ export function PracticaFlow({
               ver los espacios en la agenda, registrar su cita, pasarla a caja cuando termine su servicio y emitir su ticket digital con cambio calculado.
             </p>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-xl border border-border bg-muted/40 p-3.5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">1. Agenda</p>
-                <p className="mt-1 text-xs text-muted-foreground">Elige un espacio libre y asigna estilista.</p>
-              </div>
-              <div className="rounded-xl border border-border bg-muted/40 p-3.5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">2. Cobro en caja</p>
-                <p className="mt-1 text-xs text-muted-foreground">Agrega productos sugeridos y propina.</p>
-              </div>
-              <div className="rounded-xl border border-border bg-muted/40 p-3.5">
-                <p className="text-xs font-semibold uppercase tracking-wider text-primary">3. Ticket</p>
-                <p className="mt-1 text-xs text-muted-foreground">Calcula el cambio y emite el recibo final.</p>
-              </div>
-            </div>
-
-            <div className="pt-2">
+            <div>
               <Button
                 className="rounded-xl"
                 data-action-clave="1"
                 data-action-id="practica.iniciar"
                 onClick={() => setPaso(1)}
-                size="lg"
+                size="touch"
                 type="button"
               >
                 Comenzar práctica interactiva
                 <ChevronRight className="size-4 ml-1.5" />
               </Button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-border bg-muted/40 p-3.5">
+                <p className="text-op-xs font-semibold uppercase tracking-wider text-primary">1. Agenda</p>
+                <p className="mt-1 text-op-xs text-muted-foreground">Elige un espacio libre y asigna estilista.</p>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/40 p-3.5">
+                <p className="text-op-xs font-semibold uppercase tracking-wider text-primary">2. Cobro en caja</p>
+                <p className="mt-1 text-op-xs text-muted-foreground">Agrega productos sugeridos y propina.</p>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/40 p-3.5">
+                <p className="text-op-xs font-semibold uppercase tracking-wider text-primary">3. Ticket</p>
+                <p className="mt-1 text-op-xs text-muted-foreground">Calcula el cambio y emite el recibo final.</p>
+              </div>
             </div>
           </div>
         )}
@@ -253,11 +256,11 @@ export function PracticaFlow({
                   <CalendarCheck className="size-5 text-primary" />
                   Agenda del día (Simulador)
                 </h2>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-op-xs text-muted-foreground">
                   Martes · Haz clic en cualquier espacio libre para agendar la cita de prueba.
                 </p>
               </div>
-              <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-2 text-op-xs">
                 <span className="flex items-center gap-1 text-success">
                   <span className="size-2 rounded-full bg-success" /> Ocupada
                 </span>
@@ -271,13 +274,13 @@ export function PracticaFlow({
               {/* Cita fija ocupada 1 */}
               <div className="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm">
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs font-semibold text-muted-foreground">09:00</span>
+                  <span className="font-mono text-op-xs font-semibold text-muted-foreground">09:00</span>
                   <div>
                     <p className="font-medium text-foreground">Sofía Morales · Balayage & Brushing</p>
-                    <p className="text-xs text-muted-foreground">Atiende: Carlos Morales (Colorista)</p>
+                    <p className="text-op-xs text-muted-foreground">Atiende: Carlos Morales (Colorista)</p>
                   </div>
                 </div>
-                <span className="rounded-full bg-success/10 px-2.5 py-0.5 text-xs font-medium text-success">
+                <span className="rounded-full bg-success-soft px-2.5 py-0.5 text-op-xs font-medium text-success-soft-foreground">
                   En proceso
                 </span>
               </div>
@@ -295,13 +298,13 @@ export function PracticaFlow({
                 type="button"
               >
                 <div className="flex items-center gap-3 text-left">
-                  <span className="font-mono text-xs font-semibold text-primary">09:30</span>
+                  <span className="font-mono text-op-xs font-semibold text-primary">09:30</span>
                   <div>
                     <p className="font-medium text-primary">Espacio libre · 45 minutos</p>
-                    <p className="text-xs text-muted-foreground">Disponible con Ana Martínez</p>
+                    <p className="text-op-xs text-muted-foreground">Disponible con Ana Martínez</p>
                   </div>
                 </div>
-                <span className="inline-flex items-center text-xs font-semibold text-primary">
+                <span className="inline-flex items-center text-op-xs font-semibold text-primary">
                   Agendar aquí <ChevronRight className="size-3.5 ml-1" />
                 </span>
               </button>
@@ -319,13 +322,13 @@ export function PracticaFlow({
                 type="button"
               >
                 <div className="flex items-center gap-3 text-left">
-                  <span className="font-mono text-xs font-semibold text-primary">11:30</span>
+                  <span className="font-mono text-op-xs font-semibold text-primary">11:30</span>
                   <div>
                     <p className="font-medium text-foreground">Espacio libre · Recomendado para corte</p>
-                    <p className="text-xs text-muted-foreground">Especialistas disponibles</p>
+                    <p className="text-op-xs text-muted-foreground">Especialistas disponibles</p>
                   </div>
                 </div>
-                <span className="inline-flex items-center rounded-lg bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground">
+                <span className="inline-flex items-center rounded-lg bg-primary px-3 py-1 text-op-xs font-semibold text-primary-foreground">
                   Agendar aquí
                 </span>
               </button>
@@ -333,13 +336,13 @@ export function PracticaFlow({
               {/* Cita fija ocupada 2 */}
               <div className="flex items-center justify-between rounded-xl border border-border bg-muted/50 px-4 py-3 text-sm">
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs font-semibold text-muted-foreground">13:00</span>
+                  <span className="font-mono text-op-xs font-semibold text-muted-foreground">13:00</span>
                   <div>
                     <p className="font-medium text-foreground">Laura Méndez · Manicura Spa</p>
-                    <p className="text-xs text-muted-foreground">Atiende: Valeria Ríos (Uñas)</p>
+                    <p className="text-op-xs text-muted-foreground">Atiende: Valeria Ríos (Uñas)</p>
                   </div>
                 </div>
-                <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+                <span className="rounded-full bg-muted px-2.5 py-0.5 text-op-xs font-medium text-muted-foreground">
                   Confirmada
                 </span>
               </div>
@@ -357,13 +360,13 @@ export function PracticaFlow({
                 type="button"
               >
                 <div className="flex items-center gap-3 text-left">
-                  <span className="font-mono text-xs font-semibold text-primary">14:00</span>
+                  <span className="font-mono text-op-xs font-semibold text-primary">14:00</span>
                   <div>
                     <p className="font-medium text-primary">Espacio libre · Turno tarde</p>
-                    <p className="text-xs text-muted-foreground">Disponible para cualquier servicio</p>
+                    <p className="text-op-xs text-muted-foreground">Disponible para cualquier servicio</p>
                   </div>
                 </div>
-                <span className="inline-flex items-center text-xs font-semibold text-primary">
+                <span className="inline-flex items-center text-op-xs font-semibold text-primary">
                   Agendar aquí <ChevronRight className="size-3.5 ml-1" />
                 </span>
               </button>
@@ -386,21 +389,21 @@ export function PracticaFlow({
           <div className="max-w-2xl space-y-6">
             <div>
               <h2 className="text-lg font-bold text-foreground">Registrar cita de prueba</h2>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-op-xs text-muted-foreground">
                 Configura los datos de la cita simulada. Nota cómo el precio y duración se calculan en vivo.
               </p>
             </div>
 
             {/* Selector de Cliente */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <label className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                 <User className="size-3.5" /> Clienta de ejemplo
               </label>
               <div className="flex flex-wrap gap-2">
                 {CLIENTES_PRESET.map((nombre) => (
                   <button
                     className={cn(
-                      "rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors",
+                      "rounded-xl border px-3 py-1.5 text-op-xs font-medium transition-colors",
                       clienteNombre === nombre
                         ? "border-primary bg-primary/10 text-primary font-semibold"
                         : "border-border hover:bg-muted/50 text-foreground",
@@ -423,7 +426,7 @@ export function PracticaFlow({
 
             {/* Selector de Servicio */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Servicio a realizar
               </label>
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
@@ -443,10 +446,10 @@ export function PracticaFlow({
                       type="button"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-foreground">{item.nombre}</span>
-                        <span className="text-xs font-bold text-primary">{money.format(item.precio)}</span>
+                        <span className="text-op-xs font-semibold text-foreground">{item.nombre}</span>
+                        <span className="text-op-xs font-bold text-primary">{money.format(item.precio)}</span>
                       </div>
-                      <div className="mt-1 flex items-center justify-between text-[11px] text-muted-foreground">
+                      <div className="mt-1 flex items-center justify-between text-op-xs text-muted-foreground">
                         <span>{item.categoria}</span>
                         <span className="flex items-center gap-1">
                           <Clock className="size-3" /> {item.duracion} min
@@ -461,14 +464,14 @@ export function PracticaFlow({
             {/* Selector de Especialista y Hora */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <label className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                   <Users className="size-3.5" /> Profesional asignado
                 </label>
                 <div className="space-y-1.5">
                   {ESPECIALISTAS.map((item, index) => (
                     <button
                       className={cn(
-                        "w-full rounded-xl border px-3 py-2 text-left text-xs transition-colors",
+                        "w-full rounded-xl border px-3 py-2 text-left text-op-xs transition-colors",
                         especialistaIdx === index
                           ? "border-primary bg-primary/10 font-semibold text-primary"
                           : "border-border hover:bg-muted/40 text-foreground",
@@ -478,21 +481,21 @@ export function PracticaFlow({
                       type="button"
                     >
                       <p>{item.nombre}</p>
-                      <p className="text-[10px] text-muted-foreground">{item.rol}</p>
+                      <p className="text-op-xs text-muted-foreground">{item.rol}</p>
                     </button>
                   ))}
                 </div>
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <label className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
                   <Clock className="size-3.5" /> Hora de inicio
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {HORAS_DISPONIBLES.map((hora) => (
                     <button
                       className={cn(
-                        "rounded-xl border py-2.5 text-center text-xs font-semibold transition-colors",
+                        "rounded-xl border py-2.5 text-center text-op-xs font-semibold transition-colors",
                         horaSeleccionada === hora
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border hover:bg-muted/40 text-foreground",
@@ -506,7 +509,7 @@ export function PracticaFlow({
                   ))}
                 </div>
 
-                <div className="mt-4 rounded-xl bg-muted/60 p-3 text-xs space-y-1">
+                <div className="mt-4 rounded-xl bg-muted/60 p-3 text-op-xs space-y-1">
                   <p className="font-semibold text-foreground">Resumen de la cita:</p>
                   <p className="text-muted-foreground">
                     {clienteNombre || "Clienta"} · {horaSeleccionada} ({servicioActual.duracion} min)
@@ -538,24 +541,24 @@ export function PracticaFlow({
           <div className="max-w-xl space-y-5">
             <div>
               <h2 className="text-lg font-bold text-foreground">Cita programada con éxito</h2>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-op-xs text-muted-foreground">
                 La cita quedó visible en la agenda. Cuando la clienta concluye su servicio, se transfiere al módulo de cobro.
               </p>
             </div>
 
             <div className="rounded-2xl border border-success/30 bg-success-soft/30 p-5 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="rounded-full bg-success/20 px-3 py-1 text-xs font-bold text-success">
+                <span className="rounded-full bg-success-soft px-3 py-1 text-op-xs font-bold text-success-soft-foreground">
                   En atención
                 </span>
                 <span className="font-mono text-sm font-bold text-foreground">{horaSeleccionada} hrs</span>
               </div>
               <div>
                 <h3 className="text-base font-bold text-foreground">{clienteNombre}</h3>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-op-xs text-muted-foreground">
                   {servicioActual.nombre} ({servicioActual.duracion} min)
                 </p>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="text-op-xs text-muted-foreground mt-0.5">
                   Atendió: <strong className="text-foreground">{especialistaActual.nombre}</strong> ({especialistaActual.rol})
                 </p>
               </div>
@@ -565,7 +568,7 @@ export function PracticaFlow({
               </div>
             </div>
 
-            <div className="rounded-xl border border-border bg-muted/40 p-4 text-xs text-muted-foreground space-y-1">
+            <div className="rounded-xl border border-border bg-muted/40 p-4 text-op-xs text-muted-foreground space-y-1">
               <p className="font-semibold text-foreground">💡 Tip de recepción:</p>
               <p>
                 Al pasar a caja, puedes añadir productos de reventa (shampoo, tratamientos) o propina para el estilista en una sola transacción.
@@ -598,19 +601,19 @@ export function PracticaFlow({
                 <ReceiptText className="size-5 text-primary" />
                 Caja y Cobro interactivo
               </h2>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-op-xs text-muted-foreground">
                 Aprende a registrar venta cruzada, propinas y el cálculo de cambio en efectivo.
               </p>
             </div>
 
             {/* Líneas del ticket */}
             <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Líneas del ticket</p>
+              <p className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">Líneas del ticket</p>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm py-1 border-b border-border/50">
                   <div>
                     <p className="font-medium text-foreground">{servicioActual.nombre}</p>
-                    <p className="text-xs text-muted-foreground">{especialistaActual.nombre}</p>
+                    <p className="text-op-xs text-muted-foreground">{especialistaActual.nombre}</p>
                   </div>
                   <span className="font-semibold tabular-nums">{money.format(servicioActual.precio)}</span>
                 </div>
@@ -624,7 +627,8 @@ export function PracticaFlow({
                     <div className="flex items-center gap-2">
                       <span className="font-semibold tabular-nums">{money.format(productoActual.precio)}</span>
                       <button
-                        className="text-xs text-destructive hover:underline"
+                        className="inline-flex min-h-8 items-center rounded-lg px-2 text-op-xs font-medium text-destructive hover:bg-destructive-soft"
+                        data-action-id="practica.producto.quitar"
                         onClick={() => setProductoAgregado(false)}
                         type="button"
                       >
@@ -638,7 +642,7 @@ export function PracticaFlow({
               {/* Venta sugerida de producto */}
               {!productoAgregado ? (
                 <div className="mt-3 rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-xs">
+                  <div className="text-op-xs">
                     <p className="font-semibold text-primary">Sugerir producto de reventa (+ comisión):</p>
                     <p className="text-muted-foreground">{PRODUCTOS_EJEMPLO[0].nombre}</p>
                   </div>
@@ -660,7 +664,7 @@ export function PracticaFlow({
 
             {/* Propina */}
             <div className="space-y-2">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+              <label className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
                 <span>Propina para {especialistaActual.nombre}</span>
                 <span className="text-primary font-bold">{money.format(montoPropina)}</span>
               </label>
@@ -668,7 +672,7 @@ export function PracticaFlow({
                 {[0, 10, 15, 20].map((pct) => (
                   <button
                     className={cn(
-                      "rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors",
+                      "rounded-xl border px-3 py-1.5 text-op-xs font-semibold transition-colors",
                       propinaPct === pct
                         ? "border-primary bg-primary text-primary-foreground"
                         : "border-border hover:bg-muted text-muted-foreground",
@@ -685,7 +689,7 @@ export function PracticaFlow({
 
             {/* Medio de Pago */}
             <div className="space-y-3">
-              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Medio de pago
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -701,7 +705,7 @@ export function PracticaFlow({
                     onClick={() => setMedioPagoId(medio.id)}
                     type="button"
                   >
-                    <p className="text-xs">{medio.nombre}</p>
+                    <p className="text-op-xs">{medio.nombre}</p>
                   </button>
                 ))}
               </div>
@@ -711,18 +715,18 @@ export function PracticaFlow({
             {medioPagoId === "efectivo" && (
               <div className="rounded-2xl border border-border bg-muted/30 p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                  <label className="text-op-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
                     <DollarSign className="size-4 text-success" />
                     Calculadora de cambio (Efectivo)
                   </label>
-                  <span className="text-xs text-muted-foreground">Total: {money.format(total)}</span>
+                  <span className="text-op-xs text-muted-foreground">Total: {money.format(total)}</span>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs text-muted-foreground">Billetes rápidos:</span>
+                  <span className="text-op-xs text-muted-foreground">Billetes rápidos:</span>
                   {[total, 500, 1000].map((monto) => (
                     <button
-                      className="rounded-lg border border-border bg-background px-2.5 py-1 text-xs font-medium hover:bg-accent"
+                      className="rounded-lg border border-border bg-background px-2.5 py-1 text-op-xs font-medium hover:bg-accent"
                       key={monto}
                       onClick={() => setMontoEntregado(String(monto))}
                       type="button"
@@ -734,9 +738,9 @@ export function PracticaFlow({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                   <div>
-                    <label className="text-xs text-muted-foreground block mb-1">Monto entregado por la clienta</label>
+                    <label className="text-op-xs text-muted-foreground block mb-1">Monto entregado por la clienta</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-xs text-muted-foreground">$</span>
+                      <span className="absolute left-3 top-2.5 text-op-xs text-muted-foreground">$</span>
                       <input
                         className="w-full rounded-xl border border-input bg-background pl-7 pr-3 py-2 text-sm font-semibold tabular-nums"
                         inputMode="decimal"
@@ -747,7 +751,7 @@ export function PracticaFlow({
                   </div>
 
                   <div className="rounded-xl border border-border bg-background p-3 flex flex-col justify-center">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <span className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Cambio a devolver
                     </span>
                     <span
@@ -766,7 +770,7 @@ export function PracticaFlow({
             {/* Total General */}
             <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 flex items-center justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">Total final a registrar</p>
+                <p className="text-op-xs text-muted-foreground">Total final a registrar</p>
                 <p className="text-2xl font-extrabold text-foreground tabular-nums">{money.format(total)}</p>
               </div>
               <Button
@@ -795,12 +799,12 @@ export function PracticaFlow({
         {paso === 5 && (
           <div className="max-w-xl space-y-6">
             <div className="flex items-center gap-3">
-              <span className="flex size-10 items-center justify-center rounded-xl bg-success/10 text-success">
+              <span className="flex size-10 items-center justify-center rounded-xl bg-success-soft text-success-soft-foreground">
                 <Check className="size-6" />
               </span>
               <div>
                 <h2 className="text-xl font-bold text-foreground">¡Cobro completado con éxito!</h2>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-op-xs text-muted-foreground">
                   Comprobante digital generado en memoria. Nada se guardó en tu contabilidad real.
                 </p>
               </div>
@@ -809,24 +813,24 @@ export function PracticaFlow({
             {/* Vista del Ticket Simulado */}
             <div
               className={cn(
-                "rounded-2xl border border-border bg-card p-6 shadow-md font-mono text-xs space-y-4",
+                "rounded-2xl border border-border bg-card p-6 shadow-md font-mono text-op-xs space-y-4",
                 vistaImpresion && "border-2 border-primary bg-background shadow-xl",
               )}
             >
               {/* Encabezado */}
               <div className="text-center space-y-1 border-b border-dashed border-border pb-4">
                 <p className="text-base font-bold tracking-widest uppercase">MELENA SALÓN</p>
-                <p className="text-[11px] text-muted-foreground">Sucursal Principal · Demostración</p>
-                <p className="text-[10px] text-muted-foreground">
+                <p className="text-op-xs text-muted-foreground">Sucursal Principal · Demostración</p>
+                <p className="text-op-xs text-muted-foreground">
                   Folio: #SIM-4821 · Demo de práctica
                 </p>
-                <span className="inline-block rounded-full bg-warning/20 px-2 py-0.5 text-[10px] font-bold text-warning uppercase mt-1">
+                <span className="inline-block rounded-full bg-warning-soft px-2 py-0.5 text-op-xs font-bold text-warning-soft-foreground uppercase mt-1">
                   Ticket de entrenamiento
                 </span>
               </div>
 
               {/* Datos de la clienta */}
-              <div className="text-[11px] space-y-0.5">
+              <div className="text-op-xs space-y-0.5">
                 <p>Clienta: <strong className="font-sans">{clienteNombre}</strong></p>
                 <p>Atendió: <strong className="font-sans">{especialistaActual.nombre}</strong></p>
               </div>
@@ -875,7 +879,7 @@ export function PracticaFlow({
                 )}
               </div>
 
-              <div className="text-center pt-3 text-[10px] text-muted-foreground border-t border-dashed border-border">
+              <div className="text-center pt-3 text-op-xs text-muted-foreground border-t border-dashed border-border">
                 ¡Gracias por su visita!
               </div>
             </div>
@@ -897,7 +901,7 @@ export function PracticaFlow({
             </div>
 
             {/* Caja de Logros Aprendidos */}
-            <div className="rounded-2xl border border-success/30 bg-success-soft/30 p-4 text-xs space-y-2">
+            <div className="rounded-2xl border border-success/30 bg-success-soft/30 p-4 text-op-xs space-y-2">
               <p className="font-bold text-success flex items-center gap-1.5">
                 <Check className="size-4" /> ¡Felicidades! Completaste el entrenamiento
               </p>
@@ -940,7 +944,8 @@ export function PracticaFlow({
           </Button>
         ) : <span />}
         <Link
-          className="text-xs text-muted-foreground hover:text-foreground hover:underline"
+          className="inline-flex min-h-6 items-center text-op-xs text-muted-foreground hover:text-foreground hover:underline"
+          data-action-id="practica.salir"
           href={ayudaHref}
         >
           Salir de la práctica y volver a Ayuda

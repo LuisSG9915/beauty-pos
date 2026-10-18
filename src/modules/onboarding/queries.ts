@@ -53,6 +53,63 @@ export async function cargarEstadoNegocio(
   };
 }
 
+export type EstadoYProgreso = {
+  estadoNegocio: EstadoNegocio;
+  progresoGuia: ProgresoGuiaRow | null;
+};
+
+/**
+ * Estado del negocio + progreso de guía en UNA sola consulta: los 6
+ * escalares operativos y el row de `progreso_guias` viajan como subselects
+ * de la misma ronda (cada consulta extra pagaría otro handshake al pool).
+ */
+export async function cargarEstadoYProgresoGuia(
+  db: Db,
+  organizacionId: string,
+  sucursalId: string,
+  usuarioId: string,
+): Promise<EstadoYProgreso> {
+  const result = await db.execute<{
+    servicios_activos: number;
+    horarios_activos: number;
+    miembros_activos: number;
+    citas_registradas: number;
+    ventas_cobradas: number;
+    sucursal_nombre: string | null;
+    progreso: { estado: EstadoGuia; paso_actual: number } | null;
+  }>(sql`
+    select
+      (select count(*)::int from servicios where organizacion_id = ${organizacionId} and activo = true) as servicios_activos,
+      (select count(*)::int from horarios_sucursales where organizacion_id = ${organizacionId} and sucursal_id = ${sucursalId} and activo = true) as horarios_activos,
+      (select count(*)::int from miembros_organizaciones where organizacion_id = ${organizacionId} and estado = 'activo') as miembros_activos,
+      (select count(*)::int from citas where organizacion_id = ${organizacionId} and sucursal_id = ${sucursalId} and activo = true) as citas_registradas,
+      (select count(*)::int from ventas where organizacion_id = ${organizacionId} and sucursal_id = ${sucursalId} and activo = true and estado = 'completada') as ventas_cobradas,
+      (select nombre from sucursales where id = ${sucursalId} limit 1) as sucursal_nombre,
+      (select jsonb_build_object('estado', estado, 'paso_actual', paso_actual)
+         from progreso_guias
+        where organizacion_id = ${organizacionId}
+          and usuario_id = ${usuarioId}
+          and guia_clave = ${GUIA_CONFIGURACION}
+          and guia_version = ${GUIA_VERSION}
+        limit 1) as progreso
+  `);
+
+  const row = result.rows?.[0] ?? {};
+  return {
+    estadoNegocio: {
+      serviciosActivos: Number(row.servicios_activos ?? 0),
+      horariosActivos: Number(row.horarios_activos ?? 0),
+      miembrosActivos: Number(row.miembros_activos ?? 0),
+      citasRegistradas: Number(row.citas_registradas ?? 0),
+      ventasCobradas: Number(row.ventas_cobradas ?? 0),
+      sucursalNombre: row.sucursal_nombre ?? null,
+    },
+    progresoGuia: row.progreso
+      ? { estado: row.progreso.estado, pasoActual: row.progreso.paso_actual }
+      : null,
+  };
+}
+
 export type ProgresoGuiaRow = {
   estado: EstadoGuia;
   pasoActual: number;
@@ -98,15 +155,16 @@ export async function obtenerProgresoOnboarding(
   if (cached !== null) return cached;
 
   const db = getDatabase();
-  const [estadoNegocio, progresoGuia] = await Promise.all([
-    sucursalId ? cargarEstadoNegocio(db, organizacionId, sucursalId) : Promise.resolve(null),
-    usuarioId ? cargarProgresoGuia(db, organizacionId, usuarioId) : Promise.resolve(null),
-  ]);
-
-  const resultado: ProgresoOnboarding = {
-    estadoNegocio,
-    progresoGuia,
-  };
+  let resultado: ProgresoOnboarding;
+  if (sucursalId && usuarioId) {
+    resultado = await cargarEstadoYProgresoGuia(db, organizacionId, sucursalId, usuarioId);
+  } else {
+    const [estadoNegocio, progresoGuia] = await Promise.all([
+      sucursalId ? cargarEstadoNegocio(db, organizacionId, sucursalId) : Promise.resolve(null),
+      usuarioId ? cargarProgresoGuia(db, organizacionId, usuarioId) : Promise.resolve(null),
+    ]);
+    resultado = { estadoNegocio, progresoGuia };
+  }
 
   await kvPutJson(cacheKey, resultado, { expirationTtl: 600 });
   return resultado;

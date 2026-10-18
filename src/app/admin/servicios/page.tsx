@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, getTableColumns, ilike, or, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -17,17 +17,6 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
-import { catRoles } from "@/db/schema/access";
-import {
-  catCategoriasServicios,
-  catUnidadesMedida,
-  comisiones,
-  productos,
-  relServiciosInsumos,
-  servicios,
-} from "@/db/schema/catalogs";
-import { medios } from "@/db/schema/media";
-import { detalleVentasServicios, ventas } from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/format";
@@ -46,99 +35,217 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
   const db = getDatabase();
 
   const query = firstParam(params.q) ?? "";
-  const filters = [eq(servicios.organizacionId, organizationId)];
-  if (query) filters.push(ilike(servicios.nombre, `%${query}%`));
-
-  const [categories, serviceRows, roles] = await Promise.all([
-    db
-      .select({ id: catCategoriasServicios.id, nombre: catCategoriasServicios.nombre })
-      .from(catCategoriasServicios)
-      .where(and(eq(catCategoriasServicios.organizacionId, organizationId), eq(catCategoriasServicios.activo, true)))
-      .orderBy(asc(catCategoriasServicios.nombre)),
-    db
-      .select({
-        id: servicios.id,
-        clave: servicios.clave,
-        nombre: servicios.nombre,
-        categoriaNombre: catCategoriasServicios.nombre,
-        duracionMinutos: servicios.duracionMinutos,
-        precioBase: servicios.precioBase,
-        activo: servicios.activo,
-        // Veces vendido en los últimos 30 días (líneas de servicio de ventas
-        // completadas) como subselect escalar: mismo round-trip, sin N+1.
-        vecesVendido: sql<number>`(
-          select coalesce(sum(${detalleVentasServicios.cantidad}), 0)::int
-            from ${detalleVentasServicios}
-            join ${ventas} on ${ventas.id} = ${detalleVentasServicios.ventaId}
-           where ${detalleVentasServicios.servicioId} = ${servicios.id}
-             and ${detalleVentasServicios.activo}
-             and ${ventas.activo}
-             and ${ventas.estado} = 'completada'
-             and ${ventas.organizacionId} = ${organizationId}
-             and coalesce(${ventas.cobradaAt}, ${ventas.createdAt}) >= now() - interval '30 days'
-        )`,
-      })
-      .from(servicios)
-      .leftJoin(catCategoriasServicios, eq(servicios.categoriaId, catCategoriasServicios.id))
-      .where(and(...filters))
-      .orderBy(desc(servicios.createdAt))
-      .limit(100),
-    db
-      .select({ id: catRoles.id, nombre: catRoles.nombre })
-      .from(catRoles)
-      .where(and(eq(catRoles.organizacionId, organizationId), eq(catRoles.activo, true)))
-      .orderBy(asc(catRoles.nombre)),
-  ]);
-
   const editId = firstParam(params.edit);
-  const editing = editId
-    ? (await db
-        .select({ ...getTableColumns(servicios), imagenClaveR2: medios.claveR2 })
-        .from(servicios)
-        .leftJoin(medios, eq(servicios.imagenPrincipalId, medios.id))
-        .where(and(eq(servicios.id, editId), eq(servicios.organizacionId, organizationId)))
-        .limit(1))[0]
+  const filtroBusqueda = query ? sql` and s.nombre ilike ${`%${query}%`}` : sql``;
+
+  type ServiceRowItem = {
+    id: string;
+    clave: string;
+    nombre: string;
+    categoriaNombre: string | null;
+    duracionMinutos: number;
+    precioBase: string;
+    activo: boolean;
+    vecesVendido: number;
+  };
+  type EditingServiceRow = {
+    id: string;
+    organizacionId: string;
+    categoriaId: string | null;
+    clave: string;
+    nombre: string;
+    descripcion: string | null;
+    duracionMinutos: number;
+    precioBase: string;
+    visibleAgenda: boolean;
+    requiereCabina: boolean;
+    imagenClaveR2: string | null;
+    updatedAt: string | null;
+  };
+  type ServiciosSqlRow = {
+    categories: Array<{ id: string; nombre: string }>;
+    servicios: ServiceRowItem[];
+    roles: Array<{ id: string; nombre: string }>;
+    editing: EditingServiceRow | null;
+    insumos_data: Array<{
+      id: string;
+      productoId: string;
+      productoNombre: string;
+      productoSku: string;
+      cantidad: string;
+      unidadNombre: string | null;
+    }>;
+    insumos_disponibles: Array<{
+      id: string;
+      sku: string;
+      nombre: string;
+      unidadNombre: string | null;
+    }>;
+    comisiones_data: Array<{
+      id: string;
+      tipo: string;
+      valor: string;
+      rolNombre: string | null;
+    }>;
+  };
+
+  // Toda la pantalla (incluyendo edición con insumos y comisiones cuando viene
+  // ?edit=) en UNA sola ronda SQL con CTEs materializados (antes hasta 7
+  // consultas repartidas en 3 rondas secuenciales).
+  const { rows } = await db.execute<ServiciosSqlRow>(sql`
+    with servicios_pagina as materialized (
+      select
+        s.id,
+        s.clave,
+        s.nombre,
+        cs.nombre as "categoriaNombre",
+        s.duracion_minutos as "duracionMinutos",
+        s.precio_base::text as "precioBase",
+        s.activo,
+        s.created_at
+      from servicios s
+      left join cat_categorias_servicios cs on cs.id = s.categoria_id
+      where s.organizacion_id = ${organizationId}${filtroBusqueda}
+      order by s.created_at desc
+      limit 100
+    ),
+    vendidos_30d as materialized (
+      select
+        dvs.servicio_id,
+        coalesce(sum(dvs.cantidad), 0)::int as veces
+      from servicios_pagina sp
+      join detalle_ventas_servicios dvs on dvs.servicio_id = sp.id and dvs.activo
+      join ventas v on v.id = dvs.venta_id
+      where v.organizacion_id = ${organizationId}
+        and v.activo
+        and v.estado = 'completada'
+        and coalesce(v.cobrada_at, v.created_at) >= now() - interval '30 days'
+      group by dvs.servicio_id
+    )
+    select
+      coalesce((
+        select jsonb_agg(t) from (
+          select cs.id, cs.nombre
+          from cat_categorias_servicios cs
+          where cs.organizacion_id = ${organizationId} and cs.activo = true
+          order by cs.nombre asc
+        ) t
+      ), '[]'::jsonb) as categories,
+      coalesce((
+        select jsonb_agg(
+          jsonb_build_object(
+            'id', sp.id,
+            'clave', sp.clave,
+            'nombre', sp.nombre,
+            'categoriaNombre', sp."categoriaNombre",
+            'duracionMinutos', sp."duracionMinutos",
+            'precioBase', sp."precioBase",
+            'activo', sp.activo,
+            'vecesVendido', coalesce(v30.veces, 0)
+          )
+          order by sp.created_at desc
+        )
+        from servicios_pagina sp
+        left join vendidos_30d v30 on v30.servicio_id = sp.id
+      ), '[]'::jsonb) as servicios,
+      coalesce((
+        select jsonb_agg(t) from (
+          select r.id, r.nombre
+          from cat_roles r
+          where r.organizacion_id = ${organizationId} and r.activo = true
+          order by r.nombre asc
+        ) t
+      ), '[]'::jsonb) as roles,
+      ${editId
+        ? sql`(
+            select jsonb_build_object(
+              'id', s.id,
+              'organizacionId', s.organizacion_id,
+              'categoriaId', s.categoria_id,
+              'clave', s.clave,
+              'nombre', s.nombre,
+              'descripcion', s.descripcion,
+              'duracionMinutos', s.duracion_minutos,
+              'precioBase', s.precio_base::text,
+              'visibleAgenda', s.visible_agenda,
+              'requiereCabina', s.requiere_cabina,
+              'imagenClaveR2', m.clave_r2,
+              'updatedAt', to_char(s.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+            )
+            from servicios s
+            left join medios m on m.id = s.imagen_principal_id
+            where s.id = ${editId} and s.organizacion_id = ${organizationId}
+            limit 1
+          ) as editing,
+          coalesce((
+            select jsonb_agg(t) from (
+              select
+                rsi.id,
+                rsi.producto_id as "productoId",
+                p.nombre as "productoNombre",
+                p.sku as "productoSku",
+                rsi.cantidad::text as cantidad,
+                um.nombre as "unidadNombre"
+              from rel_servicios_insumos rsi
+              join productos p on p.id = rsi.producto_id
+              left join cat_unidades_medida um on um.id = p.unidad_medida_id
+              where rsi.servicio_id = ${editId}
+                and rsi.organizacion_id = ${organizationId}
+                and rsi.activo = true
+            ) t
+          ), '[]'::jsonb) as insumos_data,
+          coalesce((
+            select jsonb_agg(t) from (
+              select
+                p.id,
+                p.sku,
+                p.nombre,
+                um.nombre as "unidadNombre"
+              from productos p
+              left join cat_unidades_medida um on um.id = p.unidad_medida_id
+              where p.organizacion_id = ${organizationId}
+                and p.activo = true
+                and p.tipo in ('insumo', 'ambos')
+              order by p.nombre asc
+            ) t
+          ), '[]'::jsonb) as insumos_disponibles,
+          coalesce((
+            select jsonb_agg(t) from (
+              select
+                c.id,
+                c.tipo,
+                c.valor::text as valor,
+                r.nombre as "rolNombre"
+              from comisiones c
+              left join cat_roles r on r.id = c.rol_id
+              where c.servicio_id = ${editId}
+                and c.organizacion_id = ${organizationId}
+                and c.activo = true
+            ) t
+          ), '[]'::jsonb) as comisiones_data`
+        : sql`null as editing, '[]'::jsonb as insumos_data, '[]'::jsonb as insumos_disponibles, '[]'::jsonb as comisiones_data`}
+  `);
+
+  const datos = rows[0];
+  const categories = datos?.categories ?? [];
+  const serviceRows = datos?.servicios ?? [];
+  const roles = datos?.roles ?? [];
+  const editing = datos?.editing
+    ? {
+        ...datos.editing,
+        updatedAt: datos.editing.updatedAt ? new Date(datos.editing.updatedAt) : null,
+      }
     : undefined;
-
-  let insumosData: Array<{ id: string; productoId: string; productoNombre: string; productoSku: string; cantidad: string; unidadNombre: string | null }> = [];
-  let insumosDisponibles: Array<{ id: string; sku: string; nombre: string; unidadNombre: string | null }> = [];
-  let comisionesData: Array<{ id: string; tipo: string; valor: string; rolNombre: string | null }> = [];
-
-  if (editing) {
-    [insumosData, insumosDisponibles, comisionesData] = await Promise.all([
-      db
-        .select({
-          id: relServiciosInsumos.id,
-          productoId: relServiciosInsumos.productoId,
-          productoNombre: productos.nombre,
-          productoSku: productos.sku,
-          cantidad: relServiciosInsumos.cantidad,
-          unidadNombre: catUnidadesMedida.nombre,
-        })
-        .from(relServiciosInsumos)
-        .innerJoin(productos, eq(relServiciosInsumos.productoId, productos.id))
-        .leftJoin(catUnidadesMedida, eq(productos.unidadMedidaId, catUnidadesMedida.id))
-        .where(and(eq(relServiciosInsumos.servicioId, editing.id), eq(relServiciosInsumos.activo, true))),
-      db
-        .select({ id: productos.id, sku: productos.sku, nombre: productos.nombre, unidadNombre: catUnidadesMedida.nombre })
-        .from(productos)
-        .leftJoin(catUnidadesMedida, eq(productos.unidadMedidaId, catUnidadesMedida.id))
-        .where(and(eq(productos.organizacionId, organizationId), eq(productos.activo, true), or(eq(productos.tipo, "insumo"), eq(productos.tipo, "ambos"))))
-        .orderBy(asc(productos.nombre)),
-      db
-        .select({ id: comisiones.id, tipo: comisiones.tipo, valor: comisiones.valor, rolNombre: catRoles.nombre })
-        .from(comisiones)
-        .leftJoin(catRoles, eq(comisiones.rolId, catRoles.id))
-        .where(and(eq(comisiones.servicioId, editing.id), eq(comisiones.activo, true))),
-    ]);
-  }
+  const insumosData = datos?.insumos_data ?? [];
+  const insumosDisponibles = datos?.insumos_disponibles ?? [];
+  const comisionesData = datos?.comisiones_data ?? [];
 
   type ServiceRow = (typeof serviceRows)[number];
   const columns: Array<DataTableColumn<ServiceRow>> = [
     {
       id: "clave",
       header: "Clave",
-      cell: (service) => <span className="font-mono text-xs">{service.clave}</span>,
+      cell: (service) => <span className="font-mono text-op-xs">{service.clave}</span>,
     },
     { id: "nombre", header: "Nombre", cell: (service) => <span className="font-medium">{service.nombre}</span> },
     {
@@ -172,7 +279,8 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
       cell: (service) => (
         <div className="flex flex-wrap justify-end gap-2">
           <Link
-            className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60"
+            className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60"
+            data-action-id="catalogo.servicios.editar"
             href={buildAdminHref("/servicios", { organizationId, extra: { edit: service.id, q: query || null } })}
           >
             Editar
@@ -245,7 +353,8 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
                   acciones={
                     <div className="flex flex-wrap gap-2">
                       <Link
-                        className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60"
+                        className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60"
+                        data-action-id="catalogo.servicios.editar"
                         href={buildAdminHref("/servicios", { organizationId, extra: { edit: service.id, q: query || null } })}
                       >
                         Editar

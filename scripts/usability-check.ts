@@ -19,10 +19,12 @@
  *   --json               guarda findings en .artifacts/usability-*.json
  */
 import { AxePuppeteer } from "@axe-core/puppeteer";
+import { createHash } from "node:crypto";
 import type { Page } from "puppeteer";
 
 import { loggedPage, pickViewports, withBrowser } from "./lib/browser";
 import { checkFlags } from "./lib/cli";
+import { withDb } from "./lib/db";
 import { clickByHref, clickByText, waitForPath } from "./lib/dom";
 import { BASE_URL } from "./lib/e2e";
 import { printFindings, writeArtifact, type Finding } from "./lib/report";
@@ -70,6 +72,136 @@ const PAGES = [
 ];
 
 const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"];
+
+const NOTA_PRUEBA = "Cita de prueba del arnés de usabilidad (e2e-usability)";
+
+/**
+ * Rutas dinámicas del arnés: el expediente de un cliente y el portal
+ * "Mi cita" necesitan un id/token reales. Se resuelven contra la BD E2E; si
+ * algo falla o no hay datos, se omiten y el arnés sigue con las estáticas.
+ *
+ * El token de mi-cita es determinístico (sha256 de un prefijo + citaId, igual
+ * que `hashTokenGestion`). La org E2E no tiene citas futuras gestionables, así
+ * que el arnés asegura UNA cita de prueba identificable por su nota: la
+ * reutiliza si ya existe con nuestro token y solo crea una nueva cuando hace
+ * falta. Nunca pisa el token de una cita real.
+ *
+ * Devuelve también `limpiar()` para borrar al terminar todas las citas de
+ * prueba (incluidas huérfanas de corridas anteriores) y dejar la agenda E2E
+ * como estaba.
+ */
+async function rutasDinamicas(): Promise<{ rutas: string[]; limpiar: () => Promise<void> }> {
+  const limpiar = async () => {
+    try {
+      await withDb(async (client) => {
+        await client.query(
+          `delete from reservas_gestion_tokens t
+            using citas c
+           where t.cita_id = c.id and c.notas = $1`,
+          [NOTA_PRUEBA],
+        );
+        await client.query(`delete from citas where notas = $1`, [NOTA_PRUEBA]);
+      });
+    } catch (error) {
+      console.warn(`Limpieza de la cita de prueba omitida: ${(error as Error).message}`);
+    }
+  };
+
+  try {
+    const rutas = await withDb(async (client) => {
+      const rutas: string[] = [];
+
+      const org = (
+        await client.query(`select id from organizaciones where slug = $1`, [E2E_RESERVA_SLUG])
+      ).rows[0];
+      if (!org) return rutas;
+
+      const cliente = (
+        await client.query(
+          `select c.id
+             from clientes c
+            where c.organizacion_id = $1 and c.activo
+            order by c.created_at asc
+            limit 1`,
+          [org.id],
+        )
+      ).rows[0];
+      if (cliente) rutas.push(`/admin/clientes/${cliente.id}`);
+
+      // Igual que `hashTokenGestion`: en BD vive sha256(token claro); el token
+      // claro (64 hex, cumple el regex del portal) es determinístico por cita.
+      const tokenClaroDe = (citaId: string) =>
+        createHash("sha256").update(`e2e-usability:${citaId}`).digest("hex");
+      const hashDe = (tokenClaro: string) =>
+        createHash("sha256").update(tokenClaro).digest("hex");
+
+      // 1) ¿Ya existe la cita de prueba de una corrida anterior? Se reutiliza
+      // si su token está intacto; si quedó con un hash viejo del propio arnés,
+      // se corrige (nunca se toca el token de una cita real).
+      const previas = (
+        await client.query(
+          `select ci.id, t.token_hash as "tokenHash"
+             from citas ci
+             join reservas_gestion_tokens t on t.cita_id = ci.id
+            where ci.organizacion_id = $1 and ci.activo and ci.estado in ('pendiente', 'confirmada')
+              and ci.fecha_hora >= now() and ci.notas = $2 and t.revocado_at is null
+            order by ci.fecha_hora asc
+            limit 20`,
+          [org.id, NOTA_PRUEBA],
+        )
+      ).rows;
+      const previa = previas.find((cita) => cita.tokenHash === hashDe(tokenClaroDe(cita.id)));
+      if (previa) {
+        rutas.push(`/mi-cita/${tokenClaroDe(previa.id)}`);
+        return rutas;
+      }
+      const desactualizada = previas.find((cita) => cita.tokenHash === tokenClaroDe(cita.id));
+      if (desactualizada) {
+        await client.query(
+          `update reservas_gestion_tokens set token_hash = $2 where cita_id = $1`,
+          [desactualizada.id, hashDe(tokenClaroDe(desactualizada.id))],
+        );
+        rutas.push(`/mi-cita/${tokenClaroDe(desactualizada.id)}`);
+        return rutas;
+      }
+
+      // 2) Crear la cita de prueba (mínima, futura y gestionable) con su token.
+      const sucursal = (
+        await client.query(
+          `select id from sucursales
+            where organizacion_id = $1 and activo
+            order by nombre
+            limit 1`,
+          [org.id],
+        )
+      ).rows[0];
+      if (!sucursal) return rutas;
+
+      const nueva = (
+        await client.query(
+          `insert into citas (organizacion_id, sucursal_id, fecha_hora, duracion_minutos, estado, origen, notas)
+           values ($1, $2, now() + interval '3 days', 30, 'pendiente', 'panel', $3)
+           returning id`,
+          [org.id, sucursal.id, NOTA_PRUEBA],
+        )
+      ).rows[0];
+      if (!nueva) return rutas;
+
+      await client.query(
+        `insert into reservas_gestion_tokens (organizacion_id, cita_id, token_hash)
+         values ($1, $2, $3)
+         on conflict (cita_id) do nothing`,
+        [org.id, nueva.id, hashDe(tokenClaroDe(nueva.id))],
+      );
+      rutas.push(`/mi-cita/${tokenClaroDe(nueva.id)}`);
+      return rutas;
+    });
+    return { rutas, limpiar };
+  } catch (error) {
+    console.warn(`Rutas dinámicas omitidas: ${(error as Error).message}`);
+    return { rutas: [], limpiar };
+  }
+}
 
 async function axeScan(page: Page, pagina: string, viewport: string): Promise<Finding[]> {
   const results = await new AxePuppeteer(page).withTags(AXE_TAGS).analyze();
@@ -301,9 +433,11 @@ async function rutaCobrarDesdeInicio(page: Page): Promise<{ pasos: number; detal
 
 async function main() {
   const flags = checkFlags();
+  const { rutas: dinamicas, limpiar } = await rutasDinamicas();
+  const todas = [...PAGES, ...dinamicas];
   const pages = flags.only.length
-    ? PAGES.filter((p) => flags.only.some((o) => p.includes(o)))
-    : PAGES;
+    ? todas.filter((p) => flags.only.some((o) => p.includes(o)))
+    : todas;
   const viewports = pickViewports(flags.viewports);
   if (viewports.length === 0) {
     throw new Error(`--viewport sin coincidencias: ${flags.viewports.join(", ")} (desktop | movil)`);
@@ -312,103 +446,109 @@ async function main() {
   const findings: Finding[] = [];
   const rutas: Array<{ nombre: string; pasos: number; detalle: string }> = [];
   let tactil: { toque: boolean; feedback: boolean; destino: boolean } | null = null;
+  let errores = 0;
 
-  await withBrowser(async (browser) => {
-    for (const viewport of viewports) {
-      const page = await loggedPage(browser, viewport);
-      console.log(`\n=== ${viewport.nombre} ${viewport.width}x${viewport.height} ===`);
+  try {
+    await withBrowser(async (browser) => {
+      for (const viewport of viewports) {
+        const page = await loggedPage(browser, viewport);
+        console.log(`\n=== ${viewport.nombre} ${viewport.width}x${viewport.height} ===`);
 
-      for (const ruta of pages) {
-        await page.goto(`${BASE_URL}${ruta}`, { waitUntil: "networkidle0", timeout: 60000 });
-        const hallazgos = [
-          ...(await axeScan(page, ruta, viewport.nombre)),
-          ...(await accionPrimariaCheck(page, ruta, viewport.nombre)),
-          ...(await objetivoTactilCheck(page, ruta, viewport.nombre)),
-          ...(viewport.isMobile ? await layoutMovilCheck(page, ruta, viewport.nombre) : []),
-        ];
-        findings.push(...hallazgos);
-        const errores = hallazgos.filter((h) => h.severidad === "error").length;
-        console.log(`${ruta.padEnd(18)} ${hallazgos.length === 0 ? "OK" : `${errores} error(es), ${hallazgos.length - errores} aviso(s)`}`);
+        for (const ruta of pages) {
+          await page.goto(`${BASE_URL}${ruta}`, { waitUntil: "networkidle0", timeout: 60000 });
+          const hallazgos = [
+            ...(await axeScan(page, ruta, viewport.nombre)),
+            ...(await accionPrimariaCheck(page, ruta, viewport.nombre)),
+            ...(await objetivoTactilCheck(page, ruta, viewport.nombre)),
+            ...(viewport.isMobile ? await layoutMovilCheck(page, ruta, viewport.nombre) : []),
+          ];
+          findings.push(...hallazgos);
+          const errores = hallazgos.filter((h) => h.severidad === "error").length;
+          console.log(`${ruta.padEnd(18)} ${hallazgos.length === 0 ? "OK" : `${errores} error(es), ${hallazgos.length - errores} aviso(s)`}`);
+        }
+        await page.close();
       }
-      await page.close();
-    }
 
-    const desktop = viewports.find((v) => v.nombre === "desktop");
-    const movil = viewports.find((v) => v.nombre === "movil");
+      const desktop = viewports.find((v) => v.nombre === "desktop");
+      const movil = viewports.find((v) => v.nombre === "movil");
 
-    if (desktop) {
-      // Rutas por clics en escritorio.
-      const page = await loggedPage(browser, desktop);
-      console.log("\n=== Rutas por clics (desktop) ===");
-      for (const [nombre, ruta] of [
-        ["nueva-cita", rutaNuevaCita],
-        ["cobrar", rutaCobrarDesdeInicio],
-      ] as const) {
-        const resultado = await ruta(page);
-        rutas.push({ nombre, ...resultado });
-        console.log(`pasos=${resultado.pasos} · ${resultado.detalle}`);
-        if (resultado.pasos < 0) {
+      if (desktop) {
+        // Rutas por clics en escritorio.
+        const page = await loggedPage(browser, desktop);
+        console.log("\n=== Rutas por clics (desktop) ===");
+        for (const [nombre, ruta] of [
+          ["nueva-cita", rutaNuevaCita],
+          ["cobrar", rutaCobrarDesdeInicio],
+        ] as const) {
+          const resultado = await ruta(page);
+          rutas.push({ nombre, ...resultado });
+          console.log(`pasos=${resultado.pasos} · ${resultado.detalle}`);
+          if (resultado.pasos < 0) {
+            findings.push({
+              pagina: `ruta:${nombre}`,
+              viewport: "desktop",
+              tipo: "accion-primaria",
+              severidad: "error",
+              detalle: resultado.detalle,
+            });
+          }
+        }
+        await page.close();
+      }
+
+      if (movil) {
+        // Caso crítico reportado en móvil: Agenda → Mi día debe responder al
+        // primer toque con una señal visible y completar sin segunda activación.
+        const mobilePage = await loggedPage(browser, movil);
+        console.log("\n=== Recorrido táctil (móvil) ===");
+        await mobilePage.goto(`${BASE_URL}/admin/agenda`, { waitUntil: "networkidle0", timeout: 60000 });
+        const tapOk = await clickByHref(mobilePage, "/admin/mi-dia");
+        const feedbackOk = tapOk
+          ? await mobilePage
+              .waitForFunction(
+                () =>
+                  Boolean(
+                    document.querySelector(".admin-nav-progress") ||
+                      document.querySelector('[data-pending="true"]'),
+                  ),
+                { timeout: 1500, polling: 16 },
+              )
+              .then(() => true)
+              .catch(() => false)
+          : false;
+        const completedOk = tapOk
+          ? await mobilePage
+              .waitForFunction(
+                () =>
+                  location.pathname === "/admin/mi-dia" &&
+                  document.querySelector("main h1")?.textContent?.trim() === "Mi día",
+                { timeout: 15000, polling: 100 },
+              )
+              .then(() => true)
+              .catch(() => false)
+          : false;
+        tactil = { toque: tapOk, feedback: feedbackOk, destino: completedOk };
+        console.log(
+          `Agenda → Mi día: toque=${tapOk ? "OK" : "FALLO"}, feedback=${feedbackOk ? "OK" : "FALLO"}, destino=${completedOk ? "OK" : "FALLO"}`,
+        );
+        if (!tapOk || !feedbackOk || !completedOk) {
           findings.push({
-            pagina: `ruta:${nombre}`,
-            viewport: "desktop",
+            pagina: "/admin/agenda → /admin/mi-dia",
+            viewport: "movil",
             tipo: "accion-primaria",
             severidad: "error",
-            detalle: resultado.detalle,
+            detalle: `un toque no produjo navegación confirmada (toque=${tapOk}, feedback=${feedbackOk}, destino=${completedOk})`,
           });
         }
+        await mobilePage.close();
       }
-      await page.close();
-    }
+    });
 
-    if (movil) {
-      // Caso crítico reportado en móvil: Agenda → Mi día debe responder al
-      // primer toque con una señal visible y completar sin segunda activación.
-      const mobilePage = await loggedPage(browser, movil);
-      console.log("\n=== Recorrido táctil (móvil) ===");
-      await mobilePage.goto(`${BASE_URL}/admin/agenda`, { waitUntil: "networkidle0", timeout: 60000 });
-      const tapOk = await clickByHref(mobilePage, "/admin/mi-dia");
-      const feedbackOk = tapOk
-        ? await mobilePage
-            .waitForFunction(
-              () =>
-                Boolean(
-                  document.querySelector(".admin-nav-progress") ||
-                    document.querySelector('[data-pending="true"]'),
-                ),
-              { timeout: 1500, polling: 16 },
-            )
-            .then(() => true)
-            .catch(() => false)
-        : false;
-      const completedOk = tapOk
-        ? await mobilePage
-            .waitForFunction(
-              () =>
-                location.pathname === "/admin/mi-dia" &&
-                document.querySelector("main h1")?.textContent?.trim() === "Mi día",
-              { timeout: 15000, polling: 100 },
-            )
-            .then(() => true)
-            .catch(() => false)
-        : false;
-      tactil = { toque: tapOk, feedback: feedbackOk, destino: completedOk };
-      console.log(
-        `Agenda → Mi día: toque=${tapOk ? "OK" : "FALLO"}, feedback=${feedbackOk ? "OK" : "FALLO"}, destino=${completedOk ? "OK" : "FALLO"}`,
-      );
-      if (!tapOk || !feedbackOk || !completedOk) {
-        findings.push({
-          pagina: "/admin/agenda → /admin/mi-dia",
-          viewport: "movil",
-          tipo: "accion-primaria",
-          severidad: "error",
-          detalle: `un toque no produjo navegación confirmada (toque=${tapOk}, feedback=${feedbackOk}, destino=${completedOk})`,
-        });
-      }
-      await mobilePage.close();
-    }
-  });
+  } finally {
+    await limpiar();
+  }
 
-  const errores = printFindings(findings);
+  errores = printFindings(findings);
   if (flags.json) {
     writeArtifact("usability", {
       generado: new Date().toISOString(),

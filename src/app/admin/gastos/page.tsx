@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 
 import Link from "next/link";
@@ -14,13 +14,11 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
-import { catMediosPago } from "@/db/schema/catalogs";
-import { catCategoriasGastos } from "@/db/schema/finance";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, todayDateInput } from "@/lib/format";
 import { buildAdminHref, firstParam, normalizeDateInput } from "@/lib/url-context";
-import { listarGastos, resumenGastos } from "@/modules/gastos/queries";
+import type { GastoRow } from "@/modules/gastos/queries";
 import { contextoSuscripcionCache as contextoSuscripcion } from "@/modules/billing/queries";
 import { shiftDateKey } from "@/modules/agenda";
 
@@ -60,31 +58,101 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
   const page = Math.max(1, Number(firstParam(params.page) ?? "1") || 1);
 
   const db = getDatabase();
-  const [categorias, medios, listado, resumen] = await Promise.all([
-    db
-      .select({ id: catCategoriasGastos.id, nombre: catCategoriasGastos.nombre })
-      .from(catCategoriasGastos)
-      .where(and(eq(catCategoriasGastos.organizacionId, organizationId), eq(catCategoriasGastos.activo, true)))
-      .orderBy(asc(catCategoriasGastos.nombre)),
-    db
-      .select({ id: catMediosPago.id, nombre: catMediosPago.nombre, categoria: catMediosPago.categoria })
-      .from(catMediosPago)
-      .where(and(eq(catMediosPago.organizacionId, organizationId), eq(catMediosPago.activo, true)))
-      .orderBy(asc(catMediosPago.nombre)),
-    listarGastos(
-      db,
-      {
-        organizacionId: organizationId,
-        sucursalId,
-        desde,
-        hasta,
-        estado: estadoValido || undefined,
-        categoriaId: categoriaId || undefined,
-      },
-      { page, pageSize: PAGE_SIZE },
-    ),
-    resumenGastos(db, { organizacionId: organizationId, sucursalId, desde, hasta }),
-  ]);
+  const filtroEstado = estadoValido ? sql` and g.estado = ${estadoValido}` : sql``;
+  const filtroCategoria = categoriaId ? sql` and g.categoria_id = ${categoriaId}` : sql``;
+
+  type GastoJson = Omit<GastoRow, "createdAt"> & { createdAt: string };
+  type GastosSqlRow = {
+    categorias: Array<{ id: string; nombre: string }>;
+    medios: Array<{ id: string; nombre: string; categoria: string }>;
+    gastos_rows: GastoJson[];
+    confirmado: string;
+    revertido: string;
+  };
+
+  // Categorías, medios de pago, listado paginado y totales del periodo en UNA
+  // sola consulta SQL (antes 5 consultas simultáneas al pool).
+  const { rows: sqlRows } = await db.execute<GastosSqlRow>(sql`
+    select
+      coalesce((
+        select jsonb_agg(t) from (
+          select cg.id, cg.nombre
+          from cat_categorias_gastos cg
+          where cg.organizacion_id = ${organizationId} and cg.activo = true
+          order by cg.nombre asc
+        ) t
+      ), '[]'::jsonb) as categorias,
+      coalesce((
+        select jsonb_agg(t) from (
+          select mp.id, mp.nombre, mp.categoria
+          from cat_medios_pago mp
+          where mp.organizacion_id = ${organizationId} and mp.activo = true
+          order by mp.nombre asc
+        ) t
+      ), '[]'::jsonb) as medios,
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            g.id,
+            g.concepto,
+            g.fecha_gasto::text as "fechaGasto",
+            g.importe::text as importe,
+            g.estado,
+            g.proveedor,
+            g.referencia,
+            g.notas,
+            cg.nombre as categoria,
+            mp.nombre as medio,
+            mp.categoria as "medioCategoria",
+            (g.movimiento_caja_id is not null) as "cajaVinculada",
+            u.nombre as "registradoPor",
+            g.motivo_reversion as "motivoReversion",
+            to_char(g.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt"
+          from gastos g
+          left join cat_categorias_gastos cg on cg.id = g.categoria_id
+          join cat_medios_pago mp on mp.id = g.medio_pago_id
+          left join usuarios u on u.id = g.usuario_id
+          where g.organizacion_id = ${organizationId}
+            and g.sucursal_id = ${sucursalId}
+            and g.fecha_gasto >= ${desde}
+            and g.fecha_gasto <= ${hasta}${filtroEstado}${filtroCategoria}
+          order by g.fecha_gasto desc, g.created_at desc
+          limit ${PAGE_SIZE + 1} offset ${(page - 1) * PAGE_SIZE}
+        ) t
+      ), '[]'::jsonb) as gastos_rows,
+      coalesce((
+        select sum(g2.importe) filter (where g2.estado = 'confirmado')
+        from gastos g2
+        where g2.organizacion_id = ${organizationId}
+          and g2.sucursal_id = ${sucursalId}
+          and g2.fecha_gasto >= ${desde}
+          and g2.fecha_gasto <= ${hasta}
+      ), 0)::text as confirmado,
+      coalesce((
+        select sum(g3.importe) filter (where g3.estado = 'revertido')
+        from gastos g3
+        where g3.organizacion_id = ${organizationId}
+          and g3.sucursal_id = ${sucursalId}
+          and g3.fecha_gasto >= ${desde}
+          and g3.fecha_gasto <= ${hasta}
+      ), 0)::text as revertido
+  `);
+
+  const datos = sqlRows[0];
+  const categorias = datos?.categorias ?? [];
+  const medios = datos?.medios ?? [];
+  const gastosRaw = (datos?.gastos_rows ?? []).map((g) => ({
+    ...g,
+    createdAt: new Date(g.createdAt),
+  }));
+  const listado = {
+    rows: gastosRaw.slice(0, PAGE_SIZE),
+    hasMore: gastosRaw.length > PAGE_SIZE,
+  };
+  const resumen = {
+    totalConfirmado: Number(datos?.confirmado ?? 0),
+    totalRevertido: Number(datos?.revertido ?? 0),
+  };
 
   const fmt = (v: string | number) => formatCurrency(Number(v), { currency });
   const pageHref = (next: number) =>
@@ -146,12 +214,12 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
       </form>
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Gastos confirmados</p>
+        <div className="anim-entrada rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <p className="text-op-xs font-semibold uppercase tracking-wide text-muted-foreground">Gastos confirmados</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{fmt(resumen.totalConfirmado)}</p>
         </div>
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Revertidos en el periodo</p>
+        <div className="anim-entrada rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <p className="text-op-xs font-semibold uppercase tracking-wide text-muted-foreground">Revertidos en el periodo</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-destructive">{fmt(resumen.totalRevertido)}</p>
         </div>
       </section>
@@ -179,12 +247,12 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
           ) : (
             <>
               <div className="space-y-3 md:hidden">
-                {listado.rows.map((gasto) => (
-                  <article className="rounded-xl border border-border p-4" key={gasto.id}>
+                {listado.rows.map((gasto, index) => (
+                  <article className="anim-entrada rounded-xl border border-border p-4" key={gasto.id} style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="text-sm font-semibold leading-5 text-foreground">{gasto.concepto}</h3>
-                        <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                        <p className="mt-0.5 text-op-xs leading-5 text-muted-foreground">
                           {gasto.fechaGasto} · {gasto.categoria ?? "Sin categoría"}
                         </p>
                       </div>
@@ -193,21 +261,21 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
                       </StatusBadge>
                     </div>
                     {[gasto.proveedor, gasto.referencia, gasto.registradoPor].filter(Boolean).length > 0 ? (
-                      <p className="mt-1.5 text-xs text-muted-foreground">
+                      <p className="mt-1.5 text-op-xs text-muted-foreground">
                         {[gasto.proveedor, gasto.referencia, gasto.registradoPor].filter(Boolean).join(" · ")}
                       </p>
                     ) : null}
                     {gasto.motivoReversion ? (
-                      <p className="mt-0.5 text-xs text-destructive">Reversión: {gasto.motivoReversion}</p>
+                      <p className="mt-0.5 text-op-xs text-destructive">Reversión: {gasto.motivoReversion}</p>
                     ) : null}
                     <dl className="mt-3 space-y-1.5">
                       <div className="flex items-baseline justify-between gap-3 text-sm">
-                        <dt className="shrink-0 text-xs text-muted-foreground">Importe</dt>
+                        <dt className="shrink-0 text-op-xs text-muted-foreground">Importe</dt>
                         <dd className="min-w-0 text-right font-semibold tabular-nums text-foreground">{fmt(gasto.importe)}</dd>
                       </div>
                       <div className="flex items-baseline justify-between gap-3 text-sm">
-                        <dt className="shrink-0 text-xs text-muted-foreground">Medio</dt>
-                        <dd className="min-w-0 text-right text-xs text-muted-foreground">
+                        <dt className="shrink-0 text-op-xs text-muted-foreground">Medio</dt>
+                        <dd className="min-w-0 text-right text-op-xs text-muted-foreground">
                           {gasto.medio}{gasto.cajaVinculada ? " · caja" : ""}
                         </dd>
                       </div>
@@ -226,7 +294,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
               </div>
               <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[640px] text-left text-sm">
-                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+                <thead className="border-b border-border text-op-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-4 font-medium">Fecha</th>
                     <th className="py-2 pr-4 font-medium">Concepto</th>
@@ -243,18 +311,18 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
                       <td className="whitespace-nowrap py-3 pr-4 text-muted-foreground">{gasto.fechaGasto}</td>
                       <td className="py-3 pr-4">
                         <p className="font-medium text-foreground">{gasto.concepto}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
+                        <p className="mt-0.5 text-op-xs text-muted-foreground">
                           {[gasto.proveedor, gasto.referencia, gasto.registradoPor].filter(Boolean).join(" · ")}
                         </p>
                         {gasto.motivoReversion ? (
-                          <p className="mt-0.5 text-xs text-destructive">Reversión: {gasto.motivoReversion}</p>
+                          <p className="mt-0.5 text-op-xs text-destructive">Reversión: {gasto.motivoReversion}</p>
                         ) : null}
                       </td>
                       <td className="py-3 pr-4 text-muted-foreground">{gasto.categoria ?? "Sin categoría"}</td>
                       <td className="py-3 pr-4">
                         <span className="text-muted-foreground">{gasto.medio}</span>
                         {gasto.cajaVinculada ? (
-                          <span className="ml-1 text-xs text-muted-foreground" title="Salió del corte de caja">· caja</span>
+                          <span className="ml-1 text-op-xs text-muted-foreground" title="Salió del corte de caja">· caja</span>
                         ) : null}
                       </td>
                       <td className="py-3 pr-4 text-right font-semibold tabular-nums">{fmt(gasto.importe)}</td>

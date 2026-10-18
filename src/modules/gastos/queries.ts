@@ -95,37 +95,44 @@ export async function resumenGastos(
     sucursalId: string | null;
   },
 ): Promise<ResumenGastos> {
-  const scope = () =>
-    and(
-      eq(gastos.organizacionId, filtro.organizacionId),
-      filtro.sucursalId ? eq(gastos.sucursalId, filtro.sucursalId) : undefined,
-      gte(gastos.fechaGasto, filtro.desde),
-      lte(gastos.fechaGasto, filtro.hasta),
-    );
+  const { rows } = await db.execute<{
+    confirmado: string;
+    revertido: string;
+    por_categoria: Array<{ nombre: string; total: string }>;
+  }>(sql`
+    select
+      coalesce(sum(g.importe) filter (where g.estado = 'confirmado'), 0)::text as confirmado,
+      coalesce(sum(g.importe) filter (where g.estado = 'revertido'), 0)::text as revertido,
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            coalesce(cg.nombre, 'Sin categoría') as nombre,
+            coalesce(sum(g2.importe), 0)::text as total
+          from gastos g2
+          left join cat_categorias_gastos cg on cg.id = g2.categoria_id
+          where g2.organizacion_id = ${filtro.organizacionId}
+            ${filtro.sucursalId ? sql`and g2.sucursal_id = ${filtro.sucursalId}` : sql``}
+            and g2.fecha_gasto >= ${filtro.desde}
+            and g2.fecha_gasto <= ${filtro.hasta}
+            and g2.estado = 'confirmado'
+          group by cg.nombre
+          order by sum(g2.importe) desc
+        ) t
+      ), '[]'::jsonb) as por_categoria
+    from gastos g
+    where g.organizacion_id = ${filtro.organizacionId}
+      ${filtro.sucursalId ? sql`and g.sucursal_id = ${filtro.sucursalId}` : sql``}
+      and g.fecha_gasto >= ${filtro.desde}
+      and g.fecha_gasto <= ${filtro.hasta}
+  `);
 
-  const [totales, porCategoria] = await Promise.all([
-    db
-      .select({
-        confirmado: sql<string>`coalesce(sum(${gastos.importe}) filter (where ${gastos.estado} = 'confirmado'), 0)`,
-        revertido: sql<string>`coalesce(sum(${gastos.importe}) filter (where ${gastos.estado} = 'revertido'), 0)`,
-      })
-      .from(gastos)
-      .where(scope()),
-    db
-      .select({
-        nombre: sql<string>`coalesce(${catCategoriasGastos.nombre}, 'Sin categoría')`,
-        total: sql<string>`coalesce(sum(${gastos.importe}), 0)`,
-      })
-      .from(gastos)
-      .leftJoin(catCategoriasGastos, eq(gastos.categoriaId, catCategoriasGastos.id))
-      .where(and(scope(), eq(gastos.estado, "confirmado")))
-      .groupBy(catCategoriasGastos.nombre)
-      .orderBy(desc(sql`sum(${gastos.importe})`)),
-  ]);
-
+  const row = rows[0];
   return {
-    totalConfirmado: Number(totales[0]?.confirmado ?? 0),
-    totalRevertido: Number(totales[0]?.revertido ?? 0),
-    porCategoria: porCategoria.map((row) => ({ nombre: row.nombre, total: Number(row.total) })),
+    totalConfirmado: Number(row?.confirmado ?? 0),
+    totalRevertido: Number(row?.revertido ?? 0),
+    porCategoria: (row?.por_categoria ?? []).map((item) => ({
+      nombre: item.nombre,
+      total: Number(item.total),
+    })),
   };
 }

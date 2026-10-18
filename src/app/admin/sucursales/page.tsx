@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -8,16 +8,15 @@ import { SucursalToggle } from "@/app/admin/sucursales/toggle-form";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminNavTabs, EQUIPO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminPageHeader } from "@/components/admin/page-header";
+import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
-import { planes } from "@/db/schema/billing";
-import { miembrosOrganizaciones, relUsuariosSucursales, sucursales, usuarios } from "@/db/schema/core";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/format";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
-import { contextoSuscripcionCache, getSuscripcionActualCache } from "@/modules/billing/queries";
+import { contextoSuscripcionCache, getPlanesActivos, getSuscripcionActualCache } from "@/modules/billing/queries";
 import { motivoBloqueoSucursal, puedeCrearOtraSucursal } from "@/modules/sucursales/rules";
 
 export const dynamic = "force-dynamic";
@@ -39,53 +38,94 @@ export default async function SucursalesPage({ searchParams }: Props) {
   const puedeEditar = hasPermission(context.access, "sucursales.editar") && !context.access.soloLectura;
   const db = getDatabase();
 
-  const [lista, miembros, asignaciones, ctx] = await Promise.all([
-    db
-      .select()
-      .from(sucursales)
-      .where(eq(sucursales.organizacionId, organization.id))
-      .orderBy(asc(sucursales.nombre)),
-    db
-      .select({
-        usuarioId: usuarios.id,
-        nombre: usuarios.nombre,
-        correo: usuarios.correo,
-      })
-      .from(miembrosOrganizaciones)
-      .innerJoin(usuarios, eq(miembrosOrganizaciones.usuarioId, usuarios.id))
-      .where(
-        and(
-          eq(miembrosOrganizaciones.organizacionId, organization.id),
-          eq(miembrosOrganizaciones.estado, "activo"),
-        ),
-      )
-      .orderBy(asc(usuarios.nombre)),
-    db
-      .select({
-        usuarioId: relUsuariosSucursales.usuarioId,
-        sucursalId: relUsuariosSucursales.sucursalId,
-      })
-      .from(relUsuariosSucursales)
-      .where(eq(relUsuariosSucursales.organizacionId, organization.id)),
+  type SucursalItem = {
+    id: string;
+    nombre: string;
+    clave: string;
+    direccion: string | null;
+    telefono: string | null;
+    correo: string | null;
+    zonaHoraria: string | null;
+    capacidadSinAsignar: number;
+    exigirCorteParaCobrar: boolean;
+    reservasOnline: boolean;
+    reservasAutoConfirmar: boolean;
+    reservasCancelacionHoras: number;
+    reservasAnticipacionMinutos: number;
+    reservasHorizonteDias: number;
+    activo: boolean;
+  };
+  type MiembroItem = { usuarioId: string; nombre: string; correo: string };
+  type AsignacionItem = { usuarioId: string; sucursalId: string };
+  type SucursalesRow = {
+    sucursales: SucursalItem[];
+    miembros: MiembroItem[];
+    asignaciones: AsignacionItem[];
+  };
+
+  // Sucursales + equipo + asignaciones en UNA ronda con subselects jsonb
+  // (antes 3 consultas paralelas que abrían 3 conexiones al pool). El precio
+  // del plan sale del catálogo cacheado en KV y la suscripción de la caché
+  // por request — ninguno paga una ronda SQL extra.
+  const [datosResult, ctx, suscripcion, planesActivos] = await Promise.all([
+    db.execute<SucursalesRow>(sql`
+      select
+        coalesce((
+          select jsonb_agg(t) from (
+            select
+              s.id,
+              s.nombre,
+              s.clave,
+              s.direccion,
+              s.telefono,
+              s.correo,
+              s.zona_horaria as "zonaHoraria",
+              s.capacidad_sin_asignar as "capacidadSinAsignar",
+              s.exigir_corte_para_cobrar as "exigirCorteParaCobrar",
+              s.reservas_online as "reservasOnline",
+              s.reservas_auto_confirmar as "reservasAutoConfirmar",
+              s.reservas_cancelacion_horas as "reservasCancelacionHoras",
+              s.reservas_anticipacion_minutos as "reservasAnticipacionMinutos",
+              s.reservas_horizonte_dias as "reservasHorizonteDias",
+              s.activo
+            from sucursales s
+            where s.organizacion_id = ${organization.id}
+            order by s.nombre
+          ) t
+        ), '[]'::jsonb) as sucursales,
+        coalesce((
+          select jsonb_agg(t) from (
+            select u.id as "usuarioId", u.nombre, u.correo
+            from miembros_organizaciones mo
+            join usuarios u on u.id = mo.usuario_id
+            where mo.organizacion_id = ${organization.id} and mo.estado = 'activo'
+            order by u.nombre
+          ) t
+        ), '[]'::jsonb) as miembros,
+        coalesce((
+          select jsonb_agg(t) from (
+            select rus.usuario_id as "usuarioId", rus.sucursal_id as "sucursalId"
+            from rel_usuarios_sucursales rus
+            where rus.organizacion_id = ${organization.id}
+          ) t
+        ), '[]'::jsonb) as asignaciones
+    `),
     contextoSuscripcionCache(organization.id),
+    getSuscripcionActualCache(organization.id),
+    getPlanesActivos(),
   ]);
 
-  const [planRow] = ctx.plan?.clave
-    ? await db
-        .select({
-          precioMensual: planes.precioMensual,
-          precioAnual: planes.precioAnual,
-          sucursalesIncluidas: planes.sucursalesIncluidas,
-          precioSucursalExtra: planes.precioSucursalExtra,
-        })
-        .from(planes)
-        .where(eq(planes.clave, ctx.plan.clave))
-        .limit(1)
-    : [];
+  const datos = datosResult.rows[0];
+  const lista = datos?.sucursales ?? [];
+  const miembros = datos?.miembros ?? [];
+  const asignaciones = datos?.asignaciones ?? [];
+
+  const planRow = ctx.plan?.clave
+    ? (planesActivos.find((plan) => plan.clave === ctx.plan?.clave) ?? null)
+    : null;
 
   const activas = lista.filter((row) => row.activo).length;
   const maxSucursales = ctx.plan?.maxSucursales ?? null;
-  const suscripcion = ctx.plan ? await getSuscripcionActualCache(organization.id) : null;
   const cubiertas = suscripcion?.sucursalesFacturadas ?? null;
   const capacidad = { activas, maxSucursales, cubiertas };
   const puedeCrearOtra = puedeEditar && puedeCrearOtraSucursal(capacidad);
@@ -176,15 +216,17 @@ export default async function SucursalesPage({ searchParams }: Props) {
       />
 
       {lista.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
-          Aún no hay sucursales. Crea la primera con el botón «Nueva sucursal».
-        </div>
+        <EmptyState
+          description="Crea la primera sucursal con el botón «Nueva sucursal»."
+          title="Aún no hay sucursales"
+        />
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {lista.map((sucursal) => (
+          {lista.map((sucursal, index) => (
             <section
-              className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"
+              className="anim-entrada rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"
               key={sucursal.id}
+              style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -221,14 +263,14 @@ export default async function SucursalesPage({ searchParams }: Props) {
               {puedeEditar ? (
                 <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
                   <Link
-                    className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-op-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     data-action-id="sucursales.sucursal.abrir_edicion"
                     href={buildAdminHref("/sucursales", { organizationId: organization.id, extra: { editar: sucursal.id } })}
                   >
                     Editar
                   </Link>
                   <Link
-                    className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-op-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     data-action-id="sucursales.sucursal.abrir_equipo"
                     href={buildAdminHref("/sucursales", { organizationId: organization.id, extra: { equipo: sucursal.id } })}
                   >
@@ -257,7 +299,7 @@ export default async function SucursalesPage({ searchParams }: Props) {
         </p>
         {planRow ? (
           <details className="mt-2">
-            <summary className="cursor-pointer text-xs font-medium text-muted-foreground hover:text-primary">
+            <summary className="cursor-pointer text-op-xs font-medium text-muted-foreground hover:text-primary">
               Detalle del plan
             </summary>
             <p className="mt-2 text-sm text-muted-foreground">

@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -7,9 +7,9 @@ import { RoleForm } from "@/app/admin/roles/role-form";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminNavTabs, EQUIPO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
-import { catPermisos, catRoles, relMiembrosRoles, relRolesPermisos } from "@/db/schema/access";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
@@ -27,45 +27,59 @@ export default async function RolesPage({ searchParams }: { searchParams: Search
   const canEdit = hasPermission(context.access, "roles.editar");
   const db = getDatabase();
 
-  const [roles, permisos] = await Promise.all([
-    db
-      .select({
-        id: catRoles.id,
-        clave: catRoles.clave,
-        nombre: catRoles.nombre,
-        esSistema: catRoles.esSistema,
-        activo: catRoles.activo,
-      })
-      .from(catRoles)
-      .where(eq(catRoles.organizacionId, organizationId))
-      .orderBy(asc(catRoles.nombre)),
-    db
-      .select({ id: catPermisos.id, clave: catPermisos.clave, nombre: catPermisos.nombre, modulo: catPermisos.modulo })
-      .from(catPermisos)
-      .where(eq(catPermisos.activo, true))
-      .orderBy(asc(catPermisos.modulo), asc(catPermisos.clave)),
-  ]);
+  type RolesSqlRow = {
+    roles: Array<{
+      id: string;
+      clave: string;
+      nombre: string;
+      esSistema: boolean;
+      activo: boolean;
+      permisoIds: string[];
+      memberCount: number;
+    }>;
+    permisos: Array<{ id: string; clave: string; nombre: string; modulo: string }>;
+  };
 
-  const roleIds = roles.map((r) => r.id);
-  const [rolePermisos, memberCounts] = await Promise.all([
-    roleIds.length
-      ? db
-          .select({ rolId: relRolesPermisos.rolId, permisoId: relRolesPermisos.permisoId })
-          .from(relRolesPermisos)
-          .where(inArray(relRolesPermisos.rolId, roleIds))
-      : Promise.resolve([]),
-    roleIds.length
-      ? db
-          .select({ rolId: relMiembrosRoles.rolId })
-          .from(relMiembrosRoles)
-          .where(inArray(relMiembrosRoles.rolId, roleIds))
-      : Promise.resolve([]),
-  ]);
+  // Roles (con sus permisos y conteo de miembros embebidos) + catálogo de
+  // permisos activos en UNA sola consulta SQL (antes 4 queries en 2 rondas).
+  const { rows } = await db.execute<RolesSqlRow>(sql`
+    select
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            r.id,
+            r.clave,
+            r.nombre,
+            r.es_sistema as "esSistema",
+            r.activo,
+            coalesce((
+              select jsonb_agg(rp.permiso_id)
+              from rel_roles_permisos rp
+              where rp.rol_id = r.id
+            ), '[]'::jsonb) as "permisoIds",
+            (
+              select count(*)::int
+              from rel_miembros_roles mr
+              where mr.rol_id = r.id
+            ) as "memberCount"
+          from cat_roles r
+          where r.organizacion_id = ${organizationId}
+          order by r.nombre asc
+        ) t
+      ), '[]'::jsonb) as roles,
+      coalesce((
+        select jsonb_agg(t) from (
+          select p.id, p.clave, p.nombre, p.modulo
+          from cat_permisos p
+          where p.activo = true
+          order by p.modulo asc, p.clave asc
+        ) t
+      ), '[]'::jsonb) as permisos
+  `);
 
-  const countByRole = new Map<string, number>();
-  for (const row of memberCounts) {
-    countByRole.set(row.rolId, (countByRole.get(row.rolId) ?? 0) + 1);
-  }
+  const datos = rows[0];
+  const roles = datos?.roles ?? [];
+  const permisos = datos?.permisos ?? [];
 
   // Solo se ofrecen para asignación los permisos que el editor ya posee
   // (anti-escalamiento también reforzado en la acción).
@@ -101,18 +115,22 @@ export default async function RolesPage({ searchParams }: { searchParams: Search
       />
       <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
         <div className="space-y-4">
-          {roles.map((role) => (
-            <RoleCard
-              canEdit={canEdit}
-              memberCount={countByRole.get(role.id) ?? 0}
-              organizationId={organizationId}
-              permisoIds={rolePermisos.filter((rp) => rp.rolId === role.id).map((rp) => rp.permisoId)}
-              permisos={permisos}
-              permisosAsignables={permisosAsignables.map((p) => p.id)}
-              role={role}
-              key={role.id}
-            />
-          ))}
+          {roles.length === 0 ? (
+            <EmptyState description="Crea un rol para asignar permisos al equipo." title="Sin roles configurados" />
+          ) : (
+            roles.map((role) => (
+              <RoleCard
+                canEdit={canEdit}
+                memberCount={role.memberCount}
+                organizationId={organizationId}
+                permisoIds={role.permisoIds}
+                permisos={permisos}
+                permisosAsignables={permisosAsignables.map((p) => p.id)}
+                role={role}
+                key={role.id}
+              />
+            ))
+          )}
         </div>
         <div className="space-y-4">
           <AdminCard title="Notas">

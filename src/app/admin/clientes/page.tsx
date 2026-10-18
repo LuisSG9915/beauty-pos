@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { Download, Upload, UserPlus, Users } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -15,8 +15,6 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
-import { clientes } from "@/db/schema/core";
-import { citas, ventas } from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate } from "@/lib/format";
@@ -41,83 +39,180 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
   const query = firstParam(params.q) ?? "";
   const sortParam = firstParam(params.sort);
   const directionParam = firstParam(params.direction);
-  const sort = sortParam === "createdAt" ? clientes.createdAt : clientes.nombre;
-  const direction = directionParam === "desc" ? desc(sort) : asc(sort);
   const pagina = Math.max(1, Number.parseInt(firstParam(params.pagina) ?? "1", 10) || 1);
-  const filters = [eq(clientes.organizacionId, organizationId)];
-
-  if (query) {
-    filters.push(or(ilike(clientes.nombre, `%${query}%`), ilike(clientes.apellidoPaterno, `%${query}%`), ilike(clientes.correo, `%${query}%`), ilike(clientes.telefono, `%${query}%`))!);
-  }
 
   const inicioMes = new Date();
   inicioMes.setDate(1);
   inicioMes.setHours(0, 0, 0, 0);
 
-  const [stats, totalRows, clientRows] = await Promise.all([
-    db
-      .select({
-        total: sql<number>`count(*)::int`,
-        conTelefono: sql<number>`count(*) filter (where ${clientes.telefono} is not null and ${clientes.telefono} <> '')::int`,
-        conCorreo: sql<number>`count(*) filter (where ${clientes.correo} is not null and ${clientes.correo} <> '')::int`,
-        nuevosMes: sql<number>`count(*) filter (where ${clientes.createdAt} >= ${inicioMes})::int`,
-      })
-      .from(clientes)
-      .where(eq(clientes.organizacionId, organizationId)),
-    db
-      .select({ total: sql<number>`count(*)::int` })
-      .from(clientes)
-      .where(and(...filters)),
-    db
-      .select({
-        id: clientes.id,
-        nombre: clientes.nombre,
-        apellidoPaterno: clientes.apellidoPaterno,
-        apellidoMaterno: clientes.apellidoMaterno,
-        telefono: clientes.telefono,
-        correo: clientes.correo,
-        activo: clientes.activo,
-        // Enriquecimiento de la fila como subselects escalares en la misma
-        // consulta (regla del proyecto: fusionar, no consultas en paralelo).
-        ultimaVisita: sql<Date | null>`(
-          select max(c.fecha_hora) from ${citas} c
-           where c.cliente_id = ${clientes.id}
-             and c.organizacion_id = ${organizationId}
-             and c.activo
-             and c.estado not in ('cancelada', 'no_asistio')
-             and c.fecha_hora < now()
-        )`,
-        totalGastado: sql<string | null>`(
-          select sum(v.total + v.propina) from ${ventas} v
-           where v.cliente_id = ${clientes.id}
-             and v.organizacion_id = ${organizationId}
-             and v.activo
-             and v.estado = 'completada'
-        )`,
-        citasProximas: sql<number>`(
-          select count(*)::int from ${citas} c
-           where c.cliente_id = ${clientes.id}
-             and c.organizacion_id = ${organizationId}
-             and c.activo
-             and c.estado in ('pendiente', 'confirmada', 'en_proceso')
-             and c.fecha_hora >= now()
-        )`,
-      })
-      .from(clientes)
-      .where(and(...filters))
-      .orderBy(direction)
-      .limit(PAGE_SIZE)
-      .offset((pagina - 1) * PAGE_SIZE),
-  ]);
+  const editId = firstParam(params.edit);
 
-  const kpi = stats[0] ?? { total: 0, conTelefono: 0, conCorreo: 0, nuevosMes: 0 };
-  const totalFiltrado = totalRows[0]?.total ?? 0;
+  // Una sola ronda SQL: KPIs + conteo filtrado + página de clientes (con sus
+  // enriquecimientos como subselects) + el cliente en edición cuando ?edit=
+  // viene presente. Antes eran 4 consultas repartidas en 2 rondas; cada
+  // consulta paralela abre una conexión fría al pool (~60 ms handshake +
+  // ~100 ms RT).
+  const filtroBusqueda = query
+    ? sql` and (c.nombre ilike ${`%${query}%`} or c.apellido_paterno ilike ${`%${query}%`}
+        or c.correo ilike ${`%${query}%`} or c.telefono ilike ${`%${query}%`})`
+    : sql``;
+  const ordenSql =
+    sortParam === "createdAt"
+      ? directionParam === "desc"
+        ? sql`c.created_at desc`
+        : sql`c.created_at asc`
+      : directionParam === "desc"
+        ? sql`c.nombre desc`
+        : sql`c.nombre asc`;
+
+  type ClienteListadoItem = {
+    id: string;
+    nombre: string;
+    apellidoPaterno: string | null;
+    apellidoMaterno: string | null;
+    telefono: string | null;
+    correo: string | null;
+    activo: boolean;
+    ultimaVisita: string | null;
+    totalGastado: string | null;
+    citasProximas: number;
+  };
+  type EditingClientJson = {
+    id: string;
+    organizacion_id: string;
+    nombre: string;
+    apellido_paterno: string | null;
+    apellido_materno: string | null;
+    telefono: string | null;
+    correo: string | null;
+    fecha_nacimiento: string | null;
+    notas_operativas: string | null;
+    rfc: string | null;
+    razon_social: string | null;
+    codigo_postal_fiscal: string | null;
+    regimen_fiscal: string | null;
+    uso_cfdi: string | null;
+    activo: boolean;
+    updated_at: string | null;
+  };
+  type ClientesRow = {
+    stats: { total: number; conTelefono: number; conCorreo: number; nuevosMes: number } | null;
+    totalFiltrado: number | null;
+    clientes: ClienteListadoItem[];
+    editingClient: EditingClientJson | null;
+  };
+
+  // Una sola ronda SQL: KPIs + página de clientes (con sus enriquecimientos
+  // acotados a los 25 de la página) + el cliente en edición cuando ?edit=
+  // viene presente. Los CTE `as materialized` fijan el orden de evaluación:
+  // las agregaciones de citas/ventas corren solo sobre los clientes de la
+  // página actual (antes el planner las evaluaba sobre todo el historial,
+  // con un full scan del índice parcial de citas: 63ms de planning y 2× RUs).
+  const result = await db.execute<ClientesRow>(sql`
+    with pagina_clientes as materialized (
+      select
+        c.id,
+        c.nombre,
+        c.apellido_paterno as "apellidoPaterno",
+        c.apellido_materno as "apellidoMaterno",
+        c.telefono,
+        c.correo,
+        c.activo,
+        row_number() over (order by ${ordenSql}) as rn
+      from clientes c
+      where c.organizacion_id = ${organizationId}${filtroBusqueda}
+      order by ${ordenSql}
+      limit ${PAGE_SIZE} offset ${(pagina - 1) * PAGE_SIZE}
+    ),
+    ci_agg as materialized (
+      select
+        ci.cliente_id,
+        to_char(
+          max(ci.fecha_hora) filter (
+            where ci.estado not in ('cancelada', 'no_asistio') and ci.fecha_hora < now()
+          ) at time zone 'UTC',
+          'YYYY-MM-DD"T"HH24:MI:SS"Z"'
+        ) as "ultimaVisita",
+        count(*) filter (
+          where ci.estado in ('pendiente', 'confirmada', 'en_proceso') and ci.fecha_hora >= now()
+        )::int as "citasProximas"
+      from pagina_clientes pc
+      join citas ci on ci.cliente_id = pc.id
+      where ci.organizacion_id = ${organizationId} and ci.activo
+      group by ci.cliente_id
+    ),
+    v_agg as materialized (
+      select
+        v.cliente_id,
+        sum(v.total + v.propina)::text as "totalGastado"
+      from pagina_clientes pc
+      join ventas v on v.organizacion_id = ${organizationId} and v.cliente_id = pc.id
+      where v.activo and v.estado = 'completada'
+      group by v.cliente_id
+    )
+    select
+      (select jsonb_build_object(
+          'total', count(*)::int,
+          'conTelefono', count(*) filter (where telefono is not null and telefono <> '')::int,
+          'conCorreo', count(*) filter (where correo is not null and correo <> '')::int,
+          'nuevosMes', count(*) filter (where created_at >= ${inicioMes})::int)
+        from clientes
+       where organizacion_id = ${organizationId}) as stats,
+      ${query
+        ? sql`(select count(*)::int from clientes c
+            where c.organizacion_id = ${organizationId}${filtroBusqueda}) as "totalFiltrado",`
+        : sql`null::int as "totalFiltrado",`}
+      coalesce((
+        select jsonb_agg(
+          jsonb_build_object(
+            'id', pc.id,
+            'nombre', pc.nombre,
+            'apellidoPaterno', pc."apellidoPaterno",
+            'apellidoMaterno', pc."apellidoMaterno",
+            'telefono', pc.telefono,
+            'correo', pc.correo,
+            'activo', pc.activo,
+            'ultimaVisita', ci_agg."ultimaVisita",
+            'totalGastado', v_agg."totalGastado",
+            'citasProximas', coalesce(ci_agg."citasProximas", 0)
+          )
+          order by pc.rn
+        )
+        from pagina_clientes pc
+        left join ci_agg on ci_agg.cliente_id = pc.id
+        left join v_agg on v_agg.cliente_id = pc.id
+      ), '[]'::jsonb) as clientes,
+      ${editId
+        ? sql`(select to_jsonb(c) from clientes c
+            where c.id = ${editId} and c.organizacion_id = ${organizationId}) as "editingClient"`
+        : sql`null as "editingClient"`}
+  `);
+
+  const data = result.rows[0];
+  const kpi = data?.stats ?? { total: 0, conTelefono: 0, conCorreo: 0, nuevosMes: 0 };
+  const totalFiltrado = Number(data?.totalFiltrado ?? kpi.total);
   const totalPaginas = Math.max(1, Math.ceil(totalFiltrado / PAGE_SIZE));
   const paginaActual = Math.min(pagina, totalPaginas);
+  const clientRows = data?.clientes ?? [];
 
-  const editId = firstParam(params.edit);
-  const editingClient = editId
-    ? (await db.select().from(clientes).where(and(eq(clientes.id, editId), eq(clientes.organizacionId, organizationId))).limit(1))[0]
+  const editingClient = data?.editingClient
+    ? {
+        id: data.editingClient.id,
+        organizacionId: data.editingClient.organizacion_id,
+        nombre: data.editingClient.nombre,
+        apellidoPaterno: data.editingClient.apellido_paterno,
+        apellidoMaterno: data.editingClient.apellido_materno,
+        telefono: data.editingClient.telefono,
+        correo: data.editingClient.correo,
+        fechaNacimiento: data.editingClient.fecha_nacimiento,
+        notasOperativas: data.editingClient.notas_operativas,
+        rfc: data.editingClient.rfc,
+        razonSocial: data.editingClient.razon_social,
+        codigoPostalFiscal: data.editingClient.codigo_postal_fiscal,
+        regimenFiscal: data.editingClient.regimen_fiscal,
+        usoCfdi: data.editingClient.uso_cfdi,
+        updatedAt: data.editingClient.updated_at ? new Date(data.editingClient.updated_at) : null,
+      }
     : undefined;
   const modoNuevo = firstParam(params.nuevo) === "1";
   const modoImportar = firstParam(params.importar) === "1";
@@ -188,7 +283,8 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
             header: "Acciones",
             cell: (client: ClientRow) => (
               <Link
-                className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs font-medium text-primary hover:bg-muted/60"
+                className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs font-medium text-primary hover:bg-muted/60"
+                data-action-id="clientes.editar"
                 href={hrefBase({ edit: client.id, pagina: String(paginaActual) })}
                 prefetch={false}
               >
@@ -211,6 +307,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
               // <a> nativo, no <Link>: una descarga no es navegación y nunca
               // debe prefetchearse — el handler registra auditoría por descarga.
               <Button
+                data-action-id="clientes.exportar"
                 nativeButton={false}
                 render={<a download href={`/admin/clientes/export?organizationId=${organizationId}`} />}
                 variant="outline"
@@ -221,6 +318,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
             ) : null}
             {puedeEditar ? (
               <Button
+                data-action-id="clientes.importar"
                 nativeButton={false}
                 render={<Link href={hrefBase({ importar: "1" })} prefetch={false} />}
                 variant="outline"
@@ -319,7 +417,8 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
                 <RegistroCard
                   acciones={puedeEditar ? (
                     <Link
-                      className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60"
+                      className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60"
+                      data-action-id="clientes.editar"
                       href={hrefBase({ edit: client.id, pagina: String(paginaActual) })}
                       prefetch={false}
                     >
@@ -382,25 +481,30 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
       </section>
 
       {/* Alta, edición e importación comparten el mismo panel lateral; el modo
-          activo lo define la URL para que sea enlazable y sobreviva SSR. */}
-      <ClientSheet
-        closeHref={hrefCerrar}
-        description="Solo el nombre es obligatorio; el teléfono ayuda a confirmar citas."
-        key={`${modoNuevo}-${editingClient?.id ?? ""}-${editingClient?.updatedAt?.getTime() ?? ""}`}
-        open={modoNuevo || Boolean(editingClient)}
-        title={editingClient ? "Editar cliente" : "Nuevo cliente"}
-      >
-        <ClientForm initial={editingClient} organizationId={organizationId} />
-      </ClientSheet>
-      <ClientSheet
-        closeHref={hrefCerrar}
-        description="Carga un CSV guardado desde Excel con tus clientes."
-        key="importar"
-        open={modoImportar}
-        title="Importar clientes"
-      >
-        <ClientImport organizationId={organizationId} />
-      </ClientSheet>
+          activo lo define la URL para que sea enlazable y sobreviva SSR. Solo
+          se montan cuando están abiertos para ahorrar SSR e hidratación. */}
+      {modoNuevo || Boolean(editingClient) ? (
+        <ClientSheet
+          closeHref={hrefCerrar}
+          description="Solo el nombre es obligatorio; el teléfono ayuda a confirmar citas."
+          key={`${modoNuevo}-${editingClient?.id ?? ""}-${editingClient?.updatedAt?.getTime() ?? ""}`}
+          open
+          title={editingClient ? "Editar cliente" : "Nuevo cliente"}
+        >
+          <ClientForm initial={editingClient} organizationId={organizationId} />
+        </ClientSheet>
+      ) : null}
+      {modoImportar ? (
+        <ClientSheet
+          closeHref={hrefCerrar}
+          description="Carga un CSV guardado desde Excel con tus clientes."
+          key="importar"
+          open
+          title="Importar clientes"
+        >
+          <ClientImport organizationId={organizationId} />
+        </ClientSheet>
+      ) : null}
     </div>
   );
 }

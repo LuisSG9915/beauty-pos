@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { CalendarClock, CircleAlert, XCircle } from "lucide-react";
+import Link from "next/link";
 
 import type { ReservaGestionPublica } from "@/modules/reservas/gestion";
 import { dayKey } from "@/modules/agenda/timezone";
@@ -33,9 +34,9 @@ function formatoHora(iso: string, zonaHoraria: string) {
 }
 
 /**
- * Acciones de autogestión: cancelar y reagendar dentro de la política de la
- * sucursal. La lista de días respeta el horizonte configurado; los horarios
- * libres se piden al servidor por día (re-validados también al confirmar).
+ * Acciones de autogestión: cancelar y cambiar fecha dentro de la política de
+ * la sucursal. La lista de días respeta el horizonte configurado; los
+ * horarios libres se piden al servidor por día (re-validados al confirmar).
  */
 export function GestionPanel({ token, reserva }: { token: string; reserva: ReservaGestionPublica }) {
   const [modo, setModo] = useState<"menu" | "cancelar" | "reagendar">("menu");
@@ -81,7 +82,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
 
   if (hecho === "cancelada") {
     return (
-      <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
+      <div className="anim-entrada mt-6 rounded-2xl border border-destructive/30 bg-destructive-soft p-5 text-sm text-destructive-soft-foreground">
         <p className="font-semibold">Tu cita quedó cancelada.</p>
         <p className="mt-1">Recibirás un correo de confirmación de la cancelación.</p>
       </div>
@@ -89,8 +90,8 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
   }
   if (hecho === "reagendada") {
     return (
-      <div className="mt-6 rounded-2xl border border-success/30 bg-success/10 p-5 text-sm text-success">
-        <p className="font-semibold">Tu cita quedó reagendada.</p>
+      <div className="anim-entrada mt-6 rounded-2xl border border-success/30 bg-success-soft p-5 text-sm text-success-soft-foreground">
+        <p className="font-semibold">Actualizamos la fecha de tu cita.</p>
         <p className="mt-1">Recibirás un correo con el nuevo horario. Recarga la página para verlo.</p>
       </div>
     );
@@ -100,6 +101,15 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
     return (
       <div className="mt-6 rounded-2xl bg-muted p-5 text-sm text-muted-foreground">
         <p>{reserva.motivoNoGestionable}</p>
+        <Link
+          className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:scale-[0.98]"
+          data-action-clave="1"
+          data-action-id="mi_cita.reservar_otra_vez"
+          href={`/reservar/${reserva.organizacionSlug}`}
+        >
+          <CalendarClock className="size-4" />
+          Reservar otra cita
+        </Link>
       </div>
     );
   }
@@ -131,11 +141,12 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
     <div className="mt-6 border-t border-border pt-6">
       {aviso ? (
         <div
-          className={`mb-4 flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${
+          className={`anim-entrada mb-4 flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${
             aviso.tipo === "error"
-              ? "border-destructive/30 bg-destructive/10 text-destructive"
-              : "border-success/30 bg-success/10 text-success"
+              ? "border-destructive/30 bg-destructive-soft text-destructive-soft-foreground"
+              : "border-success/30 bg-success-soft text-success-soft-foreground"
           }`}
+          role={aviso.tipo === "error" ? "alert" : undefined}
         >
           <CircleAlert className="mt-0.5 size-4 shrink-0" />
           <p>{aviso.mensaje}</p>
@@ -145,39 +156,47 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
       {modo === "menu" ? (
         <div className="flex flex-wrap gap-3">
           <button
-            className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:border-primary hover:bg-accent"
-            onClick={() => setModo("reagendar")}
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:border-primary hover:bg-accent active:scale-[0.98]"
+            data-action-clave="1"
+            data-action-id="mi_cita.cambiar_fecha.abrir"
+            onClick={() => {
+              setModo("reagendar");
+              // Preselección del primer día: los horarios de hoy cargan sin un
+              // toque extra (mismo patrón que /reservar/[slug]).
+              if (!diaKeySel && dias[0]) setDiaKeySel(dias[0]);
+            }}
             type="button"
           >
             <CalendarClock className="size-4" />
             Cambiar fecha
           </button>
           <button
-            className="inline-flex items-center gap-2 rounded-xl border border-destructive/30 px-4 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-destructive/30 px-4 py-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive-soft active:scale-[0.98]"
+            data-action-id="mi_cita.cancelar.abrir"
             onClick={() => setModo("cancelar")}
             type="button"
           >
             <XCircle className="size-4" />
             Cancelar cita
           </button>
-          <p className="w-full text-xs leading-5 text-muted-foreground">
+          <p className="w-full text-op-xs leading-5 text-muted-foreground">
             Puedes cambiar o cancelar en línea hasta {reserva.cancelacionHoras} h antes de la cita.
           </p>
         </div>
       ) : null}
 
       {modo === "cancelar" ? (
-        <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5">
-          <p className="text-sm font-semibold text-destructive">¿Cancelar tu cita?</p>
-          <p className="mt-1 text-sm text-destructive">
+        <div className="anim-entrada rounded-2xl border border-destructive/30 bg-destructive-soft p-5">
+          <p className="text-sm font-semibold text-destructive-soft-foreground">¿Cancelar tu cita?</p>
+          <p className="mt-1 text-sm text-destructive-soft-foreground">
             Esta acción no se puede deshacer. Si cambias de opinión tendrás que reservar de nuevo.
           </p>
           {reserva.verificacionContacto ? (
-            <label className="mt-3 block text-sm text-destructive">
+            <label className="mt-3 block text-sm text-destructive-soft-foreground">
               Teléfono con el que reservaste
               <input
                 autoComplete="tel"
-                className="mt-1 w-full rounded-lg border border-destructive/30 bg-card px-3 py-2 text-sm text-foreground"
+                className="mt-1 min-h-11 w-full rounded-lg border border-destructive/30 bg-card px-3 py-2 text-sm text-foreground"
                 inputMode="tel"
                 onChange={(event) => setTelefono(event.target.value)}
                 placeholder="55 1234 5678"
@@ -188,7 +207,9 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
           ) : null}
           <div className="mt-4 flex gap-3">
             <button
-              className="rounded-xl bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 disabled:opacity-50"
+              className="min-h-11 rounded-xl bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/90 active:scale-[0.98] disabled:opacity-50"
+              data-action-clave="1"
+              data-action-id="mi_cita.cancelar.confirmar"
               disabled={pending || (reserva.verificacionContacto && !telefono.trim())}
               onClick={confirmarCancelacion}
               type="button"
@@ -196,7 +217,8 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
               {pending ? "Cancelando…" : "Sí, cancelar mi cita"}
             </button>
             <button
-              className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
+              className="min-h-11 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
+              data-action-id="mi_cita.cancelar.volver"
               onClick={() => setModo("menu")}
               type="button"
             >
@@ -207,14 +229,14 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
       ) : null}
 
       {modo === "reagendar" ? (
-        <div className="rounded-2xl border border-border bg-muted p-5">
+        <div className="anim-entrada rounded-2xl border border-border bg-muted p-5">
           <p className="text-sm font-semibold">Elige un nuevo horario</p>
           {reserva.verificacionContacto ? (
             <label className="mt-3 block text-sm text-muted-foreground">
               Teléfono con el que reservaste
               <input
                 autoComplete="tel"
-                className="mt-1 w-full max-w-xs rounded-lg border border-input bg-card px-3 py-2 text-sm"
+                className="mt-1 min-h-11 w-full max-w-xs rounded-lg border border-input bg-card px-3 py-2 text-sm"
                 inputMode="tel"
                 onChange={(event) => setTelefono(event.target.value)}
                 placeholder="55 1234 5678"
@@ -224,15 +246,20 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
             </label>
           ) : null}
           <div className="mt-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Día</p>
+            <p className="text-op-xs font-semibold uppercase tracking-[0.14em] text-primary">Día</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {dias.map((dk) => (
+              {dias.map((dk, index) => (
                 <button
-                  className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
+                  aria-pressed={dk === diaKeySel}
+                  className={`anim-entrada min-h-11 rounded-xl border px-3 py-2 text-sm font-medium transition-colors active:scale-[0.98] ${
                     dk === diaKeySel
                       ? "border-primary bg-accent text-accent-foreground"
                       : "border-border bg-card hover:border-muted-foreground/40"
                   }`}
+                  data-action-clave={
+                    !slotIso && !(slots && slots.length > 0) && dk === (diaKeySel || dias[0]) ? "1" : undefined
+                  }
+                  data-action-id="mi_cita.dia.elegir"
                   key={dk}
                   onClick={() => {
                     setDiaKeySel(dk);
@@ -240,6 +267,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
                     setSlotIso("");
                     setSlotsError(null);
                   }}
+                  style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
                   type="button"
                 >
                   {etiquetaDia(dk, reserva.zonaHoraria)}
@@ -250,24 +278,41 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
 
           {diaKeySel ? (
             <div className="mt-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Horario</p>
+              <p className="text-op-xs font-semibold uppercase tracking-[0.14em] text-primary">Horario</p>
               {slots === null ? (
-                <p className="mt-2 text-sm text-muted-foreground">Buscando horarios…</p>
+                <div
+                  aria-label="Buscando horarios disponibles"
+                  className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4"
+                  role="status"
+                >
+                  {Array.from({ length: 6 }, (_, i) => (
+                    <span className="h-11 animate-pulse rounded-xl border border-border bg-card" key={i} />
+                  ))}
+                </div>
               ) : slotsError ? (
-                <p className="mt-2 text-sm text-destructive">{slotsError}</p>
+                <p
+                  className="anim-entrada mt-2 rounded-xl border border-destructive/30 bg-destructive-soft px-3 py-2 text-sm text-destructive-soft-foreground"
+                  role="alert"
+                >
+                  {slotsError}
+                </p>
               ) : slots.length === 0 ? (
                 <p className="mt-2 text-sm text-muted-foreground">No hay horarios libres este día.</p>
               ) : (
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {slots.map((iso) => (
+                  {slots.map((iso, index) => (
                     <button
-                      className={`rounded-xl border px-3 py-2 text-sm font-medium transition-colors ${
+                      aria-pressed={iso === slotIso}
+                      className={`anim-entrada min-h-11 rounded-xl border px-3 py-2 text-sm font-medium transition-colors active:scale-[0.98] ${
                         iso === slotIso
                           ? "border-primary bg-primary text-primary-foreground"
                           : "border-border bg-card hover:border-muted-foreground/40"
                       }`}
+                      data-action-clave={!slotIso && index === 0 ? "1" : undefined}
+                      data-action-id="mi_cita.horario.elegir"
                       key={iso}
                       onClick={() => setSlotIso(iso)}
+                      style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
                       type="button"
                     >
                       {formatoHora(iso, reserva.zonaHoraria)}
@@ -280,15 +325,18 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
 
           <div className="mt-5 flex gap-3">
             <button
-              className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
+              className="min-h-11 rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50"
+              data-action-clave={slotIso ? "1" : undefined}
+              data-action-id="mi_cita.cambiar_fecha.confirmar"
               disabled={pending || !slotIso || (reserva.verificacionContacto && !telefono.trim())}
               onClick={confirmarReagenda}
               type="button"
             >
-              {pending ? "Reagendando…" : "Confirmar nuevo horario"}
+              {pending ? "Guardando nuevo horario…" : "Confirmar nuevo horario"}
             </button>
             <button
-              className="rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
+              className="min-h-11 rounded-xl border border-border bg-card px-4 py-2 text-sm font-medium transition-colors hover:bg-muted"
+              data-action-id="mi_cita.cambiar_fecha.volver"
               onClick={() => setModo("menu")}
               type="button"
             >

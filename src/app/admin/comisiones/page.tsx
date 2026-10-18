@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 
 import { LiquidarForm } from "@/app/admin/comisiones/liquidar-form";
@@ -11,14 +11,13 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
-import { catMediosPago } from "@/db/schema/catalogs";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDateTime, todayDateInput } from "@/lib/format";
 import { buildAdminHref, normalizeDateInput } from "@/lib/url-context";
 import { dayBoundsUtc, shiftDateKey } from "@/modules/agenda";
 import { contextoSuscripcionCache as contextoSuscripcion } from "@/modules/billing/queries";
-import { listarComisionesPendientes, listarLiquidaciones } from "@/modules/comisiones/queries";
+import type { ComisionPendienteRow, LiquidacionRow } from "@/modules/comisiones/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -55,20 +54,86 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
   if (!boundsDesde || !boundsHasta) notFound();
 
   const db = getDatabase();
-  const [medios, pendientes, liquidaciones] = await Promise.all([
-    db
-      .select({ id: catMediosPago.id, nombre: catMediosPago.nombre, categoria: catMediosPago.categoria })
-      .from(catMediosPago)
-      .where(and(eq(catMediosPago.organizacionId, organizationId), eq(catMediosPago.activo, true)))
-      .orderBy(asc(catMediosPago.nombre)),
-    listarComisionesPendientes(db, {
-      organizacionId: organizationId,
-      sucursalId,
-      iniciaAt: boundsDesde.iniciaAt,
-      terminaAt: boundsHasta.terminaAt,
-    }),
-    listarLiquidaciones(db, { organizacionId: organizationId, sucursalId }),
-  ]);
+  type PendienteJson = Omit<ComisionPendienteRow, "fecha"> & { fecha: string };
+  type LiquidacionJson = Omit<LiquidacionRow, "createdAt"> & { createdAt: string };
+  type ComisionesSqlRow = {
+    medios: Array<{ id: string; nombre: string; categoria: string }>;
+    pendientes: PendienteJson[];
+    liquidaciones: LiquidacionJson[];
+  };
+
+  // Medios de pago, comisiones pendientes del rango e historial de
+  // liquidaciones en UNA sola consulta SQL (antes 3 consultas paralelas).
+  const { rows: sqlRows } = await db.execute<ComisionesSqlRow>(sql`
+    select
+      coalesce((
+        select jsonb_agg(t) from (
+          select mp.id, mp.nombre, mp.categoria
+          from cat_medios_pago mp
+          where mp.organizacion_id = ${organizationId} and mp.activo = true
+          order by mp.nombre asc
+        ) t
+      ), '[]'::jsonb) as medios,
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            dvc.id,
+            dvc.usuario_id as "usuarioId",
+            u.nombre as profesional,
+            s.nombre as servicio,
+            dvc.venta_id as "ventaId",
+            dvc.base::text as base,
+            dvc.monto::text as monto,
+            to_char(coalesce(v.cobrada_at, v.created_at) at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as fecha
+          from detalle_ventas_comisiones dvc
+          join ventas v on v.id = dvc.venta_id
+          join usuarios u on u.id = dvc.usuario_id
+          left join detalle_ventas_servicios dvs on dvs.id = dvc.detalle_venta_servicio_id
+          left join servicios s on s.id = dvs.servicio_id
+          where v.organizacion_id = ${organizationId}
+            and v.sucursal_id = ${sucursalId}
+            and v.activo = true
+            and dvc.activo = true
+            and dvc.liquidacion_id is null
+            and coalesce(v.cobrada_at, v.created_at) >= ${boundsDesde.iniciaAt}
+            and coalesce(v.cobrada_at, v.created_at) < ${boundsHasta.terminaAt}
+          order by u.nombre asc, coalesce(v.cobrada_at, v.created_at) asc
+        ) t
+      ), '[]'::jsonb) as pendientes,
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            lc.id,
+            u.nombre as profesional,
+            lc.periodo_desde::text as "periodoDesde",
+            lc.periodo_hasta::text as "periodoHasta",
+            lc.total::text as total,
+            mp.nombre as medio,
+            lc.estado,
+            lc.notas,
+            lc.motivo_reversion as "motivoReversion",
+            to_char(lc.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt"
+          from liquidaciones_comisiones lc
+          join usuarios u on u.id = lc.usuario_id
+          join cat_medios_pago mp on mp.id = lc.medio_pago_id
+          where lc.organizacion_id = ${organizationId}
+            and lc.sucursal_id = ${sucursalId}
+          order by lc.created_at desc
+          limit 50
+        ) t
+      ), '[]'::jsonb) as liquidaciones
+  `);
+
+  const datos = sqlRows[0];
+  const medios = datos?.medios ?? [];
+  const pendientes: ComisionPendienteRow[] = (datos?.pendientes ?? []).map((p) => ({
+    ...p,
+    fecha: new Date(p.fecha),
+  }));
+  const liquidaciones: LiquidacionRow[] = (datos?.liquidaciones ?? []).map((l) => ({
+    ...l,
+    createdAt: new Date(l.createdAt),
+  }));
 
   // Agrupa pendientes por profesional conservando el nombre.
   const porProfesional = new Map<string, { nombre: string; total: number; cantidad: number }>();
@@ -117,10 +182,10 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
           <EmptyState description="No hay comisiones pendientes en este periodo." title="Sin pendientes" />
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {resumen.map((item) => (
-              <div className="rounded-2xl border border-border bg-muted/60 p-4" key={item.usuarioId}>
+            {resumen.map((item, index) => (
+              <div className="anim-entrada rounded-2xl border border-border bg-muted/60 p-4" key={item.usuarioId} style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}>
                 <p className="font-medium text-foreground">{item.nombre}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{item.cantidad} línea(s) de servicio</p>
+                <p className="mt-1 text-op-xs text-muted-foreground">{item.cantidad} línea(s) de servicio</p>
                 <p className="mt-2 text-xl font-semibold tabular-nums text-foreground">{fmt(item.total)}</p>
                 {puedeEditar ? (
                   <div className="mt-3">
@@ -146,7 +211,7 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+              <thead className="border-b border-border text-op-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="py-2 pr-4 font-medium">Cobro</th>
                   <th className="py-2 pr-4 font-medium">Profesional</th>
@@ -162,7 +227,10 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
                     <td className="py-3 pr-4 font-medium text-foreground">{row.profesional}</td>
                     <td className="py-3 pr-4 text-muted-foreground">
                       {row.servicio ?? "Servicio"}
-                      <a className="ml-2 text-xs text-primary hover:underline" href={buildAdminHref("/pos", { organizationId, sucursalId, extra: { ventaId: row.ventaId } })}>
+                      <a
+                        className="ml-2 inline-flex min-h-6 items-center text-op-xs text-primary hover:underline"
+                        href={buildAdminHref("/pos", { organizationId, sucursalId, extra: { ventaId: row.ventaId } })}
+                      >
                         ticket
                       </a>
                     </td>
@@ -182,7 +250,7 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+              <thead className="border-b border-border text-op-xs uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="py-2 pr-4 font-medium">Registro</th>
                   <th className="py-2 pr-4 font-medium">Profesional</th>
@@ -206,7 +274,7 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
                         {ESTADO_LABEL[liq.estado] ?? liq.estado}
                       </StatusBadge>
                       {liq.motivoReversion ? (
-                        <p className="mt-1 text-xs text-destructive">{liq.motivoReversion}</p>
+                        <p className="mt-1 text-op-xs text-destructive">{liq.motivoReversion}</p>
                       ) : null}
                     </td>
                     {puedeEditar ? (

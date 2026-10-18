@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, getTableColumns, ilike, or, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -15,10 +15,6 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
-import { catCategoriasProductos, catUnidadesMedida, productos } from "@/db/schema/catalogs";
-import { compras, detalleCompras, proveedores } from "@/db/schema/compras";
-import { medios } from "@/db/schema/media";
-import { inventarioStock } from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate, formatQuantity } from "@/lib/format";
@@ -50,60 +46,194 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
   const tipo = firstParam(params.tipo) ?? "";
   const categoriaId = firstParam(params.categoriaId) ?? "";
   const estado = firstParam(params.estado) ?? "";
-
-  const filters = [eq(productos.organizacionId, organizationId)];
-  if (query) filters.push(or(ilike(productos.nombre, `%${query}%`), ilike(productos.sku, `%${query}%`), ilike(productos.codigoBarras, `%${query}%`))!);
-  if (tipo === "producto" || tipo === "insumo" || tipo === "ambos") filters.push(eq(productos.tipo, tipo));
-  if (categoriaId) filters.push(eq(productos.categoriaId, categoriaId));
-  if (estado === "activo") filters.push(eq(productos.activo, true));
-  if (estado === "oculto") filters.push(eq(productos.activo, false));
-
-  const [categories, units, productRows] = await Promise.all([
-    db
-      .select({ id: catCategoriasProductos.id, nombre: catCategoriasProductos.nombre })
-      .from(catCategoriasProductos)
-      .where(and(eq(catCategoriasProductos.organizacionId, organizationId), eq(catCategoriasProductos.activo, true)))
-      .orderBy(asc(catCategoriasProductos.nombre)),
-    db
-      .select({ id: catUnidadesMedida.id, nombre: catUnidadesMedida.nombre })
-      .from(catUnidadesMedida)
-      .where(and(eq(catUnidadesMedida.organizacionId, organizationId), eq(catUnidadesMedida.activo, true)))
-      .orderBy(asc(catUnidadesMedida.nombre)),
-    db
-      .select({
-        id: productos.id,
-        sku: productos.sku,
-        nombre: productos.nombre,
-        tipo: productos.tipo,
-        categoriaNombre: catCategoriasProductos.nombre,
-        costo: productos.costo,
-        precioVenta: productos.precioVenta,
-        visiblePos: productos.visiblePos,
-        activo: productos.activo,
-        // Stock de la organización entera (todas las sucursales) como
-        // subselect escalar: una sola ronda a la BD por página, sin N+1.
-        stockTotal: sql<string>`(
-          select coalesce(sum(${inventarioStock.stockActual}), 0)
-            from ${inventarioStock}
-           where ${inventarioStock.organizacionId} = ${organizationId}
-             and ${inventarioStock.productoId} = ${productos.id}
-        )`,
-      })
-      .from(productos)
-      .leftJoin(catCategoriasProductos, eq(productos.categoriaId, catCategoriasProductos.id))
-      .where(and(...filters))
-      .orderBy(desc(productos.createdAt))
-      .limit(100),
-  ]);
-
   const editId = firstParam(params.edit);
-  const editing = editId
-    ? (await db
-        .select({ ...getTableColumns(productos), imagenClaveR2: medios.claveR2 })
-        .from(productos)
-        .leftJoin(medios, eq(productos.imagenPrincipalId, medios.id))
-        .where(and(eq(productos.id, editId), eq(productos.organizacionId, organizationId)))
-        .limit(1))[0]
+
+  const filtroQuery = query
+    ? sql` and (p.nombre ilike ${`%${query}%`} or p.sku ilike ${`%${query}%`} or p.codigo_barras ilike ${`%${query}%`})`
+    : sql``;
+  const filtroTipo =
+    tipo === "producto" || tipo === "insumo" || tipo === "ambos"
+      ? sql` and p.tipo = ${tipo}`
+      : sql``;
+  const filtroCategoria = categoriaId ? sql` and p.categoria_id = ${categoriaId}` : sql``;
+  const filtroEstado =
+    estado === "activo"
+      ? sql` and p.activo = true`
+      : estado === "oculto"
+        ? sql` and p.activo = false`
+        : sql``;
+
+  type ProductRowItem = {
+    id: string;
+    sku: string;
+    nombre: string;
+    tipo: string;
+    categoriaNombre: string | null;
+    costo: string;
+    precioVenta: string;
+    visiblePos: boolean;
+    activo: boolean;
+    stockTotal: string;
+  };
+  type EditingProductRow = {
+    id: string;
+    organizacionId: string;
+    categoriaId: string | null;
+    unidadMedidaId: string | null;
+    sku: string;
+    codigoBarras: string | null;
+    nombre: string;
+    descripcion: string | null;
+    tipo: string;
+    costo: string;
+    precioVenta: string;
+    stockMinimo: string;
+    visiblePos: boolean;
+    imagenClaveR2: string | null;
+    updatedAt: string | null;
+  };
+  type UltimaCompraRow = {
+    proveedorNombre: string | null;
+    proveedorTexto: string | null;
+    fechaCompra: string | null;
+    recibidaAt: string | null;
+    cantidadRecibida: string | null;
+    cantidad: string;
+    costoUnitario: string;
+  };
+  type ProductosSqlRow = {
+    categories: Array<{ id: string; nombre: string }>;
+    units: Array<{ id: string; nombre: string }>;
+    productos: ProductRowItem[];
+    editing: EditingProductRow | null;
+    ultimas_compras: UltimaCompraRow[];
+  };
+
+  // Toda la pantalla (incluyendo edición + últimas compras cuando viene
+  // ?edit=) en UNA sola ronda SQL con CTEs materializados (antes hasta 5
+  // consultas repartidas en 3 rondas secuenciales).
+  const { rows } = await db.execute<ProductosSqlRow>(sql`
+    with productos_pagina as materialized (
+      select
+        p.id,
+        p.sku,
+        p.nombre,
+        p.tipo,
+        cp.nombre as "categoriaNombre",
+        p.costo::text as costo,
+        p.precio_venta::text as "precioVenta",
+        p.visible_pos as "visiblePos",
+        p.activo,
+        p.created_at
+      from productos p
+      left join cat_categorias_productos cp on cp.id = p.categoria_id
+      where p.organizacion_id = ${organizationId}${filtroQuery}${filtroTipo}${filtroCategoria}${filtroEstado}
+      order by p.created_at desc
+      limit 100
+    ),
+    stock_por_producto as materialized (
+      select
+        i.producto_id,
+        coalesce(sum(i.stock_actual), 0)::text as stock_total
+      from productos_pagina pp
+      join inventario_stock i on i.organizacion_id = ${organizationId} and i.producto_id = pp.id
+      group by i.producto_id
+    )
+    select
+      coalesce((
+        select jsonb_agg(t) from (
+          select cp.id, cp.nombre
+          from cat_categorias_productos cp
+          where cp.organizacion_id = ${organizationId} and cp.activo = true
+          order by cp.nombre asc
+        ) t
+      ), '[]'::jsonb) as categories,
+      coalesce((
+        select jsonb_agg(t) from (
+          select um.id, um.nombre
+          from cat_unidades_medida um
+          where um.organizacion_id = ${organizationId} and um.activo = true
+          order by um.nombre asc
+        ) t
+      ), '[]'::jsonb) as units,
+      coalesce((
+        select jsonb_agg(
+          jsonb_build_object(
+            'id', pp.id,
+            'sku', pp.sku,
+            'nombre', pp.nombre,
+            'tipo', pp.tipo,
+            'categoriaNombre', pp."categoriaNombre",
+            'costo', pp.costo,
+            'precioVenta', pp."precioVenta",
+            'visiblePos', pp."visiblePos",
+            'activo', pp.activo,
+            'stockTotal', coalesce(sp.stock_total, '0')
+          )
+          order by pp.created_at desc
+        )
+        from productos_pagina pp
+        left join stock_por_producto sp on sp.producto_id = pp.id
+      ), '[]'::jsonb) as productos,
+      ${editId
+        ? sql`(
+            select jsonb_build_object(
+              'id', p.id,
+              'organizacionId', p.organizacion_id,
+              'categoriaId', p.categoria_id,
+              'unidadMedidaId', p.unidad_medida_id,
+              'sku', p.sku,
+              'codigoBarras', p.codigo_barras,
+              'nombre', p.nombre,
+              'descripcion', p.descripcion,
+              'tipo', p.tipo,
+              'costo', p.costo::text,
+              'precioVenta', p.precio_venta::text,
+              'stockMinimo', p.stock_minimo::text,
+              'visiblePos', p.visible_pos,
+              'imagenClaveR2', m.clave_r2,
+              'updatedAt', to_char(p.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+            )
+            from productos p
+            left join medios m on m.id = p.imagen_principal_id
+            where p.id = ${editId} and p.organizacion_id = ${organizationId}
+            limit 1
+          ) as editing,
+          coalesce((
+            select jsonb_agg(t) from (
+              select
+                pr.nombre as "proveedorNombre",
+                c.proveedor_texto as "proveedorTexto",
+                c.fecha_compra::text as "fechaCompra",
+                case when c.recibida_at is null then null
+                  else to_char(c.recibida_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') end as "recibidaAt",
+                dc.cantidad_recibida::text as "cantidadRecibida",
+                dc.cantidad::text as cantidad,
+                dc.costo_unitario::text as "costoUnitario"
+              from detalle_compras dc
+              join compras c on c.id = dc.compra_id
+              left join proveedores pr on pr.id = c.proveedor_id
+              where dc.producto_id = ${editId}
+                and dc.organizacion_id = ${organizationId}
+                and dc.activo = true
+                and c.activo = true
+                and c.estado = 'verificada'
+              order by c.recibida_at desc nulls last, c.fecha_compra desc nulls last
+              limit 5
+            ) t
+          ), '[]'::jsonb) as ultimas_compras`
+        : sql`null as editing, '[]'::jsonb as ultimas_compras`}
+  `);
+
+  const datos = rows[0];
+  const categories = datos?.categories ?? [];
+  const units = datos?.units ?? [];
+  const productRows = datos?.productos ?? [];
+  const editing = datos?.editing
+    ? {
+        ...datos.editing,
+        updatedAt: datos.editing.updatedAt ? new Date(datos.editing.updatedAt) : null,
+      }
     : undefined;
   const editingData = editing
     ? {
@@ -124,41 +254,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       }
     : undefined;
 
-  // Plan 10 — "Últimas compras" del producto: 5 líneas recibidas de compras
-  // ya verificadas, con proveedor, fecha y costo pagado.
-  const ultimasCompras = editing
-    ? (
-        await db
-          .select({
-            proveedorNombre: proveedores.nombre,
-            proveedorTexto: compras.proveedorTexto,
-            fechaCompra: compras.fechaCompra,
-            recibidaAt: compras.recibidaAt,
-            cantidadRecibida: detalleCompras.cantidadRecibida,
-            cantidad: detalleCompras.cantidad,
-            costoUnitario: detalleCompras.costoUnitario,
-          })
-          .from(detalleCompras)
-          .innerJoin(compras, eq(detalleCompras.compraId, compras.id))
-          .leftJoin(proveedores, eq(compras.proveedorId, proveedores.id))
-          .where(
-            and(
-              eq(detalleCompras.productoId, editing.id),
-              eq(detalleCompras.organizacionId, organizationId),
-              eq(detalleCompras.activo, true),
-              eq(compras.activo, true),
-              eq(compras.estado, "verificada"),
-            ),
-          )
-          .orderBy(desc(compras.recibidaAt), desc(compras.fechaCompra))
-          .limit(5)
-      ).map((fila) => ({
-        proveedor: fila.proveedorNombre ?? fila.proveedorTexto ?? "Sin proveedor",
-        fecha: formatDate(fila.fechaCompra ?? fila.recibidaAt, { timeZone: context.timeZone }),
-        cantidad: formatQuantity(fila.cantidadRecibida ?? fila.cantidad),
-        costo: formatCurrency(fila.costoUnitario, { currency: context.currency }),
-      }))
-    : [];
+  const ultimasCompras = (datos?.ultimas_compras ?? []).map((fila) => ({
+    proveedor: fila.proveedorNombre ?? fila.proveedorTexto ?? "Sin proveedor",
+    fecha: formatDate(fila.fechaCompra ?? (fila.recibidaAt ? new Date(fila.recibidaAt) : null), { timeZone: context.timeZone }),
+    cantidad: formatQuantity(fila.cantidadRecibida ?? fila.cantidad),
+    costo: formatCurrency(fila.costoUnitario, { currency: context.currency }),
+  }));
 
   const preserved = { q: query || null, tipo: tipo || null, categoriaId: categoriaId || null, estado: estado || null };
   const hasFilters = Boolean(query || tipo || categoriaId || estado);
@@ -168,7 +269,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
     {
       id: "clave",
       header: "Clave",
-      cell: (product) => <span className="font-mono text-xs">{product.sku}</span>,
+      cell: (product) => <span className="font-mono text-op-xs">{product.sku}</span>,
     },
     { id: "nombre", header: "Nombre", cell: (product) => <span className="font-medium">{product.nombre}</span> },
     {
@@ -181,7 +282,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       id: "tipo",
       header: "Tipo",
       cell: (product) => (
-        <span className="rounded-full bg-muted/60 px-2.5 py-1 text-xs text-muted-foreground">
+        <span className="rounded-full bg-muted/60 px-2.5 py-1 text-op-xs text-muted-foreground">
           {TIPO_LABEL[product.tipo] ?? product.tipo}
         </span>
       ),
@@ -234,7 +335,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       cell: (product) => (
         <div className="flex flex-wrap justify-end gap-2">
           <Link
-            className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60"
+            className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60"
+            data-action-id="catalogo.productos.editar"
             href={buildAdminHref("/productos", { organizationId, extra: { ...preserved, edit: product.id } })}
           >
             Editar
@@ -331,7 +433,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       </form>
 
       {hasFilters ? (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-2 text-op-xs text-muted-foreground">
           <span>Filtros activos:</span>
           {query ? <span className="rounded-full bg-muted/60 px-2.5 py-1">Búsqueda: {query}</span> : null}
           {tipo ? <span className="rounded-full bg-muted/60 px-2.5 py-1">Tipo: {TIPO_LABEL[tipo] ?? tipo}</span> : null}
@@ -367,7 +469,8 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
                   acciones={
                     <div className="flex flex-wrap gap-2">
                       <Link
-                        className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60"
+                        className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60"
+                        data-action-id="catalogo.productos.editar"
                         href={buildAdminHref("/productos", { organizationId, extra: { ...preserved, edit: product.id } })}
                       >
                         Editar

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { buildAdminHref } from "@/lib/url-context";
-import { cargarEstadoNegocio, cargarProgresoGuia } from "@/modules/onboarding/queries";
+import { cargarEstadoYProgresoGuia } from "@/modules/onboarding/queries";
 import { evaluarPasos, pasosParaPermisos, resumenGuia } from "@/modules/onboarding/rules";
 
 export const dynamic = "force-dynamic";
@@ -29,10 +29,12 @@ export default async function AyudaPage({ searchParams }: { searchParams: Search
 
   const pasos = pasosParaPermisos(access.esPlataforma ? null : access.permissions);
   const db = getDatabase();
-  const [estado, progreso] = await Promise.all([
-    cargarEstadoNegocio(db, organizationId, sucursalId),
-    cargarProgresoGuia(db, organizationId, user.id),
-  ]);
+  const { estadoNegocio: estado, progresoGuia: progreso } = await cargarEstadoYProgresoGuia(
+    db,
+    organizationId,
+    sucursalId,
+    user.id,
+  );
   const resumen = resumenGuia(evaluarPasos(pasos, estado));
   const guiaHref = buildAdminHref("/guia", { organizationId, sucursalId });
   const practicaHref = buildAdminHref("/practica", { organizationId, sucursalId });

@@ -281,21 +281,68 @@ export const resolveSessionContext = cache(async function resolveSessionContext(
   acceso: AccesoRow | null;
 }> {
   const { rows } = await getDatabase().execute<SessionContextRow>(sql`
-    with u as (
+    with u as materialized (
       select id, nombre, correo, es_administrador_plataforma
         from usuarios
        where auth_usuario_id = ${authUsuarioId}
        limit 1
     ),
-    target_org as (
+    membresias as materialized (
+      select
+        mo.id as membership_id,
+        o.id as org_id,
+        o.nombre,
+        o.slug,
+        o.activo,
+        o.zona_horaria,
+        o.moneda,
+        o.recordatorios_activos,
+        o.recordatorios_horas_antes,
+        coalesce((
+          select jsonb_agg(distinct p.clave)
+            from rel_miembros_roles mr
+            join cat_roles r on mr.rol_id = r.id and r.activo
+            join rel_roles_permisos rp on r.id = rp.rol_id
+            join cat_permisos p on rp.permiso_id = p.id and p.activo
+           where mr.miembro_organizacion_id = mo.id
+        ), '[]'::jsonb) as permisos,
+        coalesce((
+          select jsonb_agg(rus.sucursal_id)
+            from rel_usuarios_sucursales rus
+            join sucursales s on rus.sucursal_id = s.id and s.activo
+           where rus.organizacion_id = o.id
+             and rus.usuario_id = mo.usuario_id
+        ), '[]'::jsonb) as sucursal_ids,
+        coalesce((
+          select jsonb_agg(jsonb_build_object(
+              'id', sa.id,
+              'organizacionId', sa.organizacion_id,
+              'nombre', sa.nombre,
+              'clave', sa.clave,
+              'activo', sa.activo,
+              'zonaHoraria', sa.zona_horaria,
+              'capacidadSinAsignar', sa.capacidad_sin_asignar,
+              'reservasOnline', sa.reservas_online,
+              'reservasAutoConfirmar', sa.reservas_auto_confirmar,
+              'reservasCancelacionHoras', sa.reservas_cancelacion_horas,
+              'reservasAnticipacionMinutos', sa.reservas_anticipacion_minutos,
+              'reservasHorizonteDias', sa.reservas_horizonte_dias
+            ) order by sa.nombre)
+            from sucursales sa
+           where sa.organizacion_id = o.id and sa.activo
+        ), '[]'::jsonb) as sucursales_activas
+      from u
+      join miembros_organizaciones mo on mo.usuario_id = u.id and mo.estado = 'activo'
+      join organizaciones o on o.id = mo.organizacion_id
+      where not u.es_administrador_plataforma
+    ),
+    target_org as materialized (
       select coalesce(
         ${requestedOrganizationId}::uuid,
         (
-          select mo.organizacion_id
-            from miembros_organizaciones mo
-            join organizaciones o on mo.organizacion_id = o.id and o.activo
-           where mo.usuario_id = (select id from u)
-             and mo.estado = 'activo'
+          select m.org_id
+            from membresias m
+            join organizaciones o on o.id = m.org_id and o.activo
            order by o.nombre
            limit 1
         )
@@ -326,62 +373,58 @@ export const resolveSessionContext = cache(async function resolveSessionContext(
                 ), '[]'::jsonb)
               ) order by o.nombre)
               from organizaciones o
+             where (select es_administrador_plataforma from u)
           ), '[]'::jsonb)
           else coalesce((
             select jsonb_agg(jsonb_build_object(
-                'id', o.id, 'nombre', o.nombre, 'slug', o.slug,
-                'activo', o.activo, 'zonaHoraria', o.zona_horaria,
-                'moneda', o.moneda,
-                'recordatoriosActivos', o.recordatorios_activos,
-                'recordatoriosHorasAntes', o.recordatorios_horas_antes,
-                'permisos', coalesce((
-                  select jsonb_agg(distinct p.clave)
-                    from rel_miembros_roles mr
-                    join miembros_organizaciones mo2 on mr.miembro_organizacion_id = mo2.id
-                    join cat_roles r on mr.rol_id = r.id and r.activo
-                    join rel_roles_permisos rp on r.id = rp.rol_id
-                    join cat_permisos p on rp.permiso_id = p.id and p.activo
-                   where mo2.organizacion_id = o.id
-                     and mo2.usuario_id = (select id from u)
-                     and mo2.estado = 'activo'
-                ), '[]'::jsonb),
-                'sucursales', coalesce((
-                  select jsonb_agg(jsonb_build_object('id', s.id, 'nombre', s.nombre) order by s.nombre)
-                    from sucursales s
-                   where s.organizacion_id = o.id
-                     and s.activo
-                     and (
-                       -- Mismo alcance que acceso.sucursales: sin asignaciones
-                       -- a sucursales activas -> todas; con asignaciones -> solo esas.
-                       not exists (
-                         select 1
-                           from rel_usuarios_sucursales rus
-                           join sucursales sa on sa.id = rus.sucursal_id and sa.activo
-                          where rus.organizacion_id = o.id
-                            and rus.usuario_id = (select id from u)
-                       )
-                       or s.id in (
-                         select rus.sucursal_id
-                           from rel_usuarios_sucursales rus
-                           join sucursales sa on sa.id = rus.sucursal_id and sa.activo
-                          where rus.organizacion_id = o.id
-                            and rus.usuario_id = (select id from u)
-                       )
-                     )
-                 ), '[]'::jsonb)
-              ) order by o.nombre)
-              from miembros_organizaciones mo
-              join organizaciones o on mo.organizacion_id = o.id
-             where mo.usuario_id = (select id from u)
-               and mo.estado = 'activo'
+                'id', m.org_id, 'nombre', m.nombre, 'slug', m.slug,
+                'activo', m.activo, 'zonaHoraria', m.zona_horaria,
+                'moneda', m.moneda,
+                'recordatoriosActivos', m.recordatorios_activos,
+                'recordatoriosHorasAntes', m.recordatorios_horas_antes,
+                'permisos', m.permisos,
+                'sucursales', case
+                  -- Mismo alcance que acceso.sucursales: sin asignaciones
+                  -- a sucursales activas -> todas; con asignaciones -> solo esas.
+                  when jsonb_array_length(m.sucursal_ids) = 0 then (
+                    select coalesce(jsonb_agg(jsonb_build_object(
+                        'id', elem->>'id', 'nombre', elem->>'nombre')), '[]'::jsonb)
+                      from jsonb_array_elements(m.sucursales_activas) elem
+                  )
+                  else (
+                    select coalesce(jsonb_agg(jsonb_build_object(
+                        'id', elem->>'id', 'nombre', elem->>'nombre')), '[]'::jsonb)
+                      from jsonb_array_elements(m.sucursales_activas) elem
+                     where elem->>'id' in (select jsonb_array_elements_text(m.sucursal_ids))
+                  )
+                end
+              ) order by m.nombre)
+              from membresias m
           ), '[]'::jsonb)
       end as organizaciones,
       case
-        when (select id from target_org) is null
-          or coalesce((select es_administrador_plataforma from u), false)
+        when (select es_administrador_plataforma from u)
+          or (select id from target_org) is null
           then null
         else (
-          select ${ACCESO_FRAGMENT(sql`(select id from target_org)`, sql`(select id from u)`)}
+          select jsonb_build_object(
+            'organization_id', m.org_id::text,
+            'membership_id', m.membership_id,
+            'permisos', m.permisos,
+            'sucursales', m.sucursal_ids,
+            'sucursales_activas', m.sucursales_activas,
+            'suscripcion', (select jsonb_build_object(
+                'estado', s.estado,
+                'trial_termina_at', s.trial_termina_at,
+                'periodo_termina_at', s.periodo_termina_at)
+               from suscripciones s
+              where s.organizacion_id = m.org_id
+              order by s.created_at desc
+              limit 1)
+          )
+          from membresias m
+          where m.org_id = (select id from target_org)
+          limit 1
         )
       end as acceso
   `);

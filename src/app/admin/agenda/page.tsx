@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 import { AgendaBoard, type AgendaBloqueo, type AgendaCita, type AgendaHorario } from "@/app/admin/agenda/agenda-board";
 import { AgendaToolbar } from "@/app/admin/agenda/agenda-toolbar";
@@ -11,7 +11,6 @@ import {
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { getDatabase } from "@/db/client";
-import { clientes } from "@/db/schema/core";
 import { getAdminContext } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { todayDateInput } from "@/lib/format";
@@ -57,6 +56,7 @@ type AgendaDatosRow = {
   recursos: RecursoConfig[];
   citas: CitaRow[];
   avisos: AvisoReciente[];
+  clientes_iniciales: Array<{ id: string; nombre: string; telefono: string | null }>;
 };
 
 export default async function AgendaPage({ searchParams }: { searchParams: SearchParams }) {
@@ -129,7 +129,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   // paralelas de antes obligaban a abrir varias conexiones frías por request y
   // cada ronda a la BD remota cuesta ~50-100 ms. Fechas en ISO UTC para
   // serializar directo a los componentes.
-  const [datosResult, suscripcion, clientesIniciales] = await Promise.all([
+  const [datosResult, suscripcion] = await Promise.all([
     getDatabase().execute<AgendaDatosRow>(sql`
       select
         coalesce((
@@ -245,19 +245,18 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
                order by created_at desc limit 12
             ) n
             left join citas cn on n.cita_id = cn.id
-        ), '[]'::jsonb) else '[]'::jsonb end as avisos
+        ), '[]'::jsonb) else '[]'::jsonb end as avisos,
+        coalesce((
+          select jsonb_agg(t) from (
+            select cl2.id, cl2.nombre, cl2.telefono
+            from clientes cl2
+            where cl2.organizacion_id = ${organization.id} and cl2.activo
+            order by cl2.created_at desc
+            limit 100
+          ) t
+        ), '[]'::jsonb) as clientes_iniciales
     `),
     contextoSuscripcionCache(organization.id),
-    getDatabase()
-      .select({
-        id: clientes.id,
-        nombre: clientes.nombre,
-        telefono: clientes.telefono,
-      })
-      .from(clientes)
-      .where(and(eq(clientes.organizacionId, organization.id), eq(clientes.activo, true)))
-      .orderBy(desc(clientes.creadoEn))
-      .limit(100),
   ]);
   const datos = datosResult.rows[0];
   const staffRows = datos?.staff ?? [];
@@ -267,6 +266,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   const recursoRows = datos?.recursos ?? [];
   const citaRows = datos?.citas ?? [];
   const avisos: AvisoReciente[] = datos?.avisos ?? [];
+  const clientesIniciales = datos?.clientes_iniciales ?? [];
 
   const staffPorId = new Map(staffRows.map((staff) => [staff.id, staff.nombre]));
 

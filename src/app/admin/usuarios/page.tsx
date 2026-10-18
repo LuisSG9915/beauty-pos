@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -10,8 +10,6 @@ import { AdminPageHeader } from "@/components/admin/page-header";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { getDatabase } from "@/db/client";
-import { catRoles, invitacionesUsuarios, relMiembrosRoles } from "@/db/schema/access";
-import { miembrosOrganizaciones, relUsuariosSucursales, sucursales, usuarios } from "@/db/schema/core";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
@@ -41,77 +39,93 @@ export default async function UsuariosPage({ searchParams }: { searchParams: Sea
     nombre: branch.nombre,
   }));
 
-  const memberRows = await db
-    .select({
-      miembroId: miembrosOrganizaciones.id,
-      usuarioId: miembrosOrganizaciones.usuarioId,
-      estado: miembrosOrganizaciones.estado,
-      nombre: usuarios.nombre,
-      correo: usuarios.correo,
-    })
-    .from(miembrosOrganizaciones)
-    .innerJoin(usuarios, eq(miembrosOrganizaciones.usuarioId, usuarios.id))
-    .where(eq(miembrosOrganizaciones.organizacionId, organizationId))
-    .orderBy(asc(usuarios.nombre));
+  type UsuariosSqlRow = {
+    miembros: MemberRow[];
+    roles: Array<{ id: string; clave: string; nombre: string; esSistema: boolean }>;
+    invitaciones: Array<{
+      id: string;
+      correo: string;
+      nombre: string;
+      expiraAt: string;
+      sucursalId: string | null;
+      rolId: string | null;
+    }>;
+    sucursales: Array<{ id: string; nombre: string; activo: boolean }>;
+  };
 
-  const roles = await db
-    .select({ id: catRoles.id, clave: catRoles.clave, nombre: catRoles.nombre, esSistema: catRoles.esSistema })
-    .from(catRoles)
-    .where(and(eq(catRoles.organizacionId, organizationId), eq(catRoles.activo, true)))
-    .orderBy(asc(catRoles.nombre));
+  // Miembros (con sus roles y sucursales activas asignadas), catálogo de
+  // roles, invitaciones pendientes y nombres de sucursales en UNA sola ronda
+  // SQL (antes eran 6 consultas en 4 rondas secuenciales).
+  const { rows } = await db.execute<UsuariosSqlRow>(sql`
+    select
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            mo.id as "miembroId",
+            mo.usuario_id as "usuarioId",
+            mo.estado,
+            u.nombre,
+            u.correo,
+            coalesce((
+              select jsonb_agg(rmr.rol_id)
+              from rel_miembros_roles rmr
+              where rmr.miembro_organizacion_id = mo.id
+            ), '[]'::jsonb) as "rolIds",
+            coalesce((
+              select jsonb_agg(rus.sucursal_id)
+              from rel_usuarios_sucursales rus
+              join sucursales s on s.id = rus.sucursal_id and s.activo
+              where rus.organizacion_id = ${organizationId}
+                and rus.usuario_id = mo.usuario_id
+            ), '[]'::jsonb) as "sucursalIds"
+          from miembros_organizaciones mo
+          join usuarios u on u.id = mo.usuario_id
+          where mo.organizacion_id = ${organizationId}
+          order by u.nombre asc
+        ) t
+      ), '[]'::jsonb) as miembros,
+      coalesce((
+        select jsonb_agg(t) from (
+          select r.id, r.clave, r.nombre, r.es_sistema as "esSistema"
+          from cat_roles r
+          where r.organizacion_id = ${organizationId} and r.activo = true
+          order by r.nombre asc
+        ) t
+      ), '[]'::jsonb) as roles,
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            inv.id,
+            inv.correo,
+            inv.nombre,
+            to_char(inv.expira_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "expiraAt",
+            inv.sucursal_id as "sucursalId",
+            inv.rol_id as "rolId"
+          from invitaciones_usuarios inv
+          where inv.organizacion_id = ${organizationId} and inv.estado = 'pendiente'
+          order by inv.correo asc
+        ) t
+      ), '[]'::jsonb) as invitaciones,
+      coalesce((
+        select jsonb_agg(jsonb_build_object('id', s.id, 'nombre', s.nombre, 'activo', s.activo))
+        from sucursales s
+        where s.organizacion_id = ${organizationId}
+      ), '[]'::jsonb) as sucursales
+  `);
 
-  const memberIds = memberRows.map((m) => m.miembroId);
-  const [memberRoles, memberBranches, invitations] = await Promise.all([
-    memberIds.length
-      ? db
-          .select({ miembroId: relMiembrosRoles.miembroOrganizacionId, rolId: relMiembrosRoles.rolId })
-          .from(relMiembrosRoles)
-          .where(inArray(relMiembrosRoles.miembroOrganizacionId, memberIds))
-      : Promise.resolve([]),
-    memberIds.length
-      ? db
-          .select({ usuarioId: relUsuariosSucursales.usuarioId, sucursalId: relUsuariosSucursales.sucursalId })
-          .from(relUsuariosSucursales)
-          .where(eq(relUsuariosSucursales.organizacionId, organizationId))
-      : Promise.resolve([]),
-    db
-      .select({
-        id: invitacionesUsuarios.id,
-        correo: invitacionesUsuarios.correo,
-        nombre: invitacionesUsuarios.nombre,
-        expiraAt: invitacionesUsuarios.expiraAt,
-        sucursalId: invitacionesUsuarios.sucursalId,
-        rolId: invitacionesUsuarios.rolId,
-      })
-      .from(invitacionesUsuarios)
-      .where(and(eq(invitacionesUsuarios.organizacionId, organizationId), eq(invitacionesUsuarios.estado, "pendiente")))
-      .orderBy(asc(invitacionesUsuarios.correo)),
-  ]);
+  const datos = rows[0];
+  const members: MemberRow[] = datos?.miembros ?? [];
+  const roles = datos?.roles ?? [];
+  const invitations = (datos?.invitaciones ?? []).map((inv) => ({
+    ...inv,
+    expiraAt: new Date(inv.expiraAt),
+  }));
+  const allBranches = datos?.sucursales ?? [];
 
   const branchNames = new Map(assignableBranches.map((b) => [b.id, b.nombre]));
-  // Nombres de sucursales aunque estén fuera del alcance del editor (solo lectura).
-  const allBranches = await db
-    .select({ id: sucursales.id, nombre: sucursales.nombre, activo: sucursales.activo })
-    .from(sucursales)
-    .where(eq(sucursales.organizacionId, organizationId));
   const allBranchNames = new Map(allBranches.map((b) => [b.id, b.nombre]));
-  // Las asignaciones a sucursales inactivas no cuentan para el acceso:
-  // la persona sin asignaciones activas ve todas las sucursales.
-  const activeBranchIds = new Set(allBranches.filter((b) => b.activo).map((b) => b.id));
   for (const [id, nombre] of branchNames) allBranchNames.set(id, nombre);
   const roleNames = new Map(roles.map((r) => [r.id, r.nombre]));
-
-  const members: MemberRow[] = memberRows.map((m) => ({
-    miembroId: m.miembroId,
-    usuarioId: m.usuarioId,
-    estado: m.estado,
-    nombre: m.nombre,
-    correo: m.correo,
-    rolIds: memberRoles.filter((r) => r.miembroId === m.miembroId).map((r) => r.rolId),
-    sucursalIds: memberBranches
-      .filter((b) => b.usuarioId === m.usuarioId && activeBranchIds.has(b.sucursalId))
-      .map((b) => b.sucursalId),
-  }));
 
   return (
     <div className="space-y-6">

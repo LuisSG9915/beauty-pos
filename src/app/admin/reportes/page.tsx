@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { BarChart, HBarChart } from "@/components/charts";
+import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
@@ -57,18 +58,18 @@ function Tabla({
   vacio: string;
 }) {
   if (filas.length === 0) {
-    return <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">{vacio}</p>;
+    return <EmptyState className="px-4 py-6" description="Ajusta el rango de fechas si esperabas resultados." title={vacio} />;
   }
   return (
     <>
       <div className="space-y-3 md:hidden">
         {filas.map((celdas, i) => (
-          <div className="rounded-xl border border-border px-4 py-3" key={i}>
+          <div className="anim-entrada rounded-xl border border-border px-4 py-3" key={i} style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}>
             <p className="text-sm font-semibold text-foreground">{celdas[0]}</p>
             <dl className="mt-1.5 space-y-1">
               {encabezados.slice(1).map((encabezado, j) => (
                 <div className="flex items-baseline justify-between gap-3 text-sm" key={encabezado}>
-                  <dt className="shrink-0 text-xs text-muted-foreground">{encabezado}</dt>
+                  <dt className="shrink-0 text-op-xs text-muted-foreground">{encabezado}</dt>
                   <dd className="min-w-0 text-right font-medium text-foreground">{celdas[j + 1]}</dd>
                 </div>
               ))}
@@ -81,7 +82,7 @@ function Tabla({
         <thead>
           <tr className="border-b border-border text-left">
             {encabezados.map((h) => (
-              <th className="pb-2 pr-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground last:pr-0" key={h}>
+              <th className="pb-2 pr-4 text-op-xs font-semibold uppercase tracking-wide text-muted-foreground last:pr-0" key={h}>
                 {h}
               </th>
             ))}
@@ -106,10 +107,10 @@ function Tabla({
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-xl border border-border bg-muted/60 px-4 py-3">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+    <div className="anim-entrada rounded-xl border border-border bg-muted/60 px-4 py-3">
+      <p className="text-op-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">{value}</p>
-      {hint ? <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-op-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
@@ -290,12 +291,13 @@ export default async function ReportesPage({ searchParams }: Props) {
         {puedeExportar ? (
           <a
             className="inline-flex h-10 items-center rounded-xl border border-border px-4 text-sm font-medium text-muted-foreground transition hover:bg-muted/60"
+            data-action-id="reportes.exportar_csv"
             href={`/admin/reportes/export?${filtrosExport}`}
           >
             Exportar CSV
           </a>
         ) : null}
-        <div className="flex w-full flex-wrap items-center gap-2 pt-1 text-xs text-muted-foreground">
+        <div className="flex w-full flex-wrap items-center gap-2 pt-1 text-op-xs text-muted-foreground">
           <span className="font-medium text-muted-foreground">Rangos rápidos:</span>
           {presets.map((preset) => {
             const href = `?${new URLSearchParams({
@@ -307,11 +309,12 @@ export default async function ReportesPage({ searchParams }: Props) {
             const activo = preset.desde === desde && preset.hasta === hasta;
             return (
               <Link
-                className={`rounded-full border px-3 py-1.5 font-medium transition ${
+                className={`inline-flex min-h-8 items-center rounded-full border px-3 py-1.5 font-medium transition ${
                   activo
                     ? "border-primary bg-accent text-accent-foreground"
                     : "border-border text-muted-foreground hover:bg-muted/60"
                 }`}
+                data-action-id={`reportes.preset.${preset.clave}`}
                 href={href}
                 key={preset.clave}
               >
