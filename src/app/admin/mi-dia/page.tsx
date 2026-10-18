@@ -58,7 +58,7 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
     return (
       <div className="space-y-6">
         <AdminPageHeader
-          description={`${organization.nombre} · ${timeZone}`}
+          description={organization.nombre}
           title="Mi día"
         />
         <EmptyState
@@ -76,7 +76,7 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
   if (!bounds) {
     return (
       <div className="space-y-6">
-        <AdminPageHeader description={`${branch.nombre} · ${timeZone}`} title="Mi día" />
+        <AdminPageHeader description={branch.nombre} title="Mi día" />
         <EmptyState description="No se pudo resolver el día actual." title="Fecha inválida" />
       </div>
     );
@@ -96,6 +96,7 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
         estado: citas.estado,
         notas: citas.notas,
         totalEstimado: citas.totalEstimado,
+        version: citas.version,
         clienteId: clientes.id,
         clienteNombre: clientes.nombre,
         clienteNotas: clientes.notasOperativas,
@@ -191,6 +192,7 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
     clienteNotas: conAlergias(row.clienteNotas, row.clienteId ? alergias.get(row.clienteId) : undefined),
     ventaId: row.ventaId,
     ventaEstado: row.ventaEstado,
+    version: row.version,
     servicios: serviciosPorCita.get(row.id) ?? [],
   }));
 
@@ -209,7 +211,7 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
             Ver agenda
           </Button>
         }
-        description={`${branch.nombre} · ${timeZone}`}
+        description={branch.nombre}
         title="Mi día"
       />
       <MiDiaBoard

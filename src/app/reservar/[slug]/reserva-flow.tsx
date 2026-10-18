@@ -219,6 +219,7 @@ export function ReservaFlow({
           <div className="mt-3 grid gap-2 sm:grid-cols-2">
             {sucursales.map((s) => (
               <button
+                aria-pressed={s.id === sucursal.id}
                 className={`rounded-2xl border p-4 text-left transition-colors ${
                   s.id === sucursal.id
                     ? "border-primary bg-accent"
@@ -253,6 +254,7 @@ export function ReservaFlow({
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {servicios.map((s) => (
             <button
+              aria-pressed={s.id === servicioId}
               className={`rounded-2xl border p-4 text-left transition-colors ${
                 s.id === servicioId
                   ? "border-primary bg-accent"
@@ -278,6 +280,7 @@ export function ReservaFlow({
           <h2 className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Profesional</h2>
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
             <button
+              aria-pressed={usuarioId === ""}
               className={`rounded-2xl border p-4 text-left transition-colors ${
                 usuarioId === ""
                   ? "border-primary bg-accent"
@@ -291,6 +294,7 @@ export function ReservaFlow({
             </button>
             {profesionalesSucursal.map((p) => (
               <button
+                aria-pressed={p.usuarioId === usuarioId}
                 className={`rounded-2xl border p-4 text-left transition-colors ${
                   p.usuarioId === usuarioId
                     ? "border-primary bg-accent"
@@ -314,6 +318,7 @@ export function ReservaFlow({
           <div className="mt-3 flex flex-wrap gap-2">
             {dias.map((dia) => (
               <button
+                aria-pressed={dia.diaKey === diaKey}
                 className={`rounded-xl border px-4 py-2 text-sm transition-colors ${
                   dia.diaKey === diaKey
                     ? "border-primary bg-accent font-semibold"
@@ -349,6 +354,7 @@ export function ReservaFlow({
             <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
               {slots.map((iso) => (
                 <button
+                  aria-pressed={iso === slotIso}
                   className={`rounded-xl border px-3 py-2 text-sm tabular-nums transition-colors ${
                     iso === slotIso
                       ? "border-primary bg-primary font-semibold text-primary-foreground"

@@ -33,6 +33,7 @@ import {
   type AgendaDb,
   type CitaRow,
 } from "@/modules/agenda";
+import { ESTADO_BD_LABEL } from "@/modules/agenda/estados";
 import {
   CITA_STALE_MESSAGE,
   clienteEnOrganizacion,
@@ -318,7 +319,7 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
           ignoreCitaId: input.id || null,
         });
         if (colision) {
-          return { error: "El estilista ya tiene una cita en ese horario." };
+          return { error: "El profesional ya tiene una cita en ese horario." };
         }
       }
 
@@ -555,7 +556,10 @@ export async function updateCitaEstado(formData: FormData): Promise<CitaMutation
       }
       if (cita.estado === input.estado) return { success: true, message: "La cita ya está en ese estado." };
       if (!canTransitionEstado(cita.estado, input.estado)) {
-        return { success: false, error: `No se puede pasar de "${cita.estado}" a "${input.estado}".` };
+        return {
+          success: false,
+          error: `No se puede pasar de "${ESTADO_BD_LABEL[cita.estado] ?? cita.estado}" a "${ESTADO_BD_LABEL[input.estado] ?? input.estado}".`,
+        };
       }
 
       let fechaHora = cita.fechaHora;
@@ -800,7 +804,7 @@ async function moverCitaEnTx(
       ignoreCitaId: cita.id,
     });
     if (colision) {
-      return { success: false, error: "El estilista ya tiene una cita en ese horario." };
+      return { success: false, error: "El profesional ya tiene una cita en ese horario." };
     }
   }
 

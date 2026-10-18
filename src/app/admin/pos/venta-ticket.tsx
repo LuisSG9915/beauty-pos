@@ -63,6 +63,7 @@ type VentaTicketProps = {
     citaId: string | null;
     clienteId: string | null;
     clienteNombre: string | null;
+    clienteTelefono?: string | null;
     subtotal: string;
     descuento: string;
     total: string;
@@ -98,6 +99,8 @@ type VentaTicketProps = {
   anticipoPorAplicar?: number;
   currency: string;
   returnTo: string;
+  /** Nombre del negocio para el encabezado del ticket impreso/WhatsApp. */
+  negocioNombre?: string;
   /** Permiso ventas.cancelar (lo resuelve la página/llamante). */
   puedeCancelar?: boolean;
   /** Permiso ventas.ajustar_pago (lo resuelve la página/llamante). */
@@ -294,7 +297,7 @@ function TicketLine({
         <div className="mt-1.5 flex items-center gap-2">
           {paquete.usado ? (
             <>
-              <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-xs font-medium text-success">
+              <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-1 text-xs font-medium text-success-soft-foreground">
                 <PackageCheck aria-hidden="true" className="size-3.5" />
                 Paquete{paquete.nombre ? ` · ${paquete.nombre}` : ""}
               </span>
@@ -351,6 +354,8 @@ function ClientePicker({
       defaultItems={defaultItems}
       disabled={pending}
       inputClassName="h-8 text-xs"
+      label="Cliente de la venta"
+      labelClassName="sr-only"
       placeholder="Asignar cliente…"
       searchUrl={`/api/clientes?organizationId=${organizationId}`}
       onValueChange={(value) => {
@@ -512,6 +517,7 @@ export function VentaTicket({
   promocionesDisponibles = [],
   currency,
   returnTo,
+  negocioNombre,
   puedeCancelar = false,
   puedeAjustarPago = false,
   puedeFacturar = false,
@@ -786,8 +792,8 @@ export function VentaTicket({
         <section className="rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-wide text-foreground">Resumen de cobro</h2>
-            <span className="rounded-full bg-accent px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
-              {venta.estado === "en_proceso" ? "Pendiente" : venta.estado === "cobrada" ? "Cobrado" : "Cancelado"}
+            <span className="rounded-full bg-accent px-2.5 py-0.5 text-op-xs font-medium text-muted-foreground uppercase tracking-wider">
+              {venta.estado === "en_proceso" ? "Pendiente" : venta.estado === "completada" ? "Cobrado" : "Cancelado"}
             </span>
           </div>
 
@@ -846,7 +852,7 @@ export function VentaTicket({
                 <div>
                   <span className="text-xs font-semibold uppercase tracking-wider text-primary">Total</span>
                   {anticipoAplicado > 0 ? (
-                    <p className="text-[11px] text-muted-foreground">
+                    <p className="text-op-xs text-muted-foreground">
                       Anticipo: -{formatCurrency(anticipoAplicado, { currency })}
                     </p>
                   ) : null}
@@ -950,10 +956,10 @@ export function VentaTicket({
           <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md">
             <h2 className="text-sm font-semibold text-foreground">Promoción</h2>
             {venta.promocionId ? (
-              <form action={quitarPromoAction} className="flex items-center justify-between gap-3 rounded-xl border border-success/20 bg-success/10 p-3">
+              <form action={quitarPromoAction} className="flex items-center justify-between gap-3 rounded-xl border border-success/20 bg-success-soft p-3">
                 <input name="organizacionId" type="hidden" value={organizationId} />
                 <input name="ventaId" type="hidden" value={venta.id} />
-                <p className="min-w-0 flex-1 text-sm text-success">
+                <p className="min-w-0 flex-1 text-sm text-success-soft-foreground">
                   <span className="font-semibold">{venta.promocionNombre ?? "Aplicada"}</span>
                   <span className="ml-2 font-mono tabular-nums">-{formatCurrency(venta.descuentoPromocion ?? "0", { currency })}</span>
                 </p>
@@ -1083,7 +1089,7 @@ export function VentaTicket({
               ))}
             </ul>
             {editable && anticipos.some((a) => a.estado === "vigente") && anticipoPorAplicar === 0 ? (
-              <p className="mt-3 rounded-xl bg-warning/10 px-4 py-2.5 text-xs text-warning">
+              <p className="mt-3 rounded-xl bg-warning-soft px-4 py-2.5 text-xs text-warning-soft-foreground">
                 El anticipo vigente excede el total del ticket; no se aplicará automáticamente.
                 Devuélvelo desde la cita.
               </p>
@@ -1103,8 +1109,8 @@ export function VentaTicket({
             ventaId={venta.id}
           />
         ) : cancelada ? (
-          <section className="rounded-2xl border border-destructive/30 bg-destructive/10 p-6 shadow-sm">
-            <h2 className="font-semibold text-destructive">Venta cancelada</h2>
+          <section className="rounded-2xl border border-destructive/30 bg-destructive-soft p-6 shadow-sm">
+            <h2 className="font-semibold text-destructive-soft-foreground">Venta cancelada</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
               Se generó una devolución compensatoria: el stock de productos fue
               revertido y las comisiones/propinas quedaron anuladas.
@@ -1119,17 +1125,18 @@ export function VentaTicket({
             ) : null}
           </section>
         ) : (
-          <section className="rounded-2xl border border-success/30 bg-success/10 p-6 shadow-sm space-y-4">
+          <section className="rounded-2xl border border-success/30 bg-success-soft p-6 shadow-sm space-y-4">
             <div className="flex items-center justify-between">
-              <h2 className="font-semibold text-success">Venta cobrada con éxito</h2>
+              <h2 className="font-semibold text-success-soft-foreground">Venta cobrada con éxito</h2>
               <StatusBadge tone="success">Completada</StatusBadge>
             </div>
             <p className="text-sm leading-6 text-muted-foreground">
-              Esta venta ya fue cobrada y no puede modificarse.
+              Venta cerrada — ya fue cobrada y no puede modificarse.
             </p>
 
             <TicketActionsBar
               clienteNombre={venta.clienteNombre}
+              clienteTelefono={venta.clienteTelefono}
               currency={currency}
               descuento={venta.descuento}
               descuentoMembresia={venta.descuentoMembresia}
@@ -1138,6 +1145,7 @@ export function VentaTicket({
               lineasPaquetes={lineasPaquetes}
               lineasProductos={lineasProductos}
               lineasServicios={lineasServicios}
+              negocioNombre={negocioNombre}
               pagos={pagos}
               propina={venta.propina}
               subtotal={venta.subtotal}

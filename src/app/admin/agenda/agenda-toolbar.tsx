@@ -319,7 +319,7 @@ export function AgendaToolbar({
                 onClick={guardRepeatedTap}
                 title={fechaEtiqueta.format(new Date(`${dia}T12:00:00Z`))}
               >
-                <span className="text-[11px] sm:text-op-xs capitalize leading-none">
+                <span className="text-op-xs capitalize leading-none">
                   {tiraDiaSemana.format(new Date(`${dia}T12:00:00Z`))}
                 </span>
                 <span className="text-sm sm:text-base font-bold leading-tight tabular-nums">

@@ -252,7 +252,7 @@ export function CobroForm({
       </div>
 
       {cubiertoPorAnticipo ? (
-        <p className="mt-5 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm font-medium text-success">
+        <p className="mt-5 rounded-xl border border-success/30 bg-success-soft px-4 py-3 text-sm font-medium text-success-soft-foreground">
           {anticipo > 0
             ? `El anticipo cubre el total${propina > 0 ? " y la propina" : ""}; confirma para cerrar la venta.`
             : "El total ya está cubierto; confirma para cerrar la venta."}
@@ -277,7 +277,7 @@ export function CobroForm({
         </div>
 
         {mediosPago.length === 0 ? (
-          <p className="rounded-xl bg-warning/10 px-4 py-3 text-sm text-warning">
+          <p className="rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning-soft-foreground">
             No hay medios de pago configurados.
           </p>
         ) : null}
@@ -312,7 +312,7 @@ export function CobroForm({
 
               {esEfectivo && quickCashOptions.length > 0 ? (
                 <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                  <span className="text-[11px] font-medium text-muted-foreground">Billetes rápidos:</span>
+                  <span className="text-op-xs font-medium text-muted-foreground">Billetes rápidos:</span>
                   {quickCashOptions.map((opt) => (
                     <button
                       className={cn(
@@ -386,7 +386,7 @@ export function CobroForm({
               "rounded-2xl border p-3.5 transition-all duration-200 animate-in fade-in zoom-in-95",
               cambio > 0.005
                 ? "border-success/40 bg-success-soft/70 text-success-soft-foreground shadow-xs"
-                : "border-success/30 bg-success/10 text-success",
+                : "border-success/30 bg-success-soft text-success-soft-foreground",
             )}
           >
             <div className="flex items-center justify-between">

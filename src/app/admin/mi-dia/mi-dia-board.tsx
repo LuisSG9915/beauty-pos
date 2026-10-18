@@ -43,6 +43,8 @@ export type MiDiaCita = {
   clienteNotas: string | null;
   ventaId: string | null;
   ventaEstado: string | null;
+  /** Versión leída al cargar (concurrencia optimista de citas.version). */
+  version?: number;
   servicios: string[];
 };
 
@@ -93,6 +95,7 @@ export function MiDiaBoard({
     data.set("organizacionId", organizationId);
     data.set("citaId", cita.id);
     data.set("estado", estado);
+    if (cita.version !== undefined) data.set("version", String(cita.version));
     runCitaAction(cita, action, async () => {
       const result = await updateCitaEstado(data);
       if (result.success) {
@@ -243,7 +246,7 @@ export function MiDiaBoard({
                       <p className="mt-1 text-xs text-muted-foreground">Nota: {cita.notas}</p>
                     ) : null}
                     {cita.clienteNotas ? (
-                      <p className="mt-1.5 rounded-lg bg-warning/10 px-2.5 py-1.5 text-xs font-medium text-warning">
+                      <p className="mt-1.5 rounded-lg bg-warning-soft px-2.5 py-1.5 text-xs font-medium text-warning-soft-foreground">
                         {cita.clienteNotas}
                       </p>
                     ) : null}

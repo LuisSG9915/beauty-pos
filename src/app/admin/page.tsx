@@ -121,7 +121,7 @@ function MemberDashboard({
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                           alerta.tono === "critico"
-                            ? "bg-destructive/10 text-destructive"
+                            ? "bg-destructive-soft text-destructive-soft-foreground"
                             : "bg-accent/70 text-primary"
                         }`}
                       >

@@ -1,6 +1,7 @@
 "use client";
 
 import { AdminCard } from "@/components/admin/page-header";
+import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate, formatTime } from "@/lib/format";
 
@@ -23,8 +24,39 @@ export function ListView({
   onSelectCita: (id: string) => void;
 }) {
   return (
-    <AdminCard animate className="overflow-hidden p-0 sm:p-0">
-      <div className="overflow-x-auto">
+    <>
+      {/* Móvil: tarjetas apiladas (la tabla min-w-[720px] desborda en 390px). */}
+      <RegistroList>
+        {citas.length === 0 ? (
+          <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
+            No hay citas que coincidan con el filtro.
+          </p>
+        ) : null}
+        {citas.map((cita) => (
+          <RegistroCard
+            acciones={
+              <Button onClick={() => onSelectCita(cita.id)} size="sm" type="button" variant="outline">
+                Ver
+              </Button>
+            }
+            badge={<EstadoVistaBadge cita={cita} />}
+            campos={[
+              { label: "Profesional", value: cita.usuarioNombre ?? "Sin asignar" },
+              {
+                label: "Servicios",
+                value: cita.servicios.map((servicio) => servicio.nombre).join(", ") || "Sin servicios",
+              },
+              { label: "Total", value: formatCurrency(cita.totalEstimado, { currency }) },
+            ]}
+            key={cita.id}
+            subtitulo={`${formatDate(cita.fechaHora, { timeZone })} · ${formatTime(cita.fechaHora, { timeZone })}`}
+            titulo={cita.clienteNombre}
+          />
+        ))}
+      </RegistroList>
+      <div className="hidden md:block">
+        <AdminCard animate className="overflow-hidden p-0 sm:p-0">
+          <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-left text-sm">
           <thead className="bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
@@ -84,7 +116,9 @@ export function ListView({
             ) : null}
           </tbody>
         </table>
+          </div>
+        </AdminCard>
       </div>
-    </AdminCard>
+    </>
   );
 }

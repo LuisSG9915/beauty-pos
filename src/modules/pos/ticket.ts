@@ -54,6 +54,7 @@ export type TicketData = {
     sucursalId: string;
     clienteId: string | null;
     clienteNombre: string | null;
+    clienteTelefono: string | null;
     subtotal: string;
     descuento: string;
     total: string;
@@ -405,6 +406,7 @@ export async function getTicketData(
       sucursalId: ventas.sucursalId,
       clienteId: ventas.clienteId,
       clienteNombre: clientes.nombre,
+      clienteTelefono: clientes.telefono,
       clienteRfc: clientes.rfc,
       clienteRazonSocial: clientes.razonSocial,
       clienteRegimenFiscal: clientes.regimenFiscal,

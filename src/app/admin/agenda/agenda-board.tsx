@@ -562,19 +562,6 @@ export function AgendaBoard({
         </Button>
       </div>
 
-      {/* Botón flotante móvil (FAB) para agendar con un solo toque de pulgar */}
-      <Button
-        aria-label="Nueva cita"
-        className="fixed bottom-24 right-4 z-40 size-14 rounded-full shadow-xl transition-transform active:scale-95 lg:hidden"
-        data-action-clave="1"
-        data-action-id="agenda.cita.abrir_formulario_fab"
-        onClick={abrirNuevaCita}
-        size="icon"
-        type="button"
-      >
-        <CalendarPlus aria-hidden="true" className="size-6" />
-      </Button>
-
       {vista === "dia" ? (
         <div className={cn(selected ? "xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(340px,26rem)] xl:gap-4" : "")}>
           <div className="min-w-0 space-y-2.5 sm:space-y-3">
@@ -702,7 +689,7 @@ export function AgendaBoard({
           <DialogHeader>
             <DialogTitle>Nueva cita</DialogTitle>
             <DialogDescription>
-              Agenda en {sucursal.nombre}; la fecha se interpreta en {timeZone}.
+              Registra los datos de la cita en {sucursal.nombre}.
             </DialogDescription>
           </DialogHeader>
           <CitaForm

@@ -202,7 +202,7 @@ export function DayGrid({
                 role="tab"
                 type="button"
               >
-                <span className={cn("flex size-5.5 items-center justify-center rounded-full border text-[11px] font-semibold", tone.chip)}>
+                <span className={cn("flex size-5.5 items-center justify-center rounded-full border text-op-xs font-semibold", tone.chip)}>
                   {column.id ? iniciales(column.nombre) : <UserRound aria-hidden="true" className="size-3" />}
                 </span>
                 <span className="max-w-28 truncate">{column.nombre}</span>

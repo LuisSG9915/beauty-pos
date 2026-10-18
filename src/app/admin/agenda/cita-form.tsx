@@ -302,7 +302,7 @@ export function CitaForm({
       if (habitual) {
         sugerido = {
           ...habitual,
-          explicacion: `Estilista habitual del cliente · Disponible para los ${duracionEfectiva} min`,
+          explicacion: `Profesional habitual del cliente · Disponible para los ${duracionEfectiva} min`,
         };
       } else {
         // Prioridad 2: El estilista disponible con menor carga hoy
@@ -366,7 +366,7 @@ export function CitaForm({
           <div className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-3.5 anim-entrada">
             <div className="flex items-center justify-between">
               <p className="text-xs font-semibold text-foreground">Alta rápida de cliente</p>
-              <span className="text-[11px] text-muted-foreground">Sin salir de la cita</span>
+              <span className="text-op-xs text-muted-foreground">Sin salir de la cita</span>
             </div>
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
               <Field>
@@ -507,7 +507,7 @@ export function CitaForm({
             type="datetime-local"
             value={inicio}
           />
-          <FieldDescription>Hora local de la sucursal ({timeZone}).</FieldDescription>
+          <FieldDescription>Hora local de la sucursal.</FieldDescription>
         </Field>
         {seleccionados.size === 0 ? (
           <Field>
@@ -533,7 +533,7 @@ export function CitaForm({
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-op-xs font-bold uppercase tracking-wider text-primary">
-                      Estilista sugerido:
+                      Profesional sugerido:
                     </span>
                     <span className="font-semibold text-foreground text-sm">
                       {analisisStaff.sugerido.nombre}

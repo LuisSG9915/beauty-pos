@@ -19,6 +19,8 @@ export type RemoteComboboxProps = {
   /** Nombre del input oculto que se envía en formularios/server actions. */
   name?: string;
   label?: string;
+  /** Clases extra para el label (ej. `sr-only` cuando el contexto ya lo explica). */
+  labelClassName?: string;
   placeholder?: string;
   /** Mínimo de caracteres antes de consultar (default 2). */
   minQuery?: number;
@@ -46,6 +48,7 @@ export function RemoteCombobox({
   selectedItem,
   name,
   label,
+  labelClassName,
   placeholder = "Escribe para buscar",
   minQuery = 0,
   emptyMessage = "No se encontraron clientes",
@@ -170,7 +173,7 @@ export function RemoteCombobox({
   return (
     <div className={cn("flex flex-col gap-1.5", className)}>
       {label ? (
-        <label className="text-sm font-medium text-foreground" htmlFor={inputId}>
+        <label className={cn("text-sm font-medium text-foreground", labelClassName)} htmlFor={inputId}>
           {label}
           {required ? " *" : ""}
         </label>

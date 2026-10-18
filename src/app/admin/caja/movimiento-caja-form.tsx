@@ -37,7 +37,7 @@ export function MovimientoCajaForm({
 
   if (mediosEfectivo.length === 0) {
     return (
-      <p className="rounded-xl bg-warning/10 px-4 py-3 text-sm text-warning">
+      <p className="rounded-xl bg-warning-soft px-4 py-3 text-sm text-warning-soft-foreground">
         Configura un medio de pago en efectivo para registrar movimientos.
       </p>
     );
@@ -112,7 +112,7 @@ export function MovimientoCajaForm({
       </Field>
 
       <ActionFeedback state={state} />
-      <Button className="rounded-xl" data-action-clave="1" size="lg" data-action-id="caja.movimiento.registrar" disabled={pending} type="submit" variant="outline">
+      <Button className="rounded-xl" size="lg" data-action-id="caja.movimiento.registrar" disabled={pending} type="submit" variant="outline">
         {pending ? "Registrando…" : "Registrar movimiento"}
       </Button>
     </form>

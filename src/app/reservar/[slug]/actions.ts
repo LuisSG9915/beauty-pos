@@ -21,16 +21,22 @@ export async function obtenerSlotsReserva(input: {
   diaKey: string;
   usuarioId?: string | null;
 }): Promise<{ ok: true; slots: string[] } | { ok: false; error: string }> {
-  const sucursal = await getSucursalReservable(input.organizacionId, input.sucursalId);
+  const db = getDatabase();
+  const usuarioId = input.usuarioId || null;
+  // Las tres lecturas son independientes: una ronda en paralelo.
+  const [sucursal, servicios, profesionalOk] = await Promise.all([
+    getSucursalReservable(input.organizacionId, input.sucursalId),
+    getServiciosReservables(input.organizacionId),
+    usuarioId
+      ? esProfesionalReservable(db, input.organizacionId, input.sucursalId, usuarioId)
+      : Promise.resolve(true),
+  ]);
   if (!sucursal) return { ok: false, error: "La sucursal no acepta reservas en línea." };
 
-  const servicios = await getServiciosReservables(input.organizacionId);
   const servicio = servicios.find((s) => s.id === input.servicioId);
   if (!servicio) return { ok: false, error: "El servicio no está disponible." };
 
-  const db = getDatabase();
-  const usuarioId = input.usuarioId || null;
-  if (usuarioId && !(await esProfesionalReservable(db, input.organizacionId, input.sucursalId, usuarioId))) {
+  if (!profesionalOk) {
     return { ok: false, error: "El profesional elegido no está disponible." };
   }
 

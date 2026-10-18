@@ -259,7 +259,7 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                           {corte.cerradoAt ? formatTime(corte.cerradoAt, { timeZone }) : "—"}
                         </p>
                         {index === 0 ? (
-                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+                          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-op-xs font-semibold text-primary">
                             Último corte
                           </span>
                         ) : null}
@@ -288,9 +288,45 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                       {fmt(tot?.propinas)} propinas · {fmt(comisionesPorCorte.get(corte.id))} comisiones
                     </p>
 
-                    <div className="mt-3 overflow-x-auto">
+                    {/* Móvil: desglose como lista (la tabla de 5 columnas
+                        desborda en 390px); desde sm se conserva la tabla. */}
+                    <ul className="mt-3 space-y-2 sm:hidden">
+                      {detallesList.map((d, i) => {
+                        const dif = num(d.diferencia);
+                        const itemCuadrado = Math.abs(dif) < 0.01;
+                        const itemFaltante = dif <= -0.01;
+                        return (
+                          <li className="rounded-xl border border-border px-3.5 py-2.5 text-sm" key={i}>
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="font-medium text-foreground">{d.medioNombre}</span>
+                              <span
+                                className={`rounded-md px-1.5 py-0.5 text-op-xs font-medium ${
+                                  itemCuadrado
+                                    ? "bg-success-soft text-success-soft-foreground"
+                                    : itemFaltante
+                                      ? "bg-destructive-soft text-destructive-soft-foreground"
+                                      : "bg-warning-soft text-warning-soft-foreground"
+                                }`}
+                              >
+                                {itemCuadrado ? "Cuadrado" : itemFaltante ? "Faltante" : "Sobrante"}
+                              </span>
+                            </div>
+                            <div className="mt-1 flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                              <span>
+                                Esperado <span className="tabular-nums">{fmt(d.esperado)}</span> · Contado{" "}
+                                <span className="tabular-nums font-semibold text-foreground">{fmt(d.contado)}</span>
+                              </span>
+                              <span className="tabular-nums font-semibold">
+                                {itemCuadrado ? "$0.00" : (dif > 0 ? "+" : "") + fmt(dif)}
+                              </span>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <div className="mt-3 hidden overflow-x-auto sm:block">
                       <table className="w-full text-left text-sm">
-                        <thead className="text-[11px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                        <thead className="text-op-xs uppercase tracking-wider text-muted-foreground border-b border-border">
                           <tr>
                             <th className="py-1.5 pr-3 font-semibold">Medio de pago</th>
                             <th className="py-1.5 pr-3 text-right font-semibold">Esperado</th>
@@ -323,15 +359,15 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                                 </td>
                                 <td className="py-2 text-right">
                                   {itemCuadrado ? (
-                                    <span className="rounded-md bg-success-soft/60 px-1.5 py-0.5 text-[11px] font-medium text-success">
+                                    <span className="rounded-md bg-success-soft px-1.5 py-0.5 text-op-xs font-medium text-success-soft-foreground">
                                       Cuadrado
                                     </span>
                                   ) : itemFaltante ? (
-                                    <span className="rounded-md bg-destructive-soft/60 px-1.5 py-0.5 text-[11px] font-medium text-destructive">
+                                    <span className="rounded-md bg-destructive-soft px-1.5 py-0.5 text-op-xs font-medium text-destructive-soft-foreground">
                                       Faltante
                                     </span>
                                   ) : (
-                                    <span className="rounded-md bg-warning-soft/60 px-1.5 py-0.5 text-[11px] font-medium text-warning">
+                                    <span className="rounded-md bg-warning-soft px-1.5 py-0.5 text-op-xs font-medium text-warning-soft-foreground">
                                       Sobrante
                                     </span>
                                   )}

@@ -767,7 +767,7 @@ export function CitaSidePanel({
         >
           <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-primary select-none flex items-center justify-between">
             <span>Ficha técnica & Fórmulas</span>
-            <span className="text-[11px] font-normal text-muted-foreground">
+            <span className="text-op-xs font-normal text-muted-foreground">
               {cita.estado === "en_proceso" ? "servicio en curso" : "ver o registrar"}
             </span>
           </summary>
@@ -842,7 +842,7 @@ export function CitaSidePanel({
             confirmLabel={TRANSICION_LABEL.cancelada}
             description={`La cita pasará a "${ESTADO_BD_LABEL.cancelada}".`}
             onConfirm={() => onTransition(cita, "cancelada")}
-            title="Cancelar esta cita?"
+            title="¿Cancelar esta cita?"
             trigger={
               <Button className="rounded-xl" disabled={ocupado} type="button" variant="destructive">
                 {TRANSICION_LABEL.cancelada}
@@ -856,7 +856,7 @@ export function CitaSidePanel({
             description={`La cita pasará a "${ESTADO_BD_LABEL.no_asistio}".`}
             destructive={false}
             onConfirm={() => onTransition(cita, "no_asistio")}
-            title="Marcar como no asistió?"
+            title="¿Marcar como no vino?"
             trigger={
               <Button className="rounded-xl" disabled={ocupado} type="button" variant="outline">
                 {TRANSICION_LABEL.no_asistio}
@@ -866,9 +866,9 @@ export function CitaSidePanel({
         ) : null}
         <ConfirmDialog
           confirmLabel="Ocultar cita"
-          description="La cita dejará de aparecer en la agenda. Este cambio puede revertirse desde la base de datos."
+          description="La cita dejará de aparecer en la agenda, pero quedará guardada en el historial."
           onConfirm={onToggleActiva}
-          title="Ocultar esta cita?"
+          title="¿Ocultar esta cita?"
           trigger={
             <Button className="rounded-xl" disabled={ocupado} type="button" variant="ghost">
               Ocultar cita

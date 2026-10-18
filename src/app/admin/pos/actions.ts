@@ -84,7 +84,7 @@ async function registrarClaveIdempotencia(
 }
 
 async function recalcularVenta(db: PosDb, ventaId: string, userId: string | null) {
-  const [servs, prods, packs, membs] = await Promise.all([
+  const [servs, prods, packs, membs, ventaRows] = await Promise.all([
     db
       .select({ id: detalleVentasServicios.id, precio: detalleVentasServicios.precio, cantidad: detalleVentasServicios.cantidad })
       .from(detalleVentasServicios)
@@ -101,16 +101,38 @@ async function recalcularVenta(db: PosDb, ventaId: string, userId: string | null
       .select({ precio: detalleVentasMembresias.precio, cantidad: detalleVentasMembresias.cantidad })
       .from(detalleVentasMembresias)
       .where(and(eq(detalleVentasMembresias.ventaId, ventaId), eq(detalleVentasMembresias.activo, true))),
+    db
+      .select({ descuento: ventas.descuento, promocionId: ventas.promocionId, membresiaId: ventas.membresiaId, organizacionId: ventas.organizacionId })
+      .from(ventas)
+      .where(eq(ventas.id, ventaId))
+      .limit(1),
   ]);
+  const venta = ventaRows[0];
   // Líneas de servicio cubiertas por una sesión de paquete: no suman al
   // subtotal (ya se pagaron por adelantado) pero siguen generando comisión.
   const servIds = servs.map((s) => s.id);
-  const usos = servIds.length
-    ? await db
-        .select({ detalleVentaServicioId: paqueteUsos.detalleVentaServicioId })
-        .from(paqueteUsos)
-        .where(and(inArray(paqueteUsos.detalleVentaServicioId, servIds), eq(paqueteUsos.activo, true)))
-    : [];
+  const [usos, promoRows, membresiaRows] = await Promise.all([
+    servIds.length
+      ? db
+          .select({ detalleVentaServicioId: paqueteUsos.detalleVentaServicioId })
+          .from(paqueteUsos)
+          .where(and(inArray(paqueteUsos.detalleVentaServicioId, servIds), eq(paqueteUsos.activo, true)))
+      : Promise.resolve([]),
+    venta?.promocionId
+      ? db
+          .select({ tipo: promociones.tipo, valor: promociones.valor, aplica: promociones.aplica })
+          .from(promociones)
+          .where(and(eq(promociones.id, venta.promocionId), eq(promociones.organizacionId, venta.organizacionId)))
+          .limit(1)
+      : Promise.resolve([]),
+    venta?.membresiaId
+      ? db
+          .select({ descuentoPorcentaje: membresias.descuentoPorcentaje, aplica: membresias.aplica })
+          .from(membresias)
+          .where(and(eq(membresias.id, venta.membresiaId), eq(membresias.organizacionId, venta.organizacionId)))
+          .limit(1)
+      : Promise.resolve([]),
+  ]);
   const cubiertas = new Set(usos.map((u) => u.detalleVentaServicioId));
   const subtotalServicios = servs
     .filter((line) => !cubiertas.has(line.id))
@@ -119,46 +141,27 @@ async function recalcularVenta(db: PosDb, ventaId: string, userId: string | null
   const subtotalPaquetes = packs.reduce((sum, line) => sum + Number(line.precio) * line.cantidad, 0);
   const subtotalMembresias = membs.reduce((sum, line) => sum + Number(line.precio) * line.cantidad, 0);
   const subtotal = subtotalServicios + subtotalProductos + subtotalPaquetes + subtotalMembresias;
-  const [venta] = await db
-    .select({ descuento: ventas.descuento, promocionId: ventas.promocionId, membresiaId: ventas.membresiaId, organizacionId: ventas.organizacionId })
-    .from(ventas)
-    .where(eq(ventas.id, ventaId))
-    .limit(1);
   const descuento = venta ? Number(venta.descuento) : 0;
   // La promoción aplicada se reevalúa contra las líneas actuales: si el ticket
   // cambia, el descuento promocional se ajusta solo.
-  let descuentoPromocion = 0;
-  if (venta?.promocionId) {
-    const [promo] = await db
-      .select({ tipo: promociones.tipo, valor: promociones.valor, aplica: promociones.aplica })
-      .from(promociones)
-      .where(and(eq(promociones.id, venta.promocionId), eq(promociones.organizacionId, venta.organizacionId)))
-      .limit(1);
-    if (promo) {
-      descuentoPromocion = calcularDescuentoPromocion(
+  const promo = promoRows[0];
+  const descuentoPromocion = promo
+    ? calcularDescuentoPromocion(
         { tipo: promo.tipo, valor: Number(promo.valor), aplica: promo.aplica },
         subtotalServicios,
         subtotalProductos,
-      );
-    }
-  }
+      )
+    : 0;
   // Ídem la membresía aplicada: porcentaje sobre el subtotal elegible
   // (servicios/productos según `aplica`; paquetes/membresías no descuentan).
-  let descuentoMembresia = 0;
-  if (venta?.membresiaId) {
-    const [membresia] = await db
-      .select({ descuentoPorcentaje: membresias.descuentoPorcentaje, aplica: membresias.aplica })
-      .from(membresias)
-      .where(and(eq(membresias.id, venta.membresiaId), eq(membresias.organizacionId, venta.organizacionId)))
-      .limit(1);
-    if (membresia) {
-      descuentoMembresia = calcularDescuentoMembresia(
+  const membresia = membresiaRows[0];
+  const descuentoMembresia = membresia
+    ? calcularDescuentoMembresia(
         { descuentoPorcentaje: Number(membresia.descuentoPorcentaje), aplica: membresia.aplica },
         subtotalServicios,
         subtotalProductos,
-      );
-    }
-  }
+      )
+    : 0;
   const total = Math.max(subtotal - descuento - descuentoPromocion - descuentoMembresia, 0);
   await db
     .update(ventas)

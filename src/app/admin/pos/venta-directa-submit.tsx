@@ -21,7 +21,7 @@ export function VentaDirectaSubmit({ disabled }: { disabled: boolean }) {
         size="touch"
         type="submit"
       >
-        {pending ? "Iniciando venta…" : "Iniciar cobro directo"}
+        {pending ? "Abriendo venta…" : "Abrir venta directa"}
       </Button>
     </>
   );
