@@ -111,6 +111,7 @@ export function AgendaBoard({
   citas,
   horarios,
   bloqueos,
+  clientes = [],
   timeZone,
   currency,
 }: {
@@ -127,6 +128,7 @@ export function AgendaBoard({
   citas: AgendaCita[];
   horarios: AgendaHorario[];
   bloqueos: AgendaBloqueo[];
+  clientes?: Array<{ id: string; nombre: string; telefono?: string | null }>;
   timeZone: string;
   currency: string;
 }) {
@@ -706,6 +708,7 @@ export function AgendaBoard({
           <CitaForm
             bloqueos={bloqueos}
             citas={citasBoard}
+            clientes={clientes}
             currency={currency}
             horarios={horarios}
             initial={{
@@ -739,6 +742,7 @@ export function AgendaBoard({
             <CitaForm
               bloqueos={bloqueos}
               citas={citasBoard}
+              clientes={clientes}
               currency={currency}
               horarios={horarios}
               initial={{

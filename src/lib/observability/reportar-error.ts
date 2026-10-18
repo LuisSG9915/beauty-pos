@@ -94,11 +94,11 @@ export function iniciarCapturaErrores() {
  * para inyectarlos en el objeto contexto antes de guardar en incidentes_error.
  */
 export function extraerHeadersCloudflare(
-  headersSource?: Headers | Record<string, string | string[] | undefined> | null,
+  requestHeaders?: Headers | Record<string, string | string[] | undefined> | null,
 ): { "cf-ray"?: string; "cf-ipcountry"?: string } {
-  if (!headersSource) return {};
-  if (typeof (headersSource as Headers).get === "function") {
-    const h = headersSource as Headers;
+  if (!requestHeaders) return {};
+  if (typeof (requestHeaders as Headers).get === "function") {
+    const h = requestHeaders as Headers;
     const cfRay = h.get("cf-ray");
     const cfIpCountry = h.get("cf-ipcountry");
     return {
@@ -106,12 +106,28 @@ export function extraerHeadersCloudflare(
       ...(cfIpCountry ? { "cf-ipcountry": cfIpCountry } : {}),
     };
   }
-  const rec = headersSource as Record<string, string | string[] | undefined>;
+  const rec = requestHeaders as Record<string, string | string[] | undefined>;
   const rawRay = rec["cf-ray"];
   const rawCountry = rec["cf-ipcountry"];
   const cfRay = Array.isArray(rawRay) ? rawRay[0] : rawRay;
   const cfIpCountry = Array.isArray(rawCountry) ? rawCountry[0] : rawCountry;
   return {
+    ...(cfRay ? { "cf-ray": cfRay } : {}),
+    ...(cfIpCountry ? { "cf-ipcountry": cfIpCountry } : {}),
+  };
+}
+
+/**
+ * Incluye cf-ray y cf-ipcountry desde requestHeaders en el objeto contexto cuando están presentes.
+ */
+export function enriquecerContextoConHeaders(
+  contexto: Record<string, unknown> = {},
+  requestHeaders?: Headers | null,
+): Record<string, unknown> {
+  const cfRay = requestHeaders?.get("cf-ray");
+  const cfIpCountry = requestHeaders?.get("cf-ipcountry");
+  return {
+    ...contexto,
     ...(cfRay ? { "cf-ray": cfRay } : {}),
     ...(cfIpCountry ? { "cf-ipcountry": cfIpCountry } : {}),
   };

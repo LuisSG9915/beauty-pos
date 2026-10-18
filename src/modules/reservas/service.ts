@@ -1,4 +1,4 @@
-import { and, eq, or } from "drizzle-orm";
+import { and, eq, gt, lt, notInArray, or } from "drizzle-orm";
 
 import { getDatabase } from "@/db/client";
 import { withDbRetry } from "@/db/retry";
@@ -7,7 +7,7 @@ import { clientes, sucursales } from "@/db/schema/core";
 import { citas, detalleCitasServicios } from "@/db/schema/operations";
 import { auditEvent } from "@/lib/audit";
 import { contextoSuscripcion, tieneCapacidad } from "@/modules/billing/queries";
-import { getOcupacionAgenda, lockSucursalAgenda, registrarHistorialCita, verificarColisionEstilista } from "@/modules/agenda/service";
+import { getOcupacionAgenda, lockSucursalAgenda, registrarHistorialCita } from "@/modules/agenda/service";
 import { validateCitaAvailability } from "@/modules/agenda/rules";
 import { getZonedParts } from "@/modules/agenda/timezone";
 import { intervalFromDates } from "@/modules/agenda/types";
@@ -192,14 +192,27 @@ export async function crearReservaPublica(input: {
       }
 
       if (usuarioId) {
-        const colision = await verificarColisionEstilista(tx, {
-          sucursalId: input.sucursalId,
-          usuarioId,
-          inicio: input.fechaHora,
-          fin: new Date(candidato.terminaAtMs),
-        });
-        if (colision) {
-          return { ok: false, error: "El profesional ya tiene una cita en ese horario. Elige otro horario o estilista." };
+        const miembroId = usuarioId;
+        const inicioEn = input.fechaHora;
+        const finEn = new Date(input.fechaHora.getTime() + servicio.duracionMinutos * 60_000);
+
+        const [citaTraslape] = await tx
+          .select({ id: citas.id })
+          .from(citas)
+          .where(
+            and(
+              eq(citas.sucursalId, input.sucursalId),
+              eq(citas.usuarioId, miembroId),
+              eq(citas.activo, true),
+              notInArray(citas.estado, ["cancelada", "no_asistio"]),
+              lt(citas.inicioEn, finEn),
+              gt(citas.finEn, inicioEn),
+            ),
+          )
+          .limit(1);
+
+        if (citaTraslape) {
+          return { ok: false, error: "El profesional ya tiene una cita asignada en ese horario. Por favor selecciona otro horario." };
         }
       }
 

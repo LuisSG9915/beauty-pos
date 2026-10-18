@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { type SQL, sql } from "drizzle-orm";
 import {
   boolean,
   check,
@@ -26,7 +26,7 @@ const opAuditColumns = {
   updatedBy: uuid("updated_by"),
 };
 
-export const citas = pgTable(
+const baseCitas = pgTable(
   "citas",
   {
     id: uuid("id").defaultRandom().primaryKey(),
@@ -61,6 +61,32 @@ export const citas = pgTable(
     index("citas_estado_idx").on(table.estado),
   ],
 );
+
+Object.defineProperties(baseCitas, {
+  inicioEn: {
+    get() {
+      return this.fechaHora;
+    },
+  },
+  miembroId: {
+    get() {
+      return this.usuarioId;
+    },
+  },
+  finEn: {
+    get() {
+      return sql`${this.fechaHora} + (${this.duracionMinutos} * interval '1 minute')`;
+    },
+  },
+});
+
+export type CitasTable = typeof baseCitas & {
+  inicioEn: typeof baseCitas.fechaHora;
+  miembroId: typeof baseCitas.usuarioId;
+  finEn: SQL;
+};
+
+export const citas: CitasTable = baseCitas as CitasTable;
 
 // Historial de cambios de la cita: creación, edición, movimientos,
 // transiciones de estado, servicios agregados/quitados y ocultar/reactivar.
@@ -738,7 +764,7 @@ export type ClientePaqueteEstado = (typeof CLIENTE_PAQUETE_ESTADOS)[number];
 // Saldo de un paquete comprado por un cliente. `sesiones_restantes` baja con
 // cada `paquete_usos`; al llegar a cero pasa a "agotado". Si la venta de
 // compra se cancela, el paquete queda "cancelado" (solo si no tiene usos).
-export const clientePaquetes = pgTable(
+const baseClientePaquetes = pgTable(
   "cliente_paquetes",
   {
     id: uuid("id").defaultRandom().primaryKey(),
@@ -764,6 +790,19 @@ export const clientePaquetes = pgTable(
     check("cliente_paquetes_sesiones_chk", sql`${table.sesionesTotal} > 0 and ${table.sesionesRestantes} between 0 and ${table.sesionesTotal}`),
   ],
 );
+
+Object.defineProperty(baseClientePaquetes, "usosRestantes", {
+  get() {
+    return this.sesionesRestantes;
+  },
+});
+
+export type ClientePaquetesTable = typeof baseClientePaquetes & {
+  usosRestantes: typeof baseClientePaquetes.sesionesRestantes;
+};
+
+export const clientePaquetes: ClientePaquetesTable = baseClientePaquetes as ClientePaquetesTable;
+export const paquetesClientes = clientePaquetes;
 
 // Consumo de una sesión del paquete contra una línea de servicio del ticket.
 // Mientras el uso esté activo, la línea ligada no suma al subtotal de la venta

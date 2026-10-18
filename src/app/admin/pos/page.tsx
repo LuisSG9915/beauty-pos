@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, lt, sql } from "drizzle-orm";
 import { WifiOff } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
@@ -13,7 +13,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
 import { clientes } from "@/db/schema/core";
-import { ventas } from "@/db/schema/operations";
+import { paquetesClientes, ventas } from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { canAccessBranch, hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatTime } from "@/lib/format";
@@ -83,6 +83,21 @@ export default async function PosPage({ searchParams }: { searchParams: SearchPa
 
   const ticket = await getTicketData(organizationId, ventaIdParam);
   if (!ticket || !canAccessBranch(context.access, ticket.venta.sucursalId)) notFound();
+
+  // Consulta de paquetesClientes activos con saldo disponible
+  if (ticket.venta.clienteId) {
+    await db
+      .select({ id: paquetesClientes.id, sesiones: paquetesClientes.usosRestantes })
+      .from(paquetesClientes)
+      .where(
+        and(
+          eq(paquetesClientes.organizacionId, organizationId),
+          eq(paquetesClientes.clienteId, ticket.venta.clienteId),
+          eq(paquetesClientes.activo, true),
+          gt(paquetesClientes.usosRestantes, 0),
+        ),
+      );
+  }
 
   const fallbackReturnTo = ticket.venta.citaId
     ? buildAdminHref("/agenda", { organizationId, sucursalId: ticket.venta.sucursalId })
@@ -184,6 +199,13 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
           .orderBy(desc(fechaVenta))
       : Promise.resolve([]),
     sucursalId ? catalogosTicketCached(organizationId, sucursalId) : Promise.resolve(null),
+    // Clientes iniciales para selectores locales (la búsqueda completa ocurre vía /api/clientes)
+    db
+      .select({ id: clientes.id, nombre: clientes.nombre, telefono: clientes.telefono })
+      .from(clientes)
+      .where(and(eq(clientes.organizacionId, organizationId), eq(clientes.activo, true)))
+      .orderBy(desc(clientes.creadoEn))
+      .limit(100),
   ]);
 
   const currentHref = buildAdminHref("/pos", { organizationId, sucursalId });

@@ -69,6 +69,7 @@ export function CitaForm({
   horarios = [],
   bloqueos = [],
   citas = [],
+  clientes = [],
   currency = "MXN",
   timeZone,
   initial,
@@ -82,6 +83,7 @@ export function CitaForm({
   horarios?: AgendaHorario[];
   bloqueos?: AgendaBloqueo[];
   citas?: AgendaCita[];
+  clientes?: Array<{ id: string; nombre: string; telefono?: string | null }>;
   currency?: string;
   timeZone: string;
   initial?: CitaData;
@@ -89,6 +91,15 @@ export function CitaForm({
 }) {
   const router = useRouter();
   const toast = useToast();
+  const defaultItems = useMemo(
+    () =>
+      clientes?.map((c) => ({
+        value: c.id,
+        label: c.nombre,
+        description: c.telefono ?? undefined,
+      })),
+    [clientes],
+  );
   const [state, formAction, pending] = useActionState<CitaActionState, FormData>(saveCita, {});
   const [clienteId, setClienteId] = useState(initial?.clienteId ?? "");
   const [seleccionados, setSeleccionados] = useState<Set<string>>(() => new Set(initial?.servicioIds ?? []));
@@ -407,6 +418,7 @@ export function CitaForm({
         ) : null}
 
         <RemoteCombobox
+          defaultItems={defaultItems}
           initialItem={
             initial?.clienteId
               ? {

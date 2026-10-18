@@ -1,4 +1,4 @@
-import { sql } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 
 import { AgendaBoard, type AgendaBloqueo, type AgendaCita, type AgendaHorario } from "@/app/admin/agenda/agenda-board";
 import { AgendaToolbar } from "@/app/admin/agenda/agenda-toolbar";
@@ -11,6 +11,7 @@ import {
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { getDatabase } from "@/db/client";
+import { clientes } from "@/db/schema/core";
 import { getAdminContext } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { todayDateInput } from "@/lib/format";
@@ -128,7 +129,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   // paralelas de antes obligaban a abrir varias conexiones frías por request y
   // cada ronda a la BD remota cuesta ~50-100 ms. Fechas en ISO UTC para
   // serializar directo a los componentes.
-  const [datosResult, suscripcion] = await Promise.all([
+  const [datosResult, suscripcion, clientesIniciales] = await Promise.all([
     getDatabase().execute<AgendaDatosRow>(sql`
       select
         coalesce((
@@ -247,6 +248,16 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
         ), '[]'::jsonb) else '[]'::jsonb end as avisos
     `),
     contextoSuscripcionCache(organization.id),
+    getDatabase()
+      .select({
+        id: clientes.id,
+        nombre: clientes.nombre,
+        telefono: clientes.telefono,
+      })
+      .from(clientes)
+      .where(and(eq(clientes.organizacionId, organization.id), eq(clientes.activo, true)))
+      .orderBy(desc(clientes.creadoEn))
+      .limit(100),
   ]);
   const datos = datosResult.rows[0];
   const staffRows = datos?.staff ?? [];
@@ -363,6 +374,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
       <AgendaBoard
         bloqueos={bloqueos}
         citas={citasSerializadas}
+        clientes={clientesIniciales}
         currency={currency}
         fecha={fecha}
         horarios={horarios}

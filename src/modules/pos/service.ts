@@ -83,6 +83,8 @@ export type EjecutarVentaInput = {
   membresias?: MembresiaVenta[];
   anticiposAplicados?: string[];
   zonaHoraria?: string;
+  serviciosInsumos?: Array<{ servicioId: string; productoId: string; cantidad: string }>;
+  reglasComision?: Array<{ id: string; servicioId: string | null; rolId: string | null; tipo: string; valor: string }>;
   userId?: string | null;
 };
 
@@ -333,22 +335,24 @@ export async function ejecutarVentaTransaccional(
     const serviciosConId = serviciosParaComisiones.filter((s) => s.id);
     const servicioIds = [...new Set(serviciosConId.map((s) => s.servicioId))];
     if (servicioIds.length > 0) {
-      const reglas = await tx
-        .select({
-          id: comisiones.id,
-          servicioId: comisiones.servicioId,
-          rolId: comisiones.rolId,
-          tipo: comisiones.tipo,
-          valor: comisiones.valor,
-        })
-        .from(comisiones)
-        .where(
-          and(
-            inArray(comisiones.servicioId, servicioIds),
-            eq(comisiones.organizacionId, input.organizacionId),
-            eq(comisiones.activo, true),
-          ),
-        );
+      const reglas =
+        input.reglasComision ??
+        (await tx
+          .select({
+            id: comisiones.id,
+            servicioId: comisiones.servicioId,
+            rolId: comisiones.rolId,
+            tipo: comisiones.tipo,
+            valor: comisiones.valor,
+          })
+          .from(comisiones)
+          .where(
+            and(
+              inArray(comisiones.servicioId, servicioIds),
+              eq(comisiones.organizacionId, input.organizacionId),
+              eq(comisiones.activo, true),
+            ),
+          ));
 
       const usuarioIds = [...new Set(serviciosConId.map((l) => l.usuarioId).filter((u): u is string => Boolean(u)))];
       const rolesPorUsuario = await getRolesPorUsuario(input.organizacionId, usuarioIds);
@@ -413,7 +417,8 @@ export async function ejecutarVentaTransaccional(
     const servicioIdsVendidos = [...new Set(serviciosVendidos.map((s) => s.servicioId))];
 
     const insumos =
-      servicioIdsVendidos.length > 0
+      input.serviciosInsumos ??
+      (servicioIdsVendidos.length > 0
         ? await tx
             .select({
               servicioId: relServiciosInsumos.servicioId,
@@ -427,7 +432,7 @@ export async function ejecutarVentaTransaccional(
                 eq(relServiciosInsumos.activo, true),
               ),
             )
-        : [];
+        : []);
 
     const consumoProductos = new Map<string, number>();
     for (const p of productosVendidos) {
@@ -578,3 +583,8 @@ export async function ejecutarVentaTransaccional(
     return ejecutarTx(db);
   });
 }
+
+/** Aliases para paridad en sincronización offline y auditorías */
+export const ejecutarInsercionVentaLote = ejecutarVentaTransaccional;
+export const serviciosInsumos = relServiciosInsumos;
+

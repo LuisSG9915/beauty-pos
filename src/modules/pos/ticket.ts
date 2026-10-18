@@ -319,7 +319,7 @@ async function loadCatalogosTicket(organizacionId: string, sucursalId: string): 
       .select({ id: clientes.id, nombre: clientes.nombre, telefono: clientes.telefono })
       .from(clientes)
       .where(and(eq(clientes.organizacionId, organizacionId), eq(clientes.activo, true)))
-      .orderBy(desc(clientes.updatedAt))
+      .orderBy(desc(clientes.creadoEn))
       .limit(100),
     db
       .select({ id: catMediosPago.id, nombre: catMediosPago.nombre, categoria: catMediosPago.categoria })
@@ -539,7 +539,7 @@ export async function getTicketData(
               eq(clientePaquetes.clienteId, venta.clienteId),
               eq(clientePaquetes.estado, "vigente"),
               eq(clientePaquetes.activo, true),
-              gt(clientePaquetes.sesionesRestantes, 0),
+              gt(clientePaquetes.usosRestantes, 0),
             ),
           )
           .orderBy(asc(clientePaquetes.createdAt))

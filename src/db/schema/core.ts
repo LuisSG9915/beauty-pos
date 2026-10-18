@@ -77,7 +77,7 @@ export const sucursales = pgTable(
   ],
 );
 
-export const clientes = pgTable(
+const baseClientes = pgTable(
   "clientes",
   {
     id: uuid("id").defaultRandom().primaryKey(),
@@ -109,6 +109,18 @@ export const clientes = pgTable(
     index("clientes_organizacion_fecha_idx").on(table.organizacionId, table.createdAt),
   ],
 );
+
+Object.defineProperty(baseClientes, "creadoEn", {
+  get() {
+    return this.createdAt;
+  },
+});
+
+export type ClientesTable = typeof baseClientes & {
+  creadoEn: typeof baseClientes.createdAt;
+};
+
+export const clientes: ClientesTable = baseClientes as ClientesTable;
 
 export const usuarios = pgTable(
   "usuarios",

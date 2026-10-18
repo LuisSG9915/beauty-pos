@@ -6,14 +6,14 @@ import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { withDbRetry } from "@/db/retry";
-import { catMediosPago, productos, servicios } from "@/db/schema/catalogs";
+import { catMediosPago, comisiones, productos, relServiciosInsumos, servicios } from "@/db/schema/catalogs";
 import { sucursales } from "@/db/schema/core";
 import { clavesIdempotencia, cortesCaja } from "@/db/schema/operations";
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
 import { auditEvent } from "@/lib/audit";
 import { canAccessBranch, checkPermission } from "@/lib/auth/authorization";
 import { totalVentaOffline, validarPagosOffline } from "@/modules/offline/venta-offline";
-import { ejecutarVentaTransaccional } from "@/modules/pos/service";
+import { ejecutarInsercionVentaLote, serviciosInsumos } from "@/modules/pos/service";
 
 /**
  * Sincroniza una venta cobrada sin conexión. El dispositivo guardó el ticket
@@ -160,7 +160,55 @@ export async function sincronizarVentaOffline(raw: unknown): Promise<ActionState
           };
         });
 
-        const resultadoVenta = await ejecutarVentaTransaccional(tx, {
+        const tieneServicios = input.servicios.length > 0;
+        const tieneEstilista = input.servicios.some((s) => s.usuarioId);
+
+        // Cuando la venta offline incluye ítems de tipo servicio o tiene estilista asignado,
+        // consulta insumos de receta (serviciosInsumos) y reglas de comisión para pasarlos a ejecutarInsercionVentaLote.
+        let insumosReceta: Array<{ servicioId: string; productoId: string; cantidad: string }> = [];
+        let reglasComision: Array<{ id: string; servicioId: string | null; rolId: string | null; tipo: string; valor: string }> = [];
+
+        if (tieneServicios || tieneEstilista) {
+          const [insumosRows, comisionesRows] = await Promise.all([
+            servicioIds.length > 0
+              ? tx
+                  .select({
+                    servicioId: relServiciosInsumos.servicioId,
+                    productoId: relServiciosInsumos.productoId,
+                    cantidad: relServiciosInsumos.cantidad,
+                  })
+                  .from(serviciosInsumos)
+                  .where(
+                    and(
+                      inArray(relServiciosInsumos.servicioId, servicioIds),
+                      eq(relServiciosInsumos.activo, true),
+                    ),
+                  )
+              : Promise.resolve([]),
+            servicioIds.length > 0
+              ? tx
+                  .select({
+                    id: comisiones.id,
+                    servicioId: comisiones.servicioId,
+                    rolId: comisiones.rolId,
+                    tipo: comisiones.tipo,
+                    valor: comisiones.valor,
+                  })
+                  .from(comisiones)
+                  .where(
+                    and(
+                      inArray(comisiones.servicioId, servicioIds),
+                      eq(comisiones.organizacionId, input.organizacionId),
+                      eq(comisiones.activo, true),
+                    ),
+                  )
+              : Promise.resolve([]),
+          ]);
+          insumosReceta = insumosRows;
+          reglasComision = comisionesRows;
+        }
+
+        const resultadoVenta = await ejecutarInsercionVentaLote(tx, {
           organizacionId: input.organizacionId,
           sucursalId: input.sucursalId,
           idempotencyKey: input.clave,
@@ -182,6 +230,8 @@ export async function sincronizarVentaOffline(raw: unknown): Promise<ActionState
             cantidad: p.cantidad,
           })),
           pagos: pagosAjustados,
+          serviciosInsumos: insumosReceta,
+          reglasComision,
           notas: `Venta registrada offline${input.notas ? ` — ${input.notas}` : ""}`,
           userId: user.id,
         });
