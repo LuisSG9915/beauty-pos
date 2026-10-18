@@ -184,7 +184,7 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-lg font-semibold text-foreground">{actual.planNombre ?? "Plan desconocido"}</p>
                     {esTarifaFundador ? (
-                      <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs font-semibold text-primary">
+                      <span className="rounded-full bg-accent px-2.5 py-0.5 text-op-xs font-semibold text-primary">
                         Tarifa fundador
                       </span>
                     ) : null}
@@ -268,11 +268,11 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
                   <p className="font-semibold text-foreground">{plan.nombre}</p>
                   {esActual ? <StatusBadge tone="neutral">Actual</StatusBadge> : null}
                 </div>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">{plan.descripcion}</p>
+                <p className="mt-1 text-op-xs leading-5 text-muted-foreground">{plan.descripcion}</p>
                 <p className="mt-3 text-lg font-semibold text-foreground">
-                  {fmt(plan.precioMensual)} <span className="text-xs font-normal text-muted-foreground">/mes</span>
+                  {fmt(plan.precioMensual)} <span className="text-op-xs font-normal text-muted-foreground">/mes</span>
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-op-xs text-muted-foreground">
                   Incluye {plan.sucursalesIncluidas} sucursal(es)
                   {plan.precioSucursalExtra
                     ? ` · ${fmt(plan.precioSucursalExtra)}/mes por sucursal adicional`
@@ -281,7 +281,7 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
                       : ""}
                 </p>
                 {plan.precioAnual ? (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-op-xs text-muted-foreground">
                     o {fmt(plan.precioAnual)} /año (equivale a {fmt(Number(plan.precioAnual) / 12)}/mes)
                   </p>
                 ) : null}

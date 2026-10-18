@@ -385,10 +385,10 @@ export function ProductForm({
               />
             ) : null}
             {!capturaIa ? (
-              <span className="text-xs text-muted-foreground">No disponible en este entorno</span>
+              <span className="text-op-xs text-muted-foreground">No disponible en este entorno</span>
             ) : null}
             {leyendoFoto ? (
-              <span className="text-xs text-muted-foreground">Leyendo la foto…</span>
+              <span className="text-op-xs text-muted-foreground">Leyendo la foto…</span>
             ) : null}
           </div>
           {duplicado ? (
@@ -530,7 +530,7 @@ export function ProductForm({
                   key={`${compra.fecha}-${index}`}
                 >
                   <span className="min-w-0 truncate text-foreground">{compra.proveedor}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-op-xs text-muted-foreground">
                     {compra.fecha} · {compra.cantidad} pza(s) · {compra.costo}
                   </span>
                 </li>

@@ -430,7 +430,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <CalendarHeart className="size-4 text-primary" />
-              <span className="text-xs font-bold uppercase tracking-wider text-primary">
+              <span className="text-op-xs font-bold uppercase tracking-wider text-primary">
                 Radar de Retención Predictiva
               </span>
               <span

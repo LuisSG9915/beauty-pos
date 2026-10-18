@@ -117,14 +117,14 @@ export function ClientForm({
           {initial?.telefono ? (
             <div className="mt-1 flex flex-wrap items-center gap-2.5">
               <a
-                className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                className="inline-flex items-center gap-1 text-op-xs font-medium text-primary hover:underline"
                 href={`tel:${initial.telefono}`}
               >
                 <Phone className="size-3" /> {initial.telefono}
               </a>
               <span className="text-muted-foreground/30">·</span>
               <a
-                className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+                className="inline-flex items-center gap-1 text-op-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
                 href={`https://wa.me/52${initial.telefono.replace(/\D/g, "")}`}
                 rel="noopener noreferrer"
                 target="_blank"
@@ -133,7 +133,7 @@ export function ClientForm({
               </a>
             </div>
           ) : (
-            <p className="mt-0.5 text-xs text-muted-foreground">
+            <p className="mt-0.5 text-op-xs text-muted-foreground">
               {initial?.id
                 ? "Sin teléfono registrado"
                 : "Captura los datos para agendar citas y enviar recordatorios."}
@@ -144,7 +144,7 @@ export function ClientForm({
 
       {/* ----------------- SECCIÓN 1: DATOS PERSONALES ----------------- */}
       <div className="space-y-3.5 rounded-2xl border border-border bg-card p-4 shadow-2xs">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="flex items-center gap-2 text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <User className="size-3.5 text-primary" />
           <span>Datos personales</span>
         </div>
@@ -199,7 +199,7 @@ export function ClientForm({
 
       {/* ----------------- SECCIÓN 2: CONTACTO Y AVISOS ----------------- */}
       <div className="space-y-3.5 rounded-2xl border border-border bg-card p-4 shadow-2xs">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="flex items-center gap-2 text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <Phone className="size-3.5 text-primary" />
           <span>Contacto y avisos</span>
         </div>
@@ -230,7 +230,7 @@ export function ClientForm({
 
       {/* ----------------- SECCIÓN 3: PREFERENCIAS DEL SALÓN ----------------- */}
       <div className="space-y-3.5 rounded-2xl border border-border bg-card p-4 shadow-2xs">
-        <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        <div className="flex items-center gap-2 text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
           <Sparkles className="size-3.5 text-primary" />
           <span>Notas y preferencias de salón</span>
         </div>
@@ -251,7 +251,7 @@ export function ClientForm({
         className="rounded-2xl border border-border bg-muted/40 p-4 transition-colors"
         open={tieneFiscales}
       >
-        <summary className="flex cursor-pointer list-none items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-primary">
+        <summary className="flex cursor-pointer list-none items-center justify-between text-op-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-primary">
           <div className="flex items-center gap-2">
             <ReceiptText className="size-3.5 text-primary" />
             <span>Datos fiscales de facturación (CFDI)</span>
@@ -265,7 +265,7 @@ export function ClientForm({
           <Field>
             <FieldLabel>RFC</FieldLabel>
             <Input
-              className="font-mono uppercase text-xs"
+              className="font-mono uppercase text-op-xs"
               defaultValue={String(value("rfc"))}
               maxLength={13}
               name="rfc"

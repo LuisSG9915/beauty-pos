@@ -25,7 +25,7 @@ export function StatCard({ label, value, hint, icon: Icon, className }: StatCard
       )}
     >
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <p className="text-op-xs font-medium text-muted-foreground">{label}</p>
         {Icon ? <Icon aria-hidden="true" className="size-4 text-muted-foreground" strokeWidth={1.8} /> : null}
       </div>
       <p className="mt-1.5 text-2xl font-semibold tracking-tight text-foreground">{value}</p>

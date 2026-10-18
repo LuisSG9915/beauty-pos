@@ -7,6 +7,7 @@ import { UnitForm } from "@/app/admin/unidades-medida/unit-form";
 import { CrudRowActions } from "@/components/admin/crud-actions";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
@@ -66,7 +67,7 @@ export default async function UnitsPage({ searchParams }: { searchParams: Search
         {units.length === 0 ? (
           <EmptyState description="Crea unidades como pieza, litro, gramo o mililitro para el inventario." title="No hay unidades" />
         ) : (
-          <>
+          <VistaAdaptativa>
             <RegistroList>
               {units.map((unit) => (
                 <RegistroCard
@@ -116,7 +117,7 @@ export default async function UnitsPage({ searchParams }: { searchParams: Search
                 </tbody>
               </table>
             </div>
-          </>
+          </VistaAdaptativa>
         )}
       </AdminCard>
       {editing || firstParam(params.nuevo) === "1" ? (

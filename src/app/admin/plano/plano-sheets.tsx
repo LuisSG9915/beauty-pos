@@ -103,7 +103,7 @@ function ProductoUbicacionRow({
     <li className="flex items-center gap-2 rounded-xl border border-border px-3 py-2">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-foreground">{item.nombre}</p>
-        <p className="text-xs text-muted-foreground">{item.sku}</p>
+        <p className="text-op-xs text-muted-foreground">{item.sku}</p>
       </div>
       {editable ? (
         <div className="flex items-center gap-1.5">
@@ -269,7 +269,7 @@ export function UbicacionSheet({
 
             <section aria-label="Mercancía en esta ubicación" className="space-y-2">
               {asignados.length === 0 ? (
-                <p className="rounded-xl bg-muted/60 px-4 py-3 text-xs text-muted-foreground">
+                <p className="rounded-xl bg-muted/60 px-4 py-3 text-op-xs text-muted-foreground">
                   Sin mercancía asignada todavía.
                 </p>
               ) : (
@@ -292,7 +292,7 @@ export function UbicacionSheet({
                   ubicacionId={ubicacion.id}
                 />
               ) : null}
-              <p className="text-xs leading-5 text-muted-foreground">
+              <p className="text-op-xs leading-5 text-muted-foreground">
                 Las cantidades por ubicación son informativas: las ventas siguen
                 descontando del stock de la sucursal.
               </p>
@@ -387,7 +387,7 @@ export function MobiliarioSheet({
               {mueble.sesionActiva ? (
                 <div className="space-y-3.5 rounded-2xl border border-primary/25 bg-primary/5 p-4 shadow-sm">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-primary">
+                    <span className="flex items-center gap-2 text-op-xs font-bold uppercase tracking-wider text-primary">
                       <span className="relative flex size-2">
                         <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
                         <span className="relative inline-flex size-2 rounded-full bg-primary" />
@@ -395,7 +395,7 @@ export function MobiliarioSheet({
                       Sesión en curso
                     </span>
                     {mueble.sesionActiva.poseMinutos ? (
-                      <span className="flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                      <span className="flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-op-xs font-semibold text-amber-700 dark:text-amber-300">
                         <Timer aria-hidden="true" className="size-3.5" />
                         Pose {mueble.sesionActiva.poseMinutos}m
                       </span>
@@ -406,7 +406,7 @@ export function MobiliarioSheet({
                     <h4 className="text-base font-bold text-foreground">
                       {mueble.sesionActiva.clienteNombre || "Cliente de paso"}
                     </h4>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
+                    <p className="mt-0.5 text-op-xs text-muted-foreground">
                       {mueble.sesionActiva.servicioNombre || "Servicio en estación"}
                       {mueble.sesionActiva.profesionalNombre
                         ? ` · Atiende ${mueble.sesionActiva.profesionalNombre}`
@@ -416,7 +416,7 @@ export function MobiliarioSheet({
 
                   <div className="flex flex-wrap items-center gap-2 border-t border-primary/15 pt-2">
                     <Button
-                      className="h-8 gap-1.5 rounded-xl text-xs"
+                      className="h-8 gap-1.5 rounded-xl text-op-xs"
                       nativeButton={false}
                       render={
                         <Link
@@ -433,7 +433,7 @@ export function MobiliarioSheet({
 
                     {mueble.sesionActiva.ventaId ? (
                       <Button
-                        className="h-8 gap-1.5 rounded-xl text-xs"
+                        className="h-8 gap-1.5 rounded-xl text-op-xs"
                         nativeButton={false}
                         render={<Link href={`/admin/ventas?id=${mueble.sesionActiva.ventaId}`} />}
                         size="sm"
@@ -445,7 +445,7 @@ export function MobiliarioSheet({
                       </Button>
                     ) : (
                       <Button
-                        className="h-8 gap-1.5 rounded-xl text-xs"
+                        className="h-8 gap-1.5 rounded-xl text-op-xs"
                         nativeButton={false}
                         render={
                           <Link href={`/admin/ventas/nueva?citaId=${mueble.sesionActiva.citaId}`} />
@@ -461,7 +461,7 @@ export function MobiliarioSheet({
 
                     {mueble.sesionActiva.poseMinutos ? (
                       <Button
-                        className="h-8 gap-1.5 rounded-xl border-amber-500/30 bg-amber-500/10 text-xs font-semibold text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
+                        className="h-8 gap-1.5 rounded-xl border-amber-500/30 bg-amber-500/10 text-op-xs font-semibold text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
                         onClick={() => {
                           const nuevo = crearPoseTimer({
                             citaId: mueble.sesionActiva?.citaId ?? mueble.id,
@@ -498,7 +498,7 @@ export function MobiliarioSheet({
 
               <dl className="space-y-2 text-sm">
                 <div className="flex items-center justify-between gap-3">
-                  <dt className="text-xs text-muted-foreground">Estado</dt>
+                  <dt className="text-op-xs text-muted-foreground">Estado</dt>
                   <dd>
                     <StatusBadge
                       tone={MOBILIARIO_ESTADO_TONO[mueble.estado as keyof typeof MOBILIARIO_ESTADO_TONO] ?? "neutral"}
@@ -509,19 +509,19 @@ export function MobiliarioSheet({
                 </div>
                 {mueble.recursoNombre ? (
                   <div className="flex items-center justify-between gap-3">
-                    <dt className="text-xs text-muted-foreground">Recurso de agenda</dt>
+                    <dt className="text-op-xs text-muted-foreground">Recurso de agenda</dt>
                     <dd className="text-right text-sm font-medium text-foreground">{mueble.recursoNombre}</dd>
                   </div>
                 ) : null}
                 {mueble.fechaAdquisicion ? (
                   <div className="flex items-center justify-between gap-3">
-                    <dt className="text-xs text-muted-foreground">Adquisición</dt>
+                    <dt className="text-op-xs text-muted-foreground">Adquisición</dt>
                     <dd className="text-sm text-foreground">{mueble.fechaAdquisicion}</dd>
                   </div>
                 ) : null}
                 {mueble.costo != null ? (
                   <div className="flex items-center justify-between gap-3">
-                    <dt className="text-xs text-muted-foreground">Costo</dt>
+                    <dt className="text-op-xs text-muted-foreground">Costo</dt>
                     <dd className="text-sm tabular-nums text-foreground">
                       {formatCurrency(Number(mueble.costo), { currency: moneda })}
                     </dd>

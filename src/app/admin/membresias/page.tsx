@@ -7,6 +7,7 @@ import { MembresiaForm } from "@/app/admin/membresias/membresia-form";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminNavTabs, CATALOGO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
@@ -204,7 +205,7 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
         {membresiaRows.length === 0 ? (
           <EmptyState description="Crea una membresía para venderla en el punto de venta y dar descuento a tus clientes." title="No hay membresías" />
         ) : (
-          <>
+          <VistaAdaptativa>
             <RegistroList>
               {membresiaRows.map((membresia) => (
                 <RegistroCard
@@ -271,7 +272,7 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
                 </tbody>
               </table>
             </div>
-          </>
+          </VistaAdaptativa>
         )}
       </AdminCard>
       {editing || firstParam(params.nuevo) === "1" ? (

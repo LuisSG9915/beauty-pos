@@ -58,7 +58,7 @@ export function ListView({
         <AdminCard animate className="overflow-hidden p-0 sm:p-0">
           <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] text-left text-sm">
-          <thead className="bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
+          <thead className="bg-muted/60 text-op-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-3 font-medium">Fecha y hora</th>
               <th className="px-4 py-3 font-medium">Cliente</th>
@@ -78,15 +78,15 @@ export function ListView({
               >
                 <td className="whitespace-nowrap px-4 py-3">
                   {formatDate(cita.fechaHora, { timeZone })}
-                  <span className="ml-2 text-xs text-muted-foreground">
+                  <span className="ml-2 text-op-xs text-muted-foreground">
                     {formatTime(cita.fechaHora, { timeZone })}
                   </span>
                 </td>
                 <td className="px-4 py-3 font-medium">{cita.clienteNombre}</td>
-                <td className="px-4 py-3 text-xs text-muted-foreground">
+                <td className="px-4 py-3 text-op-xs text-muted-foreground">
                   {cita.usuarioNombre ?? "Sin asignar"}
                 </td>
-                <td className="max-w-56 truncate px-4 py-3 text-xs text-muted-foreground">
+                <td className="max-w-56 truncate px-4 py-3 text-op-xs text-muted-foreground">
                   {cita.servicios.map((servicio) => servicio.nombre).join(", ") || "Sin servicios"}
                   {cita.recursos.length > 0 ? (
                     <span className="block text-op-xs text-muted-foreground/80">

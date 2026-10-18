@@ -54,7 +54,7 @@ export function RegistroCard({
         <div className="min-w-0">
           <h3 className="text-sm font-semibold leading-5 text-foreground">{titulo}</h3>
           {subtitulo ? (
-            <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{subtitulo}</p>
+            <p className="mt-0.5 text-op-xs leading-5 text-muted-foreground">{subtitulo}</p>
           ) : null}
         </div>
         {badge ? <div className="shrink-0">{badge}</div> : null}
@@ -66,7 +66,7 @@ export function RegistroCard({
               className="flex items-baseline justify-between gap-3 text-sm"
               key={`${campo.label}-${index}`}
             >
-              <dt className="shrink-0 text-xs text-muted-foreground">{campo.label}</dt>
+              <dt className="shrink-0 text-op-xs text-muted-foreground">{campo.label}</dt>
               <dd className="min-w-0 text-right font-medium text-foreground">{campo.value}</dd>
             </div>
           ))}

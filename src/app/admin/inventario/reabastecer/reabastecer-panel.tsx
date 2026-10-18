@@ -199,7 +199,7 @@ export function ReabastecerPanel({
           Copiar lista
         </Button>
       )}
-      <span className="text-xs text-muted-foreground">
+      <span className="text-op-xs text-muted-foreground">
         {seleccionadas.length} de {filas.length} producto(s) seleccionados
       </span>
     </div>
@@ -239,7 +239,7 @@ export function ReabastecerPanel({
                     <span className="block text-sm font-semibold leading-5 text-foreground">
                       {fila.nombre}
                     </span>
-                    <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+                    <span className="mt-0.5 block text-op-xs leading-5 text-muted-foreground">
                       {fila.sku ? `${fila.sku} · ` : ""}
                       {fila.motivo}
                     </span>
@@ -251,21 +251,21 @@ export function ReabastecerPanel({
               </div>
               <dl className="mt-3 space-y-1.5">
                 <div className="flex items-baseline justify-between gap-3 text-sm">
-                  <dt className="shrink-0 text-xs text-muted-foreground">Stock</dt>
+                  <dt className="shrink-0 text-op-xs text-muted-foreground">Stock</dt>
                   <dd className="min-w-0 text-right font-medium tabular-nums text-foreground">
                     {formatQuantity(fila.stock)}
                   </dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3 text-sm">
-                  <dt className="shrink-0 text-xs text-muted-foreground">Vende por día</dt>
+                  <dt className="shrink-0 text-op-xs text-muted-foreground">Vende por día</dt>
                   <dd className="min-w-0 text-right tabular-nums text-foreground">
                     {fila.vendePorDia.toFixed(1)}
-                    <span className="ml-1 text-xs text-muted-foreground">{TENDENCIA_REABASTO_LABEL[fila.tendencia]}</span>
+                    <span className="ml-1 text-op-xs text-muted-foreground">{TENDENCIA_REABASTO_LABEL[fila.tendencia]}</span>
                   </dd>
                 </div>
                 <div className="flex items-baseline justify-between gap-3 text-sm">
-                  <dt className="shrink-0 text-xs text-muted-foreground">Te alcanza para</dt>
-                  <dd className="min-w-0 text-right text-xs tabular-nums text-muted-foreground">
+                  <dt className="shrink-0 text-op-xs text-muted-foreground">Te alcanza para</dt>
+                  <dd className="min-w-0 text-right text-op-xs tabular-nums text-muted-foreground">
                     {fila.cobertura === null
                       ? "—"
                       : `${formatQuantity(Math.round(fila.cobertura * 10) / 10, { maximumFractionDigits: 1 })} días${fila.seAgota ? ` · ${fila.seAgota}` : ""}`}
@@ -273,14 +273,14 @@ export function ReabastecerPanel({
                 </div>
                 {fila.enCamino > 0 ? (
                   <div className="flex items-baseline justify-between gap-3 text-sm">
-                    <dt className="shrink-0 text-xs text-muted-foreground">En camino</dt>
-                    <dd className="min-w-0 text-right text-xs tabular-nums text-muted-foreground">
+                    <dt className="shrink-0 text-op-xs text-muted-foreground">En camino</dt>
+                    <dd className="min-w-0 text-right text-op-xs tabular-nums text-muted-foreground">
                       {formatQuantity(fila.enCamino)}
                     </dd>
                   </div>
                 ) : null}
                 <div className="flex items-baseline justify-between gap-3 text-sm">
-                  <dt className="shrink-0 text-xs text-muted-foreground">Sugerido</dt>
+                  <dt className="shrink-0 text-op-xs text-muted-foreground">Sugerido</dt>
                   <dd className="flex min-w-0 items-center justify-end gap-2">
                     <Input
                       aria-label={`Cantidad a comprar de ${fila.nombre}`}
@@ -291,7 +291,7 @@ export function ReabastecerPanel({
                       type="number"
                       value={estado.cantidad}
                     />
-                    <span className="w-16 text-right text-xs tabular-nums text-muted-foreground">
+                    <span className="w-16 text-right text-op-xs tabular-nums text-muted-foreground">
                       {formatCurrency(Number(estado.cantidad || 0) * fila.costoUnitario, { currency })}
                     </span>
                   </dd>
@@ -305,7 +305,7 @@ export function ReabastecerPanel({
       {/* Escritorio: tabla */}
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[960px] text-left text-sm">
-          <thead className="bg-muted/60 text-xs uppercase tracking-wide text-muted-foreground">
+          <thead className="bg-muted/60 text-op-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="w-10 px-4 py-3 font-medium">
                 <span className="sr-only">Seleccionar</span>
@@ -338,7 +338,7 @@ export function ReabastecerPanel({
                   </td>
                   <td className="px-4 py-3">
                     <span className="block font-medium leading-5">{fila.nombre}</span>
-                    <span className="block text-xs leading-5 text-muted-foreground">
+                    <span className="block text-op-xs leading-5 text-muted-foreground">
                       {fila.sku ? `${fila.sku} · ` : ""}
                       {fila.motivo}
                     </span>
@@ -350,7 +350,7 @@ export function ReabastecerPanel({
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums">{formatQuantity(fila.stock)}</td>
                   <td className="px-4 py-3 text-right tabular-nums">{fila.vendePorDia.toFixed(1)}</td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">{TENDENCIA_REABASTO_LABEL[fila.tendencia]}</td>
+                  <td className="px-4 py-3 text-op-xs text-muted-foreground">{TENDENCIA_REABASTO_LABEL[fila.tendencia]}</td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {fila.cobertura === null ? (
                       <span className="text-muted-foreground">—</span>
@@ -358,7 +358,7 @@ export function ReabastecerPanel({
                       <span>
                         {formatQuantity(Math.round(fila.cobertura * 10) / 10, { maximumFractionDigits: 1 })} días
                         {fila.seAgota ? (
-                          <span className="block text-xs text-muted-foreground">{fila.seAgota}</span>
+                          <span className="block text-op-xs text-muted-foreground">{fila.seAgota}</span>
                         ) : null}
                       </span>
                     )}
@@ -388,7 +388,7 @@ export function ReabastecerPanel({
       </div>
 
       {acciones(false)}
-      <p className="text-xs text-muted-foreground">
+      <p className="text-op-xs text-muted-foreground">
         Cantidades redondeadas hacia arriba. El costo usa el último costo del catálogo; la compra se
         crea como borrador y no mueve el inventario hasta que la recibas en Compras.
       </p>

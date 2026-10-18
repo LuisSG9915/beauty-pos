@@ -20,7 +20,7 @@ export function AdminBreadcrumbs({
   if (items.length === 0) return null;
   return (
     <nav aria-label="Ruta de navegación" className={className}>
-      <ol className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+      <ol className="flex flex-wrap items-center gap-1 text-op-xs text-muted-foreground">
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
           return (
@@ -80,7 +80,7 @@ export function AdminPageHeader({
             {title}
           </h1>
           {description ? (
-            <p className="mt-1 max-w-2xl text-xs leading-5 text-muted-foreground sm:mt-1.5 sm:text-sm sm:leading-6">
+            <p className="mt-1 max-w-2xl text-op-xs leading-5 text-muted-foreground sm:mt-1.5 sm:text-sm sm:leading-6">
               {description}
             </p>
           ) : null}

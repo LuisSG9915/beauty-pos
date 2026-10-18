@@ -110,7 +110,7 @@ function OrganizationSelector({
 
   if (organizations.length === 0) {
     return (
-      <span className="rounded-full border border-dashed border-border px-3 py-1.5 text-xs text-muted-foreground">
+      <span className="rounded-full border border-dashed border-border px-3 py-1.5 text-op-xs text-muted-foreground">
         Sin negocio asignado
       </span>
     );
@@ -122,8 +122,8 @@ function OrganizationSelector({
       <span
         className={
           variant === "sidebar"
-            ? "block truncate rounded-xl border border-border bg-muted px-3 py-2 text-xs font-medium text-accent-foreground"
-            : "inline-flex max-w-48 items-center truncate rounded-full border border-border bg-muted px-3 py-1.5 text-xs font-medium text-accent-foreground"
+            ? "block truncate rounded-xl border border-border bg-muted px-3 py-2 text-op-xs font-medium text-accent-foreground"
+            : "inline-flex max-w-48 items-center truncate rounded-full border border-border bg-muted px-3 py-1.5 text-op-xs font-medium text-accent-foreground"
         }
       >
         {organization.nombre}
@@ -149,7 +149,7 @@ function OrganizationSelector({
       htmlFor={selectId}
     >
       {sidebarLabel ?? (
-        <span className="hidden text-xs font-medium text-muted-foreground sm:inline">
+        <span className="hidden text-op-xs font-medium text-muted-foreground sm:inline">
           Tu negocio
         </span>
       )}
@@ -157,8 +157,8 @@ function OrganizationSelector({
         aria-label="Negocio activo"
         className={
           variant === "sidebar"
-            ? "h-10 w-full min-w-0 rounded-xl border border-input bg-card px-2.5 text-xs font-medium text-foreground"
-            : "h-10 min-w-0 max-w-44 rounded-xl border border-input bg-card px-2.5 text-xs font-medium text-foreground sm:max-w-56"
+            ? "h-10 w-full min-w-0 rounded-xl border border-input bg-card px-2.5 text-op-xs font-medium text-foreground"
+            : "h-10 min-w-0 max-w-44 rounded-xl border border-input bg-card px-2.5 text-op-xs font-medium text-foreground sm:max-w-56"
         }
         id={selectId}
         onChange={(event) => {
@@ -215,7 +215,7 @@ function BranchSelector({
   if (branches.length === 1) {
     const [branch] = branches;
     return (
-      <span className="block truncate text-xs text-muted-foreground">
+      <span className="block truncate text-op-xs text-muted-foreground">
         {branch.nombre}
       </span>
     );
@@ -264,8 +264,8 @@ function BranchSelector({
           aria-label="Sucursal activa"
           className={
             variant === "sidebar"
-              ? "h-10 w-full min-w-0 rounded-xl border border-input bg-card px-2.5 text-xs font-medium text-foreground"
-              : "h-10 min-w-0 max-w-40 rounded-xl border border-input bg-card px-2.5 text-xs font-medium text-foreground"
+              ? "h-10 w-full min-w-0 rounded-xl border border-input bg-card px-2.5 text-op-xs font-medium text-foreground"
+              : "h-10 min-w-0 max-w-40 rounded-xl border border-input bg-card px-2.5 text-op-xs font-medium text-foreground"
           }
           data-action-id="shell.sucursal.cambiar"
           defaultValue={currentId}
@@ -683,7 +683,7 @@ export function AdminShell({
             <div className="flex items-center gap-2.5 px-1 pb-2">
               <span
                 aria-hidden="true"
-                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full bg-accent text-op-xs font-semibold text-accent-foreground"
               >
                 {initials(userName)}
               </span>

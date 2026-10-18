@@ -157,14 +157,14 @@ export function PoseTimerBar() {
                   <Clock aria-hidden="true" className="size-5" />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <p className="truncate text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Tiempo de Pose · {timer.clienteNombre}
                   </p>
                   <p className="flex items-baseline gap-2">
                     <span className="font-mono text-xl font-bold tabular-nums">
                       {formatearTiempoRestante(restantes)}
                     </span>
-                    <span className="truncate text-xs text-muted-foreground">
+                    <span className="truncate text-op-xs text-muted-foreground">
                       {timer.servicioNombre} ({timer.minutosTotales}m)
                     </span>
                   </p>
@@ -174,7 +174,7 @@ export function PoseTimerBar() {
               <div className="flex items-center gap-1.5 ml-auto">
                 <Button
                   aria-label="Agregar 5 minutos"
-                  className="h-8 rounded-lg text-xs"
+                  className="h-8 rounded-lg text-op-xs"
                   onClick={() => extenderCincoMinutos(timer.id)}
                   size="sm"
                   type="button"

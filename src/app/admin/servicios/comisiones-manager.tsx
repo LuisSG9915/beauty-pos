@@ -17,13 +17,13 @@ export function ComisionesManager({ organizationId, servicioId, comisiones, role
           {comisiones.map((c) => (
             <div className="flex items-center justify-between rounded-xl border border-border px-4 py-3" key={c.id}>
               <div className="flex items-center gap-3">
-                <span className="rounded-full bg-accent/70 px-2.5 py-1 text-xs font-medium text-primary">{c.tipo === "porcentaje" ? `${c.valor}%` : `$${c.valor}`}</span>
+                <span className="rounded-full bg-accent/70 px-2.5 py-1 text-op-xs font-medium text-primary">{c.tipo === "porcentaje" ? `${c.valor}%` : `$${c.valor}`}</span>
                 <span className="text-sm text-foreground">{c.rolNombre ?? "Todos los roles"}</span>
               </div>
               <form action={removeComision}>
                 <input name="organizacionId" type="hidden" value={organizationId} />
                 <input name="comisionId" type="hidden" value={c.id} />
-                <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-destructive hover:bg-destructive/10" type="submit">Quitar</button>
+                <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-destructive hover:bg-destructive/10" type="submit">Quitar</button>
               </form>
             </div>
           ))}

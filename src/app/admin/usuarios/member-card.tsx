@@ -39,7 +39,7 @@ function CheckboxList({
     <div className="flex flex-wrap gap-2">
       {items.map((item) => (
         <label
-          className={`inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors ${
+          className={`inline-flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-op-xs font-medium transition-colors ${
             disabled
               ? "cursor-not-allowed border-border bg-muted/60 text-muted-foreground"
               : "border-border bg-card text-muted-foreground hover:border-accent-foreground/30 has-checked:border-primary has-checked:bg-accent/70 has-checked:text-primary"
@@ -103,9 +103,9 @@ export function MemberCard({
           <div className="min-w-0">
             <p className="truncate font-medium text-foreground">
               {member.nombre}
-              {isSelf ? <span className="ml-2 text-xs font-normal text-muted-foreground">(tú)</span> : null}
+              {isSelf ? <span className="ml-2 text-op-xs font-normal text-muted-foreground">(tú)</span> : null}
             </p>
-            <p className="truncate text-xs text-muted-foreground">{member.correo}</p>
+            <p className="truncate text-op-xs text-muted-foreground">{member.correo}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -135,7 +135,7 @@ export function MemberCard({
         <form action={rolesAction} className="space-y-2">
           <input name="organizacionId" type="hidden" value={organizationId} />
           <input name="miembroId" type="hidden" value={member.miembroId} />
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+          <p className="flex items-center gap-1.5 text-op-xs font-semibold uppercase tracking-[0.12em] text-primary">
             <ShieldCheck aria-hidden="true" className="size-3.5" /> Roles
           </p>
           <CheckboxList
@@ -155,7 +155,7 @@ export function MemberCard({
         </form>
 
         <section className="space-y-2" aria-label={`Sucursales de ${member.nombre}`}>
-          <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+          <p className="flex items-center gap-1.5 text-op-xs font-semibold uppercase tracking-[0.12em] text-primary">
             <Store aria-hidden="true" className="size-3.5" /> Sucursales
           </p>
           <MiembroSucursalesForm
@@ -205,8 +205,8 @@ export function PendingInvitations({
         {invitations.map((inv) => (
           <li className="rounded-xl border border-border p-3 text-sm" key={inv.id}>
             <p className="font-medium text-foreground">{inv.nombre}</p>
-            <p className="mt-0.5 text-xs text-muted-foreground">{inv.correo}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
+            <p className="mt-0.5 text-op-xs text-muted-foreground">{inv.correo}</p>
+            <p className="mt-1 text-op-xs text-muted-foreground">
               {inv.rolNombre} · {inv.sucursalNombre} · expira {formatDate(inv.expiraAt)}
             </p>
             {canCancel ? (
@@ -214,7 +214,7 @@ export function PendingInvitations({
                 <input name="organizacionId" type="hidden" value={organizationId} />
                 <input name="invitacionId" type="hidden" value={inv.id} />
                 <button
-                  className="min-h-8 rounded-lg border border-border px-2.5 text-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
+                  className="min-h-8 rounded-lg border border-border px-2.5 text-op-xs text-destructive hover:bg-destructive/10 disabled:opacity-50"
                   disabled={isPending}
                   type="submit"
                 >

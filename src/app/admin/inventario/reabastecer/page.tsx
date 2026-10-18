@@ -144,7 +144,7 @@ export default async function ReabastecerPage({ searchParams }: { searchParams: 
           {DIAS_PRESET.map((preset) => (
             <Link
               aria-current={dias === preset ? "true" : undefined}
-              className={`inline-flex min-h-6 items-center rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+              className={`inline-flex min-h-6 items-center rounded-full border px-3 py-1.5 text-op-xs font-medium transition ${
                 dias === preset
                   ? "border-primary bg-accent text-accent-foreground"
                   : "border-border text-muted-foreground hover:bg-muted/60"
@@ -247,11 +247,11 @@ export default async function ReabastecerPage({ searchParams }: { searchParams: 
                       >
                         <div className="min-w-0">
                           <p className="text-sm font-medium leading-5 text-foreground">{item.nombre}</p>
-                          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                          <p className="mt-0.5 text-op-xs leading-5 text-muted-foreground">
                             {textoBuenaCompra(item, moneda)}
                           </p>
                         </div>
-                        <span className="shrink-0 rounded-full bg-success-soft px-2.5 py-0.5 text-xs font-medium text-success">
+                        <span className="shrink-0 rounded-full bg-success-soft px-2.5 py-0.5 text-op-xs font-medium text-success">
                           {Math.round(item.margenPct * 100)}% margen
                         </span>
                       </li>
@@ -276,7 +276,7 @@ export default async function ReabastecerPage({ searchParams }: { searchParams: 
                       >
                         <div className="min-w-0">
                           <p className="text-sm font-medium leading-5 text-foreground">{item.nombre}</p>
-                          <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                          <p className="mt-0.5 text-op-xs leading-5 text-muted-foreground">
                             {textoCapitalDetenido(item, moneda)}
                           </p>
                         </div>

@@ -130,7 +130,7 @@ export function RegistroForm() {
       </Field>
 
       {errorMessage ? (
-        <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+        <p className="rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-destructive-soft-foreground" role="alert">
           {errorMessage}
         </p>
       ) : null}
@@ -139,14 +139,17 @@ export function RegistroForm() {
 
       <Button
         className="w-full rounded-xl py-3 text-sm font-semibold"
+        data-action-clave="1"
+        data-action-id="registro.cuenta.crear"
         disabled={isPending}
+        size="lg"
         type="submit"
       >
         {isPending ? "Creando tu espacio…" : "Crear mi cuenta gratis"}
         <ArrowRight className="ml-2 size-4" />
       </Button>
 
-      <p className="text-center text-xs leading-5 text-muted-foreground">
+      <p className="text-center text-op-xs leading-5 text-muted-foreground">
         14 días de prueba sin tarjeta. Tus datos se conservan al contratar.
       </p>
     </form>

@@ -94,7 +94,7 @@ export function InvitationForm({ organizations, roles, branches }: InvitationFor
           <a className="mt-2 block break-all text-primary underline" href={state.invitationUrl}>
             {state.invitationUrl}
           </a>
-          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          <p className="mt-2 text-op-xs leading-5 text-muted-foreground">
             Este enlace solo se muestra en desarrollo porque no hay envío de correo habilitado.
           </p>
         </div>

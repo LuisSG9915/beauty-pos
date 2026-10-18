@@ -353,7 +353,7 @@ function ClientePicker({
       className="w-56"
       defaultItems={defaultItems}
       disabled={pending}
-      inputClassName="h-8 text-xs"
+      inputClassName="h-8 text-op-xs"
       label="Cliente de la venta"
       labelClassName="sr-only"
       placeholder="Asignar cliente…"
@@ -453,7 +453,7 @@ function AjusteMedioPagoForm({
   if (destinos.length === 0 || restante <= 0) return null;
   if (!abierto) {
     return (
-      <Button className="min-h-8 rounded-lg text-xs" onClick={() => { setMonto(restante.toFixed(2)); setAbierto(true); }} type="button" variant="outline">
+      <Button className="min-h-8 rounded-lg text-op-xs" onClick={() => { setMonto(restante.toFixed(2)); setAbierto(true); }} type="button" variant="outline">
         Corregir medio
       </Button>
     );
@@ -465,19 +465,19 @@ function AjusteMedioPagoForm({
       <input name="ventaId" type="hidden" value={ventaId} />
       <input name="pagoId" type="hidden" value={pago.id} />
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+        <label className="space-y-1.5 text-op-xs font-medium text-muted-foreground">
           <span>Nuevo medio</span>
           <select className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal" name="medioPagoId" onChange={(event) => setMedioPagoId(event.target.value)} required value={medioPagoId}>
             <option value="">Selecciona…</option>
             {destinos.map((medio) => <option key={medio.id} value={medio.id}>{medio.nombre}</option>)}
           </select>
         </label>
-        <label className="space-y-1.5 text-xs font-medium text-muted-foreground">
+        <label className="space-y-1.5 text-op-xs font-medium text-muted-foreground">
           <span>Monto máximo {formatCurrency(restante, { currency })}</span>
           <input className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal tabular-nums" inputMode="decimal" max={restante} min="0.01" name="monto" onChange={(event) => setMonto(event.target.value)} step="0.01" type="number" value={monto} />
         </label>
       </div>
-      <label className="block space-y-1.5 text-xs font-medium text-muted-foreground">
+      <label className="block space-y-1.5 text-op-xs font-medium text-muted-foreground">
         <span>Motivo</span>
         <textarea className="min-h-20 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm font-normal" maxLength={500} name="motivo" onChange={(event) => setMotivo(event.target.value)} placeholder="Ej. Se capturó transferencia en lugar de tarjeta." required value={motivo} />
       </label>
@@ -630,7 +630,7 @@ export function VentaTicket({
 
         {editable ? (
           <div className="mt-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
+            <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
               Agregar al ticket
             </h3>
             <CatalogoSelector
@@ -650,7 +650,7 @@ export function VentaTicket({
 
         <div className="mt-6 space-y-6">
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
+            <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
               Servicios
             </h3>
             <div className="mt-3 space-y-2">
@@ -686,7 +686,7 @@ export function VentaTicket({
           </section>
 
           <section>
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
+            <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
               Productos
             </h3>
             <div className="mt-3 space-y-2">
@@ -715,7 +715,7 @@ export function VentaTicket({
 
           {lineasPaquetes.length > 0 ? (
             <section>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
+              <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
                 Paquetes
               </h3>
               <div className="mt-3 space-y-2">
@@ -727,7 +727,7 @@ export function VentaTicket({
                     <PackageCheck aria-hidden="true" className="size-4 shrink-0 text-success" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{linea.nombre}</p>
-                      <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+                      <p className="mt-0.5 text-op-xs tabular-nums text-muted-foreground">
                         {linea.cantidad} × {formatCurrency(linea.precio, { currency })}
                       </p>
                     </div>
@@ -751,7 +751,7 @@ export function VentaTicket({
 
           {lineasMembresias.length > 0 ? (
             <section>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
+              <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
                 Membresías
               </h3>
               <div className="mt-3 space-y-2">
@@ -763,7 +763,7 @@ export function VentaTicket({
                     <PackageCheck aria-hidden="true" className="size-4 shrink-0 text-primary" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{linea.nombre}</p>
-                      <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+                      <p className="mt-0.5 text-op-xs tabular-nums text-muted-foreground">
                         {linea.cantidad} × {formatCurrency(linea.precio, { currency })}
                       </p>
                     </div>
@@ -806,7 +806,7 @@ export function VentaTicket({
                 </span>
               </div>
               {cubiertoPorPaquete > 0 ? (
-                <div className="flex justify-between text-xs text-success">
+                <div className="flex justify-between text-op-xs text-success">
                   <span>Cubierto por paquete (no cobrado)</span>
                   <span className="font-mono tabular-nums">
                     {formatCurrency(cubiertoPorPaquete, { currency })}
@@ -814,7 +814,7 @@ export function VentaTicket({
                 </div>
               ) : null}
               {Number(venta.descuento) > 0 ? (
-                <div className="flex justify-between text-xs text-muted-foreground">
+                <div className="flex justify-between text-op-xs text-muted-foreground">
                   <span>Descuento directo</span>
                   <span className="font-mono tabular-nums text-foreground">
                     -{formatCurrency(venta.descuento, { currency })}
@@ -822,7 +822,7 @@ export function VentaTicket({
                 </div>
               ) : null}
               {Number(venta.descuentoPromocion ?? 0) > 0 ? (
-                <div className="flex justify-between text-xs font-medium text-success">
+                <div className="flex justify-between text-op-xs font-medium text-success">
                   <span>Promoción{venta.promocionNombre ? ` · ${venta.promocionNombre}` : ""}</span>
                   <span className="font-mono tabular-nums">
                     -{formatCurrency(venta.descuentoPromocion ?? "0", { currency })}
@@ -830,7 +830,7 @@ export function VentaTicket({
                 </div>
               ) : null}
               {Number(venta.descuentoMembresia ?? 0) > 0 ? (
-                <div className="flex justify-between text-xs font-medium text-primary">
+                <div className="flex justify-between text-op-xs font-medium text-primary">
                   <span>Membresía{venta.membresiaNombre ? ` · ${venta.membresiaNombre}` : ""}</span>
                   <span className="font-mono tabular-nums">
                     -{formatCurrency(venta.descuentoMembresia ?? "0", { currency })}
@@ -838,7 +838,7 @@ export function VentaTicket({
                 </div>
               ) : null}
               {propinaNum > 0 ? (
-                <div className="flex justify-between text-xs text-muted-foreground">
+                <div className="flex justify-between text-op-xs text-muted-foreground">
                   <span>Propina</span>
                   <span className="font-mono tabular-nums text-foreground">
                     +{formatCurrency(propinaNum, { currency })}
@@ -850,7 +850,7 @@ export function VentaTicket({
             <div className="space-y-2 pt-3">
               <div className="flex items-center justify-between rounded-xl border border-primary/25 bg-primary/10 p-3.5">
                 <div>
-                  <span className="text-xs font-semibold uppercase tracking-wider text-primary">Total</span>
+                  <span className="text-op-xs font-semibold uppercase tracking-wider text-primary">Total</span>
                   {anticipoAplicado > 0 ? (
                     <p className="text-op-xs text-muted-foreground">
                       Anticipo: -{formatCurrency(anticipoAplicado, { currency })}
@@ -863,20 +863,20 @@ export function VentaTicket({
               </div>
 
               {anticipoAplicado > 0 ? (
-                <div className="flex justify-between text-xs font-medium text-success">
+                <div className="flex justify-between text-op-xs font-medium text-success">
                   <span>Anticipo aplicado</span>
                   <span className="font-mono tabular-nums">-{formatCurrency(anticipoAplicado, { currency })}</span>
                 </div>
               ) : null}
               {editable && anticipoPorAplicar > 0 ? (
-                <div className="flex justify-between text-xs font-medium text-success">
+                <div className="flex justify-between text-op-xs font-medium text-success">
                   <span>Anticipo por aplicar</span>
                   <span className="font-mono tabular-nums">-{formatCurrency(anticipoPorAplicar, { currency })}</span>
                 </div>
               ) : null}
               {totalDevuelto > 0 ? (
                 <div className="space-y-1.5 pt-1">
-                  <div className="flex justify-between text-xs text-destructive">
+                  <div className="flex justify-between text-op-xs text-destructive">
                     <span>Devuelto</span>
                     <span className="font-mono tabular-nums">-{formatCurrency(totalDevuelto, { currency })}</span>
                   </div>
@@ -889,7 +889,7 @@ export function VentaTicket({
                 </div>
               ) : null}
               {propinaNum > 0 ? (
-                <div className="flex justify-between text-xs font-semibold text-primary pt-1">
+                <div className="flex justify-between text-op-xs font-semibold text-primary pt-1">
                   <span>Total + propina</span>
                   <span className="font-mono tabular-nums">
                     {formatCurrency(Number(venta.total) + propinaNum, { currency })}
@@ -909,11 +909,11 @@ export function VentaTicket({
             <input name="ventaId" type="hidden" value={venta.id} />
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-foreground">Descuento</h2>
-              <span className="text-xs text-muted-foreground">Directo</span>
+              <span className="text-op-xs text-muted-foreground">Directo</span>
             </div>
             <div className="flex flex-wrap items-end gap-2">
               <Field className="w-32">
-                <FieldLabel className="text-xs">Monto ($)</FieldLabel>
+                <FieldLabel className="text-op-xs">Monto ($)</FieldLabel>
                 <Input
                   className="font-mono"
                   defaultValue={venta.descuento}
@@ -935,7 +935,7 @@ export function VentaTicket({
               <div aria-label="Descuento rápido" className="flex gap-1.5" role="group">
                 {[5, 10, 15, 20].map((pct) => (
                   <Button
-                    className="rounded-xl border border-border/60 hover:border-primary/50 hover:bg-primary/5 text-primary text-xs font-semibold active:scale-90 transition-all duration-150 px-2.5"
+                    className="rounded-xl border border-border/60 hover:border-primary/50 hover:bg-primary/5 text-primary text-op-xs font-semibold active:scale-90 transition-all duration-150 px-2.5"
                     disabled={descuentoPending}
                     key={pct}
                     onClick={() => aplicarPorcentaje(pct)}
@@ -1076,7 +1076,7 @@ export function VentaTicket({
                     <span className="font-medium tabular-nums">
                       {formatCurrency(ant.monto, { currency })}
                     </span>
-                    <span className="ml-2 text-xs text-muted-foreground">
+                    <span className="ml-2 text-op-xs text-muted-foreground">
                       {ant.medioNombre ?? "Medio"}
                     </span>
                   </span>
@@ -1089,7 +1089,7 @@ export function VentaTicket({
               ))}
             </ul>
             {editable && anticipos.some((a) => a.estado === "vigente") && anticipoPorAplicar === 0 ? (
-              <p className="mt-3 rounded-xl bg-warning-soft px-4 py-2.5 text-xs text-warning-soft-foreground">
+              <p className="mt-3 rounded-xl bg-warning-soft px-4 py-2.5 text-op-xs text-warning-soft-foreground">
                 El anticipo vigente excede el total del ticket; no se aplicará automáticamente.
                 Devuélvelo desde la cita.
               </p>
@@ -1183,16 +1183,16 @@ export function VentaTicket({
                     <span className="font-medium text-destructive">
                       -{formatCurrency(dev.monto, { currency })}
                     </span>
-                    <span className="text-xs text-muted-foreground">{dev.usuarioNombre ?? "—"}</span>
+                    <span className="text-op-xs text-muted-foreground">{dev.usuarioNombre ?? "—"}</span>
                   </div>
-                  <ul className="mt-1.5 space-y-0.5 text-xs text-muted-foreground">
+                  <ul className="mt-1.5 space-y-0.5 text-op-xs text-muted-foreground">
                     {dev.lineas.map((linea, i) => (
                       <li key={i}>
                         {linea.nombre} × {linea.cantidad} · {formatCurrency(linea.monto, { currency })}
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-1 text-xs text-muted-foreground">{dev.motivo}</p>
+                  <p className="mt-1 text-op-xs text-muted-foreground">{dev.motivo}</p>
                 </li>
               ))}
             </ul>
@@ -1225,7 +1225,7 @@ export function VentaTicket({
                     <span>
                       {pago.nombre}
                       {Number(pago.cambio) > 0 ? (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-op-xs text-muted-foreground">
                           {" "}
                           · recibió {formatCurrency(pago.recibido, { currency })}, cambio{" "}
                           {formatCurrency(pago.cambio, { currency })}
@@ -1235,7 +1235,7 @@ export function VentaTicket({
                     <span className="tabular-nums">{formatCurrency(pago.monto, { currency })}</span>
                   </div>
                   {pago.ajustes.length > 0 ? (
-                    <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                    <ul className="mt-2 space-y-1 text-op-xs text-muted-foreground">
                       {pago.ajustes.map((ajuste) => (
                         <li key={ajuste.id}>
                           Reclasificado a <span className="font-medium text-primary">{ajuste.destinoNombre ?? "medio inactivo"}</span> por {formatCurrency(ajuste.monto, { currency })} · {ajuste.motivo}
@@ -1355,11 +1355,11 @@ function CancelarVentaButton({
     >
       <input name="organizacionId" type="hidden" value={organizationId} />
       <input name="ventaId" type="hidden" value={ventaId} />
-      <p className="text-xs font-medium text-destructive">
+      <p className="text-op-xs font-medium text-destructive">
         La venta se cancelará con devolución compensatoria (no se puede deshacer).
       </p>
       <Field>
-        <FieldLabel className="text-xs">Motivo</FieldLabel>
+        <FieldLabel className="text-op-xs">Motivo</FieldLabel>
         <Input
           aria-label="Motivo de cancelación"
           maxLength={500}
@@ -1481,7 +1481,7 @@ function DevolucionParcialPanel({
               >
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{linea.nombre}</p>
-                  <p className="text-xs tabular-nums text-muted-foreground">
+                  <p className="text-op-xs tabular-nums text-muted-foreground">
                     {linea.tipo} · {linea.cantidad} vendida(s)
                     {devueltas > 0 ? ` · ${devueltas} devuelta(s)` : ""}
                     {(cantidades[linea.detalleId] ?? 0) > 0
@@ -1506,14 +1506,14 @@ function DevolucionParcialPanel({
                     value={cantidades[linea.detalleId] ?? 0}
                   />
                 ) : (
-                  <span className="text-xs text-muted-foreground">devuelta</span>
+                  <span className="text-op-xs text-muted-foreground">devuelta</span>
                 )}
               </li>
             );
           })}
         </ul>
         <Field>
-          <FieldLabel className="text-xs">Motivo</FieldLabel>
+          <FieldLabel className="text-op-xs">Motivo</FieldLabel>
           <Input maxLength={500} name="motivo" placeholder="Ej. producto defectuoso" required />
         </Field>
         <div className="flex flex-wrap gap-2">

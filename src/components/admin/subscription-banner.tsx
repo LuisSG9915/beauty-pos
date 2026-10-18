@@ -40,7 +40,7 @@ export function SubscriptionBanner({
           están a salvo.
         </p>
         <Link
-          className="ml-auto inline-flex min-h-6 shrink-0 items-center rounded-full border border-destructive-soft-foreground/40 px-3 text-xs font-semibold"
+          className="ml-auto inline-flex min-h-6 shrink-0 items-center rounded-full border border-destructive-soft-foreground/40 px-3 text-op-xs font-semibold"
           href="/precios"
         >
           Ver planes
@@ -60,7 +60,7 @@ export function SubscriptionBanner({
         . Todo lo que registres se conserva al contratar.
       </p>
       <Link
-        className="ml-auto inline-flex min-h-6 shrink-0 items-center rounded-full border border-warning-soft-foreground/40 px-3 text-xs font-semibold"
+        className="ml-auto inline-flex min-h-6 shrink-0 items-center rounded-full border border-warning-soft-foreground/40 px-3 text-op-xs font-semibold"
         href="/precios"
       >
         Ver planes

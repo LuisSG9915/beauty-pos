@@ -8,6 +8,7 @@ import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminNavTabs, CATALOGO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { ToggleActivo } from "@/components/admin/toggle-activo";
 import { EmptyState } from "@/components/empty-state";
@@ -462,7 +463,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         {productRows.length === 0 ? (
           <EmptyState description="Registra productos que vendes e insumos que consumes en los servicios." title="No hay productos" />
         ) : (
-          <>
+          <VistaAdaptativa>
             <RegistroList>
               {productRows.map((product) => (
                 <RegistroCard
@@ -512,7 +513,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
               rowKey={(product) => product.id}
               rows={productRows}
             />
-          </>
+          </VistaAdaptativa>
         )}
       </AdminCard>
       {editing || firstParam(params.nuevo) === "1" ? (

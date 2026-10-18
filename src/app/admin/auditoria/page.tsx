@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AdminPageHeader } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
@@ -163,7 +164,7 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
       {pageRows.length === 0 ? (
         <EmptyState description="No hay eventos registrados con esos filtros." title="Sin eventos" />
       ) : (
-        <>
+        <VistaAdaptativa>
           <div className="space-y-3 md:hidden">
             {pageRows.map((evento, index) => (
               <article className="anim-entrada rounded-xl border border-border bg-card p-4 shadow-sm" key={evento.id} style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}>
@@ -227,7 +228,7 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
             </tbody>
           </table>
           </div>
-        </>
+        </VistaAdaptativa>
       )}
 
       <div className="flex items-center justify-between text-sm">

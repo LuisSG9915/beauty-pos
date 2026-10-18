@@ -172,7 +172,7 @@ export function RecetarioEditor({
     <div className="space-y-4">
       {/* Banner de última fórmula previa del cliente con botón Replicar */}
       {ultimaFormula ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary/20 bg-primary/5 p-3 text-op-xs">
           <div className="min-w-0 flex-1">
             <span className="flex items-center gap-1.5 font-semibold text-primary">
               <Sparkles aria-hidden="true" className="size-3.5" /> Última fórmula del cliente
@@ -186,7 +186,7 @@ export function RecetarioEditor({
             </p>
           </div>
           <Button
-            className="h-8 gap-1 rounded-lg text-xs"
+            className="h-8 gap-1 rounded-lg text-op-xs"
             onClick={() => replicarFormula(ultimaFormula)}
             size="sm"
             type="button"
@@ -199,11 +199,11 @@ export function RecetarioEditor({
 
       {/* Selector modo recetario estructurado vs texto libre */}
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold uppercase tracking-wide text-foreground">
+        <span className="text-op-xs font-semibold uppercase tracking-wide text-foreground">
           {modoTextoLibre ? "Fórmula en texto libre" : "Recetario de mezcla al gramo"}
         </span>
         <button
-          className="text-xs font-medium text-primary hover:underline"
+          className="text-op-xs font-medium text-primary hover:underline"
           onClick={() => setModoTextoLibre(!modoTextoLibre)}
           type="button"
         >
@@ -230,7 +230,7 @@ export function RecetarioEditor({
               key={insumo.id}
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-muted-foreground">
+                <span className="text-op-xs font-semibold text-muted-foreground">
                   Insumo #{index + 1}
                 </span>
                 {insumos.length > 1 ? (
@@ -279,7 +279,7 @@ export function RecetarioEditor({
                 <div className="flex items-center gap-1">
                   {PROPORCIONES_RAPIDAS.map((prop) => (
                     <button
-                      className={`h-9 rounded-lg border px-2 text-xs font-medium transition-colors ${
+                      className={`h-9 rounded-lg border px-2 text-op-xs font-medium transition-colors ${
                         insumo.proporcion === prop
                           ? "border-primary bg-primary/10 text-primary"
                           : "border-input bg-background text-muted-foreground hover:bg-muted"
@@ -334,7 +334,7 @@ export function RecetarioEditor({
                 <div className="flex items-center gap-1">
                   {[10, 20, 30].map((step) => (
                     <button
-                      className="h-8 rounded-md bg-muted px-2 text-xs font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+                      className="h-8 rounded-md bg-muted px-2 text-op-xs font-semibold text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                       key={step}
                       onClick={() =>
                         actualizarInsumo(insumo.id, {
@@ -349,7 +349,7 @@ export function RecetarioEditor({
                 </div>
 
                 {/* Descontar de inventario si está vinculado a producto */}
-                <label className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground select-none">
+                <label className="ml-auto flex items-center gap-1.5 text-op-xs text-muted-foreground select-none">
                   <input
                     checked={Boolean(insumo.descontarStock)}
                     className="size-3.5 accent-primary"
@@ -378,7 +378,7 @@ export function RecetarioEditor({
 
           {/* Resumen dinámico resultante */}
           {formulaResumen ? (
-            <div className="rounded-xl bg-muted/60 px-3 py-2 text-xs">
+            <div className="rounded-xl bg-muted/60 px-3 py-2 text-op-xs">
               <span className="font-semibold text-muted-foreground">Fórmula resultante: </span>
               <span className="font-mono text-foreground font-medium">{formulaResumen}</span>
             </div>
@@ -393,7 +393,7 @@ export function RecetarioEditor({
           <div className="flex items-center gap-1">
             {TIEMPOS_POSE_RAPIDOS.map((m) => (
               <button
-                className={`rounded-md px-2 py-0.5 text-xs font-medium transition-colors ${
+                className={`rounded-md px-2 py-0.5 text-op-xs font-medium transition-colors ${
                   tiempoPose === String(m)
                     ? "bg-primary text-primary-foreground font-semibold"
                     : "bg-muted text-muted-foreground hover:text-foreground"
@@ -417,13 +417,13 @@ export function RecetarioEditor({
           value={tiempoPose}
         />
         {Number(tiempoPose) > 0 ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-800 dark:text-amber-200">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-op-xs text-amber-800 dark:text-amber-200">
             <span className="flex items-center gap-1.5 font-medium">
               <Timer aria-hidden="true" className="size-3.5 text-amber-600 dark:text-amber-400" />
               Tiempo de pose: <strong>{tiempoPose} min</strong>
             </span>
             <Button
-              className="h-8 gap-1.5 rounded-lg border-amber-500/40 bg-card text-xs font-semibold text-foreground hover:bg-amber-500/20"
+              className="h-8 gap-1.5 rounded-lg border-amber-500/40 bg-card text-op-xs font-semibold text-foreground hover:bg-amber-500/20"
               onClick={() => {
                 const min = Number(tiempoPose);
                 if (!min || min <= 0) return;

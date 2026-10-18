@@ -72,10 +72,10 @@ export function GuiaChecklistCard({
               prefetch={false}
             >
               {paso.titulo}
-              {paso.opcional ? <span className="ml-2 text-xs font-normal text-muted-foreground">Opcional</span> : null}
+              {paso.opcional ? <span className="ml-2 text-op-xs font-normal text-muted-foreground">Opcional</span> : null}
             </Link>
             {!paso.hecho ? (
-              <Link className="inline-flex min-h-6 shrink-0 items-center text-xs font-medium text-primary hover:underline" href={href(paso.href)} prefetch={false}>
+              <Link className="inline-flex min-h-6 shrink-0 items-center text-op-xs font-medium text-primary hover:underline" href={href(paso.href)} prefetch={false}>
                 Ir
               </Link>
             ) : null}

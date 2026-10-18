@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
@@ -272,7 +273,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Sear
             title={estadoValido ? "Sin compras en este estado" : "Sin compras registradas"}
           />
         ) : (
-          <>
+          <VistaAdaptativa>
             <RegistroList>
               {rows.map((row) => {
                 const info = COMPRA_ESTADO_INFO[row.estado as CompraEstado] ?? COMPRA_ESTADO_INFO.borrador;
@@ -311,7 +312,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Sear
               rowKey={(row) => row.id}
               rows={rows}
             />
-          </>
+          </VistaAdaptativa>
         )}
       </AdminCard>
     </div>

@@ -7,6 +7,7 @@ import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminNavTabs, CATALOGO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader, AdminSection } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { StatCard, StatCardGrid } from "@/components/admin/stat-card";
 import { DonutChart, HBarChart } from "@/components/charts";
 import { EmptyState } from "@/components/empty-state";
@@ -569,10 +570,10 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
                       id: "retail",
                       label: `Retail${alertas(retail) ? ` · ${alertas(retail)} bajo` : ""}`,
                       content: (
-                        <>
+                        <VistaAdaptativa>
                           {stockCards(retail)}
                           {stockTable(retail)}
-                        </>
+                        </VistaAdaptativa>
                       ),
                     },
                     {
@@ -580,8 +581,10 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
                       label: `Backbar${alertas(backbar) ? ` · ${alertas(backbar)} bajo` : ""}`,
                       content: (
                         <div className="space-y-4">
-                          {stockCards(backbar)}
-                          {stockTable(backbar)}
+                          <VistaAdaptativa>
+                            {stockCards(backbar)}
+                            {stockTable(backbar)}
+                          </VistaAdaptativa>
                           <div className="border-t border-border px-4 pb-4 pt-3">
                             <h4 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
                               Consumo por servicio · 30 días

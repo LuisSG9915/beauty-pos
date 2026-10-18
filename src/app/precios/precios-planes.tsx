@@ -118,7 +118,7 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
               key={plan.clave}
             >
               {plan.destacado ? (
-                <span className="mb-4 w-fit rounded-full bg-accent px-3 py-1 text-xs font-semibold text-accent-foreground">
+                <span className="mb-4 w-fit rounded-full bg-accent px-3 py-1 text-op-xs font-semibold text-accent-foreground">
                   El más elegido
                 </span>
               ) : null}
@@ -137,7 +137,7 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
                       <span className="text-muted-foreground line-through">
                         {formatoPrecio(listaTotal, plan.moneda)}
                       </span>
-                      <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-accent-foreground">
+                      <span className="rounded-full bg-accent px-2 py-0.5 text-op-xs font-semibold text-accent-foreground">
                         Precio fundador
                       </span>
                     </p>
@@ -153,12 +153,12 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
                     </span>
                   </p>
                   {equivMensual !== null ? (
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="mt-1 text-op-xs text-muted-foreground">
                       Equivale a {formatoPrecio(equivMensual, plan.moneda)}/mes — ahorras{" "}
                       {formatoPrecio((mensual + extras * extraMensual) * 12 - total, plan.moneda)} al año.
                     </p>
                   ) : (
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="mt-1 text-op-xs text-muted-foreground">
                       Incluye {plan.sucursalesIncluidas} sucursal(es)
                       {extras > 0
                         ? ` + ${extras} × ${formatoPrecio(extraMensual, plan.moneda)}`
@@ -169,7 +169,7 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
                   )}
                 </>
               )}
-              <p className="mt-1 text-xs text-muted-foreground">Precios en MXN, IVA incluido.</p>
+              <p className="mt-1 text-op-xs text-muted-foreground">Precios en MXN, IVA incluido.</p>
 
               <ul className="mt-6 flex-1 space-y-2.5 text-sm">
                 {plan.beneficios.map((beneficio) => (
@@ -181,8 +181,11 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
               </ul>
               <Button
                 className="mt-7 w-full rounded-xl"
+                data-action-clave={plan.destacado ? "1" : undefined}
+                data-action-id="precios.plan.prueba"
                 nativeButton={false}
                 render={<Link href="/registro" />}
+                size="lg"
                 variant={plan.destacado ? "default" : "outline"}
               >
                 Empezar prueba gratis

@@ -7,6 +7,7 @@ import { CategoryForm } from "@/app/admin/categorias-servicios/category-form";
 import { CrudRowActions } from "@/components/admin/crud-actions";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
@@ -67,7 +68,7 @@ export default async function ServiceCategoriesPage({ searchParams }: { searchPa
         {categories.length === 0 ? (
           <EmptyState description="Crea categorías para organizar los servicios del salón." title="No hay categorías" />
         ) : (
-          <>
+          <VistaAdaptativa>
             <RegistroList>
               {categories.map((category) => (
                 <RegistroCard
@@ -120,7 +121,7 @@ export default async function ServiceCategoriesPage({ searchParams }: { searchPa
                 </tbody>
               </table>
             </div>
-          </>
+          </VistaAdaptativa>
         )}
       </AdminCard>
       {editing || firstParam(params.nuevo) === "1" ? (

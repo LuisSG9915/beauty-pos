@@ -354,7 +354,7 @@ export function CitaForm({
             Cliente
           </label>
           <button
-            className="flex items-center gap-1 text-xs font-semibold text-primary transition-colors hover:underline"
+            className="flex items-center gap-1 text-op-xs font-semibold text-primary transition-colors hover:underline"
             onClick={() => setMostrarNuevoCliente((v) => !v)}
             type="button"
           >
@@ -365,7 +365,7 @@ export function CitaForm({
         {mostrarNuevoCliente ? (
           <div className="space-y-3 rounded-xl border border-primary/30 bg-primary/5 p-3.5 anim-entrada">
             <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold text-foreground">Alta rápida de cliente</p>
+              <p className="text-op-xs font-semibold text-foreground">Alta rápida de cliente</p>
               <span className="text-op-xs text-muted-foreground">Sin salir de la cita</span>
             </div>
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
@@ -462,7 +462,7 @@ export function CitaForm({
                 />
                 <MediaThumb claveR2={servicio.imagenClaveR2} nombre={servicio.nombre} />
                 <span className="flex-1 font-medium">{servicio.nombre}</span>
-                <span className="text-xs tabular-nums text-muted-foreground">
+                <span className="text-op-xs tabular-nums text-muted-foreground">
                   {formatCurrency(servicio.precioBase, { currency })} · {servicio.duracionMinutos} min
                 </span>
               </label>
@@ -544,14 +544,14 @@ export function CitaForm({
                       </span>
                     ) : null}
                   </div>
-                  <p className="text-xs text-muted-foreground truncate">
+                  <p className="text-op-xs text-muted-foreground truncate">
                     {analisisStaff.sugerido.explicacion}
                   </p>
                 </div>
               </div>
               {usuarioId !== analisisStaff.sugerido.id ? (
                 <Button
-                  className="h-8 rounded-lg text-xs font-semibold"
+                  className="h-8 rounded-lg text-op-xs font-semibold"
                   onClick={() => setUsuarioId(analisisStaff.sugerido!.id)}
                   size="sm"
                   type="button"
@@ -560,7 +560,7 @@ export function CitaForm({
                   Asignar a {analisisStaff.sugerido.nombre.split(" ")[0]}
                 </Button>
               ) : (
-                <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-md">
+                <span className="inline-flex items-center gap-1 text-op-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-md">
                   <Check className="size-3.5" aria-hidden="true" /> Asignado
                 </span>
               )}
@@ -596,7 +596,7 @@ export function CitaForm({
                 type="button"
                 onClick={() => setUsuarioId("")}
                 className={cn(
-                  "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                  "rounded-lg border px-2.5 py-1 text-op-xs font-medium transition-colors",
                   usuarioId === ""
                     ? "border-primary bg-primary/10 text-primary font-semibold"
                     : "border-border bg-card text-muted-foreground hover:bg-muted"
@@ -611,7 +611,7 @@ export function CitaForm({
                       key={est.id}
                       onClick={() => setUsuarioId(est.id)}
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-op-xs font-medium transition-colors",
                         usuarioId === est.id
                           ? "border-primary bg-primary/10 text-primary font-semibold ring-1 ring-primary/30"
                           : "border-border bg-card text-foreground hover:bg-muted"
@@ -637,7 +637,7 @@ export function CitaForm({
                       key={profesional.id}
                       onClick={() => setUsuarioId(profesional.id)}
                       className={cn(
-                        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                        "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-op-xs font-medium transition-colors",
                         usuarioId === profesional.id
                           ? "border-primary bg-primary/10 text-primary font-semibold ring-1 ring-primary/30"
                           : "border-border bg-card text-foreground hover:bg-muted"
@@ -664,18 +664,18 @@ export function CitaForm({
       </details>
 
       <div className="rounded-xl border border-border bg-muted/60 p-4">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-primary">Resumen</h4>
+        <h4 className="text-op-xs font-semibold uppercase tracking-wide text-primary">Resumen</h4>
         <div className="mt-2 grid grid-cols-3 gap-3 text-sm">
           <div>
-            <p className="text-xs text-muted-foreground">Inicio</p>
+            <p className="text-op-xs text-muted-foreground">Inicio</p>
             <p className="font-semibold tabular-nums">{inicio ? `${inicio.slice(11)} h` : "—"}</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Fin estimado</p>
+            <p className="text-op-xs text-muted-foreground">Fin estimado</p>
             <p className="font-semibold tabular-nums">{resumen.fin ? `${resumen.fin} h` : "—"}</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground">Total</p>
+            <p className="text-op-xs text-muted-foreground">Total</p>
             <p className="font-semibold tabular-nums">{formatCurrency(resumen.totalPrecio, { currency })}</p>
           </div>
         </div>
@@ -684,13 +684,13 @@ export function CitaForm({
       <ActionFeedback state={state} successMessage="Cita guardada correctamente." />
       {state.sugerencias && state.sugerencias.length > 0 ? (
         <div className="rounded-xl border border-border bg-muted/60 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+          <p className="text-op-xs font-semibold uppercase tracking-wide text-primary">
             Horarios libres sugeridos
           </p>
           <div className="mt-2 flex flex-wrap gap-2">
             {state.sugerencias.map((iso) => (
               <button
-                className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary hover:bg-accent/70"
+                className="rounded-lg border border-border bg-card px-3 py-1.5 text-op-xs font-medium text-foreground transition-colors hover:border-primary hover:bg-accent/70"
                 key={iso}
                 onClick={() => setInicio(toBranchDateTimeInput(iso, timeZone))}
                 type="button"

@@ -76,7 +76,7 @@ export function ResumenIaCard({
         </ul>
       ) : null}
       {error ? <p className="text-sm text-muted-foreground">{error}</p> : null}
-      <p className="text-xs text-muted-foreground">
+      <p className="text-op-xs text-muted-foreground">
         El resumen solo redacta los números del reporte; las cantidades siempre salen de la fórmula.
       </p>
     </div>

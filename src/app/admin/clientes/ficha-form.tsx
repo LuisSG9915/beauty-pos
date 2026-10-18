@@ -129,7 +129,7 @@ export function FichaForm({
       )}
 
       {puedePrivada ? (
-        <label className="flex items-center gap-2 text-xs text-muted-foreground select-none">
+        <label className="flex items-center gap-2 text-op-xs text-muted-foreground select-none">
           <input className="size-4 accent-primary" name="privada" type="checkbox" value="true" />
           Nota privada — solo visible para quien tenga permiso de expediente privado
         </label>

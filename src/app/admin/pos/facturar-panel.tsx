@@ -65,7 +65,7 @@ export function FacturarPanel({
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-foreground">Comprobante interno</h3>
         {comprobante ? (
-          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${(ESTADO_BADGE[comprobante.estado] ?? ESTADO_BADGE.borrador).className}`}>
+          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-op-xs font-medium ${(ESTADO_BADGE[comprobante.estado] ?? ESTADO_BADGE.borrador).className}`}>
             {(ESTADO_BADGE[comprobante.estado] ?? ESTADO_BADGE.borrador).label}
           </span>
         ) : null}
@@ -75,11 +75,11 @@ export function FacturarPanel({
         <div className="mt-3 space-y-2 text-sm">
           <div className="flex justify-between gap-3">
             <span className="text-muted-foreground">Folio</span>
-            <span className="font-mono text-xs">{comprobante.serie}-{comprobante.folio}</span>
+            <span className="font-mono text-op-xs">{comprobante.serie}-{comprobante.folio}</span>
           </div>
           <div className="flex justify-between gap-3">
             <span className="text-muted-foreground">Receptor</span>
-            <span className="text-right">{comprobante.receptorNombre} <span className="font-mono text-xs text-muted-foreground">{comprobante.receptorRfc}</span></span>
+            <span className="text-right">{comprobante.receptorNombre} <span className="font-mono text-op-xs text-muted-foreground">{comprobante.receptorRfc}</span></span>
           </div>
           <div className="flex justify-between gap-3">
             <span className="text-muted-foreground">Total</span>
@@ -88,12 +88,12 @@ export function FacturarPanel({
           {comprobante.uuid ? (
             <div className="flex justify-between gap-3">
               <span className="text-muted-foreground">UUID simulado</span>
-              <span className="max-w-56 truncate font-mono text-xs" title={comprobante.uuid}>{comprobante.uuid}</span>
+              <span className="max-w-56 truncate font-mono text-op-xs" title={comprobante.uuid}>{comprobante.uuid}</span>
             </div>
           ) : null}
-          {comprobante.error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-xs text-destructive">{comprobante.error}</p> : null}
+          {comprobante.error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-op-xs text-destructive">{comprobante.error}</p> : null}
           {comprobante.estado === "timbrada" ? (
-            <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
+            <p className="rounded-lg bg-warning/10 px-3 py-2 text-op-xs text-warning">
               Folio simulado (sin PAC contratado) — documento interno, no tiene validez fiscal ante el SAT.
             </p>
           ) : null}
@@ -187,7 +187,7 @@ function EmitirForm({
           <input name="receptorNombre" type="hidden" value={receptor.nombre} />
           <input name="receptorRegimen" type="hidden" value={receptor.regimen} />
           <input name="receptorCp" type="hidden" value={receptor.cp} />
-          <p className="rounded-lg bg-muted/60 px-3 py-2 text-xs text-muted-foreground">
+          <p className="rounded-lg bg-muted/60 px-3 py-2 text-op-xs text-muted-foreground">
             {receptor.nombre} · {receptor.rfc} · Régimen {receptor.regimen}
             {modo === "publico" ? " · CP del emisor" : ` · CP ${receptor.cp}`}
           </p>

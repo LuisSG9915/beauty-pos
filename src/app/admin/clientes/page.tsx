@@ -8,6 +8,7 @@ import { ClientImport } from "@/app/admin/client-import";
 import { ClientSheet } from "@/app/admin/clientes/client-sheet";
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { AdminPageHeader } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { StatCard, StatCardGrid } from "@/components/admin/stat-card";
 import { EmptyState } from "@/components/empty-state";
@@ -411,7 +412,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
             />
           </div>
         ) : (
-          <>
+          <VistaAdaptativa>
             <RegistroList className="p-3">
               {clientRows.map((client) => (
                 <RegistroCard
@@ -457,7 +458,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
               rowKey={(client) => client.id}
               rows={clientRows}
             />
-          </>
+          </VistaAdaptativa>
         )}
         {totalPaginas > 1 ? (
           <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm text-muted-foreground">

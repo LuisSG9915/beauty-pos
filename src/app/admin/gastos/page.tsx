@@ -8,6 +8,7 @@ import { GastoForm } from "@/app/admin/gastos/gasto-form";
 import { RevertirGastoForm } from "@/app/admin/gastos/revertir-gasto-form";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { EmptyState } from "@/components/empty-state";
 import { PlanUpgradeNotice } from "@/components/plan-gate";
 import { StatusBadge } from "@/components/status-badge";
@@ -250,7 +251,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
           {listado.rows.length === 0 ? (
             <EmptyState description="Prueba otro rango o registra el primer gasto del negocio." title="Sin gastos" />
           ) : (
-            <>
+            <VistaAdaptativa>
               <div className="space-y-3 md:hidden">
                 {listado.rows.map((gasto, index) => (
                   <article className="anim-entrada rounded-xl border border-border p-4" key={gasto.id} style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}>
@@ -352,7 +353,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
                 </tbody>
               </table>
               </div>
-            </>
+            </VistaAdaptativa>
           )}
           {page > 1 || listado.hasMore ? (
             <div className="mt-4 flex items-center justify-between text-sm">

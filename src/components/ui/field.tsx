@@ -96,7 +96,7 @@ function FieldDescription({
 }: ComponentProps<typeof FieldPrimitive.Description>) {
   return (
     <FieldPrimitive.Description
-      className={cn("text-xs leading-5 text-muted-foreground", className)}
+      className={cn("text-op-xs leading-5 text-muted-foreground", className)}
       {...props}
     />
   );
@@ -116,7 +116,7 @@ function FieldError({
   const message = error ?? (typeof children === "string" ? children : undefined);
   return (
     <FieldPrimitive.Error
-      className={cn("text-xs font-medium text-destructive", className)}
+      className={cn("text-op-xs font-medium text-destructive", className)}
       match={error ? true : match}
       {...props}
     >
@@ -142,7 +142,7 @@ function FieldFeedback({
   if (error) {
     return (
       <p
-        className={cn("text-xs font-medium text-destructive", className)}
+        className={cn("text-op-xs font-medium text-destructive", className)}
         role="alert"
       >
         {error}
@@ -151,7 +151,7 @@ function FieldFeedback({
   }
   if (hint) {
     return (
-      <p className={cn("text-xs leading-5 text-muted-foreground", className)}>
+      <p className={cn("text-op-xs leading-5 text-muted-foreground", className)}>
         {hint}
       </p>
     );

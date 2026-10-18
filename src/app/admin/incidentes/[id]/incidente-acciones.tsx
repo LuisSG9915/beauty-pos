@@ -127,7 +127,7 @@ export function IncidenteResolver({ incidenteId }: { incidenteId: string }) {
         <Input id="releaseCorregido" name="releaseCorregido" placeholder="Ej. commit 1ecc221" />
       </Field>
       {state.error ? (
-        <p className="text-xs font-medium text-destructive" role="alert">
+        <p className="text-op-xs font-medium text-destructive" role="alert">
           {state.error}
         </p>
       ) : null}

@@ -10,6 +10,7 @@ import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminNavTabs, CATALOGO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { ToggleActivo } from "@/components/admin/toggle-activo";
 import { EmptyState } from "@/components/empty-state";
@@ -346,7 +347,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
         {serviceRows.length === 0 ? (
           <EmptyState description="Crea servicios para el salón: cortes, tratamientos, manicure, etc." title="No hay servicios" />
         ) : (
-          <>
+          <VistaAdaptativa>
             <RegistroList>
               {serviceRows.map((service) => (
                 <RegistroCard
@@ -391,7 +392,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
               rowKey={(service) => service.id}
               rows={serviceRows}
             />
-          </>
+          </VistaAdaptativa>
         )}
       </AdminCard>
       {editing || firstParam(params.nuevo) === "1" ? (

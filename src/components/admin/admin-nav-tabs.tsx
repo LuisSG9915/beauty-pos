@@ -64,7 +64,7 @@ export function AdminNavTabs({
           <Link
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs sm:text-sm font-medium transition-all duration-200 select-none active:scale-[0.97]",
+              "inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-op-xs sm:text-sm font-medium transition-all duration-200 select-none active:scale-[0.97]",
               isActive
                 ? "bg-card font-semibold text-foreground shadow-xs border border-border/80"
                 : "text-muted-foreground hover:bg-card/40 hover:text-foreground",
@@ -88,7 +88,7 @@ export function AdminNavTabs({
             {tab.badge !== undefined ? (
               <span
                 className={cn(
-                  "rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+                  "rounded-full px-1.5 py-0.5 text-op-xs font-semibold tabular-nums",
                   tab.badgeTone === "success"
                     ? "bg-success/15 text-success"
                     : tab.badgeTone === "warning"

@@ -188,7 +188,7 @@ export function Combobox({
                         {item.label}
                       </span>
                       {item.description ? (
-                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                        <span className="mt-0.5 block text-op-xs text-muted-foreground">
                           {item.description}
                         </span>
                       ) : null}
@@ -202,7 +202,7 @@ export function Combobox({
       </ComboboxPrimitive.Root>
       {error ? (
         <p
-          className="text-xs font-medium text-destructive"
+          className="text-op-xs font-medium text-destructive"
           id={errorId}
           role="alert"
         >

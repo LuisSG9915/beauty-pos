@@ -540,7 +540,7 @@ export function AgendaBoard({
       ) : null}
 
       <div className="flex flex-wrap items-center justify-between gap-2 sm:gap-3">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground sm:text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-op-xs text-muted-foreground sm:text-sm">
           <Clock3 aria-hidden="true" className="hidden size-4 sm:inline" />
           <span className="hidden sm:inline">
             {turnosDia.length > 0

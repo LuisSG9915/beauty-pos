@@ -53,7 +53,7 @@ function ToastList() {
           <ToastPrimitive.Description className="text-sm leading-5 text-muted-foreground" />
         </ToastPrimitive.Content>
         {toast.actionProps ? (
-          <ToastPrimitive.Action className="shrink-0 self-center rounded-lg px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-muted" />
+          <ToastPrimitive.Action className="shrink-0 self-center rounded-lg px-2.5 py-1.5 text-op-xs font-semibold text-primary transition-colors hover:bg-muted" />
         ) : null}
         <ToastPrimitive.Close
           aria-label="Cerrar aviso"

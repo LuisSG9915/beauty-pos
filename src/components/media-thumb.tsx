@@ -36,7 +36,7 @@ export function MediaThumb({
     <span
       aria-hidden="true"
       className={cn(
-        "flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold text-muted-foreground",
+        "flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-op-xs font-semibold text-muted-foreground",
         className,
       )}
     >

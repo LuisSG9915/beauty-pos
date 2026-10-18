@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { BarChart, HBarChart } from "@/components/charts";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
@@ -61,7 +62,7 @@ function Tabla({
     return <EmptyState className="px-4 py-6" description="Ajusta el rango de fechas si esperabas resultados." title={vacio} />;
   }
   return (
-    <>
+    <VistaAdaptativa>
       <div className="space-y-3 md:hidden">
         {filas.map((celdas, i) => (
           <div className="anim-entrada rounded-xl border border-border px-4 py-3" key={i} style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}>
@@ -101,7 +102,7 @@ function Tabla({
         </tbody>
       </table>
       </div>
-    </>
+    </VistaAdaptativa>
   );
 }
 
@@ -465,7 +466,7 @@ export default async function ReportesPage({ searchParams }: Props) {
                 vacio="Sin avisos generados en el rango."
               />
               {avisosFallidos > 0 ? (
-                <p className="mt-3 rounded-xl bg-accent/70 px-4 py-3 text-xs font-medium text-primary">
+                <p className="mt-3 rounded-xl bg-accent/70 px-4 py-3 text-op-xs font-medium text-primary">
                   {avisosFallidos} aviso(s) agotaron sus reintentos. Revisa los correos de tus clientes o contacta soporte.
                 </p>
               ) : null}
@@ -671,7 +672,7 @@ export default async function ReportesPage({ searchParams }: Props) {
           ].map(([termino, definicion]) => (
             <div key={termino}>
               <dt className="font-medium text-foreground">{termino}</dt>
-              <dd className="mt-0.5 text-xs leading-5 text-muted-foreground">{definicion}</dd>
+              <dd className="mt-0.5 text-op-xs leading-5 text-muted-foreground">{definicion}</dd>
             </div>
           ))}
         </dl>

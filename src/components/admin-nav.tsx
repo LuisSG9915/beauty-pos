@@ -611,7 +611,7 @@ function NavItemRow({
                 <Link
                   aria-current={isChildActive ? "page" : undefined}
                   className={cn(
-                    "flex min-h-8 items-center gap-2 rounded-xl px-2.5 text-xs transition-colors",
+                    "flex min-h-8 items-center gap-2 rounded-xl px-2.5 text-op-xs transition-colors",
                     isChildActive
                       ? "bg-primary/10 font-semibold text-primary"
                       : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",

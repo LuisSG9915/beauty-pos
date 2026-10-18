@@ -87,7 +87,7 @@ export function ThemeModeSelector({ className, iconOnly = false }: ThemeModeSele
             aria-checked={checked}
             aria-label={label}
             className={cn(
-              "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition-colors",
+              "inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-op-xs font-medium transition-colors",
               checked
                 ? "bg-card text-foreground shadow-sm"
                 : "text-muted-foreground hover:bg-card/60 hover:text-foreground",

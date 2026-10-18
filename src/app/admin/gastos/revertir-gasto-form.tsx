@@ -25,7 +25,7 @@ export function RevertirGastoForm({
 
   return (
     <details className="group">
-      <summary className="cursor-pointer list-none text-xs font-medium text-destructive hover:underline">
+      <summary className="cursor-pointer list-none text-op-xs font-medium text-destructive hover:underline">
         Revertir
       </summary>
       <form action={action} className="mt-2 w-56 space-y-2 rounded-xl border border-border bg-muted/60 p-3">

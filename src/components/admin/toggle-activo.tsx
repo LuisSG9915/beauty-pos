@@ -128,7 +128,7 @@ export function ToggleActivo({
   return (
     <>
       <button
-        className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
+        className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60"
         data-action-id={`${telemetryBase}.${activo ? "ocultar" : "activar"}`}
         disabled={pending}
         onClick={() => ejecutar(!activo)}

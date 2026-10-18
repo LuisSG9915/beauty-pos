@@ -194,7 +194,7 @@ export function DayGrid({
               <button
                 aria-selected={activo}
                 className={cn(
-                  "flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-xs font-medium transition-colors active:scale-95",
+                  "flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-op-xs font-medium transition-colors active:scale-95",
                   activo ? "border-primary/40 bg-accent text-accent-foreground shadow-xs font-semibold" : "border-border bg-card text-muted-foreground",
                 )}
                 key={column.id || "sin-asignar"}

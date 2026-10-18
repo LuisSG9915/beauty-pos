@@ -6,6 +6,7 @@ import { toggleTax } from "@/app/admin/impuestos/actions";
 import { TaxForm } from "@/app/admin/impuestos/tax-form";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
@@ -59,7 +60,7 @@ export default async function TaxesPage({ searchParams }: { searchParams: Search
         {taxes.length === 0 ? (
           <EmptyState description="Crea impuestos como IVA (16%) o IEPS para aplicarlos en el POS." title="No hay impuestos" />
         ) : (
-          <>
+          <VistaAdaptativa>
             <RegistroList>
               {taxes.map((tax) => (
                 <RegistroCard
@@ -124,7 +125,7 @@ export default async function TaxesPage({ searchParams }: { searchParams: Search
                 </tbody>
               </table>
             </div>
-          </>
+          </VistaAdaptativa>
         )}
       </AdminCard>
       {editing || firstParam(params.nuevo) === "1" ? (

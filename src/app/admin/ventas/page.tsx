@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { AdminNavTabs, CAJA_VENTAS_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminPageHeader } from "@/components/admin/page-header";
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge, type StatusTone } from "@/components/status-badge";
@@ -297,7 +298,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
       {pageRows.length === 0 ? (
         <EmptyState description="Prueba otro rango, estado o búsqueda. Las ventas abiertas también aparecen aquí." title="No hay ventas" />
       ) : (
-        <>
+        <VistaAdaptativa>
           <RegistroList>
             {pageRows.map((venta) => {
               const estadoVenta = estadoVentaDe(venta);
@@ -334,7 +335,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
               rows={pageRows}
             />
           </div>
-        </>
+        </VistaAdaptativa>
       )}
 
       <div className="flex items-center justify-between text-sm">

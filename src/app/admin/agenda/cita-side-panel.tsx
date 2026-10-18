@@ -110,17 +110,17 @@ function CitaHistorial({
         if (event.currentTarget.open) cargar();
       }}
     >
-      <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-primary select-none">
+      <summary className="cursor-pointer text-op-xs font-semibold uppercase tracking-wide text-primary select-none">
         Historial de la cita
       </summary>
       <ul className="mt-3 space-y-2">
         {eventos === null ? (
-          <li className="text-xs text-muted-foreground">{cargando ? "Cargando…" : ""}</li>
+          <li className="text-op-xs text-muted-foreground">{cargando ? "Cargando…" : ""}</li>
         ) : eventos.length === 0 ? (
-          <li className="text-xs text-muted-foreground">Sin movimientos registrados.</li>
+          <li className="text-op-xs text-muted-foreground">Sin movimientos registrados.</li>
         ) : (
           eventos.map((evento) => (
-            <li className="flex items-baseline gap-2 text-xs" key={evento.id}>
+            <li className="flex items-baseline gap-2 text-op-xs" key={evento.id}>
               <span className="shrink-0 tabular-nums text-muted-foreground">
                 {formatDate(evento.createdAt, { timeZone })} {formatTime(evento.createdAt, { timeZone })}
               </span>
@@ -260,11 +260,11 @@ function CitaAnticipos({
   return (
     <section className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
+        <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
           Anticipos
         </h3>
         {vigenteTotal > 0 ? (
-          <span className="text-xs font-semibold tabular-nums text-success">
+          <span className="text-op-xs font-semibold tabular-nums text-success">
             {formatCurrency(vigenteTotal, { currency })} vigente
           </span>
         ) : null}
@@ -282,7 +282,7 @@ function CitaAnticipos({
                   <span className="font-medium tabular-nums">
                     {formatCurrency(ant.monto, { currency })}
                   </span>
-                  <span className="ml-2 text-xs text-muted-foreground">{ant.medioNombre ?? "Medio"}</span>
+                  <span className="ml-2 text-op-xs text-muted-foreground">{ant.medioNombre ?? "Medio"}</span>
                 </span>
                 <StatusBadge tone={ANTICIPO_ESTADO_TONE[ant.estado] ?? "neutral"}>
                   {ANTICIPO_ESTADO_LABEL[ant.estado] ?? ant.estado}
@@ -304,7 +304,7 @@ function CitaAnticipos({
                 <div className="mt-2 flex items-center gap-2">
                   <input
                     aria-label="Motivo de la devolución"
-                    className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+                    className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-op-xs outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
                     onChange={(event) => setMotivoDevolucion(event.target.value)}
                     placeholder="Motivo de la devolución"
                     type="text"
@@ -347,7 +347,7 @@ function CitaAnticipos({
                   <button
                     aria-pressed={medioPagoId === medio.id}
                     className={cn(
-                      "min-h-9 rounded-lg border px-3 text-xs font-medium transition-colors",
+                      "min-h-9 rounded-lg border px-3 text-op-xs font-medium transition-colors",
                       medioPagoId === medio.id
                         ? "border-primary bg-accent/70 text-primary"
                         : "border-border bg-card text-muted-foreground hover:border-accent-foreground/30",
@@ -615,10 +615,10 @@ export function CitaSidePanel({
 
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
+          <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
             Servicios
           </h3>
-          <span className="text-xs font-semibold tabular-nums text-muted-foreground">
+          <span className="text-op-xs font-semibold tabular-nums text-muted-foreground">
             {formatCurrency(cita.totalEstimado, { currency })}
           </span>
         </div>
@@ -635,7 +635,7 @@ export function CitaSidePanel({
               >
                 <MediaThumb claveR2={servicio.imagenClaveR2} className="size-8" nombre={servicio.nombre} />
                 <span className="min-w-0 flex-1 truncate font-medium">{servicio.nombre}</span>
-                <span className="text-xs tabular-nums text-muted-foreground">
+                <span className="text-op-xs tabular-nums text-muted-foreground">
                   {formatCurrency(servicio.precio, { currency })}
                 </span>
                 {editable ? (
@@ -678,7 +678,7 @@ export function CitaSidePanel({
 
       {cita.recursos.length > 0 || (editable && recursosDisponibles.length > 0) ? (
         <section className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
+          <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
             Recursos
           </h3>
           {cita.recursos.length === 0 ? (
@@ -739,7 +739,7 @@ export function CitaSidePanel({
 
       {cita.notas ? (
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
+          <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
             Notas de la cita
           </h3>
           <p className="mt-2 rounded-xl bg-muted/60 px-4 py-3 text-sm leading-6 text-muted-foreground">
@@ -750,7 +750,7 @@ export function CitaSidePanel({
 
       {cita.clienteNotas ? (
         <section>
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-warning">
+          <h3 className="text-op-xs font-semibold uppercase tracking-wide text-warning">
             Notas del cliente / alergias
           </h3>
           <p className="mt-2 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm leading-6 text-warning-soft-foreground">
@@ -765,7 +765,7 @@ export function CitaSidePanel({
           className="rounded-xl border border-border bg-card p-4 shadow-sm"
           open={cita.estado === "en_proceso"}
         >
-          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-primary select-none flex items-center justify-between">
+          <summary className="cursor-pointer text-op-xs font-semibold uppercase tracking-wide text-primary select-none flex items-center justify-between">
             <span>Ficha técnica & Fórmulas</span>
             <span className="text-op-xs font-normal text-muted-foreground">
               {cita.estado === "en_proceso" ? "servicio en curso" : "ver o registrar"}

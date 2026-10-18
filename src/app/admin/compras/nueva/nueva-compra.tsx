@@ -186,7 +186,7 @@ export function NuevaCompra({
           )}
           Capturar sin foto
         </Button>
-        <span className="text-xs text-muted-foreground">o</span>
+        <span className="text-op-xs text-muted-foreground">o</span>
         <Link
           className="text-sm text-primary underline-offset-4 hover:underline"
           href={buildAdminHref("/compras", { organizationId: organizacionId, sucursalId })}

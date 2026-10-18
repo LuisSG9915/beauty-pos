@@ -94,7 +94,7 @@ export function LoginForm() {
         </Link>
       </p>
 
-      <p className="text-center text-xs leading-5 text-muted-foreground">
+      <p className="text-center text-op-xs leading-5 text-muted-foreground">
         El acceso se habilita mediante una invitación administrativa.
       </p>
     </form>

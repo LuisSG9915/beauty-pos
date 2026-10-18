@@ -20,7 +20,7 @@ export function InsumosManager({ organizationId, servicioId, insumos, disponible
       {insumos.length > 0 ? (
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+            <thead className="border-b border-border text-op-xs uppercase tracking-wide text-muted-foreground">
               <tr>
                 <th className="py-2 pr-4 font-medium">Clave</th>
                 <th className="py-2 pr-4 font-medium">Producto</th>
@@ -32,15 +32,15 @@ export function InsumosManager({ organizationId, servicioId, insumos, disponible
             <tbody>
               {insumos.map((insumo) => (
                 <tr className="border-b border-border" key={insumo.id}>
-                  <td className="py-3 pr-4 font-mono text-xs">{insumo.productoSku}</td>
+                  <td className="py-3 pr-4 font-mono text-op-xs">{insumo.productoSku}</td>
                   <td className="py-3 pr-4 font-medium">{insumo.productoNombre}</td>
                   <td className="py-3 pr-4 tabular-nums">{insumo.cantidad}</td>
-                  <td className="py-3 pr-4 text-xs text-muted-foreground">{insumo.unidadNombre ?? "—"}</td>
+                  <td className="py-3 pr-4 text-op-xs text-muted-foreground">{insumo.unidadNombre ?? "—"}</td>
                   <td className="py-3">
                     <form action={removeServicioInsumo}>
                       <input name="organizacionId" type="hidden" value={organizationId} />
                       <input name="insumoRelId" type="hidden" value={insumo.id} />
-                      <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-destructive hover:bg-destructive/10" type="submit">Quitar</button>
+                      <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-destructive hover:bg-destructive/10" type="submit">Quitar</button>
                     </form>
                   </td>
                 </tr>
@@ -74,7 +74,7 @@ export function InsumosManager({ organizationId, servicioId, insumos, disponible
           <Button className="rounded-xl" disabled={!selectedProducto} type="submit">Agregar</Button>
         </form>
       ) : (
-        <p className="mt-4 text-xs font-medium text-warning">No hay productos marcados como insumo. Crea productos con tipo &quot;Insumo&quot; o &quot;Ambos&quot; en el catálogo de productos.</p>
+        <p className="mt-4 text-op-xs font-medium text-warning">No hay productos marcados como insumo. Crea productos con tipo &quot;Insumo&quot; o &quot;Ambos&quot; en el catálogo de productos.</p>
       )}
     </div>
   );

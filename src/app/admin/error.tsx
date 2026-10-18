@@ -36,7 +36,7 @@ export default function AdminError({
         problema persiste, vuelve al panel o contacta a soporte.
       </p>
       {error.digest ? (
-        <p className="mt-2 text-xs text-muted-foreground">
+        <p className="mt-2 text-op-xs text-muted-foreground">
           Referencia: {error.digest}
         </p>
       ) : null}

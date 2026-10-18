@@ -74,13 +74,13 @@ export function OfflineSyncBadge() {
           <WifiOff className="size-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-semibold text-foreground">Sin internet en el salón</p>
-          <p className="text-[11px] text-muted-foreground leading-tight">
+          <p className="text-op-xs font-semibold text-foreground">Sin internet en el salón</p>
+          <p className="text-op-xs text-muted-foreground leading-tight">
             Puedes seguir cobrando en la caja offline sin detenerte.
           </p>
         </div>
         <Link
-          className="shrink-0 inline-flex items-center gap-1 rounded-xl bg-destructive px-3 py-1.5 text-xs font-semibold text-destructive-foreground shadow-xs hover:bg-destructive/90 transition-colors"
+          className="shrink-0 inline-flex items-center gap-1 rounded-xl bg-destructive px-3 py-1.5 text-op-xs font-semibold text-destructive-foreground shadow-xs hover:bg-destructive/90 transition-colors"
           href="/offline/venta"
         >
           Cobrar
@@ -110,7 +110,7 @@ export function OfflineSyncBadge() {
           </p>
         </div>
         <span
-          className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+          className={`rounded-full px-2 py-0.5 text-op-xs font-semibold uppercase ${
             enLinea ? "bg-success-soft text-success" : "bg-warning-soft text-warning"
           }`}
         >
@@ -118,19 +118,19 @@ export function OfflineSyncBadge() {
         </span>
       </div>
 
-      <p className="text-xs text-muted-foreground mb-3">
+      <p className="text-op-xs text-muted-foreground mb-3">
         {enLinea
           ? "Sincronizando con el servidor central para asentar en caja y contabilidad…"
           : "Guardadas de forma segura en tu navegador. Se sincronizarán automáticamente al volver la red."}
       </p>
 
-      <ul className="space-y-1.5 text-xs text-foreground/90 max-h-32 overflow-y-auto mb-3 pr-1">
+      <ul className="space-y-1.5 text-op-xs text-foreground/90 max-h-32 overflow-y-auto mb-3 pr-1">
         {pendientes.slice(0, 4).map((v) => {
           const totalVenta = v.pagos.reduce((acc, p) => acc + Number(p.monto || 0), 0);
           const totalItems = v.servicios.length + v.productos.length;
           return (
             <li
-              className="rounded-lg bg-muted/40 px-2.5 py-1 text-[11px]"
+              className="rounded-lg bg-muted/40 px-2.5 py-1 text-op-xs"
               key={v.clave}
             >
               <div className="flex items-center justify-between">
@@ -141,13 +141,13 @@ export function OfflineSyncBadge() {
                 <span className="font-semibold tabular-nums ml-2">${totalVenta.toFixed(2)}</span>
               </div>
               {errores[v.clave] ? (
-                <p className="text-[10px] text-destructive truncate mt-0.5">{errores[v.clave]}</p>
+                <p className="text-op-xs text-destructive truncate mt-0.5">{errores[v.clave]}</p>
               ) : null}
             </li>
           );
         })}
         {pendientes.length > 4 ? (
-          <li className="text-[11px] text-muted-foreground text-center pt-1">
+          <li className="text-op-xs text-muted-foreground text-center pt-1">
             + {pendientes.length - 4} ventas más en cola
           </li>
         ) : null}
@@ -155,7 +155,7 @@ export function OfflineSyncBadge() {
 
       <div className="flex items-center gap-2">
         <button
-          className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
+          className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2 text-op-xs font-semibold text-primary-foreground shadow-xs transition-colors hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
           disabled={sincronizando || !enLinea}
           onClick={() => void sincronizar()}
           type="button"
@@ -164,7 +164,7 @@ export function OfflineSyncBadge() {
           {sincronizando ? "Sincronizando…" : enLinea ? "Sincronizar ahora" : "Esperando conexión…"}
         </button>
         <Link
-          className="rounded-xl border border-border px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted transition-colors text-center"
+          className="rounded-xl border border-border px-3 py-2 text-op-xs font-semibold text-foreground hover:bg-muted transition-colors text-center"
           href="/offline/venta"
         >
           Caja offline

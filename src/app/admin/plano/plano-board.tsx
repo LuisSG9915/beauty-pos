@@ -593,7 +593,7 @@ export function PlanoBoard({
               <div className="mt-4 space-y-4 border-t border-border pt-4">
                 {datos.pisos.length > 1 ? (
                   <div>
-                    <p className="mb-2 text-xs font-medium text-muted-foreground">Orden en las pestañas</p>
+                    <p className="mb-2 text-op-xs font-medium text-muted-foreground">Orden en las pestañas</p>
                     <div className="flex gap-2">
                       <Button
                         data-action-id="plano.piso.reordenar.izquierda"
@@ -753,7 +753,7 @@ export function PlanoBoard({
             <button
               aria-pressed={filtro === item.id}
               className={cn(
-                "inline-flex min-h-9 items-center rounded-lg px-3 text-xs font-medium transition-colors",
+                "inline-flex min-h-9 items-center rounded-lg px-3 text-op-xs font-medium transition-colors",
                 filtro === item.id
                   ? "bg-accent text-accent-foreground"
                   : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
@@ -781,7 +781,7 @@ export function PlanoBoard({
           </button>
           <button
             aria-label="Restablecer zoom al 100%"
-            className="inline-flex min-h-9 min-w-12 items-center justify-center rounded-lg px-1 text-xs font-medium tabular-nums text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
+            className="inline-flex min-h-9 min-w-12 items-center justify-center rounded-lg px-1 text-op-xs font-medium tabular-nums text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground"
             data-action-id="plano.zoom.restablecer"
             onClick={() => setZoom(1)}
             type="button"
@@ -800,7 +800,7 @@ export function PlanoBoard({
           </button>
           <button
             aria-label="Ajustar el piso completo en pantalla"
-            className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
+            className="inline-flex min-h-9 items-center gap-1 rounded-lg px-2.5 text-op-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:opacity-50"
             data-action-id="plano.zoom.ajustar"
             disabled={Boolean(arrastre) || !piso}
             onClick={() => {
@@ -841,12 +841,12 @@ export function PlanoBoard({
 
       {/* Guía de gestos: táctil con pulsación larga; escritorio arrastra directo. */}
       {puedeEditarPlano ? (
-        <p className="rounded-xl border border-border bg-muted/50 px-4 py-2.5 text-xs text-muted-foreground">
+        <p className="rounded-xl border border-border bg-muted/50 px-4 py-2.5 text-op-xs text-muted-foreground">
           <span className="md:hidden">Mantén presionado un elemento para moverlo; toca uno para ver sus opciones.</span>
           <span className="hidden md:inline">Arrastra los elementos para moverlos, tira de la esquina azul para cambiar el tamaño; con Supr sobre un elemento seleccionado lo quitas.</span>
         </p>
       ) : (
-        <p className="rounded-xl border border-border bg-muted/50 px-4 py-2.5 text-xs text-muted-foreground">
+        <p className="rounded-xl border border-border bg-muted/50 px-4 py-2.5 text-op-xs text-muted-foreground">
           Puedes ver el plano y consultar cada elemento; para modificarlo se necesita permiso de Sucursales.
         </p>
       )}
@@ -856,7 +856,7 @@ export function PlanoBoard({
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-3">
           <Search aria-hidden="true" className="size-4 text-primary" />
           <p className="text-sm font-medium text-foreground">{productoSel.nombre}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-op-xs text-muted-foreground">
             Stock {formatQuantity(Number(productoSel.stock))}
             {productoSel.unidad ? ` ${productoSel.unidad}` : ""} · en ubicaciones{" "}
             {formatQuantity(Number(productoSel.ubicado))}
@@ -865,7 +865,7 @@ export function PlanoBoard({
             {`Sin ubicar: ${formatQuantity(sinUbicar)}`}
           </StatusBadge>
           {sinUbicar < 0 ? (
-            <p className="flex items-center gap-1.5 text-xs font-medium text-warning" role="alert">
+            <p className="flex items-center gap-1.5 text-op-xs font-medium text-warning" role="alert">
               <CircleAlert aria-hidden="true" className="size-3.5" />
               Las cantidades por ubicación están desactualizadas: súbelas o reubícalas.
             </p>
@@ -933,7 +933,7 @@ export function PlanoBoard({
               <div className="pointer-events-auto mx-4 max-w-xs rounded-2xl border border-border bg-card/95 px-5 py-4 text-center shadow-sm">
                 <MapIcon aria-hidden="true" className="mx-auto size-5 text-muted-foreground" />
                 <p className="mt-2 text-sm font-medium text-foreground">Este piso está vacío</p>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className="mt-1 text-op-xs text-muted-foreground">
                   {puedeEditarPlano
                     ? "Agrega una ubicación para tu mercancía o un mueble, y acomódalo arrastrándolo."
                     : "Todavía no hay ubicaciones ni muebles en este piso."}
@@ -973,7 +973,7 @@ export function PlanoBoard({
             {mueblesSinColocar.map((mueble) => (
               <li className="flex items-center gap-1" key={mueble.id}>
                 <button
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted/60"
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-border px-3 text-op-xs font-medium text-foreground transition-colors hover:bg-muted/60"
                   data-action-id="plano.mobiliario.ver"
                   onClick={() => setSeleccion({ tipo: "mobiliario", id: mueble.id })}
                   type="button"
@@ -1007,9 +1007,9 @@ export function PlanoBoard({
         {piso ? (
           <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
             <section aria-label={`Ubicaciones de ${piso.nombre}`}>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">Mercancía</h3>
+              <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">Mercancía</h3>
               {ubicacionesPiso.length === 0 ? (
-                <p className="mt-2 text-xs text-muted-foreground">Sin ubicaciones en este piso.</p>
+                <p className="mt-2 text-op-xs text-muted-foreground">Sin ubicaciones en este piso.</p>
               ) : (
                 <ul className="mt-2 space-y-1.5">
                   {ubicacionesPiso.map((u) => (
@@ -1023,14 +1023,14 @@ export function PlanoBoard({
                         <span className="flex items-center justify-between gap-2">
                           <span className="min-w-0">
                             <span className="block truncate text-sm font-medium text-foreground">{u.nombre}</span>
-                            <span className="block text-xs text-muted-foreground">
+                            <span className="block text-op-xs text-muted-foreground">
                               {UBICACION_TIPO_LABEL[u.tipo as UbicacionTipo] ?? u.tipo}
                               {u.productos.length > 0
                                 ? ` · ${u.productos.map((p) => p.nombre).join(", ")}`
                                 : " · sin mercancía"}
                             </span>
                           </span>
-                          <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                          <span className="shrink-0 text-op-xs tabular-nums text-muted-foreground">
                             {formatQuantity(u.productos.reduce((t, p) => t + Number(p.cantidad), 0))} pzas
                           </span>
                         </span>
@@ -1054,9 +1054,9 @@ export function PlanoBoard({
               )}
             </section>
             <section aria-label={`Muebles de ${piso.nombre}`}>
-              <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">Muebles</h3>
+              <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">Muebles</h3>
               {mobiliarioPiso.length === 0 && mueblesSinColocar.length === 0 ? (
-                <p className="mt-2 text-xs text-muted-foreground">Sin muebles registrados.</p>
+                <p className="mt-2 text-op-xs text-muted-foreground">Sin muebles registrados.</p>
               ) : (
                 <ul className="mt-2 space-y-1.5">
                   {mobiliarioPiso.map((m) => (
@@ -1070,7 +1070,7 @@ export function PlanoBoard({
                         <span className="flex items-center justify-between gap-2">
                           <span className="min-w-0">
                             <span className="block truncate text-sm font-medium text-foreground">{m.nombre}</span>
-                            <span className="block text-xs text-muted-foreground">
+                            <span className="block text-op-xs text-muted-foreground">
                               {MOBILIARIO_TIPO_LABEL[m.tipo as MobiliarioTipo] ?? m.tipo}
                               {m.recursoNombre ? ` · ${m.recursoNombre}` : ""}
                             </span>

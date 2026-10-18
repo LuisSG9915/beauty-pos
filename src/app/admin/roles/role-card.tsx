@@ -47,9 +47,9 @@ export function RoleCard({
           <div className="min-w-0">
             <p className="truncate font-medium text-foreground">
               {role.nombre}
-              {role.esSistema ? <span className="ml-2 text-xs font-normal text-muted-foreground">sistema</span> : null}
+              {role.esSistema ? <span className="ml-2 text-op-xs font-normal text-muted-foreground">sistema</span> : null}
             </p>
-            <p className="truncate text-xs text-muted-foreground">
+            <p className="truncate text-op-xs text-muted-foreground">
               {role.clave} · {permisoIds.length} permisos · {memberCount} miembro(s)
             </p>
           </div>
@@ -87,7 +87,7 @@ export function RoleCard({
           <input name="rolId" type="hidden" value={role.id} />
           {modulos.map((modulo) => (
             <div key={modulo}>
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">{modulo}</p>
+              <p className="text-op-xs font-semibold uppercase tracking-[0.12em] text-primary">{modulo}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {permisos
                   .filter((permiso) => permiso.modulo === modulo)
@@ -96,7 +96,7 @@ export function RoleCard({
                     const marcado = permisoIds.includes(permiso.id);
                     return (
                       <label
-                        className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors ${
+                        className={`inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-op-xs font-medium transition-colors ${
                           !editable || !asignable
                             ? "cursor-not-allowed border-border bg-muted/60 text-muted-foreground"
                             : "cursor-pointer border-border bg-card text-muted-foreground hover:border-accent-foreground/30 has-checked:border-primary has-checked:bg-accent/70 has-checked:text-primary"
@@ -126,7 +126,7 @@ export function RoleCard({
               </Button>
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-op-xs text-muted-foreground">
               {protegido ? "El rol Propietario tiene todos los permisos y no se puede modificar." : "Solo lectura."}
             </p>
           )}

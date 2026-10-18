@@ -169,7 +169,7 @@ export function AgendaToolbar({
               <ChevronLeft aria-hidden="true" className="size-4" />
             </Button>
             <Button
-              className={cn("h-8 px-2.5 sm:h-9 sm:px-3 text-xs sm:text-sm rounded-xl font-medium", fecha === hoy && "border-primary/40 bg-accent text-accent-foreground")}
+              className={cn("h-8 px-2.5 sm:h-9 sm:px-3 text-op-xs sm:text-sm rounded-xl font-medium", fecha === hoy && "border-primary/40 bg-accent text-accent-foreground")}
               disabled={activePending === "fecha"}
               onClick={() => navigate("fecha", hrefFor({ fecha: hoy }))}
               type="button"
@@ -194,7 +194,7 @@ export function AgendaToolbar({
           <div className="relative rounded-xl border border-input bg-background transition-shadow focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30">
             <div
               aria-hidden="true"
-              className="flex h-8 sm:h-9 items-center gap-1.5 whitespace-nowrap px-2.5 text-xs font-semibold text-foreground sm:gap-2 sm:text-sm"
+              className="flex h-8 sm:h-9 items-center gap-1.5 whitespace-nowrap px-2.5 text-op-xs font-semibold text-foreground sm:gap-2 sm:text-sm"
             >
               <CalendarDays className="size-3.5 sm:size-4 text-muted-foreground" />
               {fechaEtiqueta.format(new Date(`${fecha}T12:00:00Z`))}
@@ -221,7 +221,7 @@ export function AgendaToolbar({
                   aria-label={`Vista ${view.label}`}
                   title={`Vista ${view.label}`}
                   className={cn(
-                    "relative inline-flex h-7 items-center justify-center gap-1 rounded-lg px-2 text-xs font-medium whitespace-nowrap transition-colors",
+                    "relative inline-flex h-7 items-center justify-center gap-1 rounded-lg px-2 text-op-xs font-medium whitespace-nowrap transition-colors",
                     vista === view.value
                       ? "bg-card font-semibold text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-primary",
@@ -242,7 +242,7 @@ export function AgendaToolbar({
           <span
             aria-live="polite"
             className={cn(
-              "hidden sm:inline text-xs font-medium text-primary transition-opacity",
+              "hidden sm:inline text-op-xs font-medium text-primary transition-opacity",
               activePending ? "opacity-100" : "opacity-0",
             )}
             role="status"
@@ -259,7 +259,7 @@ export function AgendaToolbar({
               Buscar citas
             </label>
             <input
-              className="h-8 sm:h-9 w-full rounded-xl border border-input bg-background pl-8 sm:pl-9 pr-3 text-xs sm:text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
+              className="h-8 sm:h-9 w-full rounded-xl border border-input bg-background pl-8 sm:pl-9 pr-3 text-op-xs sm:text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/30"
               defaultValue={q}
               id="agenda-buscar"
               key={q}

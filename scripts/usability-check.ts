@@ -69,6 +69,10 @@ const PAGES = [
   "/admin/practica",
   "/admin/ventas",
   `/reservar/${E2E_RESERVA_SLUG}`,
+  "/",
+  "/precios",
+  "/registro",
+  "/offline/venta",
 ];
 
 const AXE_TAGS = ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa"];

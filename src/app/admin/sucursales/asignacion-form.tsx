@@ -91,13 +91,13 @@ export function MiembroSucursalesForm({
           <div className="min-w-0">
             <p className="truncate text-sm font-medium text-foreground">{miembro.nombre}</p>
             {miembro.correo ? (
-              <p className="truncate text-xs text-muted-foreground">{miembro.correo}</p>
+              <p className="truncate text-op-xs text-muted-foreground">{miembro.correo}</p>
             ) : null}
           </div>
         ) : null}
         <label
           className={cn(
-            "inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-xs font-medium transition-colors",
+            "inline-flex min-h-9 items-center gap-2 rounded-full border px-3 text-op-xs font-medium transition-colors",
             todas
               ? "border-primary bg-accent/70 text-primary"
               : "border-border bg-card text-muted-foreground",
@@ -132,19 +132,19 @@ export function MiembroSucursalesForm({
       </div>
 
       {todas ? (
-        <p className="text-xs leading-5 text-muted-foreground">
+        <p className="text-op-xs leading-5 text-muted-foreground">
           Ve cualquier sucursal, incluidas las nuevas (perfil administrativo).
         </p>
       ) : (
         <>
-          <p className="text-xs leading-5 text-muted-foreground">
+          <p className="text-op-xs leading-5 text-muted-foreground">
             Sucursal fija asignada: las ventas, citas y operaciones de este trabajador se vincularán automáticamente a la sucursal seleccionada.
           </p>
           <div className="flex flex-wrap gap-2">
             {sucursales.map((sucursal) => (
               <label
                 className={cn(
-                  "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors",
+                  "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 text-op-xs font-medium transition-colors",
                   disabled ? "cursor-not-allowed opacity-70" : "cursor-pointer",
                   seleccionadas.has(sucursal.id)
                     ? "border-primary bg-accent/70 text-primary"
@@ -166,7 +166,7 @@ export function MiembroSucursalesForm({
             ))}
             {fueraDeAlcance.map((nombre) => (
               <span
-                className="inline-flex min-h-9 items-center rounded-full border border-dashed border-border bg-muted/60 px-3 text-xs font-medium text-muted-foreground"
+                className="inline-flex min-h-9 items-center rounded-full border border-dashed border-border bg-muted/60 px-3 text-op-xs font-medium text-muted-foreground"
                 key={nombre}
                 title="Fuera de tu alcance"
               >
@@ -178,7 +178,7 @@ export function MiembroSucursalesForm({
       )}
 
       {sinElegir ? (
-        <p className="text-xs font-medium text-warning" role="alert">
+        <p className="text-op-xs font-medium text-warning" role="alert">
           Marca al menos una sucursal o vuelve a activar «Todas».
         </p>
       ) : null}
@@ -235,7 +235,7 @@ export function SucursalAsignacionForm({
               sucursales={sucursales}
             />
             {miembro.usuarioId === editorUsuarioId ? (
-              <p className="mt-2 text-xs text-muted-foreground">
+              <p className="mt-2 text-op-xs text-muted-foreground">
                 Es tu cuenta: tus sucursales se gestionan desde otro perfil para no dejarte fuera.
               </p>
             ) : null}

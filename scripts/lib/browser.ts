@@ -1,6 +1,8 @@
 import puppeteer, { type Browser, type Page } from "puppeteer";
 
-import { E2E_EMAIL, login } from "./e2e";
+import { VIEWPORT_BREAKPOINT_PX, VIEWPORT_COOKIE_NAME } from "@/lib/viewport-preference";
+
+import { BASE_URL, E2E_EMAIL, login } from "./e2e";
 
 export type ViewportDef = {
   nombre: string;
@@ -40,6 +42,15 @@ export async function loggedPage(
 ): Promise<Page> {
   const page = await browser.newPage();
   await page.setViewport(viewport);
+  // Fija la cookie de layout al ancho del contexto ANTES de navegar: ejercita
+  // el camino optimizado (el servidor emite solo el layout visible) sin el
+  // reload de corrección del bootstrap, y valida que cada viewport reciba el
+  // layout correcto.
+  await page.setCookie({
+    name: VIEWPORT_COOKIE_NAME,
+    value: viewport.width >= VIEWPORT_BREAKPOINT_PX ? "escritorio" : "movil",
+    url: BASE_URL,
+  });
   await login(page, email);
   return page;
 }

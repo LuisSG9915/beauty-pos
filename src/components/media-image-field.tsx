@@ -107,7 +107,7 @@ export async function eliminarImagen(claveR2: string): Promise<void> {
 
 function MensajeError({ error }: { error: string | null }) {
   return error ? (
-    <p className="mt-1 text-xs font-medium text-destructive" role="alert">
+    <p className="mt-1 text-op-xs font-medium text-destructive" role="alert">
       {error}
     </p>
   ) : null;
@@ -251,7 +251,7 @@ export function ProductImageField({
               <span className="mt-2 text-sm font-medium text-foreground">
                 Tomar o elegir una foto
               </span>
-              <span className="mt-1 text-xs text-muted-foreground">
+              <span className="mt-1 text-op-xs text-muted-foreground">
                 JPG, PNG o WebP · se ajusta sola al subir
               </span>
             </>
@@ -394,7 +394,7 @@ export function MobiliarioFotoField({
               <span className="mt-2 text-sm font-medium text-foreground">
                 Tomar o elegir una foto
               </span>
-              <span className="mt-1 text-xs text-muted-foreground">
+              <span className="mt-1 text-op-xs text-muted-foreground">
                 JPG, PNG o WebP · se ajusta sola al subir
               </span>
             </>
@@ -517,7 +517,7 @@ export function FichaFotosField({
             ) : (
               <ImagePlus aria-hidden="true" className="size-4" />
             )}
-            <span className="text-[10px] font-medium">Foto</span>
+            <span className="text-op-xs font-medium">Foto</span>
           </button>
         ) : null}
       </div>
@@ -626,7 +626,7 @@ export function AntesDespuesFotosField({
       <div className="grid grid-cols-2 gap-3">
         {/* Ranura Antes */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <span className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Antes
           </span>
           {fotoAntes ? (
@@ -659,7 +659,7 @@ export function AntesDespuesFotosField({
               ) : (
                 <>
                   <Camera aria-hidden="true" className="size-5 text-primary" />
-                  <span className="mt-1 text-xs font-medium text-foreground">Subir Antes</span>
+                  <span className="mt-1 text-op-xs font-medium text-foreground">Subir Antes</span>
                 </>
               )}
             </button>
@@ -668,7 +668,7 @@ export function AntesDespuesFotosField({
 
         {/* Ranura Después */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <span className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Después
           </span>
           {fotoDespues ? (
@@ -701,7 +701,7 @@ export function AntesDespuesFotosField({
               ) : (
                 <>
                   <Camera aria-hidden="true" className="size-5 text-primary" />
-                  <span className="mt-1 text-xs font-medium text-foreground">Subir Después</span>
+                  <span className="mt-1 text-op-xs font-medium text-foreground">Subir Después</span>
                 </>
               )}
             </button>

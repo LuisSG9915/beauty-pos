@@ -6,6 +6,7 @@ import { CancelarFacturaForm } from "@/app/admin/facturacion/cancelar-form";
 import { ConfigFiscalForm } from "@/app/admin/facturacion/config-fiscal-form";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
@@ -176,7 +177,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
               title="Sin comprobantes"
             />
           ) : (
-            <>
+            <VistaAdaptativa>
               <div className="space-y-3 md:hidden">
                 {comprobanteRows.map((c, index) => {
                   const badge = ESTADO_BADGE[c.estado] ?? ESTADO_BADGE.borrador;
@@ -267,7 +268,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
                 </tbody>
               </table>
               </div>
-            </>
+            </VistaAdaptativa>
           )}
         </AdminCard>
       </div>

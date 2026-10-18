@@ -88,7 +88,7 @@ export function AntesDespuesSlider({
       <div className={cn("relative overflow-hidden rounded-2xl border border-border bg-muted", aspectRatioClass, className)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img alt={altAntes} className="size-full object-cover" src={antesUrl} />
-        <span className="absolute top-3 left-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white backdrop-blur-md">
+        <span className="absolute top-3 left-3 rounded-full bg-black/70 px-3 py-1 text-op-xs font-semibold text-white backdrop-blur-md">
           Antes
         </span>
       </div>
@@ -100,7 +100,7 @@ export function AntesDespuesSlider({
       <div className={cn("relative overflow-hidden rounded-2xl border border-border bg-muted", aspectRatioClass, className)}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img alt={altDespues} className="size-full object-cover" src={despuesUrl} />
-        <span className="absolute top-3 right-3 rounded-full border border-emerald-500/30 bg-emerald-950/80 px-3 py-1 text-xs font-semibold text-emerald-200 backdrop-blur-md">
+        <span className="absolute top-3 right-3 rounded-full border border-emerald-500/30 bg-emerald-950/80 px-3 py-1 text-op-xs font-semibold text-emerald-200 backdrop-blur-md">
           Resultado final
         </span>
       </div>
@@ -158,12 +158,12 @@ export function AntesDespuesSlider({
 
       {/* Badges fijos en esquinas superiores */}
       <div className="pointer-events-none absolute top-3 left-3 z-10">
-        <span className="rounded-full bg-black/60 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-white backdrop-blur-md shadow-sm">
+        <span className="rounded-full bg-black/60 px-2.5 py-1 text-op-xs font-bold uppercase tracking-wider text-white backdrop-blur-md shadow-sm">
           Antes
         </span>
       </div>
       <div className="pointer-events-none absolute top-3 right-3 z-10">
-        <span className="rounded-full border border-emerald-500/40 bg-emerald-950/70 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider text-emerald-200 backdrop-blur-md shadow-sm">
+        <span className="rounded-full border border-emerald-500/40 bg-emerald-950/70 px-2.5 py-1 text-op-xs font-bold uppercase tracking-wider text-emerald-200 backdrop-blur-md shadow-sm">
           Después
         </span>
       </div>

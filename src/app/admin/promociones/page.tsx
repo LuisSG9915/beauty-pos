@@ -7,6 +7,7 @@ import { PromotionForm } from "@/app/admin/promociones/promotion-form";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminNavTabs, CATALOGO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
@@ -221,7 +222,7 @@ export default async function PromotionsPage({ searchParams }: { searchParams: S
         {promotionRows.length === 0 ? (
           <EmptyState description="Crea descuentos, promociones 2x1 o paquetes para tus productos y servicios." title="No hay promociones" />
         ) : (
-          <>
+          <VistaAdaptativa>
             <RegistroList>
               {promotionRows.map((promo) => (
                 <RegistroCard
@@ -294,7 +295,7 @@ export default async function PromotionsPage({ searchParams }: { searchParams: S
                 </tbody>
               </table>
             </div>
-          </>
+          </VistaAdaptativa>
         )}
       </AdminCard>
       {editing || firstParam(params.nuevo) === "1" ? (

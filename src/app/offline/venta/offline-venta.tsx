@@ -282,7 +282,7 @@ export function OfflineVenta() {
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold tracking-tight text-foreground">Venta Offline de Emergencia</h1>
                 <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                  className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-op-xs font-semibold ${
                     enLinea ? "bg-success-soft text-success" : "bg-warning-soft text-warning"
                   }`}
                 >
@@ -290,7 +290,7 @@ export function OfflineVenta() {
                   {enLinea ? "En línea" : "Modo offline"}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-op-xs text-muted-foreground mt-0.5">
                 {catalogo
                   ? `${catalogo.sucursalNombre || "Sucursal"} · Catálogo local actualizado`
                   : "Cargando catálogo guardado…"}
@@ -300,7 +300,7 @@ export function OfflineVenta() {
 
           <div className="flex items-center gap-2">
             <button
-              className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-border px-3 py-1.5 text-op-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer"
               disabled={sincronizando || !enLinea || pendientes.length === 0}
               onClick={() => void sincronizar()}
               type="button"
@@ -323,7 +323,7 @@ export function OfflineVenta() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-foreground text-background px-3 py-1.5 text-xs font-semibold shadow-xs hover:opacity-90 transition-opacity cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-foreground text-background px-3 py-1.5 text-op-xs font-semibold shadow-xs hover:opacity-90 transition-opacity cursor-pointer"
                   onClick={() => window.print()}
                   type="button"
                 >
@@ -331,7 +331,7 @@ export function OfflineVenta() {
                   Imprimir ticket provisional
                 </button>
                 <button
-                  className="rounded-xl border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                  className="rounded-xl border border-border px-3 py-1.5 text-op-xs font-medium text-muted-foreground hover:text-foreground"
                   onClick={() => setUltimaVenta(null)}
                   type="button"
                 >
@@ -340,11 +340,11 @@ export function OfflineVenta() {
               </div>
             </div>
 
-            <div className="rounded-xl border border-border bg-card p-4 text-xs font-mono max-w-sm mx-auto shadow-xs">
+            <div className="rounded-xl border border-border bg-card p-4 text-op-xs font-mono max-w-sm mx-auto shadow-xs">
               <div className="text-center pb-2 border-b border-dashed border-border">
                 <p className="font-bold text-sm">{ultimaVenta.sucursalNombre}</p>
-                <p className="text-[11px] text-muted-foreground">Comprobante de contingencia</p>
-                <p className="text-[10px] text-muted-foreground mt-0.5">{ultimaVenta.fecha} · Folio {ultimaVenta.folio}</p>
+                <p className="text-op-xs text-muted-foreground">Comprobante de contingencia</p>
+                <p className="text-op-xs text-muted-foreground mt-0.5">{ultimaVenta.fecha} · Folio {ultimaVenta.folio}</p>
               </div>
 
               <div className="py-2.5 space-y-1 border-b border-dashed border-border">
@@ -362,20 +362,20 @@ export function OfflineVenta() {
                   <span>${ultimaVenta.total.toFixed(2)}</span>
                 </div>
                 {ultimaVenta.pagos.map((p, idx) => (
-                  <div className="flex justify-between text-[11px] text-muted-foreground" key={idx}>
+                  <div className="flex justify-between text-op-xs text-muted-foreground" key={idx}>
                     <span>{p.medioNombre}:</span>
                     <span>${p.monto.toFixed(2)}</span>
                   </div>
                 ))}
                 {ultimaVenta.cambio > 0 ? (
-                  <div className="flex justify-between text-success font-semibold text-[11px]">
+                  <div className="flex justify-between text-success font-semibold text-op-xs">
                     <span>Cambio entregado:</span>
                     <span>${ultimaVenta.cambio.toFixed(2)}</span>
                   </div>
                 ) : null}
               </div>
 
-              <p className="text-center text-[10px] text-muted-foreground pt-2 border-t border-dashed border-border">
+              <p className="text-center text-op-xs text-muted-foreground pt-2 border-t border-dashed border-border">
                 Venta almacenada localmente. Se timbrará al restablecer la conexión.
               </p>
             </div>
@@ -415,7 +415,7 @@ export function OfflineVenta() {
                     <ShoppingBag className="size-4 text-primary" />
                     <h2 className="text-sm font-semibold text-foreground">Catálogo disponible</h2>
                   </div>
-                  <div className="flex rounded-lg bg-muted p-0.5 text-xs font-medium">
+                  <div className="flex rounded-lg bg-muted p-0.5 text-op-xs font-medium">
                     <button
                       className={`rounded-md px-2.5 py-1 transition-colors ${
                         tabCatalogo === "todos" ? "bg-background text-foreground shadow-xs font-semibold" : "text-muted-foreground hover:text-foreground"
@@ -462,13 +462,13 @@ export function OfflineVenta() {
                 {/* Lista de Servicios */}
                 {(tabCatalogo === "todos" || tabCatalogo === "servicios") && serviciosFiltrados.length > 0 ? (
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                    <p className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                       Servicios ({serviciosFiltrados.length})
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
                       {serviciosFiltrados.map((s) => (
                         <button
-                          className="flex flex-col items-start justify-between rounded-xl border border-border bg-background p-2.5 text-left text-xs transition-colors hover:border-primary/50 hover:bg-muted/40 cursor-pointer"
+                          className="flex flex-col items-start justify-between rounded-xl border border-border bg-background p-2.5 text-left text-op-xs transition-colors hover:border-primary/50 hover:bg-muted/40 cursor-pointer"
                           key={s.id}
                           onClick={() => agregarLinea("servicio", s)}
                           type="button"
@@ -486,13 +486,13 @@ export function OfflineVenta() {
                 {/* Lista de Productos */}
                 {(tabCatalogo === "todos" || tabCatalogo === "productos") && productosFiltrados.length > 0 ? (
                   <div className="pt-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
+                    <p className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground mb-2">
                       Productos de reventa ({productosFiltrados.length})
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
                       {productosFiltrados.map((p) => (
                         <button
-                          className="flex flex-col items-start justify-between rounded-xl border border-border bg-background p-2.5 text-left text-xs transition-colors hover:border-primary/50 hover:bg-muted/40 cursor-pointer"
+                          className="flex flex-col items-start justify-between rounded-xl border border-border bg-background p-2.5 text-left text-op-xs transition-colors hover:border-primary/50 hover:bg-muted/40 cursor-pointer"
                           key={p.id}
                           onClick={() => agregarLinea("producto", p)}
                           type="button"
@@ -508,7 +508,7 @@ export function OfflineVenta() {
                 ) : null}
 
                 {serviciosFiltrados.length === 0 && productosFiltrados.length === 0 ? (
-                  <p className="py-6 text-center text-xs text-muted-foreground">
+                  <p className="py-6 text-center text-op-xs text-muted-foreground">
                     No encontramos ningún servicio o producto que coincida con &quot;{busqueda}&quot;.
                   </p>
                 ) : null}
@@ -523,7 +523,7 @@ export function OfflineVenta() {
                   <h2 className="text-sm font-semibold text-foreground">Ticket actual</h2>
                   {lineas.length > 0 ? (
                     <button
-                      className="text-xs text-muted-foreground hover:text-destructive transition-colors"
+                      className="text-op-xs text-muted-foreground hover:text-destructive transition-colors"
                       onClick={() => setLineas([])}
                       type="button"
                     >
@@ -533,7 +533,7 @@ export function OfflineVenta() {
                 </div>
 
                 {lineas.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-border py-8 text-center text-xs text-muted-foreground">
+                  <div className="rounded-xl border border-dashed border-border py-8 text-center text-op-xs text-muted-foreground">
                     Toca servicios o productos a la izquierda para agregarlos al cobro.
                   </div>
                 ) : (
@@ -541,10 +541,10 @@ export function OfflineVenta() {
                     {lineas.map((linea, idx) => (
                       <li className="py-2.5 flex flex-col gap-1.5" key={`${linea.tipo}-${linea.id}`}>
                         <div className="flex items-start justify-between gap-2">
-                          <span className="text-xs font-semibold text-foreground flex-1 min-w-0 truncate">
+                          <span className="text-op-xs font-semibold text-foreground flex-1 min-w-0 truncate">
                             {linea.nombre}
                           </span>
-                          <span className="text-xs font-bold text-foreground tabular-nums shrink-0">
+                          <span className="text-op-xs font-bold text-foreground tabular-nums shrink-0">
                             {formatMonto(Number(linea.precio) * linea.cantidad, moneda)}
                           </span>
                         </div>
@@ -553,7 +553,7 @@ export function OfflineVenta() {
                           {linea.tipo === "servicio" && catalogo.staff.length > 0 ? (
                             <select
                               aria-label="Profesional asignado"
-                              className="rounded-md border border-input bg-background px-2 py-0.5 text-[11px] text-muted-foreground max-w-36"
+                              className="rounded-md border border-input bg-background px-2 py-0.5 text-op-xs text-muted-foreground max-w-36"
                               onChange={(e) =>
                                 setLineas((prev) =>
                                   prev.map((l, i) => (i === idx ? { ...l, usuarioId: e.target.value || null } : l))
@@ -569,7 +569,7 @@ export function OfflineVenta() {
                               ))}
                             </select>
                           ) : (
-                            <span className="text-[11px] text-muted-foreground">
+                            <span className="text-op-xs text-muted-foreground">
                               {linea.tipo === "producto" ? "Producto" : "Servicio"}
                             </span>
                           )}
@@ -577,16 +577,16 @@ export function OfflineVenta() {
                           <div className="flex items-center gap-1.5">
                             <button
                               aria-label="Restar uno"
-                              className="inline-flex size-6 items-center justify-center rounded-md border border-input bg-background text-xs hover:bg-muted"
+                              className="inline-flex size-6 items-center justify-center rounded-md border border-input bg-background text-op-xs hover:bg-muted"
                               onClick={() => cambiarCantidad(idx, -1)}
                               type="button"
                             >
                               <Minus className="size-3" />
                             </button>
-                            <span className="w-5 text-center text-xs font-semibold tabular-nums">{linea.cantidad}</span>
+                            <span className="w-5 text-center text-op-xs font-semibold tabular-nums">{linea.cantidad}</span>
                             <button
                               aria-label="Sumar uno"
-                              className="inline-flex size-6 items-center justify-center rounded-md border border-input bg-background text-xs hover:bg-muted"
+                              className="inline-flex size-6 items-center justify-center rounded-md border border-input bg-background text-op-xs hover:bg-muted"
                               onClick={() => cambiarCantidad(idx, 1)}
                               type="button"
                             >
@@ -624,7 +624,7 @@ export function OfflineVenta() {
                   </div>
                   {total > 0 ? (
                     <button
-                      className="text-xs font-medium text-primary hover:underline cursor-pointer"
+                      className="text-op-xs font-medium text-primary hover:underline cursor-pointer"
                       onClick={() => fijarMontoPagoRapido(total)}
                       type="button"
                     >
@@ -636,11 +636,11 @@ export function OfflineVenta() {
                 {/* Botones de billetes rápidos si es efectivo */}
                 {total > 0 ? (
                   <div className="space-y-1.5">
-                    <p className="text-[11px] text-muted-foreground">Pago rápido con billete:</p>
+                    <p className="text-op-xs text-muted-foreground">Pago rápido con billete:</p>
                     <div className="flex flex-wrap gap-1.5">
                       {BILLETES_RAPIDOS.map((montoBillete) => (
                         <button
-                          className={`rounded-lg border px-2 py-1 text-xs font-semibold tabular-nums transition-colors cursor-pointer ${
+                          className={`rounded-lg border px-2 py-1 text-op-xs font-semibold tabular-nums transition-colors cursor-pointer ${
                             recibido === montoBillete
                               ? "border-primary bg-primary text-primary-foreground"
                               : "border-border bg-background hover:bg-muted"
@@ -663,7 +663,7 @@ export function OfflineVenta() {
                       <div className="flex items-center gap-2">
                         <select
                           aria-label="Medio de pago"
-                          className="flex-1 rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs font-medium"
+                          className="flex-1 rounded-lg border border-input bg-background px-2.5 py-1.5 text-op-xs font-medium"
                           onChange={(e) =>
                             setPagos((prev) =>
                               prev.map((p, i) => (i === idx ? { ...p, medioPagoId: e.target.value } : p))
@@ -679,12 +679,12 @@ export function OfflineVenta() {
                           ))}
                         </select>
                         <div className="relative w-28">
-                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-muted-foreground">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-op-xs font-semibold text-muted-foreground">
                             $
                           </span>
                           <input
                             aria-label="Monto pagado"
-                            className="w-full rounded-lg border border-input bg-background pl-6 pr-2 py-1.5 text-right text-xs font-semibold tabular-nums"
+                            className="w-full rounded-lg border border-input bg-background pl-6 pr-2 py-1.5 text-right text-op-xs font-semibold tabular-nums"
                             inputMode="decimal"
                             onChange={(e) =>
                               setPagos((prev) =>
@@ -698,7 +698,7 @@ export function OfflineVenta() {
                         {pagos.length > 1 ? (
                           <button
                             aria-label="Quitar pago"
-                            className="text-xs text-destructive hover:underline"
+                            className="text-op-xs text-destructive hover:underline"
                             onClick={() => setPagos((prev) => prev.filter((_, i) => i !== idx))}
                             type="button"
                           >
@@ -710,7 +710,7 @@ export function OfflineVenta() {
                       {pago.medioPagoId && !esEfectivo(pago.medioPagoId) ? (
                         <input
                           aria-label="Referencia o número de voucher"
-                          className="w-full rounded-lg border border-input bg-background px-2.5 py-1 text-xs"
+                          className="w-full rounded-lg border border-input bg-background px-2.5 py-1 text-op-xs"
                           onChange={(e) =>
                             setPagos((prev) =>
                               prev.map((p, i) => (i === idx ? { ...p, referencia: e.target.value } : p))
@@ -725,7 +725,7 @@ export function OfflineVenta() {
 
                   {pagos.length < 3 ? (
                     <button
-                      className="text-xs font-medium text-primary hover:underline"
+                      className="text-op-xs font-medium text-primary hover:underline"
                       onClick={() => setPagos((prev) => [...prev, { medioPagoId: "", monto: "", referencia: null }])}
                       type="button"
                     >
@@ -736,7 +736,7 @@ export function OfflineVenta() {
 
                 {/* Resumen de cambio */}
                 {recibido > 0 && total > 0 ? (
-                  <div className="rounded-xl border border-border bg-muted/30 p-2.5 text-xs space-y-1">
+                  <div className="rounded-xl border border-border bg-muted/30 p-2.5 text-op-xs space-y-1">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Total recibido:</span>
                       <span className="font-semibold tabular-nums">{formatMonto(recibido, moneda)}</span>
@@ -754,7 +754,7 @@ export function OfflineVenta() {
 
                 <input
                   aria-label="Nota de la venta"
-                  className="w-full rounded-xl border border-input bg-background px-3 py-1.5 text-xs"
+                  className="w-full rounded-xl border border-input bg-background px-3 py-1.5 text-op-xs"
                   maxLength={500}
                   onChange={(e) => setNota(e.target.value)}
                   placeholder="Nota u observación de la venta (opcional)"
@@ -763,6 +763,8 @@ export function OfflineVenta() {
 
                 <button
                   className="w-full rounded-xl bg-primary py-2.5 text-sm font-semibold text-primary-foreground shadow-xs hover:bg-primary/90 transition-colors disabled:opacity-50 cursor-pointer"
+                  data-action-clave="1"
+                  data-action-id="offline.venta.registrar"
                   disabled={lineas.length === 0}
                   onClick={registrar}
                   type="button"
@@ -771,7 +773,7 @@ export function OfflineVenta() {
                 </button>
 
                 {mensaje ? (
-                  <p className="text-xs font-medium text-center text-primary">{mensaje}</p>
+                  <p className="text-op-xs font-medium text-center text-primary">{mensaje}</p>
                 ) : null}
               </div>
             </div>
@@ -785,12 +787,12 @@ export function OfflineVenta() {
               <h2 className="text-sm font-semibold text-foreground">
                 Cola de ventas en espera ({pendientes.length})
               </h2>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-op-xs text-muted-foreground">
                 Se guardan en IndexedDB local y se transmiten al servidor central cuando hay conexión.
               </p>
             </div>
             <button
-              className="rounded-xl border border-primary px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/5 transition-colors disabled:opacity-50 cursor-pointer"
+              className="rounded-xl border border-primary px-3 py-1.5 text-op-xs font-semibold text-primary hover:bg-primary/5 transition-colors disabled:opacity-50 cursor-pointer"
               disabled={sincronizando || !enLinea || pendientes.length === 0}
               onClick={() => void sincronizar()}
               type="button"
@@ -800,7 +802,7 @@ export function OfflineVenta() {
           </div>
 
           {pendientes.length === 0 ? (
-            <p className="text-xs text-muted-foreground italic py-1">
+            <p className="text-op-xs text-muted-foreground italic py-1">
               No hay ventas pendientes por sincronizar en este dispositivo.
             </p>
           ) : (
@@ -808,7 +810,7 @@ export function OfflineVenta() {
               {pendientes.map((v) => {
                 const tot = totalVentaOffline([...v.servicios, ...v.productos]);
                 return (
-                  <div className="py-2 flex items-center justify-between text-xs" key={v.clave}>
+                  <div className="py-2 flex items-center justify-between text-op-xs" key={v.clave}>
                     <div>
                       <span className="font-semibold text-foreground tabular-nums">
                         {formatMonto(tot, moneda)}
@@ -821,7 +823,7 @@ export function OfflineVenta() {
                         <p className="text-destructive font-medium mt-0.5">{errores[v.clave]}</p>
                       ) : null}
                     </div>
-                    <span className="text-[11px] text-muted-foreground">En cola local</span>
+                    <span className="text-op-xs text-muted-foreground">En cola local</span>
                   </div>
                 );
               })}
@@ -832,13 +834,13 @@ export function OfflineVenta() {
 
       {/* Contenedor imprimible para comprobante térmico oficial */}
       {ultimaVenta ? (
-        <div className="hidden print:block font-mono text-xs text-black" id="ticket-imprimible">
+        <div className="hidden print:block font-mono text-op-xs text-black" id="ticket-imprimible">
           <div className="text-center pb-3 border-b border-black">
             <h1 className="text-base font-bold uppercase">{ultimaVenta.sucursalNombre}</h1>
-            <p className="text-xs">COMPROBANTE DE PAGO PROVISIONAL</p>
-            <p className="text-[10px]">OPERACIÓN SIN CONEXIÓN A INTERNET</p>
-            <p className="text-xs mt-1">Folio: {ultimaVenta.folio}</p>
-            <p className="text-xs">Fecha: {ultimaVenta.fecha}</p>
+            <p className="text-op-xs">COMPROBANTE DE PAGO PROVISIONAL</p>
+            <p className="text-op-xs">OPERACIÓN SIN CONEXIÓN A INTERNET</p>
+            <p className="text-op-xs mt-1">Folio: {ultimaVenta.folio}</p>
+            <p className="text-op-xs">Fecha: {ultimaVenta.fecha}</p>
           </div>
 
           <div className="py-3 border-b border-black space-y-1">
@@ -873,7 +875,7 @@ export function OfflineVenta() {
             ) : null}
           </div>
 
-          <div className="text-center pt-3 text-[10px] space-y-1">
+          <div className="text-center pt-3 text-op-xs space-y-1">
             <p>¡Gracias por su visita!</p>
             <p>Este ticket ampara su cobro mientras se restablece la conexión.</p>
           </div>

@@ -44,7 +44,7 @@ export function RenombrarSucursalCard({
           <input name="organizacionId" type="hidden" value={organizationId} />
           <input name="sucursalId" type="hidden" value={sucursalId} />
           <button
-            className="min-h-9 rounded-lg px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="min-h-9 rounded-lg px-2.5 text-op-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             data-action-id="inicio.sucursal.omitir_nombre"
             type="submit"
           >

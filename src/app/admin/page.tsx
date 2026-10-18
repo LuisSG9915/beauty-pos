@@ -151,7 +151,7 @@ function MemberDashboard({
                 key={`${item.organizationId}-${item.branchId}`}
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{item.organization}</p>
+                  <p className="text-op-xs font-semibold uppercase tracking-[0.16em] text-primary">{item.organization}</p>
                   {isSelected ? (
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-op-xs font-medium text-primary">
                       Activa
@@ -510,7 +510,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               <dt className="text-op-xs uppercase tracking-wide text-muted-foreground">{etapa.etiqueta}</dt>
               <dd className="mt-0.5 text-lg font-semibold text-foreground">
                 {etapa.valor}
-                {etapa.pct != null ? <span className="ml-1 text-xs font-normal text-muted-foreground">{etapa.pct}%</span> : null}
+                {etapa.pct != null ? <span className="ml-1 text-op-xs font-normal text-muted-foreground">{etapa.pct}%</span> : null}
               </dd>
             </div>
           ))}
@@ -539,7 +539,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 ))}
               </dl>
               {adquisicionPorOrigen.length > 0 ? (
-                <p className="mt-3 text-xs text-muted-foreground">
+                <p className="mt-3 text-op-xs text-muted-foreground">
                   Por origen:{" "}
                   {adquisicionPorOrigen.map((o) => `${o.origen} ${o.unicas}`).join(" · ")}
                 </p>
@@ -575,7 +575,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium">{organization.nombre}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">{organization.slug}</p>
+                        <p className="mt-1 text-op-xs text-muted-foreground">{organization.slug}</p>
                       </div>
                       <StatusBadge tone={organization.activo ? "success" : "neutral"}>
                         {organization.activo ? "Activa" : "Inactiva"}
@@ -605,13 +605,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                 <li className="flex flex-wrap items-center justify-between gap-2 py-2.5" key={solicitud.id}>
                   <div>
                     <p className="font-medium text-foreground">{solicitud.organizacion}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-op-xs text-muted-foreground">
                       {solicitud.tipo === "plan.cambio_solicitado"
                         ? `Cambio a ${String(payload.planNombre ?? payload.planClave ?? "?")} (${String(payload.periodicidad ?? "mensual")}${typeof payload.sucursales === "number" ? ` · ${payload.sucursales} sucursal(es)` : ""})`
                         : `Cancelación${payload.motivo ? ` — ${String(payload.motivo)}` : ""}`}
                     </p>
                   </div>
-                  <span className="text-xs text-muted-foreground">{solicitud.createdAt.toISOString().slice(0, 10)}</span>
+                  <span className="text-op-xs text-muted-foreground">{solicitud.createdAt.toISOString().slice(0, 10)}</span>
                 </li>
               );
             })}

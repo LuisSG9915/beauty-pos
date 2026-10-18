@@ -236,7 +236,11 @@ export default async function PreciosPage() {
           </div>
           <p className="pt-2 text-center text-sm text-muted-foreground">
             ¿Dudas?{" "}
-            <Link className="font-semibold text-primary hover:text-primary/80" href="/registro">
+            <Link
+              className="inline-flex min-h-6 items-center font-semibold text-primary hover:text-primary/80"
+              data-action-id="precios.registro.abrir"
+              href="/registro"
+            >
               Crea tu cuenta gratis
             </Link>{" "}
             y descúbrelo por dentro.

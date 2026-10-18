@@ -191,7 +191,7 @@ export function HBarChart({
         const ancho = Math.max(2, (punto.valor / max) * 100);
         return (
           <div key={punto.id ?? punto.etiqueta}>
-            <div className="mb-1 flex items-baseline justify-between gap-3 text-xs">
+            <div className="mb-1 flex items-baseline justify-between gap-3 text-op-xs">
               <span className="truncate font-medium text-foreground">{punto.etiqueta}</span>
               <span className="shrink-0 tabular-nums text-muted-foreground">{formato(punto.valor)}</span>
             </div>
@@ -301,7 +301,7 @@ export function DonutChart({
             />
             <span className="min-w-0 flex-1 truncate text-muted-foreground">{segmento.punto.etiqueta}</span>
             <span className="shrink-0 font-medium tabular-nums text-foreground">{formato(segmento.punto.valor)}</span>
-            <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+            <span className="w-10 shrink-0 text-right text-op-xs tabular-nums text-muted-foreground">
               {Math.round(segmento.fraccion * 100)}%
             </span>
           </li>

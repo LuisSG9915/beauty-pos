@@ -7,6 +7,7 @@ import { PaqueteForm } from "@/app/admin/paquetes/paquete-form";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminNavTabs, CATALOGO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
@@ -201,7 +202,7 @@ export default async function PaquetesPage({ searchParams }: { searchParams: Sea
         {paqueteRows.length === 0 ? (
           <EmptyState description="Crea un paquete de sesiones prepagadas para venderlo en el punto de venta." title="No hay paquetes" />
         ) : (
-          <>
+          <VistaAdaptativa>
             <RegistroList>
               {paqueteRows.map((paquete) => (
                 <RegistroCard
@@ -266,7 +267,7 @@ export default async function PaquetesPage({ searchParams }: { searchParams: Sea
                 </tbody>
               </table>
             </div>
-          </>
+          </VistaAdaptativa>
         )}
       </AdminCard>
       {editing || firstParam(params.nuevo) === "1" ? (

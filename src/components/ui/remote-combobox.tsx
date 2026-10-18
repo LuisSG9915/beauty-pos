@@ -14,7 +14,7 @@ export type RemoteComboboxProps = {
   initialItem?: ComboboxItem | null;
   /** Opciones iniciales precargadas (ej. clientes recientes para evitar fetch inicial). */
   defaultItems?: ComboboxItem[];
-  /** Clases CSS adicionales para el input group (ej. `h-8 text-xs`). */
+  /** Clases CSS adicionales para el input group (ej. `h-8 text-op-xs`). */
   inputClassName?: string;
   /** Nombre del input oculto que se envía en formularios/server actions. */
   name?: string;
@@ -209,7 +209,7 @@ export function RemoteCombobox({
             aria-describedby={ariaDescribedBy}
             className={cn(
               "h-full w-full rounded-xl bg-transparent px-3 pr-16 text-sm text-foreground outline-none placeholder:text-muted-foreground",
-              inputClassName?.includes("text-xs") && "text-xs",
+              inputClassName?.includes("text-op-xs") && "text-op-xs",
             )}
             id={inputId}
             placeholder={placeholder}
@@ -258,7 +258,7 @@ export function RemoteCombobox({
                     <span className="min-w-0">
                       <span className="block truncate font-medium">{item.label}</span>
                       {item.description ? (
-                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                        <span className="mt-0.5 block text-op-xs text-muted-foreground">
                           {item.description}
                         </span>
                       ) : null}
@@ -271,7 +271,7 @@ export function RemoteCombobox({
         </ComboboxPrimitive.Portal>
       </ComboboxPrimitive.Root>
       {seleccion ? (
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <p className="flex items-center gap-1.5 text-op-xs text-muted-foreground">
           <span className="inline-block size-1.5 rounded-full bg-emerald-500" />
           <span>Cliente seleccionado:</span>
           <span className="font-medium text-foreground">{seleccion.label}</span>

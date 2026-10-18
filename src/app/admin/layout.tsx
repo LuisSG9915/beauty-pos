@@ -4,6 +4,7 @@ import { OfflineSyncBadge } from "@/components/offline-sync";
 
 import { getAdminContext } from "@/lib/admin-context";
 import { leerSucursalesCookieMap } from "@/lib/sucursal-cookie";
+import { VIEWPORT_BOOTSTRAP_SCRIPT } from "@/lib/viewport-preference";
 import { CAPACIDADES } from "@/modules/billing/capacidades";
 import { obtenerEstadoSuscripcion } from "@/modules/billing/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
@@ -73,6 +74,10 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
       userEmail={user.correo ?? ""}
       userName={user.nombre}
     >
+      {/* Fija/corrige la cookie melena_viewport ANTES de pintar: el servidor
+          emite solo el layout (tarjetas o tabla) que el usuario verá. Sin
+          cookie (primera visita) no recarga y se renderizan ambos. */}
+      <script dangerouslySetInnerHTML={{ __html: VIEWPORT_BOOTSTRAP_SCRIPT }} suppressHydrationWarning />
       <OfflineSyncBadge />
       {children}
     </AdminShell>

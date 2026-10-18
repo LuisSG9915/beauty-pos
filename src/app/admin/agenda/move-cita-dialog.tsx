@@ -102,13 +102,13 @@ export function MoveCitaDialog({
           </Field>
           {sugerencias.length > 0 ? (
             <div className="rounded-xl border border-border bg-muted/60 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-primary">
+              <p className="text-op-xs font-semibold uppercase tracking-wide text-primary">
                 Horarios libres sugeridos
               </p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {sugerencias.map((iso) => (
                   <button
-                    className="rounded-lg border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary hover:bg-accent/70"
+                    className="rounded-lg border border-border bg-card px-3 py-1.5 text-op-xs font-medium text-foreground transition-colors hover:border-primary hover:bg-accent/70"
                     key={iso}
                     onClick={() => aplicarSugerencia(iso)}
                     type="button"

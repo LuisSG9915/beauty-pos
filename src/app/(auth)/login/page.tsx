@@ -36,7 +36,7 @@ export default async function LoginPage({
             Conecta agenda, clientes, servicios e inventario para que tu equipo se concentre en crear experiencias memorables.
           </p>
         </div>
-        <p className="relative text-xs text-muted-foreground">{BRAND.name} · Operación multisucursal</p>
+        <p className="relative text-op-xs text-muted-foreground">{BRAND.name} · Operación multisucursal</p>
       </section>
 
       <section className="relative flex items-center justify-center px-6 py-12 sm:px-10">

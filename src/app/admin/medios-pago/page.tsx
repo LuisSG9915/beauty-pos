@@ -6,6 +6,7 @@ import { togglePaymentMethod } from "@/app/admin/medios-pago/actions";
 import { PaymentMethodForm } from "@/app/admin/medios-pago/payment-method-form";
 import { FormSheet } from "@/components/admin/form-sheet";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
@@ -97,7 +98,7 @@ export default async function PaymentMethodsPage({ searchParams }: { searchParam
         {methods.length === 0 ? (
           <EmptyState description="Crea medios de pago como efectivo, tarjeta o transferencia para Cobrar." title="No hay medios de pago" />
         ) : (
-          <>
+          <VistaAdaptativa>
             <RegistroList>
               {methods.map((method) => (
                 <RegistroCard
@@ -165,7 +166,7 @@ export default async function PaymentMethodsPage({ searchParams }: { searchParam
                 </tbody>
               </table>
             </div>
-          </>
+          </VistaAdaptativa>
         )}
       </AdminCard>
       {editing || firstParam(params.nuevo) === "1" ? (

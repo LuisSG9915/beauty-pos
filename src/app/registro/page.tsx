@@ -33,7 +33,11 @@ export default function RegistroPage() {
             <RegistroForm />
             <p className="mt-6 text-center text-sm text-muted-foreground">
               ¿Ya tienes cuenta?{" "}
-              <Link className="font-semibold text-primary hover:text-primary/80" href="/login">
+              <Link
+                className="inline-flex min-h-6 items-center font-semibold text-primary hover:text-primary/80"
+                data-action-id="registro.login.abrir"
+                href="/login"
+              >
                 Inicia sesión
               </Link>
             </p>
@@ -68,7 +72,7 @@ export default function RegistroPage() {
             </div>
           ))}
         </div>
-        <p className="relative text-xs text-muted-foreground">{BRAND.name} · {BRAND.descriptor} en México</p>
+        <p className="relative text-op-xs text-muted-foreground">{BRAND.name} · {BRAND.descriptor} en México</p>
       </section>
     </main>
   );
