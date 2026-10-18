@@ -1,7 +1,9 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "beauty-pos",
-  "main": ".open-next/worker.js",
+  // Entry point propio: envuelve el worker generado por OpenNext para añadir
+  // el handler `scheduled` del cron de recordatorios (ver custom-worker.ts).
+  "main": "custom-worker.ts",
   // Dominio canónico de Melena. `workers.dev` se mantiene activo durante la
   // migración como ruta de verificación/rollback.
   "workers_dev": true,

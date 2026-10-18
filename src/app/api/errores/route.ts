@@ -5,7 +5,7 @@ import { z } from "zod";
 import { getDatabase } from "@/db/client";
 import { createAuth } from "@/lib/auth/server";
 import { registrarError } from "@/lib/observability/error-core";
-import { extraerHeadersCloudflare } from "@/lib/observability/reportar-error";
+import { extraerHeadersCloudflare } from "@/lib/observability/error-core";
 
 const reporteSchema = z.object({
   tipo: z.string().max(80).default("Error"),

@@ -258,11 +258,11 @@ async function loadCatalogosTicket(organizacionId: string, sucursalId: string): 
          where pq.organizacion_id = ${organizacionId} and pq.activo
       ), '[]'::jsonb) as "catalogoPaquetes",
       coalesce((
-        select jsonb_agg(jsonb_build_object('id', c.id, 'nombre', c.nombre, 'telefono', c.telefono) order by c.creado_en desc)
+        select jsonb_agg(jsonb_build_object('id', c.id, 'nombre', c.nombre, 'telefono', c.telefono) order by c.created_at desc)
           from (
-            select id, nombre, telefono, creado_en from clientes
+            select id, nombre, telefono, created_at from clientes
              where organizacion_id = ${organizacionId} and activo
-             order by creado_en desc limit 100
+             order by created_at desc limit 100
           ) c
       ), '[]'::jsonb) as "catalogoClientes",
       coalesce((

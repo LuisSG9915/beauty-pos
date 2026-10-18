@@ -17,8 +17,7 @@ export const onRequestError: Instrumentation.onRequestError = async (
 ) => {
   try {
     const { getDatabase } = await import("@/db/client");
-    const { registrarError } = await import("@/lib/observability/error-core");
-    const { extraerHeadersCloudflare } = await import("@/lib/observability/reportar-error");
+    const { extraerHeadersCloudflare, registrarError } = await import("@/lib/observability/error-core");
 
     const err = error instanceof Error ? error : new Error(String(error));
     const digest =

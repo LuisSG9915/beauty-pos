@@ -282,3 +282,35 @@ export async function registrarError(db: Db, reporte: ErrorReporte): Promise<str
     return null;
   }
 }
+
+/**
+ * Extrae los headers cf-ray y cf-ipcountry (si existen en el request) para
+ * inyectarlos en el contexto antes de guardar en `incidentes_error`.
+ *
+ * Vive aquí (módulo de servidor) y no en `reportar-error.ts`, que es
+ * `"use client"`: `instrumentation.ts` y `/api/errores` son de servidor y no
+ * pueden invocar funciones exportadas por un módulo cliente.
+ */
+export function extraerHeadersCloudflare(
+  requestHeaders?: Headers | Record<string, string | string[] | undefined> | null,
+): { "cf-ray"?: string; "cf-ipcountry"?: string } {
+  if (!requestHeaders) return {};
+  if (typeof (requestHeaders as Headers).get === "function") {
+    const h = requestHeaders as Headers;
+    const cfRay = h.get("cf-ray");
+    const cfIpCountry = h.get("cf-ipcountry");
+    return {
+      ...(cfRay ? { "cf-ray": cfRay } : {}),
+      ...(cfIpCountry ? { "cf-ipcountry": cfIpCountry } : {}),
+    };
+  }
+  const rec = requestHeaders as Record<string, string | string[] | undefined>;
+  const rawRay = rec["cf-ray"];
+  const rawCountry = rec["cf-ipcountry"];
+  const cfRay = Array.isArray(rawRay) ? rawRay[0] : rawRay;
+  const cfIpCountry = Array.isArray(rawCountry) ? rawCountry[0] : rawCountry;
+  return {
+    ...(cfRay ? { "cf-ray": cfRay } : {}),
+    ...(cfIpCountry ? { "cf-ipcountry": cfIpCountry } : {}),
+  };
+}
