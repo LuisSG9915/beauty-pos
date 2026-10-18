@@ -36,16 +36,6 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
   const { organization, branch, organizationId, sucursalId, timeZone, currency, access } = context;
   if (!organization || !branch || !organizationId || !sucursalId) notFound();
   requireAccessPermission(access, "gastos.ver");
-  const suscripcion = await contextoSuscripcion(organizationId);
-  if (!suscripcion.capacidades.has("gastos")) {
-    return (
-      <PlanUpgradeNotice
-        capacidad="gastos"
-        planNombre={suscripcion.plan?.nombre}
-        suscripcionHref={buildAdminHref("/suscripcion", { organizationId })}
-      />
-    );
-  }
   const puedeEditar = hasPermission(access, "gastos.editar");
 
   const hoy = todayDateInput(timeZone);
@@ -71,8 +61,12 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
   };
 
   // Categorías, medios de pago, listado paginado y totales del periodo en UNA
-  // sola consulta SQL (antes 5 consultas simultáneas al pool).
-  const { rows: sqlRows } = await db.execute<GastosSqlRow>(sql`
+  // sola consulta SQL (antes 5 consultas simultáneas al pool). El contexto de
+  // suscripción corre en la MISMA ronda (comparte la promesa en vuelo de
+  // `AdminLayout` vía React.cache), así la página paga 2 rondas y no 3.
+  const [suscripcion, { rows: sqlRows }] = await Promise.all([
+    contextoSuscripcion(organizationId),
+    db.execute<GastosSqlRow>(sql`
     select
       coalesce((
         select jsonb_agg(t) from (
@@ -136,7 +130,18 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
           and g3.fecha_gasto >= ${desde}
           and g3.fecha_gasto <= ${hasta}
       ), 0)::text as revertido
-  `);
+    `),
+  ]);
+
+  if (!suscripcion.capacidades.has("gastos")) {
+    return (
+      <PlanUpgradeNotice
+        capacidad="gastos"
+        planNombre={suscripcion.plan?.nombre}
+        suscripcionHref={buildAdminHref("/suscripcion", { organizationId })}
+      />
+    );
+  }
 
   const datos = sqlRows[0];
   const categorias = datos?.categorias ?? [];

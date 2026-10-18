@@ -233,3 +233,160 @@ export async function resultadosFormularios(dias: number, limite = 20) {
     .orderBy(desc(sql`count(*)`))
     .limit(limite);
 }
+
+export type ResumenSesiones = Awaited<ReturnType<typeof resumenSesiones>>;
+export type PaginaVista = Awaited<ReturnType<typeof paginasMasVistas>>[number];
+export type AccionUsada = Awaited<ReturnType<typeof accionesMasUsadas>>[number];
+export type ReboteEntrada = Awaited<ReturnType<typeof rebotePorEntrada>>[number];
+export type VitalMetrica = Awaited<ReturnType<typeof webVitals>>[number];
+export type ResultadoFormulario = Awaited<ReturnType<typeof resultadosFormularios>>[number];
+
+export type TableroTelemetria = {
+  resumen: ResumenSesiones;
+  paginas: PaginaVista[];
+  acciones: AccionUsada[];
+  rebotes: ReboteEntrada[];
+  vitals: VitalMetrica[];
+  formularios: ResultadoFormulario[];
+};
+
+/**
+ * Tablero completo del panel de telemetría. Con Analytics Engine configurado
+ * usa las 6 consultas del motor (con su degradación interna); sin él ejecuta
+ * UNA sola consulta SQL con subselects `jsonb` sobre CockroachDB (antes eran
+ * 6 consultas en `Promise.all` que saturaban el pool max:2 de Hyperdrive).
+ */
+export async function cargarTableroTelemetria(dias: number): Promise<TableroTelemetria> {
+  if (isAeConfigured()) {
+    const [resumen, paginas, acciones, rebotes, vitals, formularios] = await Promise.all([
+      resumenSesiones(dias),
+      paginasMasVistas(dias),
+      accionesMasUsadas(dias),
+      rebotePorEntrada(dias),
+      webVitals(dias),
+      resultadosFormularios(dias),
+    ]);
+    return { resumen, paginas, acciones, rebotes, vitals, formularios };
+  }
+
+  const db = getDatabase();
+  const corte = new Date(Date.now() - dias * 24 * 60 * 60_000);
+  const { rows } = await db.execute<{
+    resumen: {
+      sesiones: number;
+      engaged: number;
+      paginasTotales: number;
+      promedioPaginas: number;
+      promedioActivoSeg: number;
+      usuariosUnicos: number;
+    } | null;
+    paginas: PaginaVista[];
+    acciones: AccionUsada[];
+    rebotes: ReboteEntrada[];
+    vitals: VitalMetrica[];
+    formularios: ResultadoFormulario[];
+  }>(sql`
+    select
+      (
+        select jsonb_build_object(
+          'sesiones', count(*)::int,
+          'engaged', count(*) filter (where s.engaged)::int,
+          'paginasTotales', coalesce(sum(s.paginas), 0)::int,
+          'promedioPaginas', coalesce(avg(s.paginas), 0)::float,
+          'promedioActivoSeg', coalesce(avg(s.tiempo_activo_ms) / 1000, 0)::float,
+          'usuariosUnicos', count(distinct s.usuario_id)::int
+        )
+        from telemetria_sesiones s
+        where s.inicia_at >= ${corte}
+      ) as resumen,
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            e.ruta,
+            count(*)::int as vistas,
+            count(distinct e.sid)::int as sesiones
+          from telemetria_producto_eventos e
+          where e.tipo = 'page_view' and e.created_at >= ${corte}
+          group by e.ruta
+          order by count(*) desc
+          limit 20
+        ) t
+      ), '[]'::jsonb) as paginas,
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            e.action_id as "actionId",
+            count(*)::int as total,
+            count(*) filter (where e.accion_clave)::int as clave
+          from telemetria_producto_eventos e
+          where e.tipo = 'action' and e.created_at >= ${corte}
+          group by e.action_id
+          order by count(*) desc
+          limit 20
+        ) t
+      ), '[]'::jsonb) as acciones,
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            s.entrada_ruta as ruta,
+            count(*)::int as sesiones,
+            count(*) filter (where not s.engaged)::int as rebotes
+          from telemetria_sesiones s
+          where s.inicia_at >= ${corte}
+          group by s.entrada_ruta
+          order by count(*) desc
+          limit 15
+        ) t
+      ), '[]'::jsonb) as rebotes,
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            e.metrica,
+            count(*)::int as muestras,
+            percentile_cont(0.5) within group (order by e.valor)::float as p50,
+            percentile_cont(0.75) within group (order by e.valor)::float as p75,
+            percentile_cont(0.95) within group (order by e.valor)::float as p95
+          from telemetria_producto_eventos e
+          where e.tipo = 'performance' and e.created_at >= ${corte}
+          group by e.metrica
+        ) t
+      ), '[]'::jsonb) as vitals,
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            e.action_id as "actionId",
+            count(*) filter (where e.tipo = 'form_success')::int as exitos,
+            count(*) filter (where e.tipo = 'form_error')::int as errores
+          from telemetria_producto_eventos e
+          where e.tipo in ('form_success', 'form_error') and e.created_at >= ${corte}
+          group by e.action_id
+          order by count(*) desc
+          limit 20
+        ) t
+      ), '[]'::jsonb) as formularios
+  `);
+
+  const row = rows[0];
+  const resumen = row?.resumen ?? {
+    sesiones: 0,
+    engaged: 0,
+    paginasTotales: 0,
+    promedioPaginas: 0,
+    promedioActivoSeg: 0,
+    usuariosUnicos: 0,
+  };
+  return {
+    resumen: {
+      ...resumen,
+      tasaRebote:
+        resumen.sesiones > 0
+          ? Math.round(((resumen.sesiones - resumen.engaged) / resumen.sesiones) * 100)
+          : 0,
+    },
+    paginas: row?.paginas ?? [],
+    acciones: row?.acciones ?? [],
+    rebotes: row?.rebotes ?? [],
+    vitals: row?.vitals ?? [],
+    formularios: row?.formularios ?? [],
+  };
+}

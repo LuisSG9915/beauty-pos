@@ -1,4 +1,4 @@
-import { and, count, desc, eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { Check, Minus } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -9,9 +9,6 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { getDatabase } from "@/db/client";
-import { invitacionesUsuarios } from "@/db/schema/access";
-import { billingEventos, pagosSuscripcion } from "@/db/schema/billing";
-import { miembrosOrganizaciones, sucursales } from "@/db/schema/core";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDateTime } from "@/lib/format";
@@ -56,49 +53,82 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
   const db = getDatabase();
   const ahora = new Date();
 
-  const [actual, planesCatalogo, uso, sucursalesActivas, pagos, eventos] = await Promise.all([
+  type PagoJson = {
+    id: string;
+    monto: string;
+    moneda: string;
+    proveedor: string;
+    periodoDesde: string | null;
+    periodoHasta: string | null;
+    estado: string;
+    createdAt: string;
+  };
+  type EventoJson = { id: string; tipo: string; createdAt: string };
+  type SuscripcionSqlRow = {
+    miembros_activos: number;
+    sucursales_activas: number;
+    invitaciones_pendientes: number;
+    pagos: PagoJson[];
+    eventos: EventoJson[];
+  };
+
+  // Uso (miembros + invitaciones + sucursales) y los últimos pagos/eventos en
+  // UNA sola consulta SQL (antes eran 5 consultas en 2 rondas secuenciales).
+  const [actual, planesCatalogo, datosResult] = await Promise.all([
     getSuscripcionActualCache(organizationId),
     getPlanesActivos(),
-    db
-      .select({
-        miembros: count(miembrosOrganizaciones.id),
-      })
-      .from(miembrosOrganizaciones)
-      .where(
-        and(
-          eq(miembrosOrganizaciones.organizacionId, organizationId),
-          eq(miembrosOrganizaciones.estado, "activo"),
-        ),
-      )
-      .then((rows) => rows[0] ?? { miembros: 0 }),
-    db
-      .select({ activas: count() })
-      .from(sucursales)
-      .where(and(eq(sucursales.organizacionId, organizationId), eq(sucursales.activo, true)))
-      .then((rows) => rows[0]?.activas ?? 0),
-    db
-      .select()
-      .from(pagosSuscripcion)
-      .where(eq(pagosSuscripcion.organizacionId, organizationId))
-      .orderBy(desc(pagosSuscripcion.createdAt))
-      .limit(10),
-    db
-      .select()
-      .from(billingEventos)
-      .where(eq(billingEventos.organizacionId, organizationId))
-      .orderBy(desc(billingEventos.createdAt))
-      .limit(10),
+    db.execute<SuscripcionSqlRow>(sql`
+      select
+        (
+          select count(*)::int from miembros_organizaciones mo
+          where mo.organizacion_id = ${organizationId} and mo.estado = 'activo'
+        ) as miembros_activos,
+        (
+          select count(*)::int from sucursales s
+          where s.organizacion_id = ${organizationId} and s.activo = true
+        ) as sucursales_activas,
+        (
+          select count(*)::int from invitaciones_usuarios iu
+          where iu.organizacion_id = ${organizationId} and iu.estado = 'pendiente'
+        ) as invitaciones_pendientes,
+        coalesce((
+          select jsonb_agg(t) from (
+            select
+              p.id,
+              p.monto::text as monto,
+              p.moneda,
+              p.proveedor,
+              p.periodo_desde::text as "periodoDesde",
+              p.periodo_hasta::text as "periodoHasta",
+              p.estado,
+              to_char(p.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt"
+            from pagos_suscripcion p
+            where p.organizacion_id = ${organizationId}
+            order by p.created_at desc
+            limit 10
+          ) t
+        ), '[]'::jsonb) as pagos,
+        coalesce((
+          select jsonb_agg(t) from (
+            select
+              e.id,
+              e.tipo,
+              to_char(e.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt"
+            from billing_eventos e
+            where e.organizacion_id = ${organizationId}
+            order by e.created_at desc
+            limit 10
+          ) t
+        ), '[]'::jsonb) as eventos
+    `),
   ]);
 
-  const [{ invitacionesPendientes }] = await db
-    .select({ invitacionesPendientes: count() })
-    .from(invitacionesUsuarios)
-    .where(
-      and(
-        eq(invitacionesUsuarios.organizacionId, organizationId),
-        eq(invitacionesUsuarios.estado, "pendiente"),
-      ),
-    );
+  const datos = datosResult.rows[0];
+  const uso = { miembros: datos?.miembros_activos ?? 0 };
+  const sucursalesActivas = datos?.sucursales_activas ?? 0;
+  const invitacionesPendientes = datos?.invitaciones_pendientes ?? 0;
+  const pagos = (datos?.pagos ?? []).map((p) => ({ ...p, createdAt: new Date(p.createdAt) }));
+  const eventos = (datos?.eventos ?? []).map((e) => ({ ...e, createdAt: new Date(e.createdAt) }));
 
   const efectivo = estadoEfectivoSuscripcion(actual, ahora);
   const diasTrial = diasRestantesTrial(actual, ahora);
@@ -165,7 +195,7 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
                     {esTarifaFundador ? " · precio protegido mientras siga activa" : ""}
                   </p>
                   {actual.precioUnitario ? (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-op-xs text-muted-foreground">
                       Contratado: {fmt(actual.precioUnitario)} por periodo
                       {actual.sucursalesIncluidas != null ? ` (incluye ${actual.sucursalesIncluidas})` : ""}
                       {actual.precioSucursalExtra ? ` + ${fmt(actual.precioSucursalExtra)} por adicional` : ""}
@@ -177,20 +207,20 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
                 </StatusBadge>
               </div>
               {actual.motivoCancelacion || actual.canceladaAt ? (
-                <p className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                <p className="rounded-xl border border-warning/30 bg-warning-soft px-3 py-2 text-op-xs text-warning-soft-foreground">
                   Cancelación registrada{actual.canceladaAt ? ` el ${actual.canceladaAt.toISOString().slice(0, 10)}` : ""}.
                   Conservas el acceso hasta el fin del periodo ya cubierto.
                 </p>
               ) : null}
               <dl className="grid grid-cols-2 gap-3 text-sm">
                 <div className="rounded-xl bg-muted/60 px-3 py-2">
-                  <dt className="text-xs text-muted-foreground">Usuarios (activos + invitaciones)</dt>
+                  <dt className="text-op-xs text-muted-foreground">Usuarios (activos + invitaciones)</dt>
                   <dd className="font-semibold text-foreground">
                     {usuariosUsados} / {actual.maxUsuarios ?? "∞"}
                   </dd>
                 </div>
                 <div className="rounded-xl bg-muted/60 px-3 py-2">
-                  <dt className="text-xs text-muted-foreground">Sucursales activas</dt>
+                  <dt className="text-op-xs text-muted-foreground">Sucursales activas</dt>
                   <dd className="font-semibold text-foreground">
                     {sucursalesActivas} / {actual.maxSucursales ?? "∞"}
                   </dd>
@@ -281,7 +311,7 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
                 <li className="flex flex-wrap items-center justify-between gap-2 py-2.5" key={pago.id}>
                   <div>
                     <p className="font-medium text-foreground">{fmt(pago.monto)} {pago.moneda}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-op-xs text-muted-foreground">
                       {formatDateTime(pago.createdAt)} · {pago.proveedor}
                       {pago.periodoDesde && pago.periodoHasta
                         ? ` · cubre ${pago.periodoDesde} → ${pago.periodoHasta}`
@@ -303,7 +333,7 @@ export default async function SuscripcionPage({ searchParams }: { searchParams: 
               {eventos.map((evento) => (
                 <li className="flex items-center justify-between gap-2 py-2.5" key={evento.id}>
                   <span className="text-foreground">{EVENTO_LABEL[evento.tipo] ?? evento.tipo}</span>
-                  <span className="text-xs text-muted-foreground">{formatDateTime(evento.createdAt)}</span>
+                  <span className="text-op-xs text-muted-foreground">{formatDateTime(evento.createdAt)}</span>
                 </li>
               ))}
             </ul>

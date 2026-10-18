@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -13,7 +13,6 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
-import { membresias } from "@/db/schema/catalogs";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/format";
@@ -37,7 +36,90 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
   if (!context.organization) notFound();
   requireAccessPermission(context.access, "catalogos.ver");
   const organizationId = context.organization.id;
-  const suscripcion = await contextoSuscripcion(organizationId);
+  const db = getDatabase();
+
+  const query = firstParam(params.q) ?? "";
+  const estado = firstParam(params.estado) ?? "";
+  const editId = firstParam(params.edit);
+
+  const filtroBusqueda = query ? sql` and m.nombre ilike ${`%${query}%`}` : sql``;
+  const filtroEstado =
+    estado === "activo" ? sql` and m.activo = true` : estado === "oculto" ? sql` and m.activo = false` : sql``;
+
+  type MembresiaJson = {
+    id: string;
+    clave: string;
+    nombre: string;
+    duracionDias: number;
+    descuentoPorcentaje: string;
+    aplica: string;
+    precio: string;
+    activo: boolean;
+    updatedAt: string;
+  };
+  type MembresiasSqlRow = {
+    membresias: MembresiaJson[];
+    editing: {
+      id: string;
+      organizacionId: string;
+      clave: string;
+      nombre: string;
+      descripcion: string | null;
+      duracionDias: number;
+      descuentoPorcentaje: string;
+      aplica: string;
+      precio: string;
+      updatedAt: string;
+    } | null;
+  };
+
+  // Listado + fila en edición en UNA sola consulta SQL (antes 2 rondas
+  // secuenciales cuando venía `?edit=`). El contexto de suscripción corre en
+  // la MISMA ronda vía React.cache.
+  const [suscripcion, { rows }] = await Promise.all([
+    contextoSuscripcion(organizationId),
+    db.execute<MembresiasSqlRow>(sql`
+    select
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            m.id,
+            m.clave,
+            m.nombre,
+            m.duracion_dias as "duracionDias",
+            m.descuento_porcentaje::text as "descuentoPorcentaje",
+            m.aplica,
+            m.precio::text as precio,
+            m.activo,
+            to_char(m.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "updatedAt"
+          from membresias m
+          where m.organizacion_id = ${organizationId}${filtroBusqueda}${filtroEstado}
+          order by m.nombre asc
+          limit 100
+        ) t
+      ), '[]'::jsonb) as membresias,
+      ${editId
+        ? sql`(
+            select jsonb_build_object(
+              'id', m.id,
+              'organizacionId', m.organizacion_id,
+              'clave', m.clave,
+              'nombre', m.nombre,
+              'descripcion', m.descripcion,
+              'duracionDias', m.duracion_dias,
+              'descuentoPorcentaje', m.descuento_porcentaje::text,
+              'aplica', m.aplica,
+              'precio', m.precio::text,
+              'updatedAt', to_char(m.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+            )
+            from membresias m
+            where m.id = ${editId} and m.organizacion_id = ${organizationId}
+            limit 1
+          ) as editing`
+        : sql`null as editing`}
+    `),
+  ]);
+
   if (!suscripcion.capacidades.has("membresias")) {
     return (
       <PlanUpgradeNotice
@@ -47,35 +129,11 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
       />
     );
   }
-  const db = getDatabase();
 
-  const query = firstParam(params.q) ?? "";
-  const estado = firstParam(params.estado) ?? "";
-
-  const filters = [eq(membresias.organizacionId, organizationId)];
-  if (query) filters.push(ilike(membresias.nombre, `%${query}%`));
-  if (estado === "activo") filters.push(eq(membresias.activo, true));
-  if (estado === "oculto") filters.push(eq(membresias.activo, false));
-
-  const membresiaRows = await db
-    .select({
-      id: membresias.id,
-      clave: membresias.clave,
-      nombre: membresias.nombre,
-      duracionDias: membresias.duracionDias,
-      descuentoPorcentaje: membresias.descuentoPorcentaje,
-      aplica: membresias.aplica,
-      precio: membresias.precio,
-      activo: membresias.activo,
-    })
-    .from(membresias)
-    .where(and(...filters))
-    .orderBy(asc(membresias.nombre))
-    .limit(100);
-
-  const editId = firstParam(params.edit);
-  const editing = editId
-    ? (await db.select().from(membresias).where(and(eq(membresias.id, editId), eq(membresias.organizacionId, organizationId))).limit(1))[0]
+  const datos = rows[0];
+  const membresiaRows = datos?.membresias ?? [];
+  const editing = datos?.editing
+    ? { ...datos.editing, updatedAt: new Date(datos.editing.updatedAt) }
     : undefined;
   const editingData = editing
     ? {
@@ -152,12 +210,12 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
                 <RegistroCard
                   acciones={
                     <div className="flex flex-wrap gap-2">
-                      <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/membresias", { organizationId, extra: { ...preserved, edit: membresia.id } })}>Editar</Link>
+                      <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60" data-action-id="catalogo.membresias.editar" href={buildAdminHref("/membresias", { organizationId, extra: { ...preserved, edit: membresia.id } })}>Editar</Link>
                       <form action={toggleMembresia}>
                         <input name="organizacionId" type="hidden" value={organizationId} />
                         <input name="id" type="hidden" value={membresia.id} />
                         <input name="activo" type="hidden" value={String(membresia.activo)} />
-                        <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">{membresia.activo ? "Ocultar" : "Activar"}</button>
+                        <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60" data-action-id="catalogo.membresias.toggle" type="submit">{membresia.activo ? "Ocultar" : "Activar"}</button>
                       </form>
                     </div>
                   }
@@ -175,7 +233,7 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
             </RegistroList>
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[720px] text-left text-sm">
-                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+                <thead className="border-b border-border text-op-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-4 font-medium">Clave</th>
                     <th className="py-2 pr-4 font-medium">Nombre</th>
@@ -189,9 +247,9 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
                 <tbody>
                   {membresiaRows.map((membresia) => (
                     <tr className="border-b border-border" key={membresia.id}>
-                      <td className="py-3 pr-4 font-mono text-xs">{membresia.clave}</td>
+                      <td className="py-3 pr-4 font-mono text-op-xs">{membresia.clave}</td>
                       <td className="py-3 pr-4 font-medium">{membresia.nombre}</td>
-                      <td className="py-3 pr-4 text-xs tabular-nums text-muted-foreground">
+                      <td className="py-3 pr-4 text-op-xs tabular-nums text-muted-foreground">
                         {Number(membresia.descuentoPorcentaje)}% · {APLICA_LABEL[membresia.aplica] ?? membresia.aplica}
                       </td>
                       <td className="py-3 pr-4 tabular-nums">{membresia.duracionDias} días</td>
@@ -199,12 +257,12 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
                       <td className="py-3 pr-4"><StatusBadge active={membresia.activo} /></td>
                       <td className="py-3">
                         <div className="flex flex-wrap gap-2">
-                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/membresias", { organizationId, extra: { ...preserved, edit: membresia.id } })}>Editar</Link>
+                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60" data-action-id="catalogo.membresias.editar" href={buildAdminHref("/membresias", { organizationId, extra: { ...preserved, edit: membresia.id } })}>Editar</Link>
                           <form action={toggleMembresia}>
                             <input name="organizacionId" type="hidden" value={organizationId} />
                             <input name="id" type="hidden" value={membresia.id} />
                             <input name="activo" type="hidden" value={String(membresia.activo)} />
-                            <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">{membresia.activo ? "Ocultar" : "Activar"}</button>
+                            <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60" data-action-id="catalogo.membresias.toggle" type="submit">{membresia.activo ? "Ocultar" : "Activar"}</button>
                           </form>
                         </div>
                       </td>

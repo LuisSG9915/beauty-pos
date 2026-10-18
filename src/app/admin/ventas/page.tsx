@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, ilike, lt, or, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -11,14 +11,6 @@ import { StatusBadge, type StatusTone } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
-import { clientes, usuarios } from "@/db/schema/core";
-import {
-  detalleVentasMembresias,
-  detalleVentasPaquetes,
-  detalleVentasProductos,
-  detalleVentasServicios,
-  ventas,
-} from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate, formatTime, todayDateInput } from "@/lib/format";
@@ -65,58 +57,94 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
     ? (firstParam(params.estado) as (typeof ESTADOS)[number])
     : "";
   const page = Math.max(1, Number(firstParam(params.page) ?? "1") || 1);
-  const fechaVenta = sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`;
-  const conditions = [
-    eq(ventas.organizacionId, organizationId),
-    eq(ventas.sucursalId, sucursalId),
-    eq(ventas.activo, true),
-    gte(fechaVenta, boundsDesde.iniciaAt),
-    lt(fechaVenta, boundsHasta.terminaAt),
-  ];
-  if (estado) conditions.push(eq(ventas.estado, estado));
-  if (q) {
-    const searchConditions = [
-      ilike(clientes.nombre, `%${q}%`),
-      ilike(clientes.apellidoPaterno, `%${q}%`),
-      ilike(clientes.apellidoMaterno, `%${q}%`),
-    ];
-    if (UUID_RE.test(q)) searchConditions.push(eq(ventas.id, q));
-    conditions.push(or(...searchConditions)!);
-  }
 
+  const filtroEstado = estado ? sql` and v.estado = ${estado}` : sql``;
+  // Con búsqueda por cliente el join entra al CTE (filtra antes del top-k);
+  // sin búsqueda se difiere al SELECT externo y solo busca las ≤41 filas de
+  // la página. Alias distinto (`clq`) para no colisionar con el join externo.
+  const joinClientesFiltro = q ? sql`left join clientes clq on clq.id = v.cliente_id` : sql``;
+  const filtroBusqueda = q
+    ? sql` and (clq.nombre ilike ${`%${q}%`} or clq.apellido_paterno ilike ${`%${q}%`}
+        or clq.apellido_materno ilike ${`%${q}%`}${UUID_RE.test(q) ? sql` or v.id = ${q}` : sql``})`
+    : sql``;
+
+  type VentaJson = {
+    id: string;
+    estado: string;
+    total: string;
+    propina: string;
+    fecha: string;
+    clienteNombre: string | null;
+    clienteApellidoPaterno: string | null;
+    vendedorNombre: string | null;
+    articulos: number;
+  };
+
+  // `ventas_pagina AS MATERIALIZED` acota primero (LIMIT/OFFSET) y solo
+  // después resuelve cliente/vendedor y cuenta los artículos de esas filas:
+  // antes los 4 subselects correlacionados encadenaban 8 lookup joins en
+  // serie sobre todo el rango antes del top-k. Los artículos se agregan en un
+  // solo CTE con `UNION ALL` (una pasada por tabla, acotada a la página).
   const db = getDatabase();
-  const rows = await db
-    .select({
-      id: ventas.id,
-      estado: ventas.estado,
-      total: ventas.total,
-      propina: ventas.propina,
-      fecha: fechaVenta,
-      clienteNombre: clientes.nombre,
-      clienteApellidoPaterno: clientes.apellidoPaterno,
-      // Quien cobró la venta (ventas.usuario_id → usuarios).
-      vendedorNombre: usuarios.nombre,
-      // Piezas del ticket (servicios + productos + paquetes + membresías) como
-      // subselects escalares en la misma consulta: sin queries extra ni N+1.
-      articulos: sql<number>`(
-        coalesce((select sum(dvs.cantidad) from ${detalleVentasServicios} dvs
-           where dvs.venta_id = ${ventas.id} and dvs.activo), 0)
-        + coalesce((select sum(dvp.cantidad) from ${detalleVentasProductos} dvp
-           where dvp.venta_id = ${ventas.id} and dvp.activo), 0)
-        + coalesce((select sum(dvq.cantidad) from ${detalleVentasPaquetes} dvq
-           where dvq.venta_id = ${ventas.id} and dvq.activo), 0)
-        + coalesce((select sum(dvm.cantidad) from ${detalleVentasMembresias} dvm
-           where dvm.venta_id = ${ventas.id} and dvm.activo), 0)
-      )::int`,
-    })
-    .from(ventas)
-    .leftJoin(clientes, eq(ventas.clienteId, clientes.id))
-    .leftJoin(usuarios, eq(ventas.usuarioId, usuarios.id))
-    .where(and(...conditions))
-    .orderBy(desc(fechaVenta), desc(ventas.id))
-    .limit(PAGE_SIZE + 1)
-    .offset((page - 1) * PAGE_SIZE);
+  const { rows: sqlRows } = await db.execute<VentaJson>(sql`
+    with ventas_pagina as materialized (
+      select
+        v.id,
+        v.estado,
+        v.total,
+        v.propina,
+        coalesce(v.cobrada_at, v.created_at) as fecha_venta,
+        v.cliente_id,
+        v.usuario_id
+      from ventas v
+      ${joinClientesFiltro}
+      where v.organizacion_id = ${organizationId}
+        and v.sucursal_id = ${sucursalId}
+        and v.activo = true
+        and coalesce(v.cobrada_at, v.created_at) >= ${boundsDesde.iniciaAt}
+        and coalesce(v.cobrada_at, v.created_at) < ${boundsHasta.terminaAt}${filtroEstado}${filtroBusqueda}
+      order by coalesce(v.cobrada_at, v.created_at) desc, v.id desc
+      limit ${PAGE_SIZE + 1} offset ${(page - 1) * PAGE_SIZE}
+    ),
+    articulos_por_venta as materialized (
+      select venta_id, sum(cantidad)::int as articulos
+      from (
+        select dvs.venta_id, dvs.cantidad
+          from detalle_ventas_servicios dvs
+         where dvs.activo and dvs.venta_id in (select id from ventas_pagina)
+        union all
+        select dvp.venta_id, dvp.cantidad
+          from detalle_ventas_productos dvp
+         where dvp.activo and dvp.venta_id in (select id from ventas_pagina)
+        union all
+        select dvq.venta_id, dvq.cantidad
+          from detalle_ventas_paquetes dvq
+         where dvq.activo and dvq.venta_id in (select id from ventas_pagina)
+        union all
+        select dvm.venta_id, dvm.cantidad
+          from detalle_ventas_membresias dvm
+         where dvm.activo and dvm.venta_id in (select id from ventas_pagina)
+      ) todos
+      group by venta_id
+    )
+    select
+      vp.id,
+      vp.estado,
+      vp.total::text as total,
+      vp.propina::text as propina,
+      to_char(vp.fecha_venta at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as fecha,
+      cl.nombre as "clienteNombre",
+      cl.apellido_paterno as "clienteApellidoPaterno",
+      u.nombre as "vendedorNombre",
+      coalesce(av.articulos, 0) as articulos
+    from ventas_pagina vp
+    left join clientes cl on cl.id = vp.cliente_id
+    left join usuarios u on u.id = vp.usuario_id
+    left join articulos_por_venta av on av.venta_id = vp.id
+    order by vp.fecha_venta desc, vp.id desc
+  `);
 
+  const rows = sqlRows.map((r) => ({ ...r, fecha: new Date(r.fecha) }));
   const hasMore = rows.length > PAGE_SIZE;
   const pageRows = rows.slice(0, PAGE_SIZE);
   const currentHref = buildAdminHref("/ventas", {
@@ -197,7 +225,8 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
       header: "Acción",
       cell: (venta) => (
         <Link
-          className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-xs font-medium text-primary hover:bg-muted/60"
+          className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-op-xs font-medium text-primary hover:bg-muted/60"
+          data-action-id="ventas.ticket.abrir"
           href={ticketHref(venta.id)}
         >
           Abrir ticket
@@ -277,7 +306,8 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
                 <RegistroCard
                   acciones={
                     <Link
-                      className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-xs font-medium text-primary hover:bg-muted/60"
+                      className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-op-xs font-medium text-primary hover:bg-muted/60"
+                      data-action-id="ventas.ticket.abrir"
                       href={ticketHref(venta.id)}
                     >
                       Abrir ticket

@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -7,8 +7,6 @@ import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
-import { auditoriaEventos } from "@/db/schema/access";
-import { sucursales, usuarios } from "@/db/schema/core";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { requireAccessPermission } from "@/lib/auth/authorization";
 import { PlanUpgradeNotice } from "@/components/plan-gate";
@@ -24,11 +22,87 @@ const PAGE_SIZE = 50;
 
 export default async function AuditoriaPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
-  const context = await getAdminContext(params);
+  const context = await getAdminContext(params, { loadBranches: false });
   if (!context.organization) notFound();
   requireAccessPermission(context.access, "auditoria.ver");
   const organizationId = context.organization.id;
-  const suscripcion = await contextoSuscripcion(organizationId);
+  const db = getDatabase();
+
+  const desde = firstParam(params.desde) ?? "";
+  const hasta = firstParam(params.hasta) ?? "";
+  const accion = firstParam(params.accion) ?? "";
+  const usuarioId = firstParam(params.usuarioId) ?? "";
+  const page = Math.max(1, Number(firstParam(params.page) ?? "1") || 1);
+
+  const filtroDesde = desde ? sql` and ae.created_at >= ${new Date(`${desde}T00:00:00`)}` : sql``;
+  const filtroHasta = hasta ? sql` and ae.created_at < ${new Date(`${hasta}T23:59:59.999`)}` : sql``;
+  const filtroAccion = accion ? sql` and ae.accion = ${accion}` : sql``;
+  const filtroUsuario = usuarioId ? sql` and ae.usuario_id = ${usuarioId}` : sql``;
+
+  type EventoJson = {
+    id: string;
+    accion: string;
+    entidad: string | null;
+    entidadId: string | null;
+    detalle: unknown;
+    createdAt: string;
+    usuario: string | null;
+    sucursal: string | null;
+  };
+  type AuditoriaSqlRow = {
+    eventos: EventoJson[];
+    usuarios: Array<{ id: string; nombre: string }>;
+    acciones: Array<{ accion: string }>;
+  };
+
+  // Eventos paginados + usuarios con actividad + acciones registradas en UNA
+  // sola consulta SQL (antes 3 consultas en `Promise.all`). El contexto de
+  // suscripción corre en la MISMA ronda: comparte la promesa en vuelo de
+  // `AdminLayout` (React.cache), así la página paga 2 rondas y no 3.
+  const [suscripcion, { rows: sqlRows }] = await Promise.all([
+    contextoSuscripcion(organizationId),
+    db.execute<AuditoriaSqlRow>(sql`
+    select
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            ae.id,
+            ae.accion,
+            ae.entidad,
+            ae.entidad_id as "entidadId",
+            ae.detalle,
+            to_char(ae.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "createdAt",
+            u.nombre as usuario,
+            s.nombre as sucursal
+          from auditoria_eventos ae
+          left join usuarios u on u.id = ae.usuario_id
+          left join sucursales s on s.id = ae.sucursal_id
+          where ae.organizacion_id = ${organizationId}${filtroDesde}${filtroHasta}${filtroAccion}${filtroUsuario}
+          order by ae.created_at desc
+          limit ${PAGE_SIZE + 1} offset ${(page - 1) * PAGE_SIZE}
+        ) t
+      ), '[]'::jsonb) as eventos,
+      coalesce((
+        select jsonb_agg(t) from (
+          select u.id, u.nombre
+          from usuarios u
+          join auditoria_eventos ae2 on ae2.usuario_id = u.id
+          where ae2.organizacion_id = ${organizationId}
+          group by u.id, u.nombre
+          order by u.nombre asc
+        ) t
+      ), '[]'::jsonb) as usuarios,
+      coalesce((
+        select jsonb_agg(jsonb_build_object('accion', accion) order by accion)
+        from (
+          select distinct ae3.accion
+          from auditoria_eventos ae3
+          where ae3.organizacion_id = ${organizationId}
+        ) t
+      ), '[]'::jsonb) as acciones
+    `),
+  ]);
+
   if (!suscripcion.capacidades.has("auditoria")) {
     return (
       <PlanUpgradeNotice
@@ -38,53 +112,11 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
       />
     );
   }
-  const db = getDatabase();
 
-  const desde = firstParam(params.desde) ?? "";
-  const hasta = firstParam(params.hasta) ?? "";
-  const accion = firstParam(params.accion) ?? "";
-  const usuarioId = firstParam(params.usuarioId) ?? "";
-  const page = Math.max(1, Number(firstParam(params.page) ?? "1") || 1);
-
-  const conditions = [eq(auditoriaEventos.organizacionId, organizationId)];
-  if (desde) conditions.push(gte(auditoriaEventos.createdAt, new Date(`${desde}T00:00:00`)));
-  if (hasta) conditions.push(lt(auditoriaEventos.createdAt, new Date(`${hasta}T23:59:59.999`)));
-  if (accion) conditions.push(eq(auditoriaEventos.accion, accion));
-  if (usuarioId) conditions.push(eq(auditoriaEventos.usuarioId, usuarioId));
-
-  const [eventos, usuariosRows, accionesRows] = await Promise.all([
-    db
-      .select({
-        id: auditoriaEventos.id,
-        accion: auditoriaEventos.accion,
-        entidad: auditoriaEventos.entidad,
-        entidadId: auditoriaEventos.entidadId,
-        detalle: auditoriaEventos.detalle,
-        createdAt: auditoriaEventos.createdAt,
-        usuario: usuarios.nombre,
-        sucursal: sucursales.nombre,
-      })
-      .from(auditoriaEventos)
-      .leftJoin(usuarios, eq(auditoriaEventos.usuarioId, usuarios.id))
-      .leftJoin(sucursales, eq(auditoriaEventos.sucursalId, sucursales.id))
-      .where(and(...conditions))
-      .orderBy(desc(auditoriaEventos.createdAt))
-      .limit(PAGE_SIZE + 1)
-      .offset((page - 1) * PAGE_SIZE),
-    db
-      .select({ id: usuarios.id, nombre: usuarios.nombre })
-      .from(usuarios)
-      .innerJoin(auditoriaEventos, eq(auditoriaEventos.usuarioId, usuarios.id))
-      .where(eq(auditoriaEventos.organizacionId, organizationId))
-      .groupBy(usuarios.id, usuarios.nombre)
-      .orderBy(usuarios.nombre),
-    db
-      .select({ accion: auditoriaEventos.accion })
-      .from(auditoriaEventos)
-      .where(eq(auditoriaEventos.organizacionId, organizationId))
-      .groupBy(auditoriaEventos.accion)
-      .orderBy(auditoriaEventos.accion),
-  ]);
+  const datos = sqlRows[0];
+  const eventos = (datos?.eventos ?? []).map((e) => ({ ...e, createdAt: new Date(e.createdAt) }));
+  const usuariosRows = datos?.usuarios ?? [];
+  const accionesRows = datos?.acciones ?? [];
 
   const hasMore = eventos.length > PAGE_SIZE;
   const pageRows = eventos.slice(0, PAGE_SIZE);
@@ -133,27 +165,27 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
       ) : (
         <>
           <div className="space-y-3 md:hidden">
-            {pageRows.map((evento) => (
-              <article className="rounded-xl border border-border bg-card p-4 shadow-sm" key={evento.id}>
+            {pageRows.map((evento, index) => (
+              <article className="anim-entrada rounded-xl border border-border bg-card p-4 shadow-sm" key={evento.id} style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="text-sm font-semibold leading-5 text-foreground">{evento.usuario ?? "Sistema"}</h3>
-                    <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                    <p className="mt-0.5 text-op-xs leading-5 text-muted-foreground">
                       {formatDate(evento.createdAt)} · {formatTime(evento.createdAt)}
                     </p>
                   </div>
-                  <span className="shrink-0 rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-primary">
+                  <span className="shrink-0 rounded-full bg-muted/60 px-2.5 py-1 text-op-xs font-medium text-primary">
                     {evento.accion}
                   </span>
                 </div>
                 <dl className="mt-3 space-y-1.5">
                   <div className="flex items-baseline justify-between gap-3 text-sm">
-                    <dt className="shrink-0 text-xs text-muted-foreground">Sucursal</dt>
+                    <dt className="shrink-0 text-op-xs text-muted-foreground">Sucursal</dt>
                     <dd className="min-w-0 text-right font-medium text-foreground">{evento.sucursal ?? "—"}</dd>
                   </div>
                   <div className="flex items-baseline justify-between gap-3 text-sm">
-                    <dt className="shrink-0 text-xs text-muted-foreground">Detalle</dt>
-                    <dd className="min-w-0 truncate text-right text-xs text-muted-foreground" title={evento.detalle ? JSON.stringify(evento.detalle) : undefined}>
+                    <dt className="shrink-0 text-op-xs text-muted-foreground">Detalle</dt>
+                    <dd className="min-w-0 truncate text-right text-op-xs text-muted-foreground" title={evento.detalle ? JSON.stringify(evento.detalle) : undefined}>
                       {evento.detalle ? JSON.stringify(evento.detalle) : evento.entidad ? `${evento.entidad} ${evento.entidadId ?? ""}` : "—"}
                     </dd>
                   </div>
@@ -164,7 +196,7 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
           <div className="hidden overflow-hidden rounded-2xl border border-border bg-card shadow-sm md:block">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr className="border-b border-border bg-muted/60 text-left text-op-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3 font-medium">Fecha</th>
                 <th className="px-4 py-3 font-medium">Usuario</th>
                 <th className="px-4 py-3 font-medium">Acción</th>
@@ -180,13 +212,13 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
                   </td>
                   <td className="px-4 py-3 font-medium text-foreground">{evento.usuario ?? "Sistema"}</td>
                   <td className="px-4 py-3">
-                    <span className="rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-primary">
+                    <span className="rounded-full bg-muted/60 px-2.5 py-1 text-op-xs font-medium text-primary">
                       {evento.accion}
                     </span>
                   </td>
                   <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{evento.sucursal ?? "—"}</td>
                   <td className="hidden max-w-72 px-4 py-3 lg:table-cell">
-                    <span className="block truncate text-xs text-muted-foreground" title={evento.detalle ? JSON.stringify(evento.detalle) : undefined}>
+                    <span className="block truncate text-op-xs text-muted-foreground" title={evento.detalle ? JSON.stringify(evento.detalle) : undefined}>
                       {evento.detalle ? JSON.stringify(evento.detalle) : evento.entidad ? `${evento.entidad} ${evento.entidadId ?? ""}` : "—"}
                     </span>
                   </td>

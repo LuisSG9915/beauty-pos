@@ -32,16 +32,6 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
   const { organization, branch, organizationId, sucursalId, timeZone, currency, access } = context;
   if (!organization || !branch || !organizationId || !sucursalId) notFound();
   requireAccessPermission(access, "comisiones.ver");
-  const suscripcion = await contextoSuscripcion(organizationId);
-  if (!suscripcion.capacidades.has("comisiones")) {
-    return (
-      <PlanUpgradeNotice
-        capacidad="comisiones"
-        planNombre={suscripcion.plan?.nombre}
-        suscripcionHref={buildAdminHref("/suscripcion", { organizationId })}
-      />
-    );
-  }
   const puedeEditar = hasPermission(access, "comisiones.editar");
 
   const hoy = todayDateInput(timeZone);
@@ -63,8 +53,12 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
   };
 
   // Medios de pago, comisiones pendientes del rango e historial de
-  // liquidaciones en UNA sola consulta SQL (antes 3 consultas paralelas).
-  const { rows: sqlRows } = await db.execute<ComisionesSqlRow>(sql`
+  // liquidaciones en UNA sola consulta SQL (antes 3 consultas paralelas). El
+  // contexto de suscripción corre en la MISMA ronda (comparte la promesa en
+  // vuelo de `AdminLayout` vía React.cache): 2 rondas y no 3.
+  const [suscripcion, { rows: sqlRows }] = await Promise.all([
+    contextoSuscripcion(organizationId),
+    db.execute<ComisionesSqlRow>(sql`
     select
       coalesce((
         select jsonb_agg(t) from (
@@ -122,7 +116,18 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
           limit 50
         ) t
       ), '[]'::jsonb) as liquidaciones
-  `);
+    `),
+  ]);
+
+  if (!suscripcion.capacidades.has("comisiones")) {
+    return (
+      <PlanUpgradeNotice
+        capacidad="comisiones"
+        planNombre={suscripcion.plan?.nombre}
+        suscripcionHref={buildAdminHref("/suscripcion", { organizationId })}
+      />
+    );
+  }
 
   const datos = sqlRows[0];
   const medios = datos?.medios ?? [];

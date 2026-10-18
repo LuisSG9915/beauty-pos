@@ -122,7 +122,7 @@ export default async function IncidentesPage({
             <Input defaultValue={filtros.q} id="q" name="q" placeholder="Texto del error" />
           </Field>
           <div className="sm:col-span-2 lg:col-span-6">
-            <Button className="min-h-10 rounded-xl" type="submit">
+            <Button className="min-h-10 rounded-xl" data-action-clave="1" data-action-id="incidentes.filtro.aplicar" type="submit">
               Filtrar
             </Button>
           </div>
@@ -139,7 +139,7 @@ export default async function IncidentesPage({
         <AdminCard className="overflow-x-auto p-0 sm:p-0">
           <table className="w-full min-w-[720px] text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+              <tr className="border-b border-border text-left text-op-xs text-muted-foreground">
                 <th className="px-5 py-3 font-medium">Prioridad</th>
                 <th className="px-5 py-3 font-medium">Error</th>
                 <th className="px-5 py-3 font-medium">Estado</th>
@@ -168,7 +168,7 @@ export default async function IncidentesPage({
                       >
                         {incidente.titulo}
                       </Link>
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      <p className="mt-0.5 truncate text-op-xs text-muted-foreground">
                         {FUENTE_LABELS[incidente.fuente] ?? incidente.fuente}
                         {incidente.modulo ? ` · ${incidente.modulo}` : ""}
                         {incidente.ruta ? ` · ${incidente.ruta}` : ""}
@@ -181,10 +181,10 @@ export default async function IncidentesPage({
                     <td className="px-5 py-3 tabular-nums">
                       {incidente.organizacionesAfectadas}
                     </td>
-                    <td className="px-5 py-3 text-xs text-muted-foreground">
+                    <td className="px-5 py-3 text-op-xs text-muted-foreground">
                       {formatDateTime(incidente.ultimaVezAt)}
                     </td>
-                    <td className="px-5 py-3 text-xs text-muted-foreground">
+                    <td className="px-5 py-3 text-op-xs text-muted-foreground">
                       {incidente.asignadoNombre ?? "—"}
                     </td>
                   </tr>

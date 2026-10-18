@@ -60,59 +60,59 @@ export default async function IncidenteDetallePage({
           <AdminCard title="Detalle del error">
             <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
               <div>
-                <dt className="text-xs text-muted-foreground">Estado</dt>
+                <dt className="text-op-xs text-muted-foreground">Estado</dt>
                 <dd className="mt-1"><StatusBadge tone={estado.tone}>{estado.label}</StatusBadge></dd>
               </div>
               <div>
-                <dt className="text-xs text-muted-foreground">Prioridad</dt>
+                <dt className="text-op-xs text-muted-foreground">Prioridad</dt>
                 <dd className="mt-1"><StatusBadge tone={prioridad.tone}>{prioridad.label}</StatusBadge></dd>
               </div>
               <div>
-                <dt className="text-xs text-muted-foreground">Fuente</dt>
+                <dt className="text-op-xs text-muted-foreground">Fuente</dt>
                 <dd className="mt-1">{incidente.fuente}</dd>
               </div>
               <div>
-                <dt className="text-xs text-muted-foreground">Módulo / ruta</dt>
+                <dt className="text-op-xs text-muted-foreground">Módulo / ruta</dt>
                 <dd className="mt-1">
                   {incidente.modulo ?? "—"} {incidente.ruta ? `· ${incidente.ruta}` : ""}
                 </dd>
               </div>
               <div>
-                <dt className="text-xs text-muted-foreground">Ocurrencias</dt>
+                <dt className="text-op-xs text-muted-foreground">Ocurrencias</dt>
                 <dd className="mt-1 tabular-nums">{incidente.ocurrencias}</dd>
               </div>
               <div>
-                <dt className="text-xs text-muted-foreground">Negocios afectados</dt>
+                <dt className="text-op-xs text-muted-foreground">Negocios afectados</dt>
                 <dd className="mt-1 tabular-nums">{incidente.organizacionesAfectadas}</dd>
               </div>
               <div>
-                <dt className="text-xs text-muted-foreground">Primera vez</dt>
+                <dt className="text-op-xs text-muted-foreground">Primera vez</dt>
                 <dd className="mt-1">{formatDateTime(incidente.primeraVezAt)}</dd>
               </div>
               <div>
-                <dt className="text-xs text-muted-foreground">Última vez</dt>
+                <dt className="text-op-xs text-muted-foreground">Última vez</dt>
                 <dd className="mt-1">{formatDateTime(incidente.ultimaVezAt)}</dd>
               </div>
               {incidente.releaseAparece ? (
                 <div>
-                  <dt className="text-xs text-muted-foreground">Apareció en</dt>
+                  <dt className="text-op-xs text-muted-foreground">Apareció en</dt>
                   <dd className="mt-1">{incidente.releaseAparece}</dd>
                 </div>
               ) : null}
               {incidente.releaseCorregido ? (
                 <div>
-                  <dt className="text-xs text-muted-foreground">Corregido en</dt>
+                  <dt className="text-op-xs text-muted-foreground">Corregido en</dt>
                   <dd className="mt-1">{incidente.releaseCorregido}</dd>
                 </div>
               ) : null}
             </dl>
             {incidente.mensaje ? (
-              <pre className="mt-4 max-h-48 overflow-auto rounded-xl bg-muted/60 p-4 text-xs leading-5 whitespace-pre-wrap text-foreground">
+              <pre className="mt-4 max-h-48 overflow-auto rounded-xl bg-muted/60 p-4 text-op-xs leading-5 whitespace-pre-wrap text-foreground">
                 {incidente.mensaje}
               </pre>
             ) : null}
             {incidente.resueltoAt ? (
-              <p className="mt-4 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
+              <p className="mt-4 rounded-xl border border-success/30 bg-success-soft px-4 py-3 text-sm text-success-soft-foreground">
                 Resuelto por {incidente.resueltoNombre ?? "—"} el{" "}
                 {formatDateTime(incidente.resueltoAt)}.
                 {incidente.notaResolucion ? ` ${incidente.notaResolucion}` : ""}
@@ -127,7 +127,7 @@ export default async function IncidenteDetallePage({
               <ul className="divide-y divide-border">
                 {ocurrencias.map((oc) => (
                   <li className="py-3" key={oc.id}>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-op-xs text-muted-foreground">
                       <span className="font-mono">{oc.correlationId}</span>
                       <span>{formatDateTime(oc.createdAt)}</span>
                       {oc.ruta ? <span>{oc.ruta}</span> : null}
@@ -187,7 +187,7 @@ export default async function IncidenteDetallePage({
             <ul className="mt-4 space-y-3">
               {historial.map((item) => (
                 <li className="border-l-2 border-border pl-3 text-sm" key={item.id}>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-op-xs text-muted-foreground">
                     {formatDateTime(item.createdAt)} · {item.usuario ?? "Sistema"} ·{" "}
                     {TIPO_HISTORIAL[item.tipo] ?? item.tipo}
                     {item.valorAnterior || item.valorNuevo

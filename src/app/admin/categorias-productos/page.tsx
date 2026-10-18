@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -29,15 +29,14 @@ export default async function ProductCategoriesPage({ searchParams }: { searchPa
   const organizationId = context.organization.id;
   const db = getDatabase();
 
+  // Una sola consulta: la fila en edición se resuelve del listado ya cargado.
   const categories = await db
-    .select({ id: catCategoriasProductos.id, clave: catCategoriasProductos.clave, nombre: catCategoriasProductos.nombre, activo: catCategoriasProductos.activo })
+    .select({ id: catCategoriasProductos.id, clave: catCategoriasProductos.clave, nombre: catCategoriasProductos.nombre, activo: catCategoriasProductos.activo, updatedAt: catCategoriasProductos.updatedAt })
     .from(catCategoriasProductos)
     .where(eq(catCategoriasProductos.organizacionId, organizationId))
-    .orderBy(asc(catCategoriasProductos.nombre));
+    .orderBy(catCategoriasProductos.nombre);
   const editId = firstParam(params.edit);
-  const editing = editId
-    ? (await db.select({ id: catCategoriasProductos.id, clave: catCategoriasProductos.clave, nombre: catCategoriasProductos.nombre, updatedAt: catCategoriasProductos.updatedAt }).from(catCategoriasProductos).where(and(eq(catCategoriasProductos.id, editId), eq(catCategoriasProductos.organizacionId, organizationId))).limit(1))[0]
-    : undefined;
+  const editing = editId ? categories.find((row) => row.id === editId) : undefined;
 
   return (
     <div className="space-y-6">
@@ -89,7 +88,7 @@ export default async function ProductCategoriesPage({ searchParams }: { searchPa
             </RegistroList>
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[480px] text-left text-sm">
-                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+                <thead className="border-b border-border text-op-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-4 font-medium">Clave</th>
                     <th className="py-2 pr-4 font-medium">Nombre</th>
@@ -100,7 +99,7 @@ export default async function ProductCategoriesPage({ searchParams }: { searchPa
                 <tbody>
                   {categories.map((category) => (
                     <tr className="border-b border-border" key={category.id}>
-                      <td className="py-3 pr-4 font-mono text-xs">{category.clave}</td>
+                      <td className="py-3 pr-4 font-mono text-op-xs">{category.clave}</td>
                       <td className="py-3 pr-4 font-medium">{category.nombre}</td>
                       <td className="py-3 pr-4"><StatusBadge active={category.activo} /></td>
                       <td className="py-3">

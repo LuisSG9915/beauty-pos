@@ -1,4 +1,4 @@
-import { and, asc, eq, ilike } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -13,7 +13,6 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
-import { paquetes, servicios } from "@/db/schema/catalogs";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/format";
@@ -31,7 +30,93 @@ export default async function PaquetesPage({ searchParams }: { searchParams: Sea
   if (!context.organization) notFound();
   requireAccessPermission(context.access, "catalogos.ver");
   const organizationId = context.organization.id;
-  const suscripcion = await contextoSuscripcion(organizationId);
+  const db = getDatabase();
+
+  const query = firstParam(params.q) ?? "";
+  const estado = firstParam(params.estado) ?? "";
+  const editId = firstParam(params.edit);
+
+  const filtroBusqueda = query ? sql` and p.nombre ilike ${`%${query}%`}` : sql``;
+  const filtroEstado =
+    estado === "activo" ? sql` and p.activo = true` : estado === "oculto" ? sql` and p.activo = false` : sql``;
+
+  type PaqueteJson = {
+    id: string;
+    clave: string;
+    nombre: string;
+    sesiones: number;
+    precio: string;
+    activo: boolean;
+    servicioNombre: string;
+    updatedAt: string;
+  };
+  type PaquetesSqlRow = {
+    paquetes: PaqueteJson[];
+    servicios: Array<{ id: string; nombre: string; duracionMinutos: number }>;
+    editing: {
+      id: string;
+      organizacionId: string;
+      clave: string;
+      nombre: string;
+      descripcion: string | null;
+      servicioId: string;
+      sesiones: number;
+      precio: string;
+      updatedAt: string;
+    } | null;
+  };
+
+  // Listado + catálogo de servicios + fila en edición en UNA sola consulta SQL
+  // (antes 2 consultas en `Promise.all` + 1 secuencial con `?edit=`). El
+  // contexto de suscripción corre en la MISMA ronda vía React.cache.
+  const [suscripcion, { rows }] = await Promise.all([
+    contextoSuscripcion(organizationId),
+    db.execute<PaquetesSqlRow>(sql`
+    select
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            p.id,
+            p.clave,
+            p.nombre,
+            p.sesiones,
+            p.precio::text as precio,
+            p.activo,
+            s.nombre as "servicioNombre",
+            to_char(p.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "updatedAt"
+          from paquetes p
+          inner join servicios s on s.id = p.servicio_id
+          where p.organizacion_id = ${organizationId}${filtroBusqueda}${filtroEstado}
+          order by p.nombre asc
+          limit 100
+        ) t
+      ), '[]'::jsonb) as paquetes,
+      coalesce((
+        select jsonb_agg(jsonb_build_object('id', s.id, 'nombre', s.nombre, 'duracionMinutos', s.duracion_minutos) order by s.nombre)
+        from servicios s
+        where s.organizacion_id = ${organizationId} and s.activo = true
+      ), '[]'::jsonb) as servicios,
+      ${editId
+        ? sql`(
+            select jsonb_build_object(
+              'id', p.id,
+              'organizacionId', p.organizacion_id,
+              'clave', p.clave,
+              'nombre', p.nombre,
+              'descripcion', p.descripcion,
+              'servicioId', p.servicio_id,
+              'sesiones', p.sesiones,
+              'precio', p.precio::text,
+              'updatedAt', to_char(p.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+            )
+            from paquetes p
+            where p.id = ${editId} and p.organizacion_id = ${organizationId}
+            limit 1
+          ) as editing`
+        : sql`null as editing`}
+    `),
+  ]);
+
   if (!suscripcion.capacidades.has("paquetes")) {
     return (
       <PlanUpgradeNotice
@@ -41,42 +126,12 @@ export default async function PaquetesPage({ searchParams }: { searchParams: Sea
       />
     );
   }
-  const db = getDatabase();
 
-  const query = firstParam(params.q) ?? "";
-  const estado = firstParam(params.estado) ?? "";
-
-  const filters = [eq(paquetes.organizacionId, organizationId)];
-  if (query) filters.push(ilike(paquetes.nombre, `%${query}%`));
-  if (estado === "activo") filters.push(eq(paquetes.activo, true));
-  if (estado === "oculto") filters.push(eq(paquetes.activo, false));
-
-  const [paqueteRows, serviciosItems] = await Promise.all([
-    db
-      .select({
-        id: paquetes.id,
-        clave: paquetes.clave,
-        nombre: paquetes.nombre,
-        sesiones: paquetes.sesiones,
-        precio: paquetes.precio,
-        activo: paquetes.activo,
-        servicioNombre: servicios.nombre,
-      })
-      .from(paquetes)
-      .innerJoin(servicios, eq(paquetes.servicioId, servicios.id))
-      .where(and(...filters))
-      .orderBy(asc(paquetes.nombre))
-      .limit(100),
-    db
-      .select({ id: servicios.id, nombre: servicios.nombre, duracionMinutos: servicios.duracionMinutos })
-      .from(servicios)
-      .where(and(eq(servicios.organizacionId, organizationId), eq(servicios.activo, true)))
-      .orderBy(asc(servicios.nombre)),
-  ]);
-
-  const editId = firstParam(params.edit);
-  const editing = editId
-    ? (await db.select().from(paquetes).where(and(eq(paquetes.id, editId), eq(paquetes.organizacionId, organizationId))).limit(1))[0]
+  const datos = rows[0];
+  const paqueteRows = datos?.paquetes ?? [];
+  const serviciosItems = datos?.servicios ?? [];
+  const editing = datos?.editing
+    ? { ...datos.editing, updatedAt: new Date(datos.editing.updatedAt) }
     : undefined;
   const editingData = editing
     ? {
@@ -152,12 +207,12 @@ export default async function PaquetesPage({ searchParams }: { searchParams: Sea
                 <RegistroCard
                   acciones={
                     <div className="flex flex-wrap gap-2">
-                      <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/paquetes", { organizationId, extra: { ...preserved, edit: paquete.id } })}>Editar</Link>
+                      <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60" data-action-id="catalogo.paquetes.editar" href={buildAdminHref("/paquetes", { organizationId, extra: { ...preserved, edit: paquete.id } })}>Editar</Link>
                       <form action={togglePaquete}>
                         <input name="organizacionId" type="hidden" value={organizationId} />
                         <input name="id" type="hidden" value={paquete.id} />
                         <input name="activo" type="hidden" value={String(paquete.activo)} />
-                        <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">{paquete.activo ? "Ocultar" : "Activar"}</button>
+                        <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60" data-action-id="catalogo.paquetes.toggle" type="submit">{paquete.activo ? "Ocultar" : "Activar"}</button>
                       </form>
                     </div>
                   }
@@ -175,7 +230,7 @@ export default async function PaquetesPage({ searchParams }: { searchParams: Sea
             </RegistroList>
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[640px] text-left text-sm">
-                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+                <thead className="border-b border-border text-op-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-4 font-medium">Clave</th>
                     <th className="py-2 pr-4 font-medium">Nombre</th>
@@ -189,20 +244,20 @@ export default async function PaquetesPage({ searchParams }: { searchParams: Sea
                 <tbody>
                   {paqueteRows.map((paquete) => (
                     <tr className="border-b border-border" key={paquete.id}>
-                      <td className="py-3 pr-4 font-mono text-xs">{paquete.clave}</td>
+                      <td className="py-3 pr-4 font-mono text-op-xs">{paquete.clave}</td>
                       <td className="py-3 pr-4 font-medium">{paquete.nombre}</td>
-                      <td className="py-3 pr-4 text-xs text-muted-foreground">{paquete.servicioNombre}</td>
+                      <td className="py-3 pr-4 text-op-xs text-muted-foreground">{paquete.servicioNombre}</td>
                       <td className="py-3 pr-4 tabular-nums">{paquete.sesiones}</td>
                       <td className="py-3 pr-4 tabular-nums">{formatCurrency(paquete.precio, { currency: context.currency })}</td>
                       <td className="py-3 pr-4"><StatusBadge active={paquete.activo} /></td>
                       <td className="py-3">
                         <div className="flex flex-wrap gap-2">
-                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/paquetes", { organizationId, extra: { ...preserved, edit: paquete.id } })}>Editar</Link>
+                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60" data-action-id="catalogo.paquetes.editar" href={buildAdminHref("/paquetes", { organizationId, extra: { ...preserved, edit: paquete.id } })}>Editar</Link>
                           <form action={togglePaquete}>
                             <input name="organizacionId" type="hidden" value={organizationId} />
                             <input name="id" type="hidden" value={paquete.id} />
                             <input name="activo" type="hidden" value={String(paquete.activo)} />
-                            <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">{paquete.activo ? "Ocultar" : "Activar"}</button>
+                            <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60" data-action-id="catalogo.paquetes.toggle" type="submit">{paquete.activo ? "Ocultar" : "Activar"}</button>
                           </form>
                         </div>
                       </td>

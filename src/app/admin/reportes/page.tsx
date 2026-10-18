@@ -131,10 +131,18 @@ export default async function ReportesPage({ searchParams }: Props) {
   // Vista consolidada (Profesional): `sucursalId=todas` suma todas las
   // sucursales del alcance del usuario. La zona del reporte es explícita —
   // la de la organización — para no mezclar días de zonas distintas.
-  const suscripcionCtx = await contextoSuscripcionCache(organization.id);
-  const multisucursal = tieneCapacidad(suscripcionCtx, "multisucursal");
+  //
+  // `consolidado` solo puede ser true con `sucursalId=todas` (caso poco
+  // común): ahí la capacidad del plan decide antes de consultar. En el caso
+  // común la suscripción viaja en la MISMA ronda que las consultas del
+  // reporte (comparte la promesa en vuelo de `AdminLayout` vía React.cache),
+  // así la página paga 2 rondas y no 3.
+  const suscripcionPromise = contextoSuscripcionCache(organization.id);
+  const pidioTodas = firstParam(params.sucursalId) === "todas";
   const consolidado =
-    firstParam(params.sucursalId) === "todas" && multisucursal && context.branches.length > 1;
+    pidioTodas && context.branches.length > 1
+      ? tieneCapacidad(await suscripcionPromise, "multisucursal")
+      : false;
   const reportTimeZone = consolidado ? resolveTimeZone(null, organization.zonaHoraria) : timeZone;
   const sucursalReporte = consolidado ? null : branch.id;
   const sucursalNombre = consolidado ? "Todas las sucursales" : branch.nombre;
@@ -147,7 +155,7 @@ export default async function ReportesPage({ searchParams }: Props) {
   const anterior = periodoAnterior(desde, hasta);
 
   const fmt = (v: string | number | null | undefined) => formatCurrency(num(v), { currency });
-  const [reporte, agregadosAnteriores, comparativo] = await Promise.all([
+  const [reporte, agregadosAnteriores, comparativo, suscripcionCtx] = await Promise.all([
     cargarReporte(db, {
       organizacionId: organization.id,
       sucursalId: sucursalReporte,
@@ -182,8 +190,10 @@ export default async function ReportesPage({ searchParams }: Props) {
           financieros: puedeFinancieros,
         })
       : Promise.resolve([]),
+    suscripcionPromise,
   ]);
   if (!reporte) notFound();
+  const multisucursal = tieneCapacidad(suscripcionCtx, "multisucursal");
   const {
     citasPorEstado,
     clientesNuevos,

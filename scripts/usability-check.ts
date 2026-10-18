@@ -203,8 +203,97 @@ async function rutasDinamicas(): Promise<{ rutas: string[]; limpiar: () => Promi
   }
 }
 
+const FOLIO_PRUEBA_COMPRA = "E2E-USABILITY";
+
+/**
+ * Compra temporal del arnés: `/admin/compras/[id]` necesita una compra real
+ * con líneas (la BD E2E no tiene ninguna). Se crea una en borrador con 1
+ * renglón identificable por folio y `limpiarComprasDePrueba()` la borra al
+ * terminar la corrida.
+ */
+async function crearCompraDePrueba(): Promise<string[]> {
+  try {
+    return await withDb(async (client) => {
+      const org = (
+        await client.query(`select id from organizaciones where slug = $1`, [E2E_RESERVA_SLUG])
+      ).rows[0];
+      if (!org) return [];
+
+      // Reutiliza la de una corrida anterior que murió sin limpiar.
+      const previa = (
+        await client.query(
+          `select id from compras where organizacion_id = $1 and folio = $2 and activo = true limit 1`,
+          [org.id, FOLIO_PRUEBA_COMPRA],
+        )
+      ).rows[0];
+      if (previa) return [`/admin/compras/${previa.id}`];
+
+      const sucursal = (
+        await client.query(
+          `select id from sucursales where organizacion_id = $1 and activo order by nombre limit 1`,
+          [org.id],
+        )
+      ).rows[0];
+      if (!sucursal) return [];
+
+      const compra = (
+        await client.query(
+          `insert into compras (organizacion_id, sucursal_id, estado, folio, proveedor_texto, total_calculado, activo)
+           values ($1, $2, 'borrador', $3, 'Proveedor de prueba', 120.00, true)
+           returning id`,
+          [org.id, sucursal.id, FOLIO_PRUEBA_COMPRA],
+        )
+      ).rows[0];
+      if (!compra) return [];
+
+      await client.query(
+        `insert into detalle_compras (compra_id, organizacion_id, descripcion, cantidad, costo_unitario, importe)
+         values ($1, $2, 'Shampoo de prueba (arnés)', 2, 60.00, 120.00)`,
+        [compra.id, org.id],
+      );
+      return [`/admin/compras/${compra.id}`];
+    });
+  } catch (error) {
+    console.warn(`Compra de prueba omitida: ${(error as Error).message}`);
+    return [];
+  }
+}
+
+/** Borra las compras del arnés (y sus líneas) al terminar la corrida. */
+async function limpiarComprasDePrueba(): Promise<void> {
+  try {
+    await withDb(async (client) => {
+      await client.query(
+        `delete from detalle_compras d
+          using compras c
+         where d.compra_id = c.id and c.folio = $1`,
+        [FOLIO_PRUEBA_COMPRA],
+      );
+      await client.query(`delete from compras where folio = $1`, [FOLIO_PRUEBA_COMPRA]);
+    });
+  } catch (error) {
+    console.warn(`Limpieza de la compra de prueba omitida: ${(error as Error).message}`);
+  }
+}
+
 async function axeScan(page: Page, pagina: string, viewport: string): Promise<Finding[]> {
-  const results = await new AxePuppeteer(page).withTags(AXE_TAGS).analyze();
+  // `networkidle0` no garantiza que el frame esté listo para inyectar axe tras
+  // muchas navegaciones (flake "Page/Frame is not ready"): se reintenta con
+  // una espera corta antes de propagar el error.
+  let results: Awaited<ReturnType<AxePuppeteer["analyze"]>> | null = null;
+  for (let intento = 0; intento < 3; intento++) {
+    try {
+      results = await new AxePuppeteer(page).withTags(AXE_TAGS).analyze();
+      break;
+    } catch (error) {
+      if (intento === 2) throw error;
+      await page
+        .waitForFunction(() => document.readyState === "complete", { timeout: 5000 })
+        .catch(() => {});
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
+  }
+  if (!results) return [];
   return results.violations.map((violation) => ({
     pagina,
     viewport,
@@ -434,7 +523,8 @@ async function rutaCobrarDesdeInicio(page: Page): Promise<{ pasos: number; detal
 async function main() {
   const flags = checkFlags();
   const { rutas: dinamicas, limpiar } = await rutasDinamicas();
-  const todas = [...PAGES, ...dinamicas];
+  const comprasDePrueba = await crearCompraDePrueba();
+  const todas = [...PAGES, ...dinamicas, ...comprasDePrueba];
   const pages = flags.only.length
     ? todas.filter((p) => flags.only.some((o) => p.includes(o)))
     : todas;
@@ -546,6 +636,7 @@ async function main() {
 
   } finally {
     await limpiar();
+    await limpiarComprasDePrueba();
   }
 
   errores = printFindings(findings);

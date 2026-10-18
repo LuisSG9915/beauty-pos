@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -29,15 +29,14 @@ export default async function UnitsPage({ searchParams }: { searchParams: Search
   const organizationId = context.organization.id;
   const db = getDatabase();
 
+  // Una sola consulta: la fila en edición se resuelve del listado ya cargado.
   const units = await db
-    .select({ id: catUnidadesMedida.id, clave: catUnidadesMedida.clave, nombre: catUnidadesMedida.nombre, activo: catUnidadesMedida.activo })
+    .select({ id: catUnidadesMedida.id, clave: catUnidadesMedida.clave, nombre: catUnidadesMedida.nombre, activo: catUnidadesMedida.activo, updatedAt: catUnidadesMedida.updatedAt })
     .from(catUnidadesMedida)
     .where(eq(catUnidadesMedida.organizacionId, organizationId))
-    .orderBy(asc(catUnidadesMedida.nombre));
+    .orderBy(catUnidadesMedida.nombre);
   const editId = firstParam(params.edit);
-  const editing = editId
-    ? (await db.select({ id: catUnidadesMedida.id, clave: catUnidadesMedida.clave, nombre: catUnidadesMedida.nombre, updatedAt: catUnidadesMedida.updatedAt }).from(catUnidadesMedida).where(and(eq(catUnidadesMedida.id, editId), eq(catUnidadesMedida.organizacionId, organizationId))).limit(1))[0]
-    : undefined;
+  const editing = editId ? units.find((row) => row.id === editId) : undefined;
 
   return (
     <div className="space-y-6">
@@ -89,7 +88,7 @@ export default async function UnitsPage({ searchParams }: { searchParams: Search
             </RegistroList>
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[440px] text-left text-sm">
-                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+                <thead className="border-b border-border text-op-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-4 font-medium">Clave</th>
                     <th className="py-2 pr-4 font-medium">Nombre</th>
@@ -100,7 +99,7 @@ export default async function UnitsPage({ searchParams }: { searchParams: Search
                 <tbody>
                   {units.map((unit) => (
                     <tr className="border-b border-border" key={unit.id}>
-                      <td className="py-3 pr-4 font-mono text-xs">{unit.clave}</td>
+                      <td className="py-3 pr-4 font-mono text-op-xs">{unit.clave}</td>
                       <td className="py-3 pr-4 font-medium">{unit.nombre}</td>
                       <td className="py-3 pr-4"><StatusBadge active={unit.activo} /></td>
                       <td className="py-3">

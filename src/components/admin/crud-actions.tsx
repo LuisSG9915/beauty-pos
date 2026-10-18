@@ -21,7 +21,7 @@ export function CrudRowActions({
   return (
     <div className="flex flex-wrap gap-2">
       <Link
-        className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         href={editHref}
       >
         Editar
@@ -31,7 +31,7 @@ export function CrudRowActions({
         <input name="id" type="hidden" value={id} />
         <input name="activo" type="hidden" value={String(activo)} />
         <button
-          className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           type="submit"
         >
           {activo ? "Ocultar" : "Activar"}

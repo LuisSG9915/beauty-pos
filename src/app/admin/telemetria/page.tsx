@@ -4,14 +4,7 @@ import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { requirePlatformAdmin } from "@/lib/auth/access";
 import { firstParam } from "@/lib/url-context";
-import {
-  accionesMasUsadas,
-  paginasMasVistas,
-  rebotePorEntrada,
-  resumenSesiones,
-  resultadosFormularios,
-  webVitals,
-} from "@/modules/telemetria/queries";
+import { cargarTableroTelemetria } from "@/modules/telemetria/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -34,15 +27,10 @@ export default async function TelemetriaPage({
   const params = await searchParams;
   const dias = Number(firstParam(params.dias) ?? "7") || 7;
 
-  const [resumen, paginas, acciones, rebotes, vitals, formularios] =
-    await Promise.all([
-      resumenSesiones(dias),
-      paginasMasVistas(dias),
-      accionesMasUsadas(dias),
-      rebotePorEntrada(dias),
-      webVitals(dias),
-      resultadosFormularios(dias),
-    ]);
+  // Una sola consulta SQL cuando lee de CockroachDB (6 antes); con Analytics
+  // Engine configurado usa el motor externo con su degradación interna.
+  const { resumen, paginas, acciones, rebotes, vitals, formularios } =
+    await cargarTableroTelemetria(dias);
 
   const sinDatos = resumen.sesiones === 0;
 
@@ -81,34 +69,34 @@ export default async function TelemetriaPage({
         <>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <AdminCard>
-              <p className="text-xs font-medium text-muted-foreground">Sesiones</p>
+              <p className="text-op-xs font-medium text-muted-foreground">Sesiones</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">{resumen.sesiones}</p>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-op-xs text-muted-foreground">
                 {resumen.usuariosUnicos} usuarios únicos
               </p>
             </AdminCard>
             <AdminCard>
-              <p className="text-xs font-medium text-muted-foreground">Rebote</p>
+              <p className="text-op-xs font-medium text-muted-foreground">Rebote</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">{resumen.tasaRebote}%</p>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-op-xs text-muted-foreground">
                 sesiones sin engagement (&lt;10 s, 1 página, sin acción)
               </p>
             </AdminCard>
             <AdminCard>
-              <p className="text-xs font-medium text-muted-foreground">Páginas / sesión</p>
+              <p className="text-op-xs font-medium text-muted-foreground">Páginas / sesión</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">
                 {resumen.promedioPaginas.toFixed(1)}
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">
+              <p className="mt-1 text-op-xs text-muted-foreground">
                 {resumen.paginasTotales} vistas en total
               </p>
             </AdminCard>
             <AdminCard>
-              <p className="text-xs font-medium text-muted-foreground">Tiempo activo</p>
+              <p className="text-op-xs font-medium text-muted-foreground">Tiempo activo</p>
               <p className="mt-1 text-2xl font-semibold tabular-nums">
                 {Math.round(resumen.promedioActivoSeg)}s
               </p>
-              <p className="mt-1 text-xs text-muted-foreground">promedio por sesión</p>
+              <p className="mt-1 text-op-xs text-muted-foreground">promedio por sesión</p>
             </AdminCard>
           </div>
 
@@ -117,7 +105,7 @@ export default async function TelemetriaPage({
               <Tabla
                 columnas={["Ruta", "Vistas", "Sesiones"]}
                 filas={paginas.map((p) => [
-                  <span className="font-mono text-xs" key="r">{p.ruta}</span>,
+                  <span className="font-mono text-op-xs" key="r">{p.ruta}</span>,
                   p.vistas,
                   p.sesiones,
                 ])}
@@ -128,7 +116,7 @@ export default async function TelemetriaPage({
               <Tabla
                 columnas={["Acción", "Veces", "Clave"]}
                 filas={acciones.map((a) => [
-                  <span className="font-mono text-xs" key="a">{a.actionId}</span>,
+                  <span className="font-mono text-op-xs" key="a">{a.actionId}</span>,
                   a.total,
                   a.clave,
                 ])}
@@ -139,7 +127,7 @@ export default async function TelemetriaPage({
               <Tabla
                 columnas={["Ruta de entrada", "Sesiones", "Rebote"]}
                 filas={rebotes.map((r) => [
-                  <span className="font-mono text-xs" key="r">{r.ruta}</span>,
+                  <span className="font-mono text-op-xs" key="r">{r.ruta}</span>,
                   r.sesiones,
                   `${Math.round((r.rebotes / Math.max(r.sesiones, 1)) * 100)}%`,
                 ])}
@@ -177,7 +165,7 @@ export default async function TelemetriaPage({
             <Tabla
               columnas={["Flujo", "Éxitos", "Errores", "Tasa de error"]}
               filas={formularios.map((f) => [
-                <span className="font-mono text-xs" key="f">{f.actionId}</span>,
+                <span className="font-mono text-op-xs" key="f">{f.actionId}</span>,
                 f.exitos,
                 f.errores,
                 `${Math.round((f.errores / Math.max(f.exitos + f.errores, 1)) * 100)}%`,
@@ -204,7 +192,7 @@ function Tabla({
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-border text-left text-xs text-muted-foreground">
+          <tr className="border-b border-border text-left text-op-xs text-muted-foreground">
             {columnas.map((col) => (
               <th className="pb-2 pr-4 font-medium" key={col}>{col}</th>
             ))}

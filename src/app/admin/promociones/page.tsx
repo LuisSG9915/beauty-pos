@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -13,7 +13,6 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
-import { promociones } from "@/db/schema/catalogs";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency } from "@/lib/format";
@@ -34,7 +33,99 @@ export default async function PromotionsPage({ searchParams }: { searchParams: S
   if (!context.organization) notFound();
   requireAccessPermission(context.access, "catalogos.ver");
   const organizationId = context.organization.id;
-  const suscripcion = await contextoSuscripcion(organizationId);
+  const db = getDatabase();
+
+  const query = firstParam(params.q) ?? "";
+  const tipo = firstParam(params.tipo) ?? "";
+  const estado = firstParam(params.estado) ?? "";
+  const editId = firstParam(params.edit);
+
+  const filtroBusqueda = query ? sql` and p.nombre ilike ${`%${query}%`}` : sql``;
+  const filtroTipo =
+    tipo === "porcentaje" || tipo === "monto" || tipo === "2x1" || tipo === "paquete"
+      ? sql` and p.tipo = ${tipo}`
+      : sql``;
+  const filtroEstado =
+    estado === "activo" ? sql` and p.activo = true` : estado === "oculto" ? sql` and p.activo = false` : sql``;
+
+  type PromocionJson = {
+    id: string;
+    clave: string;
+    nombre: string;
+    tipo: string;
+    valor: string;
+    aplica: string;
+    vigenciaDesde: string;
+    vigenciaHasta: string | null;
+    activo: boolean;
+    updatedAt: string;
+  };
+  type PromocionesSqlRow = {
+    promociones: PromocionJson[];
+    editing: {
+      id: string;
+      organizacionId: string;
+      clave: string;
+      nombre: string;
+      descripcion: string | null;
+      tipo: string;
+      valor: string;
+      aplica: string;
+      vigenciaDesde: string;
+      vigenciaHasta: string | null;
+      updatedAt: string;
+    } | null;
+  };
+
+  // Listado + fila en edición en UNA sola consulta SQL (antes 2 rondas
+  // secuenciales cuando venía `?edit=`). El contexto de suscripción corre en
+  // la MISMA ronda vía React.cache.
+  const [suscripcion, { rows }] = await Promise.all([
+    contextoSuscripcion(organizationId),
+    db.execute<PromocionesSqlRow>(sql`
+    select
+      coalesce((
+        select jsonb_agg(t) from (
+          select
+            p.id,
+            p.clave,
+            p.nombre,
+            p.tipo,
+            p.valor::text as valor,
+            p.aplica,
+            p.vigencia_desde::text as "vigenciaDesde",
+            p.vigencia_hasta::text as "vigenciaHasta",
+            p.activo,
+            to_char(p.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "updatedAt"
+          from promociones p
+          where p.organizacion_id = ${organizationId}${filtroBusqueda}${filtroTipo}${filtroEstado}
+          order by p.created_at desc
+          limit 100
+        ) t
+      ), '[]'::jsonb) as promociones,
+      ${editId
+        ? sql`(
+            select jsonb_build_object(
+              'id', p.id,
+              'organizacionId', p.organizacion_id,
+              'clave', p.clave,
+              'nombre', p.nombre,
+              'descripcion', p.descripcion,
+              'tipo', p.tipo,
+              'valor', p.valor::text,
+              'aplica', p.aplica,
+              'vigenciaDesde', p.vigencia_desde::text,
+              'vigenciaHasta', p.vigencia_hasta::text,
+              'updatedAt', to_char(p.updated_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+            )
+            from promociones p
+            where p.id = ${editId} and p.organizacion_id = ${organizationId}
+            limit 1
+          ) as editing`
+        : sql`null as editing`}
+    `),
+  ]);
+
   if (!suscripcion.capacidades.has("promociones")) {
     return (
       <PlanUpgradeNotice
@@ -44,28 +135,11 @@ export default async function PromotionsPage({ searchParams }: { searchParams: S
       />
     );
   }
-  const db = getDatabase();
 
-  const query = firstParam(params.q) ?? "";
-  const tipo = firstParam(params.tipo) ?? "";
-  const estado = firstParam(params.estado) ?? "";
-
-  const filters = [eq(promociones.organizacionId, organizationId)];
-  if (query) filters.push(ilike(promociones.nombre, `%${query}%`));
-  if (tipo === "porcentaje" || tipo === "monto" || tipo === "2x1" || tipo === "paquete") filters.push(eq(promociones.tipo, tipo));
-  if (estado === "activo") filters.push(eq(promociones.activo, true));
-  if (estado === "oculto") filters.push(eq(promociones.activo, false));
-
-  const promotionRows = await db
-    .select({ id: promociones.id, clave: promociones.clave, nombre: promociones.nombre, tipo: promociones.tipo, valor: promociones.valor, aplica: promociones.aplica, vigenciaDesde: promociones.vigenciaDesde, vigenciaHasta: promociones.vigenciaHasta, activo: promociones.activo })
-    .from(promociones)
-    .where(and(...filters))
-    .orderBy(desc(promociones.createdAt))
-    .limit(100);
-
-  const editId = firstParam(params.edit);
-  const editing = editId
-    ? (await db.select().from(promociones).where(and(eq(promociones.id, editId), eq(promociones.organizacionId, organizationId))).limit(1))[0]
+  const datos = rows[0];
+  const promotionRows = datos?.promociones ?? [];
+  const editing = datos?.editing
+    ? { ...datos.editing, updatedAt: new Date(datos.editing.updatedAt) }
     : undefined;
   const editingData = editing
     ? {
@@ -153,12 +227,12 @@ export default async function PromotionsPage({ searchParams }: { searchParams: S
                 <RegistroCard
                   acciones={
                     <div className="flex flex-wrap gap-2">
-                      <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/promociones", { organizationId, extra: { ...preserved, edit: promo.id } })}>Editar</Link>
+                      <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60" data-action-id="catalogo.promociones.editar" href={buildAdminHref("/promociones", { organizationId, extra: { ...preserved, edit: promo.id } })}>Editar</Link>
                       <form action={togglePromotion}>
                         <input name="organizacionId" type="hidden" value={organizationId} />
                         <input name="id" type="hidden" value={promo.id} />
                         <input name="activo" type="hidden" value={String(promo.activo)} />
-                        <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">{promo.activo ? "Ocultar" : "Activar"}</button>
+                        <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60" data-action-id="catalogo.promociones.toggle" type="submit">{promo.activo ? "Ocultar" : "Activar"}</button>
                       </form>
                     </div>
                   }
@@ -180,7 +254,7 @@ export default async function PromotionsPage({ searchParams }: { searchParams: S
             </RegistroList>
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[680px] text-left text-sm">
-                <thead className="border-b border-border text-xs uppercase tracking-wide text-muted-foreground">
+                <thead className="border-b border-border text-op-xs uppercase tracking-wide text-muted-foreground">
                   <tr>
                     <th className="py-2 pr-4 font-medium">Clave</th>
                     <th className="py-2 pr-4 font-medium">Nombre</th>
@@ -195,23 +269,23 @@ export default async function PromotionsPage({ searchParams }: { searchParams: S
                 <tbody>
                   {promotionRows.map((promo) => (
                     <tr className="border-b border-border" key={promo.id}>
-                      <td className="py-3 pr-4 font-mono text-xs">{promo.clave}</td>
+                      <td className="py-3 pr-4 font-mono text-op-xs">{promo.clave}</td>
                       <td className="py-3 pr-4 font-medium">{promo.nombre}</td>
-                      <td className="py-3 pr-4"><span className="rounded-full bg-muted/60 px-2.5 py-1 text-xs text-muted-foreground">{TIPO_LABEL[promo.tipo] ?? promo.tipo}</span></td>
+                      <td className="py-3 pr-4"><span className="rounded-full bg-muted/60 px-2.5 py-1 text-op-xs text-muted-foreground">{TIPO_LABEL[promo.tipo] ?? promo.tipo}</span></td>
                       <td className="py-3 pr-4 tabular-nums">
                         {promo.tipo === "porcentaje" ? `${promo.valor}%` : promo.tipo === "2x1" ? "—" : formatCurrency(promo.valor, { currency: context.currency })}
                       </td>
-                      <td className="py-3 pr-4 text-xs text-muted-foreground">{APLICA_LABEL[promo.aplica] ?? promo.aplica}</td>
-                      <td className="py-3 pr-4 text-xs text-muted-foreground">{promo.vigenciaDesde}{promo.vigenciaHasta ? ` → ${promo.vigenciaHasta}` : " → ∞"}</td>
+                      <td className="py-3 pr-4 text-op-xs text-muted-foreground">{APLICA_LABEL[promo.aplica] ?? promo.aplica}</td>
+                      <td className="py-3 pr-4 text-op-xs text-muted-foreground">{promo.vigenciaDesde}{promo.vigenciaHasta ? ` → ${promo.vigenciaHasta}` : " → ∞"}</td>
                       <td className="py-3 pr-4"><StatusBadge active={promo.activo} /></td>
                       <td className="py-3">
                         <div className="flex flex-wrap gap-2">
-                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" href={buildAdminHref("/promociones", { organizationId, extra: { ...preserved, edit: promo.id } })}>Editar</Link>
+                          <Link className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60" data-action-id="catalogo.promociones.editar" href={buildAdminHref("/promociones", { organizationId, extra: { ...preserved, edit: promo.id } })}>Editar</Link>
                           <form action={togglePromotion}>
                             <input name="organizacionId" type="hidden" value={organizationId} />
                             <input name="id" type="hidden" value={promo.id} />
                             <input name="activo" type="hidden" value={String(promo.activo)} />
-                            <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-xs text-muted-foreground hover:bg-muted/60" type="submit">{promo.activo ? "Ocultar" : "Activar"}</button>
+                            <button className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60" data-action-id="catalogo.promociones.toggle" type="submit">{promo.activo ? "Ocultar" : "Activar"}</button>
                           </form>
                         </div>
                       </td>

@@ -455,7 +455,7 @@ export function CompraDetalle({
         >
           <ZoomIn aria-hidden="true" className="size-4" />
         </Button>
-        <span className="text-xs text-muted-foreground">
+        <span className="text-op-xs text-muted-foreground">
           Desplázate por la foto para leer el detalle
         </span>
       </div>
@@ -539,7 +539,24 @@ export function CompraDetalle({
         </AdminCard>
 
         {/* Datos del documento */}
-        <AdminCard description="Proveedor, folio y fecha tal como vienen en el ticket." title="Datos del documento">
+        <AdminCard
+          actions={
+            editable ? (
+              <Button
+                data-action-clave={recibible ? undefined : "1"}
+                data-action-id="compras.datos.guardar"
+                disabled={pending}
+                onClick={guardarDatos}
+                size={recibible ? "default" : "lg"}
+                type="button"
+              >
+                Guardar datos
+              </Button>
+            ) : null
+          }
+          description="Proveedor, folio y fecha tal como vienen en el ticket."
+          title="Datos del documento"
+        >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Combobox
               disabled={!editable}
@@ -566,7 +583,7 @@ export function CompraDetalle({
               </Field>
             ) : null}
             {compra.proveedorTexto && !proveedorId ? (
-              <p className="text-xs text-muted-foreground sm:col-span-2">
+              <p className="text-op-xs text-muted-foreground sm:col-span-2">
                 En el ticket dice “{compra.proveedorTexto}”.
               </p>
             ) : null}
@@ -614,22 +631,12 @@ export function CompraDetalle({
               </p>
               {compra.totalTicket !== null &&
               Math.abs(Number(compra.totalTicket) - Number(compra.totalCalculado)) > 1 ? (
-                <p className="inline-flex items-center gap-1.5 text-xs font-medium text-warning">
+                <p className="inline-flex items-center gap-1.5 text-op-xs font-medium text-warning">
                   <CircleAlert aria-hidden="true" className="size-3.5" />
                   La suma de las líneas difiere del ticket por más de $1.
                 </p>
               ) : null}
             </div>
-            {editable ? (
-              <Button
-                data-action-id="compras.datos.guardar"
-                disabled={pending}
-                onClick={guardarDatos}
-                type="button"
-              >
-                Guardar datos
-              </Button>
-            ) : null}
           </div>
         </AdminCard>
 
