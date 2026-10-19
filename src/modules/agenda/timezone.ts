@@ -219,13 +219,17 @@ const HAS_EXPLICIT_ZONE_RE = /(z|[+-]\d{2}:?\d{2})$/i;
  * Punto único para interpretar `fechaHora` recibido de la UI:
  * - Cadenas con zona explícita (ISO 8601 con Z u offset) se parsean directo.
  * - `datetime-local` sin zona se interpreta como hora de muro en `timeZone`.
+ *
+ * `timeZone` se resuelve con `resolveTimeZone`: en la BD `sucursales.zona_horaria`
+ * es nullable y una zona ausente o inválida reventaba el parseo (la cita no se
+ * podía guardar). El fallback es la zona por defecto del producto.
  */
-export function parseFechaHoraInput(raw: string, timeZone: string): Date | null {
+export function parseFechaHoraInput(raw: string, timeZone?: string | null): Date | null {
   const value = raw.trim();
   if (!value) return null;
   if (HAS_EXPLICIT_ZONE_RE.test(value)) {
     const parsed = new Date(value);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }
-  return localDateTimeToUtc(value, timeZone);
+  return localDateTimeToUtc(value, resolveTimeZone(timeZone));
 }
