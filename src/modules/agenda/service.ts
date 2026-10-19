@@ -3,12 +3,12 @@
  * vive aquí; las reglas puras están en `rules.ts` y no conocen la base.
  */
 
-import { and, eq, gt, inArray, lt, ne, notInArray, sql } from "drizzle-orm";
+import { and, eq, lt, ne, notInArray, sql } from "drizzle-orm";
 import type { ExtractTablesWithRelations } from "drizzle-orm";
 import type { NodePgDatabase, NodePgTransaction } from "drizzle-orm/node-postgres";
 
 import { clientes, organizaciones, relUsuariosSucursales, sucursales } from "@/db/schema/core";
-import { bloqueosAgenda, citaRecursos, citas, citasHistorial, horariosSucursales, recursos } from "@/db/schema/operations";
+import { citaRecursos, citas, citasHistorial } from "@/db/schema/operations";
 import { ESTADOS_CITA_INACTIVOS, intervalFromDates, type DisponibilidadResult } from "./types";
 import type { BloqueoLike, CitaLike, RecursoLike, TurnoDia } from "./rules";
 import { validateCitaAvailability } from "./rules";
@@ -127,6 +127,12 @@ export interface OcupacionAgenda {
  * Carga horarios activos de la sucursal, bloqueos que se traslapan con
  * [desde, hasta) y citas vivas que podrían traslaparse. Como una cita dura a lo
  * máximo 1440 min, cualquier traslape empieza dentro de las 24h previas.
+ *
+ * UNA sola query con subselects `jsonb`: `getOcupacionAgenda` se llama DENTRO
+ * de transacciones (`saveCita` → `validarDisponibilidadCita`) y ahí todas las
+ * consultas comparten una única conexión — paralelizarlas con `Promise.all`
+ * dispara "Calling client.query() when the client is already executing a
+ * query" y falla en producción (Hyperdrive). Fusionar además ahorra 4 rondas.
  */
 export async function getOcupacionAgenda(
   db: AgendaDb,
@@ -134,104 +140,119 @@ export async function getOcupacionAgenda(
 ): Promise<OcupacionAgenda> {
   const { organizacionId, sucursalId, desde, hasta } = params;
   const desdeCitas = new Date(desde.getTime() - 24 * 60 * 60 * 1000);
+  const estadosInactivos = sql.join(
+    ESTADOS_CITA_INACTIVOS.map((estado) => sql`${estado}`),
+    sql`, `,
+  );
 
-  const [horarioRows, bloqueoRows, citaRows, recursoRows] = await Promise.all([
-    db
-      .select({
-        diaSemana: horariosSucursales.diaSemana,
-        iniciaMinutos: horariosSucursales.iniciaMinutos,
-        terminaMinutos: horariosSucursales.terminaMinutos,
-        activo: horariosSucursales.activo,
-      })
-      .from(horariosSucursales)
-      .where(
-        and(
-          eq(horariosSucursales.organizacionId, organizacionId),
-          eq(horariosSucursales.sucursalId, sucursalId),
-          eq(horariosSucursales.activo, true),
-        ),
-      ),
-    db
-      .select({
-        id: bloqueosAgenda.id,
-        usuarioId: bloqueosAgenda.usuarioId,
-        iniciaAt: bloqueosAgenda.iniciaAt,
-        terminaAt: bloqueosAgenda.terminaAt,
-        tipo: bloqueosAgenda.tipo,
-      })
-      .from(bloqueosAgenda)
-      .where(
-        and(
-          eq(bloqueosAgenda.organizacionId, organizacionId),
-          eq(bloqueosAgenda.sucursalId, sucursalId),
-          eq(bloqueosAgenda.activo, true),
-          lt(bloqueosAgenda.iniciaAt, hasta),
-          gt(bloqueosAgenda.terminaAt, desde),
-        ),
-      ),
-    db
-      .select({
-        id: citas.id,
-        usuarioId: citas.usuarioId,
-        fechaHora: citas.fechaHora,
-        duracionMinutos: citas.duracionMinutos,
-        estado: citas.estado,
-        activo: citas.activo,
-      })
-      .from(citas)
-      .where(
-        and(
-          eq(citas.organizacionId, organizacionId),
-          eq(citas.sucursalId, sucursalId),
-          eq(citas.activo, true),
-          notInArray(citas.estado, [...ESTADOS_CITA_INACTIVOS]),
-          lt(citas.fechaHora, hasta),
-          gt(citas.fechaHora, desdeCitas),
-        ),
-      ),
-    db
-      .select({
-        id: recursos.id,
-        nombre: recursos.nombre,
-        capacidad: recursos.capacidad,
-      })
-      .from(recursos)
-      .where(
-        and(
-          eq(recursos.organizacionId, organizacionId),
-          eq(recursos.sucursalId, sucursalId),
-          eq(recursos.activo, true),
-        ),
-      ),
-  ]);
+  const { rows } = await db.execute<{
+    horarios: TurnoDia[];
+    bloqueos: Array<{
+      id: string;
+      usuarioId: string | null;
+      tipo: string;
+      iniciaAtMs: number | string;
+      terminaAtMs: number | string;
+    }>;
+    citas: Array<{
+      id: string;
+      usuarioId: string | null;
+      fechaHoraMs: number | string;
+      duracionMinutos: number;
+      estado: string;
+      activo: boolean;
+    }>;
+    recursos: RecursoLike[];
+    asignaciones: Array<{ citaId: string; recursoId: string }>;
+  }>(sql`
+    select
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'diaSemana', h.dia_semana, 'iniciaMinutos', h.inicia_minutos,
+          'terminaMinutos', h.termina_minutos, 'activo', h.activo))
+          from horarios_sucursales h
+         where h.organizacion_id = ${organizacionId}
+           and h.sucursal_id = ${sucursalId}
+           and h.activo
+      ), '[]'::jsonb) as horarios,
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'id', b.id, 'usuarioId', b.usuario_id, 'tipo', b.tipo,
+          'iniciaAtMs', (extract(epoch from b.inicia_at) * 1000)::float8,
+          'terminaAtMs', (extract(epoch from b.termina_at) * 1000)::float8))
+          from bloqueos_agenda b
+         where b.organizacion_id = ${organizacionId}
+           and b.sucursal_id = ${sucursalId}
+           and b.activo
+           and b.inicia_at < ${hasta}
+           and b.termina_at > ${desde}
+      ), '[]'::jsonb) as bloqueos,
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'id', c.id, 'usuarioId', c.usuario_id,
+          'fechaHoraMs', (extract(epoch from c.fecha_hora) * 1000)::float8,
+          'duracionMinutos', c.duracion_minutos, 'estado', c.estado, 'activo', c.activo))
+          from citas c
+         where c.organizacion_id = ${organizacionId}
+           and c.sucursal_id = ${sucursalId}
+           and c.activo
+           and c.estado not in (${estadosInactivos})
+           and c.fecha_hora < ${hasta}
+           and c.fecha_hora > ${desdeCitas}
+      ), '[]'::jsonb) as citas,
+      coalesce((
+        select jsonb_agg(jsonb_build_object(
+          'id', r.id, 'nombre', r.nombre, 'capacidad', r.capacidad))
+          from recursos r
+         where r.organizacion_id = ${organizacionId}
+           and r.sucursal_id = ${sucursalId}
+           and r.activo
+      ), '[]'::jsonb) as recursos,
+      coalesce((
+        select jsonb_agg(jsonb_build_object('citaId', cr.cita_id, 'recursoId', cr.recurso_id))
+          from cita_recursos cr
+         where cr.activo
+           and cr.cita_id in (
+             select c2.id from citas c2
+              where c2.organizacion_id = ${organizacionId}
+                and c2.sucursal_id = ${sucursalId}
+                and c2.activo
+                and c2.estado not in (${estadosInactivos})
+                and c2.fecha_hora < ${hasta}
+                and c2.fecha_hora > ${desdeCitas})
+      ), '[]'::jsonb) as asignaciones
+  `);
 
-  // Recursos asignados por cita (solo las citas vivas de la ventana).
-  const citaIds = citaRows.map((c) => c.id);
-  const asignaciones = citaIds.length > 0
-    ? await db
-        .select({ citaId: citaRecursos.citaId, recursoId: citaRecursos.recursoId })
-        .from(citaRecursos)
-        .where(and(inArray(citaRecursos.citaId, citaIds), eq(citaRecursos.activo, true)))
-    : [];
+  const data = rows[0];
   const recursosPorCita = new Map<string, string[]>();
-  for (const asignacion of asignaciones) {
+  for (const asignacion of data?.asignaciones ?? []) {
     const list = recursosPorCita.get(asignacion.citaId) ?? [];
     list.push(asignacion.recursoId);
     recursosPorCita.set(asignacion.citaId, list);
   }
 
   return {
-    horarios: horarioRows,
-    bloqueos: bloqueoRows.map((b) => ({
+    horarios: data?.horarios ?? [],
+    bloqueos: (data?.bloqueos ?? []).map((b) => ({
       id: b.id,
       usuarioId: b.usuarioId,
       tipo: b.tipo,
-      iniciaAtMs: b.iniciaAt.getTime(),
-      terminaAtMs: b.terminaAt.getTime(),
+      iniciaAtMs: Number(b.iniciaAtMs),
+      terminaAtMs: Number(b.terminaAtMs),
       activo: true,
     })),
-    citas: citaRows.map((c) => ({ ...toCitaLike(c), recursoIds: recursosPorCita.get(c.id) ?? [] })),
-    recursos: recursoRows,
+    citas: (data?.citas ?? []).map((c) => ({
+      ...toCitaLike({
+        id: c.id,
+        usuarioId: c.usuarioId,
+        fechaHora: new Date(Number(c.fechaHoraMs)),
+        duracionMinutos: c.duracionMinutos,
+        estado: c.estado,
+        activo: c.activo,
+      }),
+      recursoIds: recursosPorCita.get(c.id) ?? [],
+    })),
+    recursos: data?.recursos ?? [],
   };
 }
 

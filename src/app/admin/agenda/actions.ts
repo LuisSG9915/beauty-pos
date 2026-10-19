@@ -227,7 +227,7 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
       const sucursal = await lockSucursalAgenda(tx, input.organizacionId, input.sucursalId);
       if (!sucursal) return { error: "La sucursal no existe o no pertenece a la organización." };
       if (!sucursal.activo) return { error: "La sucursal está inactiva." };
-      if (!(await assertBranchScope(access, input.sucursalId))) {
+      if (!(await assertBranchScope(access, input.sucursalId, tx))) {
         return { error: "No tienes acceso a esta sucursal." };
       }
 
@@ -273,7 +273,7 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
       if (input.id) {
         previa = await getCita(tx, input.organizacionId, input.id);
         if (!previa || !previa.activo) return { error: "La cita no existe." };
-        if (!(await assertBranchScope(access, previa.sucursalId))) {
+        if (!(await assertBranchScope(access, previa.sucursalId, tx))) {
           return { error: "No tienes acceso a esta sucursal." };
         }
         if (!isCitaEditable(previa.estado)) {
@@ -450,7 +450,7 @@ export async function toggleServicioCita(formData: FormData): Promise<CitaMutati
       db.transaction(async (tx): Promise<CitaMutationResult> => {
       const cita = await getCita(tx, input.organizacionId, input.citaId);
       if (!cita || !cita.activo) return { success: false, error: "La cita no existe." };
-      if (!(await assertBranchScope(access, cita.sucursalId))) {
+      if (!(await assertBranchScope(access, cita.sucursalId, tx))) {
         return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
       }
       if (!isCitaEditable(cita.estado)) {
@@ -542,7 +542,7 @@ export async function updateCitaEstado(formData: FormData): Promise<CitaMutation
       db.transaction(async (tx): Promise<CitaMutationResult> => {
       const referencia = await getCita(tx, input.organizacionId, input.citaId);
       if (!referencia || !referencia.activo) return { success: false, error: "La cita no existe." };
-      if (!(await assertBranchScope(access, referencia.sucursalId))) {
+      if (!(await assertBranchScope(access, referencia.sucursalId, tx))) {
         return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
       }
       const sucursal = await lockSucursalAgenda(tx, input.organizacionId, referencia.sucursalId);
@@ -959,7 +959,7 @@ export async function cambiarDuracionCita(formData: FormData): Promise<CitaMutat
       if (!referencia || !referencia.activo) {
         return { success: false, error: "La cita no existe." };
       }
-      if (!(await assertBranchScope(access, referencia.sucursalId))) {
+      if (!(await assertBranchScope(access, referencia.sucursalId, tx))) {
         return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
       }
       const sucursal = await lockSucursalAgenda(tx, input.organizacionId, referencia.sucursalId);
@@ -1185,7 +1185,7 @@ export async function saveBloqueoAgenda(formData: FormData): Promise<CitaMutatio
         const sucursal = await lockSucursalAgenda(tx, input.organizacionId, input.sucursalId);
       if (!sucursal) return { success: false, error: "La sucursal no existe o no pertenece a la organización." };
       if (!sucursal.activo) return { success: false, error: "La sucursal está inactiva." };
-      if (!(await assertBranchScope(access, input.sucursalId))) {
+      if (!(await assertBranchScope(access, input.sucursalId, tx))) {
         return { success: false, error: "No tienes acceso a esta sucursal." };
       }
       const inicia = parseFechaHoraInput(input.iniciaAt, sucursal.zonaHoraria);
@@ -1609,7 +1609,7 @@ export async function toggleRecursoCita(formData: FormData): Promise<CitaMutatio
       db.transaction(async (tx): Promise<CitaMutationResult> => {
         const cita = await getCita(tx, input.organizacionId, input.citaId);
       if (!cita || !cita.activo) return { success: false, error: "La cita no existe." };
-      if (!(await assertBranchScope(access, cita.sucursalId))) {
+      if (!(await assertBranchScope(access, cita.sucursalId, tx))) {
         return { success: false, error: "La cita pertenece a una sucursal sin acceso." };
       }
       if (!isCitaEditable(cita.estado)) {

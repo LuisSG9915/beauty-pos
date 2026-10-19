@@ -488,13 +488,20 @@ export async function checkPermission(
  * Valida que la sucursal pertenece a la organización, está activa y entra en
  * el alcance del usuario. Devuelve true/false (sin redirigir) para que las
  * server actions puedan responder con un estado de error.
+ *
+ * `conn` permite reutilizar la conexión de una transacción en curso. Es
+ * obligatorio pasarlo dentro de un `db.transaction(...)`: `getDatabase()`
+ * tomaría OTRA conexión del pool y, con Hyperdrive (max 2 por request), la
+ * consulta agota el tiempo esperando ("Query read timeout") — la cita no se
+ * podía guardar.
  */
 export async function assertBranchScope(
   access: ResolvedAccess,
   sucursalId: string,
+  conn?: Pick<ReturnType<typeof getDatabase>, "select">,
 ): Promise<boolean> {
   if (!canAccessBranch(access, sucursalId)) return false;
-  const db = getDatabase();
+  const db = conn ?? getDatabase();
   const [branch] = await db
     .select({ id: sucursales.id })
     .from(sucursales)
