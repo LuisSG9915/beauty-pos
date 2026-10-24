@@ -19,6 +19,7 @@
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore `.open-next/worker.js` se genera con `opennextjs-cloudflare build`.
 import handler from "./.open-next/worker.js";
+import { esRutaPublicaAccess } from "./src/lib/auth/access";
 
 type Env = {
   CRON_SECRET?: string;
@@ -26,7 +27,15 @@ type Env = {
 };
 
 const worker = {
-  fetch: handler.fetch,
+  async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+    const url = new URL(request.url);
+    // Cortocircuito: rutas públicas nunca exigen validación de Zero Trust ni cabeceras de Access
+    if (esRutaPublicaAccess(url.pathname)) {
+      return handler.fetch(request, env, ctx);
+    }
+
+    return handler.fetch(request, env, ctx);
+  },
 
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
     try {

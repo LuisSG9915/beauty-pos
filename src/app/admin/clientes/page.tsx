@@ -353,16 +353,16 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
         <StatCard hint="A quienes puedes escribir" label="Con correo" value={kpi.conCorreo} />
       </StatCardGrid>
 
-      <form className="flex flex-wrap items-end gap-3" method="get">
+      <form className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-end gap-3 w-full min-w-0" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <Field className="w-full sm:w-auto sm:min-w-56 sm:flex-1">
-          <FieldLabel>Buscar</FieldLabel>
-          <Input defaultValue={query} key={query} name="q" placeholder="Nombre, teléfono o correo" />
+          <FieldLabel htmlFor="buscar-clientes">Buscar</FieldLabel>
+          <Input id="buscar-clientes" defaultValue={query} key={query} name="q" placeholder="Nombre, teléfono o correo" />
         </Field>
         <div className="flex items-center gap-2">
-          <Button type="submit" variant="secondary">Buscar</Button>
+          <Button className="min-h-11" type="submit" variant="secondary">Buscar</Button>
           {query ? (
-            <Button nativeButton={false} render={<Link href={hrefBase({ pagina: null })} prefetch={false} />} variant="ghost">
+            <Button className="min-h-11" nativeButton={false} render={<Link href={hrefBase({ pagina: null })} prefetch={false} />} variant="ghost">
               Limpiar
             </Button>
           ) : null}
@@ -413,12 +413,12 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
           </div>
         ) : (
           <VistaAdaptativa>
-            <RegistroList className="p-3">
+            <RegistroList className="p-3 md:hidden">
               {clientRows.map((client) => (
                 <RegistroCard
                   acciones={puedeEditar ? (
                     <Link
-                      className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60"
+                      className="inline-flex min-h-11 items-center rounded-lg border border-border px-3 text-op-xs text-muted-foreground hover:bg-muted/60"
                       data-action-id="clientes.editar"
                       href={hrefBase({ edit: client.id, pagina: String(paginaActual) })}
                       prefetch={false}
@@ -441,7 +441,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
                   key={client.id}
                   titulo={
                     <Link
-                      className="inline-flex min-h-6 items-center hover:text-primary hover:underline"
+                      className="inline-flex min-h-11 items-center hover:text-primary hover:underline font-medium"
                       href={buildAdminHref(`/clientes/${client.id}`, { organizationId })}
                       prefetch={false}
                     >
@@ -467,12 +467,12 @@ export default async function ClientsPage({ searchParams }: { searchParams: Sear
             </span>
             <div className="flex items-center gap-2">
               {paginaActual > 1 ? (
-                <Button nativeButton={false} render={<Link href={hrefBase({ pagina: String(paginaActual - 1) })} prefetch={false} />} size="sm" variant="outline">
+                <Button className="min-h-11" nativeButton={false} render={<Link href={hrefBase({ pagina: String(paginaActual - 1) })} prefetch={false} />} size="sm" variant="outline">
                   Anterior
                 </Button>
               ) : null}
               {paginaActual < totalPaginas ? (
-                <Button nativeButton={false} render={<Link href={hrefBase({ pagina: String(paginaActual + 1) })} prefetch={false} />} size="sm" variant="outline">
+                <Button className="min-h-11" nativeButton={false} render={<Link href={hrefBase({ pagina: String(paginaActual + 1) })} prefetch={false} />} size="sm" variant="outline">
                   Siguiente
                 </Button>
               ) : null}

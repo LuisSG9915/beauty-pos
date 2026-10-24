@@ -1,5 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 
 import { getDatabase } from "@/db/client";
 import { sucursales } from "@/db/schema/core";
@@ -13,6 +14,7 @@ import {
   type ResolvedAccess,
   type UsuarioSesion,
 } from "@/lib/auth/authorization";
+import { kvReadThrough } from "@/lib/kv-cache";
 import { leerSucursalCookie } from "@/lib/sucursal-cookie";
 import { firstParam } from "@/lib/url-context";
 import { DEFAULT_TIME_ZONE, resolveTimeZone } from "@/modules/agenda/timezone";
@@ -61,127 +63,154 @@ export type AdminContext = {
  * La consulta de contexto (`resolveSessionContext`) devuelve usuario +
  * organizaciones + acceso a la org pedida en UNA ronda; cuando la URL no
  * trae `organizationId` o cae a otra org se recurre a `resolveAccess`.
+ *
+ * Deduplicado por request vía `React.cache()` y cacheado en KV con TTL de 60 s.
  */
-export async function getAdminContext(
-  params: AdminSearchParams,
-  options: { loadBranches?: boolean; includeInactiveBranches?: boolean } = {},
-): Promise<AdminContext> {
-  const session = await getSessionOrRedirect();
-  const db = getDatabase();
-  const requestedOrganizationId = firstParam(params.organizationId);
-  const contextRow = await resolveSessionContext(session.user.id, requestedOrganizationId ?? null);
-  const user = contextRow.usuario;
-  if (!user) {
-    redirect("/login?error=account-not-configured");
-  }
-  const organizations = contextRow.organizaciones;
-  const organization =
-    (requestedOrganizationId
-      ? organizations.find((item) => item.id === requestedOrganizationId)
-      : undefined) ?? organizations[0] ?? null;
+const getAdminContextMemo = cache(
+  async (
+    requestedOrganizationId: string | null,
+    requestedSucursalId: string | null,
+    loadBranches: boolean,
+    includeInactiveBranches: boolean,
+  ): Promise<AdminContext> => {
+    const session = await getSessionOrRedirect();
+    const db = getDatabase();
 
-  if (!organization) {
+    const contextRow = await kvReadThrough(
+      `admin-ctx:${session.user.id}:${requestedOrganizationId ?? "default"}`,
+      60,
+      () => resolveSessionContext(session.user.id, requestedOrganizationId ?? null),
+    );
+
+    const user = contextRow.usuario;
+    if (!user) {
+      redirect("/login?error=account-not-configured");
+    }
+    const organizations = contextRow.organizaciones;
+    const organization =
+      (requestedOrganizationId
+        ? organizations.find((item) => item.id === requestedOrganizationId)
+        : undefined) ?? organizations[0] ?? null;
+
+    if (!organization) {
+      return {
+        user,
+        organizations,
+        organization: null,
+        branches: [],
+        branch: null,
+        access: {
+          user,
+          organizationId: "",
+          membershipId: null,
+          permissions: new Set(),
+          branchIds: null,
+          sucursalesActivas: [],
+          esPlataforma: user.esAdministradorPlataforma,
+          soloLectura: false,
+        },
+        timeZone: DEFAULT_TIME_ZONE,
+        currency: "MXN",
+      };
+    }
+
+    // El acceso ya viaja en la consulta de contexto cuando la org pedida (o la
+    // primera por defecto) coincide con el acceso devuelto; solo se consulta aparte
+    // si el usuario pidió explícitamente otra organización distinta.
+    const orgAccesoId = contextRow.acceso?.organization_id ?? (requestedOrganizationId ?? organizations[0]?.id);
+    const access =
+      organization.id === orgAccesoId && contextRow.acceso
+        ? (accessFromContextRow(user, organization.id, contextRow.acceso) ??
+          (await resolveAccess(organization.id)))
+        : await resolveAccess(organization.id);
+
+    let branches: AdminBranch[] = [];
+    if (loadBranches) {
+      if (!includeInactiveBranches) {
+        branches = await sucursalesActivasDelAcceso(access);
+      } else {
+        const conditions = [eq(sucursales.organizacionId, organization.id)];
+        // Usuarios con asignaciones explícitas solo ven sus sucursales.
+        if (access.branchIds !== null) {
+          conditions.push(inArray(sucursales.id, [...access.branchIds]));
+        }
+        branches = await db
+          .select({
+            id: sucursales.id,
+            organizacionId: sucursales.organizacionId,
+            nombre: sucursales.nombre,
+            clave: sucursales.clave,
+            activo: sucursales.activo,
+            zonaHoraria: sucursales.zonaHoraria,
+            capacidadSinAsignar: sucursales.capacidadSinAsignar,
+            reservasOnline: sucursales.reservasOnline,
+            reservasAutoConfirmar: sucursales.reservasAutoConfirmar,
+            reservasCancelacionHoras: sucursales.reservasCancelacionHoras,
+            reservasAnticipacionMinutos: sucursales.reservasAnticipacionMinutos,
+            reservasHorizonteDias: sucursales.reservasHorizonteDias,
+          })
+          .from(sucursales)
+          .where(and(...conditions))
+          .orderBy(asc(sucursales.nombre));
+      }
+    }
+
+    // Sucursal efectiva: `?sucursalId` válida → cookie preferida válida →
+    // primera del alcance. "Válida" = presente en `branches`, que ya están
+    // acotadas al alcance del usuario (la cookie nunca se confía sola).
+    let branch: AdminBranch | null =
+      (requestedSucursalId
+        ? branches.find((item) => item.id === requestedSucursalId)
+        : undefined) ?? null;
+    if (!branch && branches.length > 0) {
+      const preferidaId = await leerSucursalCookie(organization.id);
+      branch =
+        (preferidaId
+          ? branches.find((item) => item.id === preferidaId)
+          : undefined) ??
+        branches[0] ??
+        null;
+    }
+
+    let effectiveSucursalId = branch?.id;
+    if (!effectiveSucursalId && !loadBranches) {
+      const preferidaId = await leerSucursalCookie(organization.id);
+      const candidateId = requestedSucursalId ?? preferidaId;
+      if (candidateId && (access.esPlataforma || access.sucursalesActivas.some((s) => s.id === candidateId))) {
+        effectiveSucursalId = candidateId;
+      } else {
+        effectiveSucursalId = access.sucursalesActivas[0]?.id;
+      }
+    }
+
     return {
       user,
       organizations,
-      organization: null,
-      branches: [],
-      branch: null,
-      access: {
-        user,
-        organizationId: "",
-        membershipId: null,
-        permissions: new Set(),
-        branchIds: null,
-        sucursalesActivas: [],
-        esPlataforma: user.esAdministradorPlataforma,
-        soloLectura: false,
-      },
-      timeZone: DEFAULT_TIME_ZONE,
-      currency: "MXN",
+      organization,
+      organizationId: organization.id,
+      branches,
+      branch,
+      sucursalId: effectiveSucursalId,
+      access,
+      timeZone: resolveTimeZone(branch?.zonaHoraria, organization.zonaHoraria),
+      currency: organization.moneda || "MXN",
     };
-  }
+  },
+);
 
-  // El acceso ya viaja en la consulta de contexto cuando la org pedida (o la
-  // primera por defecto) coincide con el acceso devuelto; solo se consulta aparte
-  // si el usuario pidió explícitamente otra organización distinta.
-  const orgAccesoId = contextRow.acceso?.organization_id ?? (requestedOrganizationId ?? organizations[0]?.id);
-  const access =
-    organization.id === orgAccesoId && contextRow.acceso
-      ? (accessFromContextRow(user, organization.id, contextRow.acceso) ??
-        (await resolveAccess(organization.id)))
-      : await resolveAccess(organization.id);
+export async function getAdminContext(
+  params: AdminSearchParams = {},
+  options: { loadBranches?: boolean; includeInactiveBranches?: boolean } = {},
+): Promise<AdminContext> {
+  const requestedOrganizationId = firstParam(params?.organizationId) ?? null;
+  const requestedSucursalId = firstParam(params?.sucursalId) ?? null;
+  const loadBranches = options.loadBranches ?? true;
+  const includeInactiveBranches = options.includeInactiveBranches ?? false;
 
-  let branches: AdminBranch[] = [];
-  if (options.loadBranches ?? true) {
-    if (!(options.includeInactiveBranches ?? false)) {
-      branches = await sucursalesActivasDelAcceso(access);
-    } else {
-      const conditions = [eq(sucursales.organizacionId, organization.id)];
-      // Usuarios con asignaciones explícitas solo ven sus sucursales.
-      if (access.branchIds !== null) {
-        conditions.push(inArray(sucursales.id, [...access.branchIds]));
-      }
-      branches = await db
-        .select({
-          id: sucursales.id,
-          organizacionId: sucursales.organizacionId,
-          nombre: sucursales.nombre,
-          clave: sucursales.clave,
-          activo: sucursales.activo,
-          zonaHoraria: sucursales.zonaHoraria,
-          capacidadSinAsignar: sucursales.capacidadSinAsignar,
-          reservasOnline: sucursales.reservasOnline,
-          reservasAutoConfirmar: sucursales.reservasAutoConfirmar,
-          reservasCancelacionHoras: sucursales.reservasCancelacionHoras,
-          reservasAnticipacionMinutos: sucursales.reservasAnticipacionMinutos,
-          reservasHorizonteDias: sucursales.reservasHorizonteDias,
-        })
-        .from(sucursales)
-        .where(and(...conditions))
-        .orderBy(asc(sucursales.nombre));
-    }
-  }
-
-  // Sucursal efectiva: `?sucursalId` válida → cookie preferida válida →
-  // primera del alcance. "Válida" = presente en `branches`, que ya están
-  // acotadas al alcance del usuario (la cookie nunca se confía sola).
-  const requestedSucursalId = firstParam(params.sucursalId);
-  let branch: AdminBranch | null =
-    (requestedSucursalId
-      ? branches.find((item) => item.id === requestedSucursalId)
-      : undefined) ?? null;
-  if (!branch && branches.length > 0) {
-    const preferidaId = await leerSucursalCookie(organization.id);
-    branch =
-      (preferidaId
-        ? branches.find((item) => item.id === preferidaId)
-        : undefined) ??
-      branches[0] ??
-      null;
-  }
-
-  let effectiveSucursalId = branch?.id;
-  if (!effectiveSucursalId && !(options.loadBranches ?? true)) {
-    const preferidaId = await leerSucursalCookie(organization.id);
-    const candidateId = requestedSucursalId ?? preferidaId;
-    if (candidateId && (access.esPlataforma || access.sucursalesActivas.some((s) => s.id === candidateId))) {
-      effectiveSucursalId = candidateId;
-    } else {
-      effectiveSucursalId = access.sucursalesActivas[0]?.id;
-    }
-  }
-
-  return {
-    user,
-    organizations,
-    organization,
-    organizationId: organization.id,
-    branches,
-    branch,
-    sucursalId: effectiveSucursalId,
-    access,
-    timeZone: resolveTimeZone(branch?.zonaHoraria, organization.zonaHoraria),
-    currency: organization.moneda || "MXN",
-  };
+  return getAdminContextMemo(
+    requestedOrganizationId,
+    requestedSucursalId,
+    loadBranches,
+    includeInactiveBranches,
+  );
 }

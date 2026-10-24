@@ -50,8 +50,8 @@ export function MovimientoForm({
       />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field>
-          <FieldLabel required>Tipo de movimiento</FieldLabel>
-          <Select defaultValue="entrada" invalid={Boolean(fieldError(state, "tipo"))} name="tipo" required>
+          <FieldLabel htmlFor="movimiento-tipo" required>Tipo de movimiento</FieldLabel>
+          <Select className="min-h-11" defaultValue="entrada" id="movimiento-tipo" invalid={Boolean(fieldError(state, "tipo"))} name="tipo" required>
             <option value="entrada">Entrada</option>
             <option value="salida">Salida</option>
             <option value="ajuste">Ajuste por conteo físico</option>
@@ -59,8 +59,10 @@ export function MovimientoForm({
           <FieldError error={fieldError(state, "tipo")} />
         </Field>
         <Field>
-          <FieldLabel required>Cantidad</FieldLabel>
+          <FieldLabel htmlFor="movimiento-cantidad" required>Cantidad</FieldLabel>
           <Input
+            className="min-h-11"
+            id="movimiento-cantidad"
             invalid={Boolean(fieldError(state, "cantidad"))}
             min="0"
             name="cantidad"
@@ -75,8 +77,9 @@ export function MovimientoForm({
         </Field>
       </div>
       <Field>
-        <FieldLabel>Notas</FieldLabel>
+        <FieldLabel htmlFor="movimiento-notas">Notas</FieldLabel>
         <Textarea
+          id="movimiento-notas"
           invalid={Boolean(fieldError(state, "notas"))}
           name="notas"
           placeholder="Compra a proveedor, merma, conteo físico…"
@@ -85,7 +88,7 @@ export function MovimientoForm({
         <FieldDescription>Obligatorias para salidas y ajustes.</FieldDescription>
       </Field>
       <ActionFeedback state={state} />
-      <Button className="w-full rounded-xl" data-action-clave="1" size="lg" data-action-id="inventario.movimiento.registrar" disabled={pending || !sucursalId || productos.length === 0} type="submit">
+      <Button className="w-full rounded-xl min-h-11" data-action-clave="1" size="lg" data-action-id="inventario.movimiento.registrar" disabled={pending || !sucursalId || productos.length === 0} type="submit">
         {pending ? "Registrando…" : "Registrar movimiento"}
       </Button>
     </form>

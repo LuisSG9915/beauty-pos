@@ -6,6 +6,37 @@ import { getDatabase } from "@/db/client";
 import { catPermisos, catRoles, relRolesPermisos } from "@/db/schema/access";
 import { organizaciones } from "@/db/schema/core";
 import { defaultPermissions, defaultRoles } from "@/lib/auth/defaults";
+import { RUTAS_PUBLICAS_ACCESS } from "@/lib/auth/access";
+
+/**
+ * Definición declarativa de la aplicación y políticas de Cloudflare Access (Zero Trust).
+ * Protege exclusivamente melena.app/admin* y crea un bypass explícito (precedencia 1)
+ * para todas las rutas públicas.
+ */
+export const cloudflareAccessConfig = {
+  application: {
+    domain: "melena.app/admin*",
+    name: "Melena Admin",
+    type: "self_hosted",
+    sessionDuration: "24h",
+  },
+  policies: [
+    {
+      name: "Bypass Rutas Públicas",
+      precedence: 1,
+      decision: "bypass" as const,
+      include: [{ everyone: {} }],
+      paths: [...RUTAS_PUBLICAS_ACCESS],
+    },
+    {
+      name: "Acceso Exclusivo Administradores",
+      precedence: 2,
+      decision: "allow" as const,
+      include: [{ email_domain: { domain: "melena.app" } }],
+      paths: ["/admin", "/admin/*"],
+    },
+  ],
+};
 
 async function main() {
   const db = getDatabase();

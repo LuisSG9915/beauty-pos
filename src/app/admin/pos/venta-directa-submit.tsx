@@ -14,7 +14,8 @@ export function VentaDirectaSubmit({ disabled }: { disabled: boolean }) {
     <>
       <input type="hidden" name="idempotencyKey" value={idempotencyKey} />
       <Button
-        className="rounded-xl font-semibold"
+        aria-busy={pending}
+        className="w-full min-h-11 rounded-xl font-semibold"
         data-action-clave="1"
         data-action-id="pos.venta.abrir"
         disabled={disabled || pending}

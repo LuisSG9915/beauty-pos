@@ -17,7 +17,9 @@ export const dynamic = "force-dynamic";
  * resto). El shell es client component y conserva el estado entre rutas.
  */
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
-  const context = await getAdminContext({});
+  // getAdminContext() está deduplicado por request con React.cache() y cacheado
+  // en KV con TTL 60 s; layout y page comparten la misma promesa en vuelo.
+  const context = await getAdminContext();
   const { user, organizations } = context;
 
   // Solo la suscripción por organización alimenta el shell (badges de plan y

@@ -123,3 +123,68 @@ export async function requirePlatformAdmin() {
 
   return result;
 }
+
+export const RUTAS_PUBLICAS_PREFIJOS = [
+  "/precios",
+  "/registro",
+  "/reservar",
+  "/mi-cita",
+  "/invitacion",
+  "/privacidad",
+  "/terminos",
+  "/soporte",
+  "/login",
+  "/recuperar",
+  "/restablecer",
+  "/offline",
+  "/api/health",
+  "/api/auth",
+  "/_next",
+] as const;
+
+export const RUTAS_PUBLICAS_EXACTAS = [
+  "/",
+  "/favicon.ico",
+  "/manifest.webmanifest",
+  "/sw.js",
+  "/robots.txt",
+  "/icon.png",
+  "/icon.svg",
+  "/apple-icon.png",
+  "/og.png",
+] as const;
+
+export const RUTAS_PUBLICAS_ACCESS = [
+  ...RUTAS_PUBLICAS_EXACTAS,
+  ...RUTAS_PUBLICAS_PREFIJOS,
+] as const;
+
+/**
+ * Determina si una ruta es pública y debe omitir cualquier verificación
+ * o redirección de Cloudflare Access (Zero Trust).
+ */
+export function esRutaPublicaAccess(pathname: string): boolean {
+  if ((RUTAS_PUBLICAS_EXACTAS as readonly string[]).includes(pathname)) {
+    return true;
+  }
+  if (pathname.startsWith("/icon") || pathname.startsWith("/apple-icon")) {
+    return true;
+  }
+  for (const prefijo of RUTAS_PUBLICAS_PREFIJOS) {
+    if (pathname === prefijo || pathname.startsWith(`${prefijo}/`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Validador de Access que retorna acceso permitido inmediatamente si la ruta es pública.
+ */
+export function validarAccesoRuta(pathname: string, hasAssertion = false): boolean {
+  if (esRutaPublicaAccess(pathname)) {
+    return true;
+  }
+  return hasAssertion;
+}
+

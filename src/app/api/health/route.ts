@@ -13,8 +13,14 @@ export async function GET() {
   try {
     const db = getDatabase();
     await db.execute(sql`select 1`);
-    return NextResponse.json({ status: "ok" });
+    return NextResponse.json(
+      { ok: true, status: "healthy" },
+      { status: 200, headers: { "Cache-Control": "no-store" } },
+    );
   } catch {
-    return NextResponse.json({ status: "error" }, { status: 503 });
+    return NextResponse.json(
+      { ok: false, status: "error" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }

@@ -157,8 +157,8 @@ function OrganizationSelector({
         aria-label="Negocio activo"
         className={
           variant === "sidebar"
-            ? "h-10 w-full min-w-0 rounded-xl border border-input bg-card px-2.5 text-op-xs font-medium text-foreground"
-            : "h-10 min-w-0 max-w-44 rounded-xl border border-input bg-card px-2.5 text-op-xs font-medium text-foreground sm:max-w-56"
+            ? "h-11 min-h-11 w-full min-w-0 rounded-xl border border-input bg-card px-2.5 text-op-xs font-medium text-foreground"
+            : "h-11 min-h-11 min-w-0 max-w-44 rounded-xl border border-input bg-card px-2.5 text-op-xs font-medium text-foreground sm:max-w-56"
         }
         id={selectId}
         onChange={(event) => {
@@ -264,8 +264,8 @@ function BranchSelector({
           aria-label="Sucursal activa"
           className={
             variant === "sidebar"
-              ? "h-10 w-full min-w-0 rounded-xl border border-input bg-card px-2.5 text-op-xs font-medium text-foreground"
-              : "h-10 min-w-0 max-w-40 rounded-xl border border-input bg-card px-2.5 text-op-xs font-medium text-foreground"
+              ? "h-11 min-h-11 w-full min-w-0 rounded-xl border border-input bg-card px-2.5 text-op-xs font-medium text-foreground"
+              : "h-11 min-h-11 min-w-0 max-w-40 rounded-xl border border-input bg-card px-2.5 text-op-xs font-medium text-foreground"
           }
           data-action-id="shell.sucursal.cambiar"
           defaultValue={currentId}
@@ -560,7 +560,8 @@ function NavigationActivity() {
 function HomeLink({ organizationId, sucursalId }: { organizationId?: string; sucursalId?: string }) {
   return (
     <Link
-      className="inline-flex rounded-lg outline-offset-4"
+      aria-label="Ir al inicio del panel"
+      className="inline-flex min-h-11 items-center rounded-lg outline-offset-4"
       href={buildAdminHref("", { organizationId, sucursalId })}
       prefetch={false}
     >
@@ -660,7 +661,7 @@ export function AdminShell({
           <div className="space-y-2.5 px-4 pb-4">
             <Suspense
               fallback={
-                <span className="block h-10 animate-pulse rounded-xl bg-muted" />
+                <span className="block h-11 min-h-11 animate-pulse rounded-xl bg-muted" />
               }
             >
               <OrganizationSelector organizations={organizations} variant="sidebar" />
@@ -700,7 +701,7 @@ export function AdminShell({
         {/* Columna de contenido */}
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Header móvil: marca + organización */}
-          <header className="sticky top-0 z-40 border-b border-sidebar-border bg-card/95 backdrop-blur lg:hidden">
+          <header className="sticky top-0 z-40 max-w-full overflow-x-hidden border-b border-sidebar-border bg-card/95 backdrop-blur lg:hidden">
             <div className="flex items-center gap-3 px-4 py-3">
               <Suspense fallback={<BrandWordmark markSize={32} />}>
                 <SidebarHome
@@ -711,7 +712,7 @@ export function AdminShell({
               <div className="ml-auto flex min-w-0 items-center gap-3">
                 <Suspense
                   fallback={
-                    <span className="h-10 w-36 animate-pulse rounded-xl bg-muted" />
+                    <span className="h-11 min-h-11 w-36 animate-pulse rounded-xl bg-muted" />
                   }
                 >
                   <OrganizationSelector organizations={organizations} />
@@ -727,12 +728,10 @@ export function AdminShell({
             </Suspense>
           </header>
 
-          {/* overflow-x-clip: red de seguridad — ningún contenido del main
-              puede empujar la página más allá del ancho del teléfono. `clip`
-              no crea contexto de scroll, así que los sticky internos siguen
-              funcionando. */}
+          {/* Red de seguridad — ningún contenido del main puede empujar la página
+              más allá del ancho del teléfono (390 px). */}
           <main
-            className="mx-auto w-full max-w-[1400px] flex-1 overflow-x-clip px-2.5 pb-24 pt-2 sm:px-6 sm:pt-6 lg:px-8 lg:pb-8"
+            className="mx-auto w-full max-w-[1400px] min-w-0 max-w-full flex-1 overflow-x-hidden px-2.5 pb-24 pt-2 sm:px-6 sm:pt-6 lg:px-8 lg:pb-8"
             id="contenido-admin"
           >
             {billingByOrg ? (

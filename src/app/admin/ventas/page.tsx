@@ -270,29 +270,29 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
         title="Historial de ventas"
       />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm" method="get">
+      <form className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm w-full min-w-0" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <input name="sucursalId" type="hidden" value={sucursalId} />
         <Field className="w-full sm:w-40">
-          <FieldLabel>Desde</FieldLabel>
-          <Input defaultValue={desde} name="desde" type="date" />
+          <FieldLabel htmlFor="filtro-ventas-desde">Desde</FieldLabel>
+          <Input className="min-h-11" defaultValue={desde} id="filtro-ventas-desde" name="desde" type="date" />
         </Field>
         <Field className="w-full sm:w-40">
-          <FieldLabel>Hasta</FieldLabel>
-          <Input defaultValue={hasta} name="hasta" type="date" />
+          <FieldLabel htmlFor="filtro-ventas-hasta">Hasta</FieldLabel>
+          <Input className="min-h-11" defaultValue={hasta} id="filtro-ventas-hasta" name="hasta" type="date" />
         </Field>
         <Field className="w-full sm:w-44">
-          <FieldLabel>Estado</FieldLabel>
-          <Select defaultValue={estado} name="estado">
+          <FieldLabel htmlFor="filtro-ventas-estado">Estado</FieldLabel>
+          <Select className="min-h-11" defaultValue={estado} id="filtro-ventas-estado" name="estado">
             <option value="">Todos</option>
             {ESTADOS.map((value) => <option key={value} value={value}>{ESTADO_LABEL[value]}</option>)}
           </Select>
         </Field>
         <Field className="w-full sm:w-auto sm:min-w-56 sm:flex-1">
-          <FieldLabel>Buscar cliente</FieldLabel>
-          <Input defaultValue={q} name="q" placeholder="Nombre del cliente" />
+          <FieldLabel htmlFor="filtro-ventas-buscar">Buscar cliente</FieldLabel>
+          <Input className="min-h-11" defaultValue={q} id="filtro-ventas-buscar" name="q" placeholder="Nombre del cliente" />
         </Field>
-        <Button className="rounded-xl" type="submit">Filtrar</Button>
+        <Button className="min-h-11 rounded-xl w-full sm:w-auto" type="submit">Filtrar</Button>
       </form>
 
       {pageRows.length === 0 ? (
@@ -307,7 +307,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
                 <RegistroCard
                   acciones={
                     <Link
-                      className="inline-flex min-h-9 items-center rounded-lg border border-border px-3 text-op-xs font-medium text-primary hover:bg-muted/60"
+                      className="inline-flex min-h-11 items-center rounded-lg border border-border px-3 text-op-xs font-medium text-primary hover:bg-muted/60"
                       data-action-id="ventas.ticket.abrir"
                       href={ticketHref(venta.id)}
                     >
@@ -322,7 +322,14 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
                     { label: "Total", value: formatCurrency(Number(venta.total) + Number(venta.propina), { currency }) },
                   ]}
                   key={venta.id}
-                  titulo={cliente}
+                  titulo={
+                    <Link
+                      className="inline-flex min-h-11 items-center hover:text-primary hover:underline font-semibold"
+                      href={ticketHref(venta.id)}
+                    >
+                      {cliente}
+                    </Link>
+                  }
                 />
               );
             })}
@@ -338,11 +345,29 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
         </VistaAdaptativa>
       )}
 
-      <div className="flex items-center justify-between text-sm">
+      <div className="flex items-center justify-between gap-3 text-sm">
         <span className="text-muted-foreground">Página {page}</span>
         <div className="flex gap-2">
-          {page > 1 ? <Button nativeButton={false} render={<Link href={pageHref(page - 1)} />} variant="outline">← Anterior</Button> : null}
-          {hasMore ? <Button nativeButton={false} render={<Link href={pageHref(page + 1)} />} variant="outline">Siguiente →</Button> : null}
+          {page > 1 ? (
+            <Button
+              className="min-h-11"
+              nativeButton={false}
+              render={<Link href={pageHref(page - 1)} />}
+              variant="outline"
+            >
+              ← Anterior
+            </Button>
+          ) : null}
+          {hasMore ? (
+            <Button
+              className="min-h-11"
+              nativeButton={false}
+              render={<Link href={pageHref(page + 1)} />}
+              variant="outline"
+            >
+              Siguiente →
+            </Button>
+          ) : null}
         </div>
       </div>
     </div>

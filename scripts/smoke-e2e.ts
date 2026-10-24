@@ -16,9 +16,50 @@ const pages = [
   { name: "servicios", path: "/admin/servicios" },
 ];
 
+const E2E_RESERVA_SLUG = process.env.PERF_RESERVA_SLUG ?? "estetica-prueba-e2e";
+
+const RUTAS_PUBLICAS_SMOKE = [
+  "/",
+  "/precios",
+  "/registro",
+  "/api/health",
+  `/reservar/${E2E_RESERVA_SLUG}`,
+];
+
+async function verificarRutasPublicas() {
+  console.log("\n--- Comprobando rutas públicas (garantía HTTP 200 sin 302 a Access) ---");
+  let fallos = 0;
+
+  for (const path of RUTAS_PUBLICAS_SMOKE) {
+    const url = `${BASE_URL}${path}`;
+    try {
+      const res = await fetch(url, { redirect: "manual" });
+      const location = res.headers.get("location");
+
+      if (res.status !== 200 || location) {
+        console.error(
+          `❌ FALLO ${path} — status: ${res.status}, location: ${location ?? "none"} (esperado 200 sin redirección)`,
+        );
+        fallos += 1;
+      } else {
+        console.log(`✅ OK ${path} — HTTP 200 (sin redirección)`);
+      }
+    } catch (error) {
+      console.error(`❌ ERROR conectando a ${path}:`, error instanceof Error ? error.message : error);
+      fallos += 1;
+    }
+  }
+
+  if (fallos > 0) {
+    throw new Error(`Se detectaron ${fallos} fallos en rutas públicas.`);
+  }
+}
+
 async function main() {
   const { mkdir } = await import("node:fs/promises");
   await mkdir(OUT_DIR, { recursive: true });
+
+  await verificarRutasPublicas();
 
   await withBrowser(async (browser) => {
   const page = await browser.newPage();

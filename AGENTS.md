@@ -1,10 +1,29 @@
 # Notas del proyecto
 
+## Plan maestro y ejecución con agentes (Argon / Antigravity)
+
+- **Fuente de verdad del trabajo:** `readme/README.md` (plan maestro v2). Ahí
+  están el estado real, las prioridades, el presupuesto de rendimiento y el
+  proceso. No se empieza una tarea sin una **misión** en
+  `readme/estados/pendiente/NN-*.md` (formato en `readme/PLANTILLA-PLAN.md`).
+- **Una misión por sesión:** ≤ 2 h, ≤ 8 archivos (sin pruebas), ≤ 200k tokens
+  de contexto. Entre misiones, sesión nueva (`/clear`): la memoria durable es el
+  repo, no el chat. Si el código contradice el "Contexto verificado", se anota
+  `BLOQUEO:` y se detiene.
+- **Entrega a Argon:** `readme/analisis/argon-entrega.md` (investigación,
+  límites de Antigravity y contrato). `AGENTS.md` debe quedar < 24 KB y las
+  reglas agregadas < 20k tokens: el detalle largo va en `readme/`, aquí solo
+  enlaces e invariantes.
+- **Reglas:** `.windsurf/rules/` es la fuente y `.agents/rules/` el espejo que
+  lee Antigravity; se regenera con `pnpm reglas:sync` (no editar el espejo).
+- **Ciclo:** `/plan` → artifact aprobado → pasos pequeños → verificación (§
+  abajo) → reporte de 10 líneas → mover la misión a `hecho/`.
+
 ## Base de datos y despliegue
 
 - `src/db/client.ts` usa el binding `HYPERDRIVE` (instancia `beauty-pos-db`, id `1e6092cc079c4f5c86a5d4bca6ddc7e4`, declarado en `wrangler.jsonc`) y cae a `DATABASE_URL` fuera de Cloudflare. Desplegado como Worker `beauty-pos` con dominio canónico `https://melena.app` (el hostname `*.workers.dev` queda como ruta de rollback).
 - Deploy: `pnpm run deploy` (ojo: `pnpm deploy` a secas es el comando propio de pnpm y falla). `opennextjs-cloudflare deploy` exige `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` apuntando a Postgres local — exportarla desde `DATABASE_URL` de `.env` antes de desplegar; el Worker desplegado sigue usando el binding Hyperdrive real.
-- Deploy en Windows: `patches/@opennextjs__cloudflare@1.20.6.patch` (registrado en `patchedDependencies` de `pnpm-workspace.yaml`) arregla dos cosas: (1) esbuild rompe con `cloudflare:sockets` y `sharp` al empaquetar; (2) `getEnvFromPlatformProxy` aborta porque el binding `AI` abre una sesión remota a `*.workers.dev`, que está detrás de Cloudflare Access — el parche la envuelve en try/catch. Al actualizar `@opennextjs/cloudflare` hay que regenerar el parche (o desplegar desde WSL/Linux/CI). Detalle en `readme/estados/en-progreso/13-deploy-windows-y-publicacion.md`.
+- Deploy en Windows: `patches/@opennextjs__cloudflare@1.20.6.patch` (registrado en `patchedDependencies` de `pnpm-workspace.yaml`) arregla dos cosas: (1) esbuild rompe con `cloudflare:sockets` y `sharp` al empaquetar; (2) `getEnvFromPlatformProxy` aborta porque el binding `AI` abre una sesión remota a `*.workers.dev`, que está detrás de Cloudflare Access — el parche la envuelve en try/catch. Al actualizar `@opennextjs/cloudflare` hay que regenerar el parche (o desplegar desde WSL/Linux/CI). Detalle en `readme/estados/hecho/13-deploy-windows-y-publicacion.md`.
 - `pnpm deploy` (opennextjs-cloudflare) evalúa bindings en local: requiere `CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE` apuntando al `DATABASE_URL` de `.env`, p. ej. `export CLOUDFLARE_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE="$(python3 -c "import re;print(re.search(r'^DATABASE_URL=(.*)$',open('.env').read(),re.M).group(1))")"` antes de `npx opennextjs-cloudflare deploy`.
 - **Regla crítica de Workers**: los sockets de `pg` no sobreviven entre invocaciones — nada que capture una conexión puede vivir en un global. `getDatabase()` crea un pool por request (WeakMap sobre el ExecutionContext, cerrado con `after()`); `createAuth` se cachea por request vía `getRequestScope()`. Cualquier caché nueva que toque la BD debe usar `getRequestScope()` igual.
 - **Placement**: `wrangler.jsonc` fija `placement.region = "aws:us-east-2"` para correr el Worker junto a CockroachDB (cada RT edge→origen cuesta ~80–100 ms). La sesión viaja en cookie firmada (`session.cookieCache`, 5 min, en `src/lib/auth/server.ts`) — `getSession` no toca la BD; la revocación de sesión tarda hasta 5 min en propagarse.
@@ -32,7 +51,7 @@ Convenciones de scripts: helpers compartidos en `scripts/lib/` (`browser.ts` vie
 - `/admin` arranca en claro por defecto (`src/lib/theme-preference.ts`); tipografía mínima `text-op-xs` (13px); tokens `--cita-*` y pares `bg-*-soft text-*` en `globals.css`.
 - **Excepción de tipografía**: `src/app/admin/pos/printable-ticket.tsx` (ticket térmico 80 mm, solo visible al imprimir) conserva `text-[10px]/[11px]` por el formato físico; el resto de la app no baja de `text-op-xs`.
 - **Listados adaptativos (no duplicar layouts)**: cada página con tarjetas móviles + tabla de escritorio envuelve AMBOS bloques en `<VistaAdaptativa>` (`src/components/admin/vista-adaptativa.tsx`, orden `[móvil, escritorio]`). El servidor emite solo el layout que el usuario verá según la cookie `melena_viewport` (`src/lib/viewport-preference.ts` + bootstrap inline en `src/app/admin/layout.tsx`); sin cookie (primera visita) se emiten ambos y el CSS decide. Ahorro medido: 23–35 % del HTML en páginas con datos (6–14 ms y ~6–9 KB por fila duplicada). **No volver a renderizar los dos layouts a la vez**: duplica el HTML y el render.
-- Reglas de desarrollo para Windsurf/Cascade en `.windsurf/rules/` (arquitectura, UI de salón, datos, verificación) y workflows en `.windsurf/workflows/` (`/verificar`, `/deploy`, `/nueva-pantalla`).
+- Reglas de desarrollo para Windsurf/Cascade en `.windsurf/rules/` (arquitectura, UI de salón, datos, verificación) y workflows en `.windsurf/workflows/` (`/verificar`, `/deploy`, `/nueva-pantalla`). Antigravity lee el espejo `.agents/rules/` (regenerar con `pnpm reglas:sync`).
 
 ## Telemetría e incidentes
 

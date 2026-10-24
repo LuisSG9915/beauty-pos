@@ -71,7 +71,7 @@ export function AdminPageHeader({
 }: AdminPageHeaderProps) {
   return (
     <header className={cn("flex flex-col gap-2.5 sm:gap-4", className)} {...props}>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
         <div className="min-w-0">
           {breadcrumbs && breadcrumbs.length > 0 ? (
             <AdminBreadcrumbs className="mb-1.5 sm:mb-2" items={breadcrumbs} />
@@ -86,7 +86,7 @@ export function AdminPageHeader({
           ) : null}
         </div>
         {actions ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
             {actions}
           </div>
         ) : null}

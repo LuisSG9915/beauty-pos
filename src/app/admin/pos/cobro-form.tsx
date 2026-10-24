@@ -158,14 +158,14 @@ export function CobroForm({
 
   const chipPagoClass = (seleccionado: boolean) =>
     cn(
-      "min-h-10 rounded-xl border px-3.5 text-op-xs font-medium transition-all duration-150 active:scale-[0.98] cursor-pointer select-none",
+      "min-h-11 rounded-xl border px-3.5 text-op-xs font-medium transition-all duration-150 active:scale-[0.98] cursor-pointer select-none",
       seleccionado
         ? "border-primary bg-accent/80 text-primary font-semibold ring-2 ring-primary/20 shadow-xs"
         : "border-border bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground",
     );
 
   const inputClass =
-    "h-10 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-all duration-150 focus:border-primary focus:ring-3 focus:ring-primary/20 hover:border-border";
+    "h-11 min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-all duration-150 focus:border-primary focus:ring-3 focus:ring-primary/20 hover:border-border";
 
   const quickCashOptions = useMemo(() => {
     if (aCubrir <= 0) return [];
@@ -217,7 +217,7 @@ export function CobroForm({
             <button
               aria-pressed={propinaOpcion === opcion.value}
               className={cn(
-                "min-h-9 rounded-xl border px-3 text-op-xs font-medium transition-all duration-150 active:scale-[0.98] cursor-pointer",
+                "min-h-11 rounded-xl border px-3 text-op-xs font-medium transition-all duration-150 active:scale-[0.98] cursor-pointer",
                 propinaOpcion === opcion.value
                   ? "border-primary bg-accent/70 text-primary font-semibold ring-2 ring-primary/20 shadow-xs"
                   : "border-border bg-card text-muted-foreground hover:border-accent-foreground/30 hover:text-primary",
@@ -267,7 +267,8 @@ export function CobroForm({
           </p>
           {pagos.length < MAX_PAGOS && mediosPago.length > 0 ? (
             <button
-              className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2 text-op-xs font-medium text-primary transition-colors hover:bg-accent/70 cursor-pointer active:scale-[0.98]"
+              aria-label="Agregar otro pago"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3 text-op-xs font-medium text-primary transition-colors hover:bg-accent/70 cursor-pointer active:scale-[0.98]"
               data-action-id="pos.cobro.agregar_pago"
               onClick={agregarPago}
               type="button"
@@ -319,7 +320,7 @@ export function CobroForm({
                   {quickCashOptions.map((opt) => (
                     <button
                       className={cn(
-                        "inline-flex min-h-9 items-center rounded-lg border px-2.5 text-op-xs font-semibold tabular-nums transition-all duration-150 active:scale-[0.98] cursor-pointer select-none any-pointer-coarse:min-h-10",
+                        "inline-flex min-h-11 items-center rounded-lg border px-2.5 text-op-xs font-semibold tabular-nums transition-all duration-150 active:scale-[0.98] cursor-pointer select-none",
                         Math.abs((Number(pago.monto) || 0) - opt) < 0.005
                           ? "border-primary bg-primary text-primary-foreground shadow-xs"
                           : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground",
@@ -335,10 +336,10 @@ export function CobroForm({
                 </div>
               ) : null}
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] items-center gap-2 min-w-0">
                 <input
                   aria-label={`Monto del pago ${index + 1}`}
-                  className={cn(inputClass, "min-w-0 flex-1 basis-32 tabular-nums")}
+                  className={cn(inputClass, "min-w-0 flex-1 tabular-nums")}
                   inputMode="decimal"
                   min="0"
                   onChange={(event) => updatePago(index, { monto: event.target.value })}
@@ -348,7 +349,8 @@ export function CobroForm({
                   value={pago.monto}
                 />
                 <button
-                  className="min-h-10 rounded-xl border border-border bg-card px-3 text-op-xs font-medium text-primary transition-all hover:bg-accent/70 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                  aria-label={`Resto a cubrir: ${formatCurrency(resto)}`}
+                  className="min-h-11 h-11 rounded-xl border border-border bg-card px-3 text-op-xs font-medium text-primary transition-all hover:bg-accent/70 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   disabled={resto <= 0}
                   onClick={() => updatePago(index, { monto: resto.toFixed(2) })}
                   type="button"
@@ -358,7 +360,7 @@ export function CobroForm({
                 {pagos.length > 1 ? (
                   <button
                     aria-label={`Quitar pago ${index + 1}`}
-                    className="flex size-10 items-center justify-center rounded-xl text-destructive transition-all hover:bg-destructive-soft active:scale-[0.98] cursor-pointer"
+                    className="flex size-11 min-h-11 min-w-11 items-center justify-center rounded-xl text-destructive transition-all hover:bg-destructive-soft active:scale-[0.98] cursor-pointer"
                     onClick={() => quitarPago(index)}
                     type="button"
                   >

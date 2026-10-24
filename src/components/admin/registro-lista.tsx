@@ -14,7 +14,7 @@ export function RegistroList({
   children: ReactNode;
   className?: string;
 }) {
-  return <div className={cn("space-y-3 md:hidden", className)}>{children}</div>;
+  return <div className={cn("w-full min-w-0 space-y-3 md:hidden", className)}>{children}</div>;
 }
 
 export type RegistroCampo = {
@@ -46,15 +46,15 @@ export function RegistroCard({
   return (
     <article
       className={cn(
-        "anim-entrada rounded-xl border border-border bg-card p-4 shadow-sm",
+        "anim-entrada min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm",
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h3 className="text-sm font-semibold leading-5 text-foreground">{titulo}</h3>
+      <div className="flex items-start justify-between gap-3 min-w-0">
+        <div className="min-w-0 flex-1">
+          <h3 className="truncate text-sm font-semibold leading-5 text-foreground">{titulo}</h3>
           {subtitulo ? (
-            <p className="mt-0.5 text-op-xs leading-5 text-muted-foreground">{subtitulo}</p>
+            <p className="mt-0.5 truncate text-op-xs leading-5 text-muted-foreground">{subtitulo}</p>
           ) : null}
         </div>
         {badge ? <div className="shrink-0">{badge}</div> : null}
@@ -63,17 +63,17 @@ export function RegistroCard({
         <dl className="mt-3 space-y-1.5">
           {campos.map((campo, index) => (
             <div
-              className="flex items-baseline justify-between gap-3 text-sm"
+              className="flex items-baseline justify-between gap-3 text-sm min-w-0"
               key={`${campo.label}-${index}`}
             >
               <dt className="shrink-0 text-op-xs text-muted-foreground">{campo.label}</dt>
-              <dd className="min-w-0 text-right font-medium text-foreground">{campo.value}</dd>
+              <dd className="min-w-0 break-words text-right font-medium text-foreground">{campo.value}</dd>
             </div>
           ))}
         </dl>
       ) : null}
       {acciones ? (
-        <div className="mt-3 flex flex-wrap gap-2 border-t border-border pt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3 min-w-0">
           {acciones}
         </div>
       ) : null}

@@ -63,15 +63,15 @@ function Tabla({
   }
   return (
     <VistaAdaptativa>
-      <div className="space-y-3 md:hidden">
+      <div className="w-full min-w-0 space-y-3 md:hidden">
         {filas.map((celdas, i) => (
-          <div className="anim-entrada rounded-xl border border-border px-4 py-3" key={i} style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}>
-            <p className="text-sm font-semibold text-foreground">{celdas[0]}</p>
+          <div className="anim-entrada min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-card px-4 py-3 shadow-sm" key={i} style={{ animationDelay: `${Math.min(i, 8) * 30}ms` }}>
+            <p className="truncate text-sm font-semibold text-foreground">{celdas[0]}</p>
             <dl className="mt-1.5 space-y-1">
               {encabezados.slice(1).map((encabezado, j) => (
-                <div className="flex items-baseline justify-between gap-3 text-sm" key={encabezado}>
+                <div className="flex items-baseline justify-between gap-3 text-sm min-w-0" key={encabezado}>
                   <dt className="shrink-0 text-op-xs text-muted-foreground">{encabezado}</dt>
-                  <dd className="min-w-0 text-right font-medium text-foreground">{celdas[j + 1]}</dd>
+                  <dd className="min-w-0 break-words text-right font-medium text-foreground">{celdas[j + 1]}</dd>
                 </div>
               ))}
             </dl>
@@ -108,10 +108,10 @@ function Tabla({
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="anim-entrada rounded-xl border border-border bg-muted/60 px-4 py-3">
-      <p className="text-op-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xl font-semibold tabular-nums text-foreground">{value}</p>
-      {hint ? <p className="mt-0.5 text-op-xs text-muted-foreground">{hint}</p> : null}
+    <div className="anim-entrada min-w-0 overflow-hidden rounded-xl border border-border bg-muted/60 px-4 py-3">
+      <p className="truncate text-op-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-1 truncate text-xl font-semibold tabular-nums text-foreground">{value}</p>
+      {hint ? <p className="mt-0.5 line-clamp-2 text-op-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
@@ -273,12 +273,12 @@ export default async function ReportesPage({ searchParams }: Props) {
         title="Reportes"
       />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm" method="get">
+      <form className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm w-full min-w-0" method="get">
         <input name="organizationId" type="hidden" value={organization.id} />
         {context.branches.length > 1 ? (
-          <Field className="w-56">
-            <FieldLabel>Sucursal</FieldLabel>
-            <Select defaultValue={sucursalParam} name="sucursalId">
+          <Field className="w-full sm:w-56">
+            <FieldLabel htmlFor="reportes-sucursal">Sucursal</FieldLabel>
+            <Select className="min-h-11" defaultValue={sucursalParam} id="reportes-sucursal" name="sucursalId">
               {context.branches.map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.nombre}
@@ -290,18 +290,18 @@ export default async function ReportesPage({ searchParams }: Props) {
         ) : (
           <input name="sucursalId" type="hidden" value={branch.id} />
         )}
-        <Field className="w-40">
-          <FieldLabel>Desde</FieldLabel>
-          <Input defaultValue={desde} name="desde" type="date" />
+        <Field className="w-full sm:w-40">
+          <FieldLabel htmlFor="reportes-desde">Desde</FieldLabel>
+          <Input className="min-h-11" defaultValue={desde} id="reportes-desde" name="desde" type="date" />
         </Field>
-        <Field className="w-40">
-          <FieldLabel>Hasta</FieldLabel>
-          <Input defaultValue={hasta} name="hasta" type="date" />
+        <Field className="w-full sm:w-40">
+          <FieldLabel htmlFor="reportes-hasta">Hasta</FieldLabel>
+          <Input className="min-h-11" defaultValue={hasta} id="reportes-hasta" name="hasta" type="date" />
         </Field>
-        <Button className="rounded-xl" data-action-clave="1" data-action-id="reportes.filtro.aplicar" size="lg" type="submit">Aplicar</Button>
+        <Button className="min-h-11 rounded-xl w-full sm:w-auto" data-action-clave="1" data-action-id="reportes.filtro.aplicar" size="lg" type="submit">Aplicar</Button>
         {puedeExportar ? (
           <a
-            className="inline-flex h-10 items-center rounded-xl border border-border px-4 text-sm font-medium text-muted-foreground transition hover:bg-muted/60"
+            className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border px-4 text-sm font-medium text-muted-foreground transition hover:bg-muted/60 w-full sm:w-auto"
             data-action-id="reportes.exportar_csv"
             href={`/admin/reportes/export?${filtrosExport}`}
           >
@@ -320,7 +320,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             const activo = preset.desde === desde && preset.hasta === hasta;
             return (
               <Link
-                className={`inline-flex min-h-8 items-center rounded-full border px-3 py-1.5 font-medium transition ${
+                className={`inline-flex min-h-11 items-center rounded-full border px-3 py-1.5 font-medium transition ${
                   activo
                     ? "border-primary bg-accent text-accent-foreground"
                     : "border-border text-muted-foreground hover:bg-muted/60"
@@ -401,7 +401,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             <AdminCard
               actions={
                 consolidado ? null : (
-                  <Link className="inline-flex min-h-6 items-center text-sm font-medium text-primary hover:underline" href={`/admin/ventas?${filtrosExport}`}>
+                  <Link className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline" href={`/admin/ventas?${filtrosExport}`}>
                     Ver ventas →
                   </Link>
                 )
@@ -420,7 +420,7 @@ export default async function ReportesPage({ searchParams }: Props) {
           <AdminCard
             actions={
               consolidado ? null : (
-                <Link className="inline-flex min-h-6 items-center text-sm font-medium text-primary hover:underline" href={`/admin/agenda?${filtrosExport}`}>
+                <Link className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline" href={`/admin/agenda?${filtrosExport}`}>
                   Ver agenda →
                 </Link>
               )
@@ -528,7 +528,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             <AdminCard
               actions={
                 consolidado ? null : (
-                  <Link className="inline-flex min-h-6 items-center text-sm font-medium text-primary hover:underline" href={`/admin/ventas?${filtrosExport}`}>
+                  <Link className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline" href={`/admin/ventas?${filtrosExport}`}>
                     Ver historial →
                   </Link>
                 )
@@ -584,7 +584,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             <AdminCard
               actions={
                 consolidado ? null : (
-                  <Link className="inline-flex min-h-6 items-center text-sm font-medium text-primary hover:underline" href={`/admin/comisiones?${filtrosExport}`}>
+                  <Link className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline" href={`/admin/comisiones?${filtrosExport}`}>
                     Ver detalle →
                   </Link>
                 )
@@ -606,7 +606,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             <AdminCard
               actions={
                 consolidado ? null : (
-                  <Link className="inline-flex min-h-6 items-center text-sm font-medium text-primary hover:underline" href={`/admin/gastos?${filtrosExport}`}>
+                  <Link className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline" href={`/admin/gastos?${filtrosExport}`}>
                     Ver detalle →
                   </Link>
                 )

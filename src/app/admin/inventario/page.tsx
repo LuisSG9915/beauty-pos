@@ -230,42 +230,44 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
     }).length;
 
   const stockCards = (rows: typeof catalogoProductos) => (
-    <div className="space-y-3 px-4 pb-4 md:hidden">
+    <div className="w-full min-w-0 space-y-3 px-4 pb-4 md:hidden">
       {rows.map((producto, index) => {
         const stock = stockPorProducto.get(producto.id) ?? 0;
         const minimo = Number(producto.stockMinimo);
         const estado = stockTone(stock, minimo);
         return (
           <article
-            className="anim-entrada rounded-xl border border-border p-4"
+            className="anim-entrada min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm"
             key={producto.id}
             style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h3 className="text-sm font-semibold leading-5 text-foreground">{producto.nombre}</h3>
-                <p className="mt-0.5 text-op-xs leading-5 text-muted-foreground">{producto.sku} · {producto.tipo}</p>
+            <div className="flex items-start justify-between gap-3 min-w-0">
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-sm font-semibold leading-5 text-foreground">{producto.nombre}</h3>
+                <p className="mt-0.5 truncate text-op-xs leading-5 text-muted-foreground">{producto.sku} · {producto.tipo}</p>
               </div>
-              <StatusBadge tone={estado.tone}>{estado.label}</StatusBadge>
+              <div className="shrink-0">
+                <StatusBadge tone={estado.tone}>{estado.label}</StatusBadge>
+              </div>
             </div>
             <dl className="mt-3 space-y-1.5">
-              <div className="flex items-baseline justify-between gap-3 text-sm">
+              <div className="flex items-baseline justify-between gap-3 text-sm min-w-0">
                 <dt className="shrink-0 text-op-xs text-muted-foreground">Stock</dt>
                 <dd className="min-w-0 text-right font-semibold tabular-nums text-foreground">
                   {stock.toFixed(3)}{producto.unidad ? ` ${producto.unidad}` : ""}
                 </dd>
               </div>
-              <div className="flex items-baseline justify-between gap-3 text-sm">
+              <div className="flex items-baseline justify-between gap-3 text-sm min-w-0">
                 <dt className="shrink-0 text-op-xs text-muted-foreground">Valor en stock</dt>
                 <dd className="min-w-0 text-right text-op-xs tabular-nums text-muted-foreground">
                   {formatCurrency(stock * Number(producto.costo), { currency: context.currency })}
                 </dd>
               </div>
-              <div className="flex items-baseline justify-between gap-3 text-sm">
+              <div className="flex items-baseline justify-between gap-3 text-sm min-w-0">
                 <dt className="shrink-0 text-op-xs text-muted-foreground">Mínimo</dt>
                 <dd className="min-w-0 text-right text-op-xs tabular-nums text-muted-foreground">{minimo.toFixed(3)}</dd>
               </div>
-              <div className="flex items-baseline justify-between gap-3 text-sm">
+              <div className="flex items-baseline justify-between gap-3 text-sm min-w-0">
                 <dt className="shrink-0 text-op-xs text-muted-foreground">Ubicación</dt>
                 <dd className="min-w-0 text-right text-op-xs text-muted-foreground">
                   {(() => {
@@ -276,7 +278,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
                   })()}
                   {" · "}
                   <Link
-                    className="inline-flex min-h-8 items-center font-medium text-primary hover:underline"
+                    className="inline-flex min-h-11 items-center font-medium text-primary hover:underline"
                     data-action-id="inventario.producto.ver_en_mapa"
                     href={hrefMapa(producto.id)}
                   >
@@ -399,6 +401,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
         actions={
           <>
             <Button
+              className="min-h-11"
               data-action-id="inventario.reabastecer.abrir"
               nativeButton={false}
               render={<Link href={buildAdminHref("/inventario/reabastecer", { organizationId, sucursalId: branch.id })} />}
@@ -407,6 +410,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
               Qué comprar
             </Button>
             <Button
+              className="min-h-11"
               data-action-clave="1"
               data-action-id="inventario.movimiento.abrir_formulario"
               nativeButton={false}
@@ -441,7 +445,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
                     return (
                       <Link
                         aria-current={activa ? "true" : undefined}
-                        className={`inline-flex min-h-8 items-center rounded-full border px-3 py-1.5 text-op-xs font-medium transition ${
+                        className={`inline-flex min-h-11 items-center rounded-full border px-3 py-1.5 text-op-xs font-medium transition ${
                           activa
                             ? "border-primary bg-accent text-accent-foreground"
                             : "border-border text-muted-foreground hover:bg-muted/60"
@@ -623,85 +627,89 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
 
           <AdminSection title="Movimientos recientes">
             <AdminCard className="overflow-hidden p-0 sm:p-0">
-              <div className="space-y-3 p-4 md:hidden">
-                {movimientos.map((movimiento, index) => {
-                  const cantidad = Number(movimiento.cantidad);
-                  return (
-                    <article
-                      className="anim-entrada rounded-xl border border-border p-4"
-                      key={movimiento.id}
-                      style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <h3 className="text-sm font-semibold leading-5 text-foreground">{movimiento.productoNombre}</h3>
-                          <p className="mt-0.5 text-op-xs leading-5 text-muted-foreground">
-                            {movimiento.sku} · {formatDateTime(movimiento.createdAt, { timeZone })}
-                          </p>
-                        </div>
-                        <StatusBadge tone={cantidad >= 0 ? "success" : "destructive"}>{TIPO_LABEL[movimiento.tipo] ?? movimiento.tipo}</StatusBadge>
-                      </div>
-                      <dl className="mt-3 space-y-1.5">
-                        <div className="flex items-baseline justify-between gap-3 text-sm">
-                          <dt className="shrink-0 text-op-xs text-muted-foreground">Cantidad</dt>
-                          <dd className="min-w-0 text-right font-medium tabular-nums text-foreground">
-                            {cantidad > 0 ? "+" : ""}{cantidad.toFixed(3)}
-                          </dd>
-                        </div>
-                        <div className="flex items-baseline justify-between gap-3 text-sm">
-                          <dt className="shrink-0 text-op-xs text-muted-foreground">Stock final</dt>
-                          <dd className="min-w-0 text-right text-op-xs tabular-nums text-muted-foreground">{Number(movimiento.stockResultante).toFixed(3)}</dd>
-                        </div>
-                        {movimiento.notas ? (
-                          <div className="flex items-baseline justify-between gap-3 text-sm">
-                            <dt className="shrink-0 text-op-xs text-muted-foreground">Notas</dt>
-                            <dd className="min-w-0 truncate text-right text-op-xs text-muted-foreground" title={movimiento.notas}>{movimiento.notas}</dd>
+              <VistaAdaptativa>
+                <div className="w-full min-w-0 space-y-3 p-4 md:hidden">
+                  {movimientos.map((movimiento, index) => {
+                    const cantidad = Number(movimiento.cantidad);
+                    return (
+                      <article
+                        className="anim-entrada min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm"
+                        key={movimiento.id}
+                        style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
+                      >
+                        <div className="flex items-start justify-between gap-3 min-w-0">
+                          <div className="min-w-0 flex-1">
+                            <h3 className="truncate text-sm font-semibold leading-5 text-foreground">{movimiento.productoNombre}</h3>
+                            <p className="mt-0.5 truncate text-op-xs leading-5 text-muted-foreground">
+                              {movimiento.sku} · {formatDateTime(movimiento.createdAt, { timeZone })}
+                            </p>
                           </div>
-                        ) : null}
-                      </dl>
-                    </article>
-                  );
-                })}
-                {movimientos.length === 0 ? (
-                  <EmptyState
-                    className="px-4 py-6"
-                    description="Las entradas, salidas y ajustes de esta sucursal aparecerán aquí."
-                    title="Sin movimientos en esta sucursal"
-                  />
-                ) : null}
-              </div>
-              <div className="hidden overflow-x-auto md:block">
-                <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead className="bg-muted/60 text-op-xs uppercase tracking-wide text-muted-foreground">
-                    <tr>
-                      <th className="px-4 py-3 font-medium">Fecha</th>
-                      <th className="px-4 py-3 font-medium">Producto</th>
-                      <th className="px-4 py-3 font-medium">Tipo</th>
-                      <th className="px-4 py-3 text-right font-medium">Cantidad</th>
-                      <th className="px-4 py-3 text-right font-medium">Stock final</th>
-                      <th className="px-4 py-3 font-medium">Notas</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {movimientos.map((movimiento) => {
-                      const cantidad = Number(movimiento.cantidad);
-                      return (
-                        <tr className="hover:bg-muted/60" key={movimiento.id}>
-                          <td className="px-4 py-3 text-op-xs whitespace-nowrap text-muted-foreground">{formatDateTime(movimiento.createdAt, { timeZone })}</td>
-                          <td className="px-4 py-3 text-op-xs">{movimiento.sku} · {movimiento.productoNombre}</td>
-                          <td className="px-4 py-3"><StatusBadge tone={cantidad >= 0 ? "success" : "destructive"}>{TIPO_LABEL[movimiento.tipo] ?? movimiento.tipo}</StatusBadge></td>
-                          <td className="px-4 py-3 text-right text-op-xs tabular-nums">{cantidad > 0 ? "+" : ""}{cantidad.toFixed(3)}</td>
-                          <td className="px-4 py-3 text-right text-op-xs tabular-nums text-muted-foreground">{Number(movimiento.stockResultante).toFixed(3)}</td>
-                          <td className="max-w-44 truncate px-4 py-3 text-op-xs text-muted-foreground" title={movimiento.notas ?? ""}>{movimiento.notas ?? "—"}</td>
-                        </tr>
-                      );
-                    })}
-                    {movimientos.length === 0 ? (
-                      <tr><td className="px-4 py-10 text-center text-sm text-muted-foreground" colSpan={6}>Sin movimientos en esta sucursal.</td></tr>
-                    ) : null}
-                  </tbody>
-                </table>
-              </div>
+                          <div className="shrink-0">
+                            <StatusBadge tone={cantidad >= 0 ? "success" : "destructive"}>{TIPO_LABEL[movimiento.tipo] ?? movimiento.tipo}</StatusBadge>
+                          </div>
+                        </div>
+                        <dl className="mt-3 space-y-1.5">
+                          <div className="flex items-baseline justify-between gap-3 text-sm min-w-0">
+                            <dt className="shrink-0 text-op-xs text-muted-foreground">Cantidad</dt>
+                            <dd className="min-w-0 text-right font-medium tabular-nums text-foreground">
+                              {cantidad > 0 ? "+" : ""}{cantidad.toFixed(3)}
+                            </dd>
+                          </div>
+                          <div className="flex items-baseline justify-between gap-3 text-sm min-w-0">
+                            <dt className="shrink-0 text-op-xs text-muted-foreground">Stock final</dt>
+                            <dd className="min-w-0 text-right text-op-xs tabular-nums text-muted-foreground">{Number(movimiento.stockResultante).toFixed(3)}</dd>
+                          </div>
+                          {movimiento.notas ? (
+                            <div className="flex items-baseline justify-between gap-3 text-sm min-w-0">
+                              <dt className="shrink-0 text-op-xs text-muted-foreground">Notas</dt>
+                              <dd className="min-w-0 truncate text-right text-op-xs text-muted-foreground" title={movimiento.notas}>{movimiento.notas}</dd>
+                            </div>
+                          ) : null}
+                        </dl>
+                      </article>
+                    );
+                  })}
+                  {movimientos.length === 0 ? (
+                    <EmptyState
+                      className="px-4 py-6"
+                      description="Las entradas, salidas y ajustes de esta sucursal aparecerán aquí."
+                      title="Sin movimientos en esta sucursal"
+                    />
+                  ) : null}
+                </div>
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="w-full min-w-[760px] text-left text-sm">
+                    <thead className="bg-muted/60 text-op-xs uppercase tracking-wide text-muted-foreground">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">Fecha</th>
+                        <th className="px-4 py-3 font-medium">Producto</th>
+                        <th className="px-4 py-3 font-medium">Tipo</th>
+                        <th className="px-4 py-3 text-right font-medium">Cantidad</th>
+                        <th className="px-4 py-3 text-right font-medium">Stock final</th>
+                        <th className="px-4 py-3 font-medium">Notas</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {movimientos.map((movimiento) => {
+                        const cantidad = Number(movimiento.cantidad);
+                        return (
+                          <tr className="hover:bg-muted/60" key={movimiento.id}>
+                            <td className="px-4 py-3 text-op-xs whitespace-nowrap text-muted-foreground">{formatDateTime(movimiento.createdAt, { timeZone })}</td>
+                            <td className="px-4 py-3 text-op-xs">{movimiento.sku} · {movimiento.productoNombre}</td>
+                            <td className="px-4 py-3"><StatusBadge tone={cantidad >= 0 ? "success" : "destructive"}>{TIPO_LABEL[movimiento.tipo] ?? movimiento.tipo}</StatusBadge></td>
+                            <td className="px-4 py-3 text-right text-op-xs tabular-nums">{cantidad > 0 ? "+" : ""}{cantidad.toFixed(3)}</td>
+                            <td className="px-4 py-3 text-right text-op-xs tabular-nums text-muted-foreground">{Number(movimiento.stockResultante).toFixed(3)}</td>
+                            <td className="max-w-44 truncate px-4 py-3 text-op-xs text-muted-foreground" title={movimiento.notas ?? ""}>{movimiento.notas ?? "—"}</td>
+                          </tr>
+                        );
+                      })}
+                      {movimientos.length === 0 ? (
+                        <tr><td className="px-4 py-10 text-center text-sm text-muted-foreground" colSpan={6}>Sin movimientos en esta sucursal.</td></tr>
+                      ) : null}
+                    </tbody>
+                  </table>
+                </div>
+              </VistaAdaptativa>
             </AdminCard>
           </AdminSection>
         </div>

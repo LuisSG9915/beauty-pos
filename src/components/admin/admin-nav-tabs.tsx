@@ -50,7 +50,7 @@ export function AdminNavTabs({
     <nav
       aria-label="Sub-navegación de módulo"
       className={cn(
-        "inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-2xl border border-border/80 bg-muted/40 p-1 shadow-2xs backdrop-blur-xs",
+        "inline-flex max-w-full items-center gap-1 overflow-x-auto no-scrollbar rounded-2xl border border-border/80 bg-muted/40 p-1 shadow-2xs backdrop-blur-xs",
         className,
       )}
     >
@@ -64,7 +64,7 @@ export function AdminNavTabs({
           <Link
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "inline-flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-op-xs sm:text-sm font-medium transition-all duration-200 select-none active:scale-[0.97]",
+              "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 py-1.5 text-op-xs sm:text-sm font-medium transition-all duration-200 select-none active:scale-[0.97]",
               isActive
                 ? "bg-card font-semibold text-foreground shadow-xs border border-border/80"
                 : "text-muted-foreground hover:bg-card/40 hover:text-foreground",

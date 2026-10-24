@@ -1,4 +1,8 @@
+import { cache } from "react";
 import { updateTag } from "next/cache";
+
+import { kvInvalidate, kvReadThrough } from "@/lib/kv-cache";
+import { catalogosTicketCached } from "@/modules/pos/ticket";
 
 /**
  * Tag de los catálogos del POS por organización. Los catálogos del ticket
@@ -13,6 +17,33 @@ export function catalogoTag(organizacionId: string): string {
   return `catalogos:${organizacionId}`;
 }
 
-export function revalidateCatalogos(organizacionId: string): void {
-  updateTag(catalogoTag(organizacionId));
+export function catalogoKvKey(organizacionId: string, sucursalId: string): string {
+  return `catalogo:pos:${organizacionId}:${sucursalId}`;
 }
+
+/**
+ * Obtiene el catálogo activo del POS (servicios, productos, medios de pago,
+ * impuestos, promociones y estilistas) cacheado en KV (TTL 300 s) y
+ * deduplicado intra-request con `React.cache()`.
+ */
+export const obtenerCatalogoPosCacheado = cache(
+  async (organizacionId: string, sucursalId: string) => {
+    return kvReadThrough(
+      catalogoKvKey(organizacionId, sucursalId),
+      300,
+      () => catalogosTicketCached(organizacionId, sucursalId),
+    );
+  },
+);
+
+export function revalidateCatalogos(organizacionId: string, sucursalId?: string): void {
+  try {
+    updateTag(catalogoTag(organizacionId));
+  } catch {
+    // updateTag solo es válido en Server Actions
+  }
+  if (sucursalId) {
+    void kvInvalidate(catalogoKvKey(organizacionId, sucursalId));
+  }
+}
+

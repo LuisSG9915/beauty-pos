@@ -166,17 +166,17 @@ function EmitirForm({
 
       <div className="flex flex-wrap gap-3 text-sm">
         {clienteFiscal ? (
-          <label className="flex items-center gap-1.5">
-            <input checked={modo === "cliente"} className="accent-primary" name="receptorModo" onChange={() => setModo("cliente")} type="radio" />
+          <label className="flex min-h-11 items-center gap-2 cursor-pointer">
+            <input checked={modo === "cliente"} className="size-4 accent-primary" name="receptorModo" onChange={() => setModo("cliente")} type="radio" />
             Datos del cliente
           </label>
         ) : null}
-        <label className="flex items-center gap-1.5">
-          <input checked={modo === "publico"} className="accent-primary" name="receptorModo" onChange={() => setModo("publico")} type="radio" />
+        <label className="flex min-h-11 items-center gap-2 cursor-pointer">
+          <input checked={modo === "publico"} className="size-4 accent-primary" name="receptorModo" onChange={() => setModo("publico")} type="radio" />
           Público en general
         </label>
-        <label className="flex items-center gap-1.5">
-          <input checked={modo === "otro"} className="accent-primary" name="receptorModo" onChange={() => setModo("otro")} type="radio" />
+        <label className="flex min-h-11 items-center gap-2 cursor-pointer">
+          <input checked={modo === "otro"} className="size-4 accent-primary" name="receptorModo" onChange={() => setModo("otro")} type="radio" />
           Otro receptor
         </label>
       </div>
@@ -193,18 +193,18 @@ function EmitirForm({
           </p>
         </>
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 min-w-0">
           <Field>
-            <FieldLabel required>RFC</FieldLabel>
-            <Input maxLength={13} name="receptorRfc" placeholder="AAA010101AAA" required />
+            <FieldLabel htmlFor="receptor-rfc" required>RFC</FieldLabel>
+            <Input className="min-h-11" id="receptor-rfc" maxLength={13} name="receptorRfc" placeholder="AAA010101AAA" required />
           </Field>
           <Field>
-            <FieldLabel required>Razón social</FieldLabel>
-            <Input name="receptorNombre" required />
+            <FieldLabel htmlFor="receptor-nombre" required>Razón social</FieldLabel>
+            <Input className="min-h-11" id="receptor-nombre" name="receptorNombre" required />
           </Field>
           <Field>
-            <FieldLabel required>Régimen fiscal</FieldLabel>
-            <Select name="receptorRegimen">
+            <FieldLabel htmlFor="receptor-regimen" required>Régimen fiscal</FieldLabel>
+            <Select className="min-h-11" id="receptor-regimen" name="receptorRegimen">
               {REGIMENES_FISCALES.map((r) => (
                 <option key={r.clave} value={r.clave}>
                   {r.clave} · {r.nombre}
@@ -213,16 +213,16 @@ function EmitirForm({
             </Select>
           </Field>
           <Field>
-            <FieldLabel required>CP fiscal</FieldLabel>
-            <Input inputMode="numeric" maxLength={5} name="receptorCp" required />
+            <FieldLabel htmlFor="receptor-cp" required>CP fiscal</FieldLabel>
+            <Input className="min-h-11" id="receptor-cp" inputMode="numeric" maxLength={5} name="receptorCp" required />
           </Field>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 min-w-0">
         <Field>
-          <FieldLabel required>Uso de CFDI</FieldLabel>
-          <Select defaultValue={receptor?.usoCfdi ?? "S01"} key={receptor?.usoCfdi ?? "S01"} name="usoCfdi">
+          <FieldLabel htmlFor="uso-cfdi" required>Uso de CFDI</FieldLabel>
+          <Select className="min-h-11" defaultValue={receptor?.usoCfdi ?? "S01"} id="uso-cfdi" key={receptor?.usoCfdi ?? "S01"} name="usoCfdi">
             {USOS_CFDI.map((u) => (
               <option key={u.clave} value={u.clave}>
                 {u.clave} · {u.nombre}
@@ -231,8 +231,8 @@ function EmitirForm({
           </Select>
         </Field>
         <Field>
-          <FieldLabel required>Forma de pago</FieldLabel>
-          <Select defaultValue={formaPagoSugerida} name="formaPago">
+          <FieldLabel htmlFor="forma-pago" required>Forma de pago</FieldLabel>
+          <Select className="min-h-11" defaultValue={formaPagoSugerida} id="forma-pago" name="formaPago">
             {FORMAS_PAGO.map((f) => (
               <option key={f.clave} value={f.clave}>
                 {f.clave} · {f.nombre}
@@ -243,7 +243,7 @@ function EmitirForm({
       </div>
 
       <ActionFeedback state={state} />
-      <Button className="rounded-xl" disabled={pending} type="submit">
+      <Button className="w-full sm:w-auto min-h-11 rounded-xl" disabled={pending} type="submit">
         {pending ? "Generando…" : reintento ? "Reintentar" : "Generar comprobante"}
       </Button>
     </form>

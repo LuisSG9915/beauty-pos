@@ -17,10 +17,10 @@ import { billingEventos, planes, suscripciones } from "@/db/schema/billing";
 import { organizaciones, sucursales } from "@/db/schema/core";
 import { ventas } from "@/db/schema/operations";
 import { telemetriaEventos } from "@/db/schema/telemetry";
-import { getSessionOrRedirect, requirePlatformAdmin } from "@/lib/auth/access";
-import { redirect } from "next/navigation";
-import { accessFromContextRow, canAccessBranch, hasPermission, resolveAccessSafe, resolveSessionContext } from "@/lib/auth/authorization";
-import { leerNombreSucursalOmitida, leerSucursalCookie } from "@/lib/sucursal-cookie";
+import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
+import { requirePlatformAdmin } from "@/lib/auth/access";
+import { canAccessBranch, hasPermission, resolveAccessSafe } from "@/lib/auth/authorization";
+import { leerNombreSucursalOmitida } from "@/lib/sucursal-cookie";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { cargarAlertas, type AlertaOperativa } from "@/modules/alertas/queries";
 import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
@@ -224,63 +224,32 @@ const ACCIONES_HOY: Array<{
   { id: "clientes", href: "/clientes", label: "Clientes", ayuda: "Buscar o registrar", icon: Users, permiso: "clientes.ver" },
 ];
 
-export default async function AdminPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+export default async function AdminPage({ searchParams }: { searchParams: Promise<AdminSearchParams> }) {
   const params = await searchParams;
   const error = firstParam(params.error);
-  const session = await getSessionOrRedirect();
   const db = getDatabase();
 
-  // Usuario + organizaciones en la consulta de contexto única.
-  const contextRow = await resolveSessionContext(session.user.id, null);
-  const user = contextRow.usuario;
-  if (!user) {
-    redirect("/login?error=account-not-configured");
-  }
+  // Contexto administrativo deduplicado con el layout vía React.cache y KV (0 consultas adicionales).
+  const adminContext = await getAdminContext(params);
+  const user = adminContext.user;
 
   if (!user.esAdministradorPlataforma) {
-    const organizations = contextRow.organizaciones;
-    const access: Array<{ organization: string; branch: string; branchKey: string; organizationId: string; branchId: string }> = [];
-    const permissionsByOrg: Record<string, string[]> = {};
-    const alertasByOrg: Record<string, AlertaOperativa[]> = {};
+    const organizations = adminContext.organizations;
+    const orgPrincipal = adminContext.organization ?? organizations[0];
+    const sucursalActivaId = adminContext.sucursalId;
 
-    // Todas las organizaciones en paralelo. La primera reutiliza el `acceso`
-    // que `resolveSessionContext` ya resolvió para `target_org` — solo es
-    // seguro cuando TODAS las organizaciones del usuario están activas (con
-    // una org inactiva, `organizations[0]` podría no ser el `target_org` del
-    // acceso embebido). En ese caso se cae a `resolveAccessSafe`.
-    const todasActivas = organizations.every((org) => org.activo);
-    const resolved0 =
-      todasActivas && contextRow.acceso
-        ? accessFromContextRow(user, organizations[0].id, contextRow.acceso)
-        : null;
+    // Pasos de guía sobre la sucursal activa conocida
+    const permisosActivos = new Set(adminContext.access.permissions ?? []);
+    const pasosGuia = sucursalActivaId ? pasosParaPermisos(permisosActivos) : [];
 
-    // Lanzamiento optimista del checklist: con el acceso de la primera org ya
-    // en memoria (sin BD) sabemos qué sucursal mostrará el checklist — así la
-    // consulta de estado+guía corre en la MISMA ronda que acceso/alertas.
-    const orgPrincipal = organizations[0];
-    const sucursalesAccesibles0 = (resolved0?.sucursalesActivas ?? []).filter(
-      (sucursal) => resolved0?.branchIds == null || resolved0.branchIds.has(sucursal.id),
-    );
-    const preferidaId0 =
-      firstParam(params.sucursalId) ??
-      (orgPrincipal ? await leerSucursalCookie(orgPrincipal.id) : undefined);
-    const sucursalChecklist0 =
-      sucursalesAccesibles0.find((sucursal) => sucursal.id === preferidaId0) ?? sucursalesAccesibles0[0];
-    const pasos0 = sucursalChecklist0
-      ? pasosParaPermisos(new Set(resolved0?.permissions ?? []))
-      : [];
-    const estadoYProgresoOptimista =
-      orgPrincipal && sucursalChecklist0 && pasos0.length > 0
-        ? cargarEstadoYProgresoGuia(db, orgPrincipal.id, sucursalChecklist0.id, user.id)
-        : null;
-
-    const [porOrganizacion, estadoYProgresoOpt] = await Promise.all([
+    // Consolidación a <= 2 consultas SQL en paralelo en Promise.all:
+    // (1) Alertas operativas de la organización activa
+    // (2) Estado del negocio y progreso de la guía de la sucursal activa
+    const [porOrganizacion, estadoYProgreso] = await Promise.all([
       Promise.all(
-        organizations.map(async (org, index) => {
-          const resolved =
-            index === 0 && resolved0
-              ? resolved0
-              : await resolveAccessSafe(org.id, user);
+        organizations.map(async (org) => {
+          const isActiva = org.id === orgPrincipal?.id;
+          const resolved = isActiva ? adminContext.access : await resolveAccessSafe(org.id, user);
           const alertas = resolved
             ? await cargarAlertas(db, {
                 organizacionId: org.id,
@@ -291,8 +260,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           return { org, resolved, alertas };
         }),
       ),
-      estadoYProgresoOptimista ?? Promise.resolve(null),
+      orgPrincipal && sucursalActivaId && pasosGuia.length > 0
+        ? cargarEstadoYProgresoGuia(db, orgPrincipal.id, sucursalActivaId, user.id)
+        : Promise.resolve(null),
     ]);
+
+    const access: Array<{ organization: string; branch: string; branchKey: string; organizationId: string; branchId: string }> = [];
+    const permissionsByOrg: Record<string, string[]> = {};
+    const alertasByOrg: Record<string, AlertaOperativa[]> = {};
 
     for (const { org, resolved, alertas } of porOrganizacion) {
       permissionsByOrg[org.id] = resolved ? [...resolved.permissions] : [];
@@ -313,37 +288,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       }
     }
 
-    // Sucursal activa/preferida para checklist y accesos directos
-    const requestedSucursalId = firstParam(params.sucursalId);
-    let activeAccess = access[0];
-    if (access.length > 0) {
-      const orgId = access[0].organizationId;
-      const preferidaId = requestedSucursalId ?? (orgId ? await leerSucursalCookie(orgId) : undefined);
-      if (preferidaId) {
-        activeAccess = access.find((item) => item.branchId === preferidaId) ?? access[0];
-      }
-    }
+    const activeAccess = access.find((item) => item.branchId === sucursalActivaId) ?? access[0];
 
-    // Checklist de primera configuración sobre la sucursal activa:
-    // se muestra mientras queden pasos requeridos y la guía no esté omitida.
-    // Si la sucursal activa coincide con la calculada de forma optimista, la
-    // consulta ya venía hecha; si no (preferencia apuntando a otra org), se
-    // carga ahora — una sola consulta gracias a `cargarEstadoYProgresoGuia`.
+    // Checklist evaluado a partir de la única consulta de estado y progreso ejecutada en paralelo
     let checklist: ResumenGuia | null = null;
-    if (activeAccess) {
-      const pasos = pasosParaPermisos(new Set(permissionsByOrg[activeAccess.organizationId] ?? []));
-      if (pasos.length > 0) {
-        const coincide =
-          estadoYProgresoOpt &&
-          activeAccess.organizationId === orgPrincipal?.id &&
-          activeAccess.branchId === sucursalChecklist0?.id;
-        const { estadoNegocio, progresoGuia } = coincide
-          ? estadoYProgresoOpt
-          : await cargarEstadoYProgresoGuia(db, activeAccess.organizationId, activeAccess.branchId, user.id);
-        const resumen = resumenGuia(evaluarPasos(pasos, estadoNegocio));
-        if (!resumen.terminada && progresoGuia?.estado !== "omitida") {
-          checklist = resumen;
-        }
+    if (estadoYProgreso && pasosGuia.length > 0) {
+      const { estadoNegocio, progresoGuia } = estadoYProgreso;
+      const resumen = resumenGuia(evaluarPasos(pasosGuia, estadoNegocio));
+      if (!resumen.terminada && progresoGuia?.estado !== "omitida") {
+        checklist = resumen;
       }
     }
 
@@ -368,7 +321,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         alertasByOrg={alertasByOrg}
         checklist={checklist}
         error={error}
-        name={session.user.name}
+        name={adminContext.user.nombre}
         permissionsByOrg={permissionsByOrg}
         renombrar={renombrar}
       />

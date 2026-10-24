@@ -1,5 +1,6 @@
 import { Children, type ReactNode } from "react";
 
+import { cn } from "@/lib/utils";
 import { leerViewportPreference } from "@/lib/viewport-preference";
 
 /**
@@ -12,9 +13,15 @@ import { leerViewportPreference } from "@/lib/viewport-preference";
  * (tarjetas `md:hidden` primero, tabla `hidden md:block` después). Con la
  * cookie correcta solo se emite el layout visible en ese ancho.
  */
-export async function VistaAdaptativa({ children }: { children: ReactNode }) {
+export async function VistaAdaptativa({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   const preferida = await leerViewportPreference();
-  if (!preferida) return <>{children}</>;
+  if (!preferida) return <div className={cn("w-full min-w-0", className)}>{children}</div>;
   const [movil, escritorio] = Children.toArray(children);
-  return <>{preferida === "movil" ? movil : escritorio}</>;
+  return <div className={cn("w-full min-w-0", className)}>{preferida === "movil" ? movil : escritorio}</div>;
 }

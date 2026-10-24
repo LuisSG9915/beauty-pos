@@ -340,7 +340,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
                 <input name="id" type="hidden" value={ficha.id} />
                 <input name="activo" type="hidden" value="true" />
                 <button
-                  className="inline-flex min-h-8 items-center rounded-lg px-2 text-op-xs font-medium text-destructive hover:bg-destructive-soft"
+                  className="inline-flex min-h-11 items-center rounded-lg px-2.5 text-op-xs font-medium text-destructive hover:bg-destructive-soft"
                   data-action-id="cliente.ficha.desactivar"
                   type="submit"
                 >
@@ -465,7 +465,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
           <div className="flex flex-wrap items-center gap-2">
             {retencionSugerida.whatsappUrl ? (
               <a
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-xl bg-success-soft px-3.5 text-op-xs font-semibold text-success-soft-foreground shadow-sm transition hover:opacity-90"
+                className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-success-soft px-3.5 text-op-xs font-semibold text-success-soft-foreground shadow-sm transition hover:opacity-90"
                 data-action-id="cliente.retencion.whatsapp"
                 href={retencionSugerida.whatsappUrl}
                 rel="noopener noreferrer"
@@ -476,7 +476,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
               </a>
             ) : null}
             <Link
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-op-xs font-semibold text-foreground hover:bg-muted"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-border bg-card px-3 text-op-xs font-semibold text-foreground hover:bg-muted"
               data-action-id="cliente.retencion.agendar"
               href={buildAdminHref("/agenda", {
                 organizationId: organization.id,
@@ -490,7 +490,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 min-w-0">
         <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
           <h3 className="text-sm font-semibold text-foreground">Registrar fórmula o tratamiento</h3>
           <div className="mt-4">
@@ -508,7 +508,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
   );
 
   const alergiasTab = (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 min-w-0">
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h3 className="text-sm font-semibold text-foreground">Registrar alergia o nota</h3>
         <div className="mt-4">
@@ -520,7 +520,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
   );
 
   const privadoTab = (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 min-w-0">
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h3 className="text-sm font-semibold text-foreground">Registrar nota privada</h3>
         <p className="mt-1 text-op-xs text-muted-foreground">
@@ -535,7 +535,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
   );
 
   const consentimientosTab = (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 min-w-0">
       <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
         <h3 className="text-sm font-semibold text-foreground">Registrar consentimiento informado</h3>
         <p className="mt-1 text-op-xs text-muted-foreground">
@@ -582,7 +582,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
                   <input name="id" type="hidden" value={consent.id} />
                   <input name="activo" type="hidden" value="true" />
                   <button
-                    className="inline-flex min-h-8 items-center rounded-lg px-2 text-op-xs font-medium text-destructive hover:bg-destructive-soft"
+                    className="inline-flex min-h-11 items-center rounded-lg px-2.5 text-op-xs font-medium text-destructive hover:bg-destructive-soft"
                     data-action-id="cliente.consentimiento.desactivar"
                     type="submit"
                   >

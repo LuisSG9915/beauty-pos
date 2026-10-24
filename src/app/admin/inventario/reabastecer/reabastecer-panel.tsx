@@ -176,6 +176,7 @@ export function ReabastecerPanel({
       {puedeCrearCompra ? (
         <Button
           {...(primaria ? { "data-action-clave": "1" } : {})}
+          className="min-h-11"
           data-action-id="reabastecer.compra.crear"
           disabled={pending || seleccionadas.length === 0}
           onClick={crearCompra}
@@ -188,6 +189,7 @@ export function ReabastecerPanel({
       ) : (
         <Button
           {...(primaria ? { "data-action-clave": "1" } : {})}
+          className="min-h-11"
           data-action-id="reabastecer.lista.copiar"
           disabled={seleccionadas.length === 0}
           onClick={copiarLista}
@@ -221,21 +223,22 @@ export function ReabastecerPanel({
       {acciones(true)}
 
       {/* Móvil: tarjetas */}
-      <div className="space-y-3 md:hidden">
+      <div className="w-full min-w-0 space-y-3 md:hidden">
         {filas.map((fila) => {
           const estado = estadoDe(fila.productoId);
           return (
-            <article className="rounded-xl border border-border p-4" key={fila.productoId}>
-              <div className="flex items-start justify-between gap-3">
-                <label className="flex min-h-11 min-w-0 items-start gap-3">
+            <article className="anim-entrada min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm" key={fila.productoId}>
+              <div className="flex items-start justify-between gap-3 min-w-0">
+                <label className="flex min-h-11 min-w-0 items-start gap-3 flex-1 cursor-pointer">
                   <input
+                    aria-label={`Seleccionar ${fila.nombre}`}
                     checked={estado.marcada}
-                    className="mt-1"
+                    className="mt-1 size-5 min-h-5 min-w-5 shrink-0 cursor-pointer"
                     data-action-id="reabastecer.fila.seleccionar"
                     onChange={(event) => actualizar(fila.productoId, { marcada: event.target.checked })}
                     type="checkbox"
                   />
-                  <span className="min-w-0">
+                  <span className="min-w-0 flex-1">
                     <span className="block text-sm font-semibold leading-5 text-foreground">
                       {fila.nombre}
                     </span>
@@ -245,25 +248,27 @@ export function ReabastecerPanel({
                     </span>
                   </span>
                 </label>
-                <StatusBadge tone={PRIORIDAD_TONO[fila.prioridad]}>
-                  {PRIORIDAD_REABASTO_LABEL[fila.prioridad]}
-                </StatusBadge>
+                <div className="shrink-0">
+                  <StatusBadge tone={PRIORIDAD_TONO[fila.prioridad]}>
+                    {PRIORIDAD_REABASTO_LABEL[fila.prioridad]}
+                  </StatusBadge>
+                </div>
               </div>
               <dl className="mt-3 space-y-1.5">
-                <div className="flex items-baseline justify-between gap-3 text-sm">
+                <div className="flex items-baseline justify-between gap-3 text-sm min-w-0">
                   <dt className="shrink-0 text-op-xs text-muted-foreground">Stock</dt>
                   <dd className="min-w-0 text-right font-medium tabular-nums text-foreground">
                     {formatQuantity(fila.stock)}
                   </dd>
                 </div>
-                <div className="flex items-baseline justify-between gap-3 text-sm">
+                <div className="flex items-baseline justify-between gap-3 text-sm min-w-0">
                   <dt className="shrink-0 text-op-xs text-muted-foreground">Vende por día</dt>
                   <dd className="min-w-0 text-right tabular-nums text-foreground">
                     {fila.vendePorDia.toFixed(1)}
                     <span className="ml-1 text-op-xs text-muted-foreground">{TENDENCIA_REABASTO_LABEL[fila.tendencia]}</span>
                   </dd>
                 </div>
-                <div className="flex items-baseline justify-between gap-3 text-sm">
+                <div className="flex items-baseline justify-between gap-3 text-sm min-w-0">
                   <dt className="shrink-0 text-op-xs text-muted-foreground">Te alcanza para</dt>
                   <dd className="min-w-0 text-right text-op-xs tabular-nums text-muted-foreground">
                     {fila.cobertura === null
@@ -272,19 +277,19 @@ export function ReabastecerPanel({
                   </dd>
                 </div>
                 {fila.enCamino > 0 ? (
-                  <div className="flex items-baseline justify-between gap-3 text-sm">
+                  <div className="flex items-baseline justify-between gap-3 text-sm min-w-0">
                     <dt className="shrink-0 text-op-xs text-muted-foreground">En camino</dt>
                     <dd className="min-w-0 text-right text-op-xs tabular-nums text-muted-foreground">
                       {formatQuantity(fila.enCamino)}
                     </dd>
                   </div>
                 ) : null}
-                <div className="flex items-baseline justify-between gap-3 text-sm">
+                <div className="flex items-baseline justify-between gap-3 text-sm min-w-0">
                   <dt className="shrink-0 text-op-xs text-muted-foreground">Sugerido</dt>
                   <dd className="flex min-w-0 items-center justify-end gap-2">
                     <Input
                       aria-label={`Cantidad a comprar de ${fila.nombre}`}
-                      className="h-9 w-24 text-right tabular-nums"
+                      className="h-11 min-h-11 w-24 text-right tabular-nums"
                       min="0"
                       onChange={(event) => actualizar(fila.productoId, { cantidad: event.target.value })}
                       step="1"

@@ -56,6 +56,7 @@ import {
   resolveAccessSafe,
   type ResolvedAccess,
 } from "@/lib/auth/authorization";
+import { esRutaPublicaAccess } from "@/lib/auth/access";
 
 const ORG_A = "11111111-1111-4111-8111-111111111111";
 const ORG_B = "22222222-2222-4222-8222-222222222222";
@@ -225,3 +226,26 @@ describe("assertBranchScope", () => {
     expect(await assertBranchScope(access, SUC_A1)).toBe(true);
   });
 });
+
+describe("esRutaPublicaAccess", () => {
+  it("rutas públicas devuelven true", () => {
+    expect(esRutaPublicaAccess("/")).toBe(true);
+    expect(esRutaPublicaAccess("/precios")).toBe(true);
+    expect(esRutaPublicaAccess("/registro")).toBe(true);
+    expect(esRutaPublicaAccess("/reservar/salon-demo")).toBe(true);
+    expect(esRutaPublicaAccess("/api/health")).toBe(true);
+    expect(esRutaPublicaAccess("/mi-cita/token-123")).toBe(true);
+    expect(esRutaPublicaAccess("/api/auth/session")).toBe(true);
+    expect(esRutaPublicaAccess("/manifest.webmanifest")).toBe(true);
+    expect(esRutaPublicaAccess("/sw.js")).toBe(true);
+    expect(esRutaPublicaAccess("/icon.png")).toBe(true);
+  });
+
+  it("rutas administrativas protegidas devuelven false", () => {
+    expect(esRutaPublicaAccess("/admin")).toBe(false);
+    expect(esRutaPublicaAccess("/admin/pos")).toBe(false);
+    expect(esRutaPublicaAccess("/admin/clientes")).toBe(false);
+    expect(esRutaPublicaAccess("/admin/ajustes")).toBe(false);
+  });
+});
+

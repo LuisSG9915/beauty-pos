@@ -105,3 +105,19 @@ export async function kvInvalidate(key: string): Promise<void> {
   }
 }
 
+/**
+ * Invalida el caché KV de contexto administrativo para un usuario (permisos, organizaciones).
+ */
+export async function invalidarCacheContextoAdmin(userId: string, organizationId?: string): Promise<void> {
+  await Promise.all([
+    kvInvalidate(`admin-ctx:${userId}:default`),
+    organizationId ? kvInvalidate(`admin-ctx:${userId}:${organizationId}`) : Promise.resolve(),
+  ]);
+}
+
+/**
+ * Alias tipado para kvReadThrough con TTL en segundos.
+ */
+export const kvGetOrSet = kvReadThrough;
+
+

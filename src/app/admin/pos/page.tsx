@@ -17,11 +17,12 @@ import { clientes } from "@/db/schema/core";
 import { ventas } from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { canAccessBranch, hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
+import { obtenerCatalogoPosCacheado } from "@/lib/catalogo-cache";
 import { formatCurrency, formatTime } from "@/lib/format";
 import { GLOSARIO } from "@/lib/glosario";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { dayBoundsUtc, dayKey } from "@/modules/agenda/timezone";
-import { catalogosTicketCached, getTicketData } from "@/modules/pos/ticket";
+import { getTicketData } from "@/modules/pos/ticket";
 
 export const dynamic = "force-dynamic";
 
@@ -91,7 +92,7 @@ export default async function PosPage({ searchParams }: { searchParams: SearchPa
   const returnTo = safeReturnTo(firstParam(params.returnTo), fallbackReturnTo);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 max-w-full">
       <OfflineCatalogoCache
         catalogo={{
           organizacionId: organizationId,
@@ -159,6 +160,36 @@ export default async function PosPage({ searchParams }: { searchParams: SearchPa
   );
 }
 
+async function obtenerEstadoOperativoPos(
+  db: ReturnType<typeof getDatabase>,
+  organizationId: string,
+  sucursalId: string | null | undefined,
+  bounds: { iniciaAt: Date; terminaAt: Date } | null,
+) {
+  if (!sucursalId || !bounds) return [];
+  const fechaVenta = sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`;
+  return db
+    .select({
+      id: ventas.id,
+      estado: ventas.estado,
+      total: ventas.total,
+      fecha: fechaVenta,
+      clienteNombre: clientes.nombre,
+    })
+    .from(ventas)
+    .leftJoin(clientes, eq(ventas.clienteId, clientes.id))
+    .where(
+      and(
+        eq(ventas.organizacionId, organizationId),
+        eq(ventas.sucursalId, sucursalId),
+        eq(ventas.activo, true),
+        gte(fechaVenta, bounds.iniciaAt),
+        lt(fechaVenta, bounds.terminaAt),
+      ),
+    )
+    .orderBy(desc(fechaVenta));
+}
+
 async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdminContext>> }) {
   const organizationId = context.organization?.id;
   if (!organizationId) notFound();
@@ -167,31 +198,15 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
   const sucursalId = context.sucursalId;
   const day = dayKey(new Date(), context.timeZone);
   const bounds = dayBoundsUtc(day, context.timeZone);
-  const fechaVenta = sql<Date>`coalesce(${ventas.cobradaAt}, ${ventas.createdAt})`;
   const [ventasHoy, catalogos] = await Promise.all([
-    sucursalId && bounds
-      ? db
-          .select({ id: ventas.id, estado: ventas.estado, total: ventas.total, fecha: fechaVenta, clienteNombre: clientes.nombre })
-          .from(ventas)
-          .leftJoin(clientes, eq(ventas.clienteId, clientes.id))
-          .where(
-            and(
-              eq(ventas.organizacionId, organizationId),
-              eq(ventas.sucursalId, sucursalId),
-              eq(ventas.activo, true),
-              gte(fechaVenta, bounds.iniciaAt),
-              lt(fechaVenta, bounds.terminaAt),
-            ),
-          )
-          .orderBy(desc(fechaVenta))
-      : Promise.resolve([]),
-    sucursalId ? catalogosTicketCached(organizationId, sucursalId) : Promise.resolve(null),
+    obtenerEstadoOperativoPos(db, organizationId, sucursalId, bounds),
+    sucursalId ? obtenerCatalogoPosCacheado(organizationId, sucursalId) : Promise.resolve(null),
   ]);
 
   const currentHref = buildAdminHref("/pos", { organizationId, sucursalId });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 max-w-full">
       {catalogos && sucursalId ? (
         <OfflineCatalogoCache
           catalogo={{
@@ -261,7 +276,7 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
         }
         title="Cobrar"
       />
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 min-w-0 max-w-full">
         <AdminCard description="Cobro al momento: productos y servicios sin cita agendada." title="Venta sin cita">
           {/* La sucursal se cambia desde el selector global del shell; aquí
               solo se muestra la activa para que el cobro quede claro. */}

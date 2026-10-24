@@ -39,10 +39,10 @@ export function BarChart({
   const mostrarEtiquetaCada = Math.ceil(puntos.length / 8);
 
   return (
-    <div aria-label="Gráfica de barras" className="overflow-x-auto" role="region" tabIndex={0}>
+    <div aria-label="Gráfica de barras" className="w-full max-w-full overflow-x-auto" role="region" tabIndex={0}>
       <svg
         aria-label="Gráfica de barras"
-        className="h-auto"
+        className="h-auto max-w-none"
         height={alto + 36}
         role="img"
         viewBox={`0 0 ${ancho} ${alto + 36}`}
@@ -113,10 +113,10 @@ export function HBarChart({
     const max = Math.max(1, ...puntos.map((p) => Math.max(p.valor, p.marca ?? 0)));
     const alto = puntos.length * ALTO_FILA;
     return (
-      <div aria-label={etiquetaAccesible} className="overflow-x-auto" role="region" tabIndex={0}>
+      <div aria-label={etiquetaAccesible} className="w-full max-w-full overflow-x-auto" role="region" tabIndex={0}>
         <svg
           aria-label={etiquetaAccesible}
-          className="h-auto w-full min-w-[420px]"
+          className="h-auto w-full min-w-[320px]"
           height={alto}
           role="img"
           viewBox={`0 0 ${ANCHO} ${alto}`}
@@ -186,7 +186,7 @@ export function HBarChart({
 
   const max = Math.max(...puntos.map((p) => p.valor), 1);
   return (
-    <div className="space-y-2.5" role="img" aria-label={etiquetaAccesible}>
+    <div className="w-full min-w-0 space-y-2.5" role="img" aria-label={etiquetaAccesible}>
       {puntos.map((punto) => {
         const ancho = Math.max(2, (punto.valor / max) * 100);
         return (
@@ -254,10 +254,10 @@ export function DonutChart({
   });
 
   return (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-center w-full min-w-0 overflow-hidden">
       <svg
         aria-label={etiquetaAccesible}
-        className="mx-auto shrink-0"
+        className="mx-auto shrink-0 max-w-full"
         height={tamano}
         role="img"
         viewBox="0 0 120 120"

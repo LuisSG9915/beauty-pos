@@ -193,8 +193,8 @@ function TicketLine({
         pending && "opacity-60",
       )}
     >
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <div className="min-w-0 flex-1 basis-44">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-foreground">{line.nombre}</p>
           <p className="mt-0.5 text-op-xs tabular-nums text-muted-foreground">
             {formatCurrency(line.precio, { currency })} c/u
@@ -203,20 +203,20 @@ function TicketLine({
           </p>
         </div>
         {editable ? (
-          <>
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             <div
               aria-label={`Cantidad de ${line.nombre}`}
               className="flex items-center overflow-hidden rounded-xl border border-border bg-muted/30 shadow-xs"
               role="group"
             >
               <button
-                aria-label="Reducir cantidad"
-                className="flex size-8 items-center justify-center text-muted-foreground transition-all duration-100 hover:bg-muted hover:text-foreground active:scale-[0.98] disabled:opacity-40"
+                aria-label="Disminuir cantidad"
+                className="flex size-11 min-h-11 min-w-11 items-center justify-center text-muted-foreground transition-all duration-100 hover:bg-muted hover:text-foreground active:scale-[0.98] disabled:opacity-40"
                 disabled={pending}
                 onClick={() => run(cambiarCantidadLinea, { tipo, delta: "-1" })}
                 type="button"
               >
-                <Minus aria-hidden="true" className="size-3.5" />
+                <Minus aria-hidden="true" className="size-4" />
               </button>
               <span
                 aria-live="polite"
@@ -226,12 +226,12 @@ function TicketLine({
               </span>
               <button
                 aria-label="Aumentar cantidad"
-                className="flex size-8 items-center justify-center text-muted-foreground transition-all duration-100 hover:bg-muted hover:text-foreground active:scale-[0.98] disabled:opacity-40"
+                className="flex size-11 min-h-11 min-w-11 items-center justify-center text-muted-foreground transition-all duration-100 hover:bg-muted hover:text-foreground active:scale-[0.98] disabled:opacity-40"
                 disabled={pending}
                 onClick={() => run(cambiarCantidadLinea, { tipo, delta: "1" })}
                 type="button"
               >
-                <Plus aria-hidden="true" className="size-3.5" />
+                <Plus aria-hidden="true" className="size-4" />
               </button>
             </div>
             <span className="w-24 text-right font-bold tabular-nums text-foreground">
@@ -239,25 +239,25 @@ function TicketLine({
             </span>
             <Button
               aria-label={`Quitar ${line.nombre}`}
-              className="text-muted-foreground transition-all duration-150 hover:bg-destructive-soft hover:text-destructive active:scale-[0.98]"
+              className="min-h-11 min-w-11 text-muted-foreground transition-all duration-150 hover:bg-destructive-soft hover:text-destructive active:scale-[0.98]"
               disabled={pending}
               onClick={() => run(removeAction, {})}
-              size="icon-sm"
+              size="icon"
               type="button"
               variant="ghost"
             >
               <Trash2 aria-hidden="true" className="size-4" />
             </Button>
-          </>
+          </div>
         ) : (
-          <>
+          <div className="flex items-center gap-2">
             <span className="text-op-xs tabular-nums text-muted-foreground">
               {line.cantidad} × {formatCurrency(line.precio, { currency })}
             </span>
             <span className="w-24 text-right font-bold tabular-nums text-foreground">
               {paquete?.usado ? "Paquete" : formatCurrency(importe, { currency })}
             </span>
-          </>
+          </div>
         )}
       </div>
       {esServicio && editable ? (
@@ -270,7 +270,7 @@ function TicketLine({
           </label>
           <select
             aria-label={`Profesional para ${line.nombre}`}
-            className="h-9 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-op-xs outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 disabled:opacity-60 sm:max-w-52"
+            className="h-11 min-h-11 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-op-xs outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 disabled:opacity-60 sm:max-w-52"
             defaultValue={usuarioId ?? ""}
             disabled={pending}
             id={`profesional-${line.id}`}
@@ -302,7 +302,7 @@ function TicketLine({
                 Paquete{paquete.nombre ? ` · ${paquete.nombre}` : ""}
               </span>
               <button
-                className="inline-flex min-h-8 items-center rounded-lg px-2 text-op-xs font-medium text-primary underline underline-offset-2 transition-colors hover:bg-accent/70 hover:text-primary disabled:opacity-50"
+                className="inline-flex min-h-11 items-center rounded-lg px-2 text-op-xs font-medium text-primary underline underline-offset-2 transition-colors hover:bg-accent/70 hover:text-primary disabled:opacity-50"
                 disabled={pending}
                 onClick={() => run(quitarPaqueteDeLinea, {})}
                 type="button"
@@ -312,7 +312,7 @@ function TicketLine({
             </>
           ) : paquete.disponible > 0 ? (
             <button
-              className="inline-flex min-h-8 items-center gap-1 rounded-lg px-2.5 text-op-xs font-medium bg-success-soft text-success-soft-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2.5 text-op-xs font-medium bg-success-soft text-success-soft-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
               disabled={pending}
               onClick={() => run(usarPaqueteEnLinea, {})}
               type="button"
@@ -400,6 +400,7 @@ function PaqueteQuitarButton({
   return (
     <Button
       aria-label={`Quitar ${nombre}`}
+      className="min-h-11 min-w-11"
       disabled={pending}
       onClick={() => {
         const data = lineFormData(organizationId, ventaId, detalleId, {});
@@ -413,7 +414,7 @@ function PaqueteQuitarButton({
           }
         });
       }}
-      size="icon-sm"
+      size="icon"
       type="button"
       variant="ghost"
     >
@@ -467,14 +468,14 @@ function AjusteMedioPagoForm({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="space-y-1.5 text-op-xs font-medium text-muted-foreground">
           <span>Nuevo medio</span>
-          <select className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal" name="medioPagoId" onChange={(event) => setMedioPagoId(event.target.value)} required value={medioPagoId}>
+          <select aria-label="Nuevo medio de pago" className="h-11 min-h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal" name="medioPagoId" onChange={(event) => setMedioPagoId(event.target.value)} required value={medioPagoId}>
             <option value="">Selecciona…</option>
             {destinos.map((medio) => <option key={medio.id} value={medio.id}>{medio.nombre}</option>)}
           </select>
         </label>
         <label className="space-y-1.5 text-op-xs font-medium text-muted-foreground">
           <span>Monto máximo {formatCurrency(restante, { currency })}</span>
-          <input className="h-10 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal tabular-nums" inputMode="decimal" max={restante} min="0.01" name="monto" onChange={(event) => setMonto(event.target.value)} step="0.01" type="number" value={monto} />
+          <input className="h-11 min-h-11 w-full rounded-lg border border-input bg-background px-3 text-sm font-normal tabular-nums" inputMode="decimal" max={restante} min="0.01" name="monto" onChange={(event) => setMonto(event.target.value)} step="0.01" type="number" value={monto} />
         </label>
       </div>
       <label className="block space-y-1.5 text-op-xs font-medium text-muted-foreground">
@@ -601,8 +602,8 @@ export function VentaTicket({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-      <section className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] min-w-0 max-w-full">
+      <section className="rounded-2xl border border-border bg-card p-4 sm:p-6 shadow-sm min-w-0 max-w-full">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
@@ -721,28 +722,32 @@ export function VentaTicket({
               <div className="mt-3 space-y-2">
                 {lineasPaquetes.map((linea) => (
                   <div
-                    className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5 text-sm sm:px-4"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-w-0 rounded-xl border border-border px-3 py-2.5 text-sm sm:px-4"
                     key={linea.id}
                   >
-                    <PackageCheck aria-hidden="true" className="size-4 shrink-0 text-success" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{linea.nombre}</p>
-                      <p className="mt-0.5 text-op-xs tabular-nums text-muted-foreground">
-                        {linea.cantidad} × {formatCurrency(linea.precio, { currency })}
-                      </p>
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <PackageCheck aria-hidden="true" className="size-4 shrink-0 text-success" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{linea.nombre}</p>
+                        <p className="mt-0.5 text-op-xs tabular-nums text-muted-foreground">
+                          {linea.cantidad} × {formatCurrency(linea.precio, { currency })}
+                        </p>
+                      </div>
                     </div>
-                    <span className="w-24 text-right font-semibold tabular-nums">
-                      {formatCurrency(Number(linea.precio) * linea.cantidad, { currency })}
-                    </span>
-                    {editable ? (
-                      <PaqueteQuitarButton
-                        detalleId={linea.id}
-                        nombre={linea.nombre}
-                        onChanged={onChanged}
-                        organizationId={organizationId}
-                        ventaId={venta.id}
-                      />
-                    ) : null}
+                    <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+                      <span className="w-24 text-right font-semibold tabular-nums">
+                        {formatCurrency(Number(linea.precio) * linea.cantidad, { currency })}
+                      </span>
+                      {editable ? (
+                        <PaqueteQuitarButton
+                          detalleId={linea.id}
+                          nombre={linea.nombre}
+                          onChanged={onChanged}
+                          organizationId={organizationId}
+                          ventaId={venta.id}
+                        />
+                      ) : null}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -757,29 +762,33 @@ export function VentaTicket({
               <div className="mt-3 space-y-2">
                 {lineasMembresias.map((linea) => (
                   <div
-                    className="flex items-center gap-3 rounded-xl border border-border px-3 py-2.5 text-sm sm:px-4"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-w-0 rounded-xl border border-border px-3 py-2.5 text-sm sm:px-4"
                     key={linea.id}
                   >
-                    <PackageCheck aria-hidden="true" className="size-4 shrink-0 text-primary" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{linea.nombre}</p>
-                      <p className="mt-0.5 text-op-xs tabular-nums text-muted-foreground">
-                        {linea.cantidad} × {formatCurrency(linea.precio, { currency })}
-                      </p>
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <PackageCheck aria-hidden="true" className="size-4 shrink-0 text-primary" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{linea.nombre}</p>
+                        <p className="mt-0.5 text-op-xs tabular-nums text-muted-foreground">
+                          {linea.cantidad} × {formatCurrency(linea.precio, { currency })}
+                        </p>
+                      </div>
                     </div>
-                    <span className="w-24 text-right font-semibold tabular-nums">
-                      {formatCurrency(Number(linea.precio) * linea.cantidad, { currency })}
-                    </span>
-                    {editable ? (
-                      <PaqueteQuitarButton
-                        action={quitarMembresiaVenta}
-                        detalleId={linea.id}
-                        nombre={linea.nombre}
-                        onChanged={onChanged}
-                        organizationId={organizationId}
-                        ventaId={venta.id}
-                      />
-                    ) : null}
+                    <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+                      <span className="w-24 text-right font-semibold tabular-nums">
+                        {formatCurrency(Number(linea.precio) * linea.cantidad, { currency })}
+                      </span>
+                      {editable ? (
+                        <PaqueteQuitarButton
+                          action={quitarMembresiaVenta}
+                          detalleId={linea.id}
+                          nombre={linea.nombre}
+                          onChanged={onChanged}
+                          organizationId={organizationId}
+                          ventaId={venta.id}
+                        />
+                      ) : null}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -932,14 +941,13 @@ export function VentaTicket({
               >
                 {descuentoPending ? "Aplicando…" : "Aplicar"}
               </Button>
-              <div aria-label="Descuento rápido" className="flex gap-1.5" role="group">
+              <div aria-label="Descuento rápido" className="flex flex-wrap gap-1.5" role="group">
                 {[5, 10, 15, 20].map((pct) => (
                   <Button
-                    className="rounded-xl border border-border/60 hover:border-primary/50 hover:bg-primary/5 text-primary text-op-xs font-semibold active:scale-90 transition-all duration-150 px-2.5"
+                    className="min-h-11 rounded-xl border border-border/60 hover:border-primary/50 hover:bg-primary/5 text-primary text-op-xs font-semibold active:scale-90 transition-all duration-150 px-2.5"
                     disabled={descuentoPending}
                     key={pct}
                     onClick={() => aplicarPorcentaje(pct)}
-                    size="sm"
                     type="button"
                     variant="ghost"
                   >

@@ -28,7 +28,7 @@ const TABS: Array<{ value: CatalogoTab; label: string; icon: typeof Scissors }> 
 
 function chipClass(tone: string, selected: boolean) {
   return cn(
-    "inline-flex min-h-8 items-center rounded-full border px-3 text-op-xs font-medium transition-all",
+    "inline-flex min-h-11 items-center rounded-full border px-3 text-op-xs font-medium transition-all shrink-0",
     tone,
     selected ? "font-semibold shadow-sm" : "opacity-70 hover:opacity-100",
   );
@@ -146,11 +146,11 @@ export function CatalogoSelector({
   };
 
   return (
-    <div className={cn("space-y-3", className)}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className={cn("space-y-3 min-w-0 max-w-full", className)}>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
         <div
           aria-label="Tipo de catálogo"
-          className="flex rounded-xl border border-border bg-muted/60 p-1"
+          className="flex flex-wrap sm:flex-nowrap rounded-xl border border-border bg-muted/60 p-1 w-full sm:w-auto"
           role="group"
         >
           {TABS.map((opcion) => {
@@ -160,7 +160,7 @@ export function CatalogoSelector({
               <button
                 aria-pressed={activo}
                 className={cn(
-                  "inline-flex min-h-8 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-op-xs font-medium whitespace-nowrap transition-all duration-150 sm:px-4 active:scale-[0.98] cursor-pointer",
+                  "inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-op-xs font-medium whitespace-nowrap transition-all duration-150 sm:px-4 active:scale-[0.98] cursor-pointer",
                   activo
                     ? "bg-card text-primary shadow-xs font-semibold"
                     : "text-muted-foreground hover:text-foreground",
@@ -178,7 +178,7 @@ export function CatalogoSelector({
             );
           })}
         </div>
-        <div className="relative min-w-0 flex-1 sm:max-w-64">
+        <div className="relative min-w-0 w-full sm:w-auto sm:max-w-64 flex-1">
           <Search
             aria-hidden="true"
             className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
@@ -187,7 +187,7 @@ export function CatalogoSelector({
             Buscar en el catálogo
           </label>
           <input
-            className="h-10 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm outline-none transition-all duration-150 focus:border-primary focus:ring-3 focus:ring-primary/20 hover:border-border"
+            className="h-11 min-h-11 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm outline-none transition-all duration-150 focus:border-primary focus:ring-3 focus:ring-primary/20 hover:border-border"
             id="pos-catalogo-buscar"
             onChange={(event) => setQuery(event.target.value)}
             placeholder={tab === "servicios" ? "Buscar servicio" : tab === "paquetes" ? "Buscar paquete" : tab === "membresias" ? "Buscar membresía" : "Buscar por clave o nombre"}
@@ -198,7 +198,7 @@ export function CatalogoSelector({
       </div>
 
       {categorias.length > 0 ? (
-        <div aria-label="Filtrar por categoría" className="flex flex-wrap gap-1.5" role="group">
+        <div aria-label="Filtrar por categoría" className="flex flex-wrap gap-2 max-w-full" role="group">
           <button
             aria-pressed={categoriaId === null}
             className={chipClass(categoryTone(null).chip, categoriaId === null)}
@@ -238,7 +238,7 @@ export function CatalogoSelector({
                 : "No hay productos que coincidan."}
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4 min-w-0 max-w-full">
           {filtrados.map((item, index) => {
             const tone = categoryTone("categoriaId" in item ? item.categoriaId : null);
             const imagenClave = "imagenClaveR2" in item ? item.imagenClaveR2 : null;
@@ -247,7 +247,7 @@ export function CatalogoSelector({
               <button
                 aria-label={`Agregar ${item.nombre} al ticket`}
                 className={cn(
-                  "group relative flex min-h-16 flex-col gap-2 rounded-2xl border p-2.5 text-left transition-all duration-200 anim-entrada",
+                  "group relative flex min-h-16 min-w-0 flex-col gap-2 rounded-2xl border p-2.5 text-left transition-all duration-200 anim-entrada",
                   "hover:-translate-y-1 hover:shadow-md hover:border-primary/40",
                   "active:scale-[0.98] active:shadow-xs",
                   "focus-visible:outline-2 focus-visible:outline-ring cursor-pointer select-none",
