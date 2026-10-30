@@ -138,3 +138,73 @@ export function resumenGuia(pasos: readonly PasoEvaluado[]): ResumenGuia {
     terminada: pasos.length > 0 && pasos.every((paso) => paso.hecho || paso.opcional),
   };
 }
+
+export type PackArranqueId = "estetica" | "barberia" | "unas" | "pestanas";
+
+export interface ServicioPreset {
+  nombre: string;
+  duracionMinutos: number;
+  precioMxn: number;
+  precioCentavos: number;
+}
+
+export interface PackArranquePreset {
+  id: PackArranqueId;
+  etiqueta: string;
+  categoriaNombre: string;
+  servicios: readonly ServicioPreset[];
+}
+
+export const PACKS_ARRANQUE_MEXICO: readonly PackArranquePreset[] = [
+  {
+    id: "estetica",
+    etiqueta: "Estética / Salón",
+    categoriaNombre: "Servicios de Salón",
+    servicios: [
+      { nombre: "Corte Dama", duracionMinutos: 45, precioMxn: 250, precioCentavos: 25000 },
+      { nombre: "Corte Caballero", duracionMinutos: 30, precioMxn: 180, precioCentavos: 18000 },
+      { nombre: "Tinte Completo", duracionMinutos: 120, precioMxn: 850, precioCentavos: 85000 },
+      { nombre: "Balayage", duracionMinutos: 180, precioMxn: 1800, precioCentavos: 180000 },
+      { nombre: "Alaciado Express", duracionMinutos: 120, precioMxn: 1200, precioCentavos: 120000 },
+      { nombre: "Manicure Gelish", duracionMinutos: 45, precioMxn: 280, precioCentavos: 28000 },
+    ],
+  },
+  {
+    id: "barberia",
+    etiqueta: "Barbería Clásica",
+    categoriaNombre: "Barbería",
+    servicios: [
+      { nombre: "Corte Clásico", duracionMinutos: 35, precioMxn: 200, precioCentavos: 20000 },
+      { nombre: "Arreglo de Barba con Toalla Caliente", duracionMinutos: 30, precioMxn: 180, precioCentavos: 18000 },
+      { nombre: "Paquete Corte + Barba", duracionMinutos: 60, precioMxn: 350, precioCentavos: 35000 },
+      { nombre: "Exfoliación Facial", duracionMinutos: 30, precioMxn: 220, precioCentavos: 22000 },
+    ],
+  },
+  {
+    id: "unas",
+    etiqueta: "Nail Spa / Uñas",
+    categoriaNombre: "Uñas y Spa",
+    servicios: [
+      { nombre: "Aplicación Gelish", duracionMinutos: 45, precioMxn: 250, precioCentavos: 25000 },
+      { nombre: "Uñas Acrílicas Esculturales", duracionMinutos: 90, precioMxn: 550, precioCentavos: 55000 },
+      { nombre: "Retoque de Acrílico", duracionMinutos: 60, precioMxn: 350, precioCentavos: 35000 },
+      { nombre: "Pedicure Spa", duracionMinutos: 60, precioMxn: 420, precioCentavos: 42000 },
+    ],
+  },
+  {
+    id: "pestanas",
+    etiqueta: "Lash & Brow Bar",
+    categoriaNombre: "Pestañas y Cejas",
+    servicios: [
+      { nombre: "Extensiones Clásicas 1x1", duracionMinutos: 90, precioMxn: 650, precioCentavos: 65000 },
+      { nombre: "Retoque 15 días", duracionMinutos: 45, precioMxn: 350, precioCentavos: 35000 },
+      { nombre: "Lifting de Pestañas", duracionMinutos: 45, precioMxn: 400, precioCentavos: 40000 },
+      { nombre: "Planchado de Ceja", duracionMinutos: 35, precioMxn: 300, precioCentavos: 30000 },
+    ],
+  },
+] as const;
+
+export function obtenerPackArranque(id: string): PackArranquePreset | null {
+  return PACKS_ARRANQUE_MEXICO.find((pack) => pack.id === id) ?? null;
+}
+

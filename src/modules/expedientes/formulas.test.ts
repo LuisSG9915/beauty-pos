@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  construirResumenFormulaRapida,
   fichaInsumoSchema,
   formatearResumenFormula,
   obtenerConsumosInventario,
@@ -109,6 +110,50 @@ describe("expedientes / formulas", () => {
       productoId: "a10e4635-c3f2-45e0-82dc-3fe67b93a202",
       cantidad: 3.75,
       nombre: "Olaplex Nº 1",
+    });
+  });
+
+  describe("construirResumenFormulaRapida", () => {
+    it("construye resumen completo con mezcla, peróxido, tiempo de pose y matiz", () => {
+      const resumen = construirResumenFormulaRapida({
+        id: "ficha-123",
+        creadoEn: "2025-09-12T15:30:00.000Z",
+        mezcla: "Tinte 7.1",
+        peroxido: "20 vol",
+        tiempoPoseMinutos: 45,
+        matiz: "Matiz 9.2",
+      });
+
+      expect(resumen.id).toBe("ficha-123");
+      expect(resumen.fechaCorta).toBe("12-sep");
+      expect(resumen.formulaCompleta).toBe("Tinte 7.1 + 20 vol (45 min) — Matiz 9.2");
+      expect(resumen.textoPastilla).toBe("12-sep: Tinte 7.1 + 20 vol (45 min) — Matiz 9.2");
+    });
+
+    it("funciona con Date object y omite campos opcionales no proporcionados", () => {
+      const resumen = construirResumenFormulaRapida({
+        id: "ficha-456",
+        creadoEn: new Date(2025, 8, 12),
+        mezcla: "Decoloración global",
+      });
+
+      expect(resumen.id).toBe("ficha-456");
+      expect(resumen.fechaCorta).toBe("12-sep");
+      expect(resumen.formulaCompleta).toBe("Decoloración global");
+      expect(resumen.textoPastilla).toBe("12-sep: Decoloración global");
+    });
+
+    it("maneja mezclas con peróxido pero sin tiempo ni matiz", () => {
+      const resumen = construirResumenFormulaRapida({
+        id: "ficha-789",
+        creadoEn: "2025-09-12",
+        mezcla: "Tinte 5.0",
+        peroxido: "10 vol",
+      });
+
+      expect(resumen.fechaCorta).toBe("12-sep");
+      expect(resumen.formulaCompleta).toBe("Tinte 5.0 + 10 vol");
+      expect(resumen.textoPastilla).toBe("12-sep: Tinte 5.0 + 10 vol");
     });
   });
 });

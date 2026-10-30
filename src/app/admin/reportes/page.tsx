@@ -12,13 +12,15 @@ import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate, formatTime, todayDateInput } from "@/lib/format";
 import { firstParam, normalizeDateInput } from "@/lib/url-context";
-import { resolveTimeZone, shiftDateKey } from "@/modules/agenda";
+import { dayBoundsUtc, resolveTimeZone, shiftDateKey } from "@/modules/agenda";
 import { contextoSuscripcionCache, tieneCapacidad } from "@/modules/billing/queries";
 import {
   cargarAgregadosAnteriores,
   cargarReporte,
   comparativoSucursales,
   num,
+  obtenerGananciaNetaPeriodo,
+  type ResumenGananciaNeta,
 } from "@/modules/reportes/queries";
 import {
   deltaKpi,
@@ -106,6 +108,84 @@ function Tabla({
   );
 }
 
+function TarjetaGananciaNeta({
+  ganancia,
+  currency,
+  titulo,
+  subtitulo,
+}: {
+  ganancia: ResumenGananciaNeta;
+  currency: string;
+  titulo: string;
+  subtitulo: string;
+}) {
+  const fmt = (centavos: number) => formatCurrency(centavos / 100, { currency });
+  const esPositivo = ganancia.utilidadNetaCentavos >= 0;
+
+  return (
+    <div className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-6">
+      <div className="mb-4">
+        <h2 className="text-base font-semibold text-foreground">{titulo}</h2>
+        <p className="text-xs text-muted-foreground">{subtitulo}</p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {/* 1. Total Ingresado */}
+        <div className="rounded-xl border border-border/80 bg-muted/30 p-4">
+          <p className="text-op-xs font-medium text-muted-foreground">Total Ingresado</p>
+          <p className="mt-1 text-xl font-bold tracking-tight text-foreground tabular-nums">
+            {fmt(ganancia.totalIngresadoCentavos)}
+          </p>
+          <p className="mt-1.5 truncate text-[11px] text-muted-foreground">
+            Efectivo {fmt(ganancia.efectivoCentavos)} · Tarjeta {fmt(ganancia.tarjetaCentavos)} · SPEI {fmt(ganancia.transferenciaCentavos)}
+          </p>
+        </div>
+
+        {/* 2. Por Pagar a Equipo */}
+        <div className="rounded-xl border border-border/80 bg-muted/30 p-4">
+          <p className="text-op-xs font-medium text-muted-foreground">Por Pagar a Equipo</p>
+          <p className="mt-1 text-xl font-bold tracking-tight text-foreground tabular-nums">
+            {fmt(ganancia.comisionesEquipoCentavos)}
+          </p>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">Comisiones devengadas</p>
+        </div>
+
+        {/* 3. Gastos Operativos */}
+        <div className="rounded-xl border border-border/80 bg-muted/30 p-4">
+          <p className="text-op-xs font-medium text-muted-foreground">Gastos Operativos</p>
+          <p className="mt-1 text-xl font-bold tracking-tight text-foreground tabular-nums">
+            {fmt(ganancia.gastosOperativosCentavos)}
+          </p>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">Salidas de caja / gastos</p>
+        </div>
+
+        {/* 4. Utilidad Neta en Mano */}
+        <div
+          className={`rounded-xl border p-4 ${
+            esPositivo
+              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-950 dark:bg-emerald-500/15 dark:text-emerald-100"
+              : "border-destructive/30 bg-destructive/10 text-destructive-foreground dark:bg-destructive/15"
+          }`}
+        >
+          <p className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Utilidad Neta en Mano
+          </p>
+          <p
+            className={`mt-1 text-2xl font-black tracking-tight tabular-nums ${
+              esPositivo ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
+            }`}
+          >
+            {fmt(ganancia.utilidadNetaCentavos)}
+          </p>
+          <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">
+            {esPositivo ? "Disponible libre de compromisos" : "Déficit en el período"}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="anim-entrada min-w-0 overflow-hidden rounded-xl border border-border bg-muted/60 px-4 py-3">
@@ -155,8 +235,13 @@ export default async function ReportesPage({ searchParams }: Props) {
   if (desde > hasta) [desde, hasta] = [hasta, desde];
   const anterior = periodoAnterior(desde, hasta);
 
+  const boundsDesde = dayBoundsUtc(desde, reportTimeZone);
+  const boundsHasta = dayBoundsUtc(hasta, reportTimeZone);
+  const desdeDate = boundsDesde?.iniciaAt ?? new Date();
+  const hastaDate = boundsHasta?.terminaAt ?? new Date();
+
   const fmt = (v: string | number | null | undefined) => formatCurrency(num(v), { currency });
-  const [reporte, agregadosAnteriores, comparativo, suscripcionCtx] = await Promise.all([
+  const [reporte, agregadosAnteriores, comparativo, suscripcionCtx, gananciaNeta] = await Promise.all([
     cargarReporte(db, {
       organizacionId: organization.id,
       sucursalId: sucursalReporte,
@@ -192,6 +277,14 @@ export default async function ReportesPage({ searchParams }: Props) {
         })
       : Promise.resolve([]),
     suscripcionPromise,
+    puedeFinancieros
+      ? obtenerGananciaNetaPeriodo({
+          organizacionId: organization.id,
+          sucursalId: sucursalReporte,
+          desde: desdeDate,
+          hasta: hastaDate,
+        })
+      : Promise.resolve(null),
   ]);
   if (!reporte) notFound();
   const multisucursal = tieneCapacidad(suscripcionCtx, "multisucursal");
@@ -340,6 +433,15 @@ export default async function ReportesPage({ searchParams }: Props) {
           ) : null}
         </div>
       </form>
+
+      {gananciaNeta && puedeFinancieros ? (
+        <TarjetaGananciaNeta
+          currency={currency}
+          ganancia={gananciaNeta}
+          subtitulo={`Ventas cobradas menos comisiones devengadas y gastos operativos en el período seleccionado (${desde} → ${hasta}).`}
+          titulo="Tu Ganancia Real del Período"
+        />
+      ) : null}
 
       {consolidado ? (
         <AdminCard

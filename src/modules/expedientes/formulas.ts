@@ -69,3 +69,79 @@ export function obtenerConsumosInventario(
   }
   return consumos;
 }
+
+export interface ResumenFormulaRapida {
+  id: string;
+  fechaCorta: string;
+  textoPastilla: string; // Ej: "12-sep: Tinte 7.1 + 20 vol (45 min) — Matiz 9.2"
+  formulaCompleta: string;
+}
+
+const MESES_CORTOS = [
+  "ene",
+  "feb",
+  "mar",
+  "abr",
+  "may",
+  "jun",
+  "jul",
+  "ago",
+  "sep",
+  "oct",
+  "nov",
+  "dic",
+] as const;
+
+export function construirResumenFormulaRapida(registro: {
+  id: string;
+  creadoEn: Date | string;
+  mezcla: string;
+  peroxido?: string | null;
+  tiempoPoseMinutos?: number | null;
+  matiz?: string | null;
+}): ResumenFormulaRapida {
+  let dia = "";
+  let mes = "";
+
+  if (typeof registro.creadoEn === "string") {
+    const match = registro.creadoEn.match(/^\d{4}-(\d{2})-(\d{2})/);
+    if (match) {
+      const mesIndex = Number(match[1]) - 1;
+      dia = match[2];
+      mes = MESES_CORTOS[mesIndex] ?? "";
+    }
+  }
+
+  if (!mes) {
+    const d = typeof registro.creadoEn === "string" ? new Date(registro.creadoEn) : registro.creadoEn;
+    if (d instanceof Date && !Number.isNaN(d.getTime())) {
+      dia = String(d.getDate()).padStart(2, "0");
+      mes = MESES_CORTOS[d.getMonth()] ?? "";
+    }
+  }
+
+  const fechaCorta = mes ? `${dia}-${mes}` : "";
+
+  let base = registro.mezcla?.trim() || "";
+  if (registro.peroxido?.trim()) {
+    base = base ? `${base} + ${registro.peroxido.trim()}` : registro.peroxido.trim();
+  }
+  if (registro.tiempoPoseMinutos && registro.tiempoPoseMinutos > 0) {
+    base = base ? `${base} (${registro.tiempoPoseMinutos} min)` : `(${registro.tiempoPoseMinutos} min)`;
+  }
+  if (registro.matiz?.trim()) {
+    base = base ? `${base} — ${registro.matiz.trim()}` : registro.matiz.trim();
+  }
+
+  const formulaCompleta = base;
+  const textoPastilla = fechaCorta
+    ? (formulaCompleta ? `${fechaCorta}: ${formulaCompleta}` : fechaCorta)
+    : formulaCompleta;
+
+  return {
+    id: registro.id,
+    fechaCorta,
+    textoPastilla,
+    formulaCompleta,
+  };
+}

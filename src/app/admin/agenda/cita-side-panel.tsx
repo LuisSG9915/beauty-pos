@@ -7,6 +7,7 @@ import {
   Phone,
   RefreshCcw,
   ShoppingCart,
+  Sparkles,
   UserCheck,
   X,
 } from "lucide-react";
@@ -14,10 +15,13 @@ import { useEffect, useState, useTransition } from "react";
 
 import {
   getCitaHistorial,
+  obtenerUltimaFormulaClienteAction,
+  repetirUltimaFormulaEnCitaAction,
   toggleRecursoCita,
   toggleServicioCita,
   type CitaHistorialEvento,
 } from "@/app/admin/agenda/actions";
+import type { ResumenFormulaRapida } from "@/modules/expedientes/formulas";
 import {
   cobrarAnticipo,
   devolverAnticipo,
@@ -474,7 +478,64 @@ export function CitaSidePanel({
 }) {
   const toast = useToast();
   const [servicioPending, startServicioTransition] = useTransition();
-  const ocupado = pending || servicioPending;
+  const [formulaPending, startFormulaTransition] = useTransition();
+  const [formulaCliente, setFormulaCliente] = useState<{
+    clienteId: string;
+    formula: ResumenFormulaRapida | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!cita.clienteId) return;
+    const cid = cita.clienteId;
+    let activo = true;
+    void obtenerUltimaFormulaClienteAction({
+      organizacionId: organizationId,
+      clienteId: cid,
+    }).then((res) => {
+      if (activo) {
+        setFormulaCliente({
+          clienteId: cid,
+          formula: res.success ? (res.data ?? null) : null,
+        });
+      }
+    });
+    return () => {
+      activo = false;
+    };
+  }, [cita.clienteId, organizationId]);
+
+  const ultimaFormula =
+    formulaCliente?.clienteId === cita.clienteId ? formulaCliente.formula : null;
+
+  const ocupado = pending || servicioPending || formulaPending;
+
+  const yaRepetida = Boolean(
+    ultimaFormula &&
+      cita.notas &&
+      (cita.notas.includes(`[Fórmula repetida]: ${ultimaFormula.textoPastilla}`) ||
+        cita.notas.includes(ultimaFormula.textoPastilla)),
+  );
+
+  const handleRepetirFormula = () => {
+    if (!cita.id || yaRepetida || formulaPending) return;
+    startFormulaTransition(async () => {
+      try {
+        const result = await repetirUltimaFormulaEnCitaAction({
+          citaId: cita.id,
+          organizacionId: organizationId,
+        });
+        if (result.success) {
+          toast.success(result.message ?? "Fórmula aplicada.");
+          onToggleServicio();
+        } else {
+          toast.error(result.error ?? "No se pudo aplicar la fórmula.");
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error("No se pudo aplicar la fórmula.");
+      }
+    });
+  };
 
   const profesional = cita.usuarioId
     ? (staff.find((item) => item.id === cita.usuarioId)?.nombre ?? cita.usuarioNombre ?? "Profesional")
@@ -756,6 +817,41 @@ export function CitaSidePanel({
           <p className="mt-2 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm leading-6 text-warning-soft-foreground">
             {cita.clienteNotas}
           </p>
+        </section>
+      ) : null}
+
+      {/* Última fórmula química registrada del cliente */}
+      {ultimaFormula ? (
+        <section className="space-y-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
+              <Sparkles aria-hidden="true" className="size-3.5" />
+              Última fórmula: {ultimaFormula.textoPastilla}
+            </span>
+          </div>
+          {editable ? (
+            <Button
+              className="w-full min-h-11 rounded-xl text-sm font-semibold"
+              data-action-id="agenda.repetir_formula"
+              disabled={ocupado || yaRepetida}
+              onClick={handleRepetirFormula}
+              size="touch"
+              type="button"
+              variant={yaRepetida ? "secondary" : "default"}
+            >
+              {yaRepetida ? (
+                <>
+                  <Check aria-hidden="true" className="size-4" />
+                  Fórmula aplicada
+                </>
+              ) : (
+                <>
+                  <Sparkles aria-hidden="true" className="size-4" />
+                  Repetir fórmula en esta cita
+                </>
+              )}
+            </Button>
+          ) : null}
         </section>
       ) : null}
 

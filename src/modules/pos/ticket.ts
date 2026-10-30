@@ -590,10 +590,14 @@ export async function getTicketData(
          where d.venta_id = (select id from v)
       ), '[]'::jsonb) as "devolucionesRows",
       coalesce((
-        select jsonb_object_agg(dd.detalle_id::text, sum(dd.cantidad)::float8)
-          from detalle_devoluciones dd
-          join devoluciones dv on dd.devolucion_id = dv.id
-         where dv.venta_id = (select id from v) and dd.detalle_id is not null
+        select jsonb_object_agg(t.detalle_id, t.total_devuelto)
+          from (
+            select dd.detalle_id::text as detalle_id, sum(dd.cantidad)::float8 as total_devuelto
+              from detalle_devoluciones dd
+              join devoluciones dv on dd.devolucion_id = dv.id
+             where dv.venta_id = (select id from v) and dd.detalle_id is not null
+             group by dd.detalle_id
+          ) t
       ), '{}'::jsonb) as "devueltoPorDetalle",
       -- Anticipos aplicados a esta venta + vigentes de la cita (se aplican al cobrar).
       coalesce((

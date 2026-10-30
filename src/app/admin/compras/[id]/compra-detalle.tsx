@@ -173,9 +173,30 @@ export function CompraDetalle({
   const recibible = compra.estado === "por_verificar" && puedeRecibir;
   const info = COMPRA_ESTADO_INFO[compra.estado];
 
+  // ── Líneas ───────────────────────────────────────────────────────────────
+  const [lineas, setLineas] = useState<LineaDraft[]>(() => lineasIniciales.map(aDraft));
+  // Re-sincroniza cuando el servidor devuelve líneas distintas (post-mutación):
+  // ajuste de estado durante el render (patrón oficial de React para
+  // "resetear estado al cambiar una prop"), no en un effect.
+  const lineasKey = JSON.stringify(lineasIniciales);
+  const [lineasKeyPrev, setLineasKeyPrev] = useState(lineasKey);
+  if (lineasKey !== lineasKeyPrev) {
+    setLineasKeyPrev(lineasKey);
+    setLineas(lineasIniciales.map(aDraft));
+  }
+
   // ── Lectura del ticket con IA ────────────────────────────────────────────
   const [leyendo, setLeyendo] = useState(false);
+  const [modoAsistido, setModoAsistido] = useState(
+    Boolean(
+      compra.analisisError ||
+        (compra.medioUrl && lineasIniciales.length === 0 && compra.estado === "borrador"),
+    ),
+  );
+  const activoAsistido = modoAsistido || Boolean(compra.analisisError);
   const lanzadoRef = useRef(false);
+  const primeraFilaRef = useRef<HTMLInputElement>(null);
+
   const analizar = async () => {
     setLeyendo(true);
     try {
@@ -184,9 +205,49 @@ export function CompraDetalle({
       if (response.ok) {
         toast.success("Ticket leído. Revisa las líneas antes de recibir.");
       } else {
+        setModoAsistido(true);
+        setLineas((actuales) => {
+          if (actuales.length === 0) {
+            return [
+              {
+                key: crypto.randomUUID(),
+                id: null,
+                descripcion: "",
+                productoId: null,
+                cantidad: "1",
+                costo: "",
+                importe: "",
+                observacion: "",
+                recibidaOriginal: null,
+                recibida: "1",
+              },
+            ];
+          }
+          return actuales;
+        });
         toast.error(resultado.error ?? "No pudimos leer el ticket.");
       }
     } catch {
+      setModoAsistido(true);
+      setLineas((actuales) => {
+        if (actuales.length === 0) {
+          return [
+            {
+              key: crypto.randomUUID(),
+              id: null,
+              descripcion: "",
+              productoId: null,
+              cantidad: "1",
+              costo: "",
+              importe: "",
+              observacion: "",
+              recibidaOriginal: null,
+              recibida: "1",
+            },
+          ];
+        }
+        return actuales;
+      });
       toast.error("No pudimos leer el ticket. Intenta de nuevo.");
     } finally {
       setLeyendo(false);
@@ -229,17 +290,11 @@ export function CompraDetalle({
     });
   };
 
-  // ── Líneas ───────────────────────────────────────────────────────────────
-  const [lineas, setLineas] = useState<LineaDraft[]>(() => lineasIniciales.map(aDraft));
-  // Re-sincroniza cuando el servidor devuelve líneas distintas (post-mutación):
-  // ajuste de estado durante el render (patrón oficial de React para
-  // "resetear estado al cambiar una prop"), no en un effect.
-  const lineasKey = JSON.stringify(lineasIniciales);
-  const [lineasKeyPrev, setLineasKeyPrev] = useState(lineasKey);
-  if (lineasKey !== lineasKeyPrev) {
-    setLineasKeyPrev(lineasKey);
-    setLineas(lineasIniciales.map(aDraft));
-  }
+  useEffect(() => {
+    if (activoAsistido) {
+      primeraFilaRef.current?.focus();
+    }
+  }, [activoAsistido, lineas.length]);
 
   // El catálogo crece cuando se crea un producto desde el alta rápida y se
   // re-sincroniza igual que las líneas tras `router.refresh()`.
@@ -431,7 +486,32 @@ export function CompraDetalle({
   // ── Foto con zoom ────────────────────────────────────────────────────────
   const [zoom, setZoom] = useState(1);
   const panelFoto = compra.medioUrl ? (
-    <div className="space-y-2">
+    <div className="space-y-3">
+      {activoAsistido ? (
+        <div
+          className="rounded-xl border border-warning/40 bg-warning/10 p-3.5 text-sm text-foreground"
+          role="status"
+        >
+          <div className="flex items-start gap-2">
+            <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning" />
+            <p className="font-medium leading-snug">
+              Nota manuscrita o parcial detectada: completa o corrige los renglones abajo mirando tu foto
+            </p>
+          </div>
+          {editable ? (
+            <Button
+              className="mt-2.5 w-full text-xs font-semibold"
+              data-action-id="compras.linea.captura_asistida"
+              onClick={agregarLinea}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              + Agregar renglón manual
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="flex items-center gap-2">
         <Button
           aria-label="Alejar"
@@ -479,7 +559,7 @@ export function CompraDetalle({
       {/* Foto del ticket: colapsable en móvil, columna fija en escritorio. */}
       <div className="lg:sticky lg:top-4 lg:self-start">
         {compra.medioUrl ? (
-          <details className="lg:hidden" open={compra.estado === "borrador"}>
+          <details className="lg:hidden" open={compra.estado === "borrador" || activoAsistido}>
             <summary className="cursor-pointer list-none rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground">
               Foto del ticket
             </summary>
@@ -658,18 +738,44 @@ export function CompraDetalle({
           description={`${lineas.length} renglón(es). Empareja cada línea con un producto para darle entrada al inventario.`}
           title="Líneas de la compra"
         >
+          {activoAsistido ? (
+            <div
+              className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-foreground"
+              role="status"
+            >
+              <div className="flex items-center gap-2">
+                <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-warning" />
+                <span className="font-medium">
+                  Nota manuscrita o parcial detectada: completa o corrige los renglones abajo mirando tu foto
+                </span>
+              </div>
+              {editable ? (
+                <Button
+                  className="text-xs font-semibold"
+                  data-action-id="compras.linea.captura_asistida"
+                  onClick={agregarLinea}
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  + Agregar renglón
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
           {lineas.length === 0 ? (
             <p className="rounded-xl border border-dashed border-border px-4 py-6 text-center text-sm text-muted-foreground">
               Sin líneas todavía. Lee el ticket con IA o agrega una línea a mano.
             </p>
           ) : (
             <ul className="space-y-4">
-              {lineas.map((linea) => (
+              {lineas.map((linea, index) => (
                 <li className="rounded-xl border border-border p-4" key={linea.key}>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <Field className="sm:col-span-2">
                       <FieldLabel required>Descripción del renglón</FieldLabel>
                       <Input
+                        ref={index === 0 ? primeraFilaRef : undefined}
                         disabled={!editable}
                         onChange={(event) => actualizarLinea(linea.key, { descripcion: event.target.value })}
                         placeholder="Texto del ticket o nombre del producto"

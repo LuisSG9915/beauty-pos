@@ -21,7 +21,9 @@ import {
   ejecutarTextoJson,
   ejecutarVisionJson,
   getAi,
+  GLOSARIO_REMISION_BELLEZA_MX,
   IaNoDisponible,
+  normalizarAbreviaturasBellezaMexico,
 } from "@/lib/ia/cliente";
 
 const esquemaPrueba = z.strictObject({ nombre: z.string().nullable() });
@@ -152,5 +154,122 @@ describe("ejecutarTextoJson", () => {
     )[1]!.content;
     expect(contenido).toHaveLength(1);
     expect(contenido[0]).toEqual({ type: "text", text: OPCIONES.instruccion });
+  });
+});
+
+describe("normalizarAbreviaturasBellezaMexico", () => {
+  it("exporta el glosario de remisiones de belleza en México con equivalencias clave", () => {
+    expect(GLOSARIO_REMISION_BELLEZA_MX).toContain("Tte / Tte. = Tinte");
+    expect(GLOSARIO_REMISION_BELLEZA_MX).toContain("Deco / Polvo deco = Decolorante");
+    expect(GLOSARIO_REMISION_BELLEZA_MX).toContain("Perox / Oxig = Peróxido");
+  });
+
+  it("normaliza Tte 8.1 a Tinte 8.1", () => {
+    expect(normalizarAbreviaturasBellezaMexico("Tte 8.1")).toBe("Tinte 8.1");
+    expect(normalizarAbreviaturasBellezaMexico("Tte. 8.1")).toBe("Tinte 8.1");
+  });
+
+  it("normaliza Deco azul 500grs a Decolorante azul 500g", () => {
+    expect(normalizarAbreviaturasBellezaMexico("Deco azul 500grs")).toBe("Decolorante azul 500g");
+    expect(normalizarAbreviaturasBellezaMexico("Polvo deco 500gr")).toBe("Decolorante 500g");
+  });
+
+  it("normaliza Perox 30v 1000mls a Peróxido 30 vol 1000ml", () => {
+    expect(normalizarAbreviaturasBellezaMexico("Perox 30v 1000mls")).toBe("Peróxido 30 vol 1000ml");
+    expect(normalizarAbreviaturasBellezaMexico("Oxig 20v")).toBe("Peróxido 20 vol");
+  });
+
+  it("normaliza Amp keratina 12pzas a Ampolleta keratina 12pz", () => {
+    expect(normalizarAbreviaturasBellezaMexico("Amp keratina 12pzas")).toBe("Ampolleta keratina 12pz");
+    expect(normalizarAbreviaturasBellezaMexico("Amp. colágeno 1 pza")).toBe("Ampolleta colágeno 1pz");
+  });
+
+  it("normaliza shampoo, tratamientos y acrílicos", () => {
+    expect(normalizarAbreviaturasBellezaMexico("Sh neutro 1000ml.")).toBe("Shampoo neutro 1000ml");
+    expect(normalizarAbreviaturasBellezaMexico("Shamp matizador")).toBe("Shampoo matizador");
+    expect(normalizarAbreviaturasBellezaMexico("Trat capilar")).toBe("Tratamiento capilar");
+    expect(normalizarAbreviaturasBellezaMexico("Acril cristal 2oz.")).toBe("Acrílico cristal 2oz");
+    expect(normalizarAbreviaturasBellezaMexico("Acic rosa")).toBe("Acrílico rosa");
+  });
+
+  it("maneja textos vacíos, nulos o cadenas sin abreviaturas sin fallar", () => {
+    expect(normalizarAbreviaturasBellezaMexico("")).toBe("");
+    expect(normalizarAbreviaturasBellezaMexico(null as unknown as string)).toBe("");
+    expect(normalizarAbreviaturasBellezaMexico(undefined as unknown as string)).toBe("");
+    expect(normalizarAbreviaturasBellezaMexico("Tijeras profesionales")).toBe("Tijeras profesionales");
+  });
+});
+
+describe("glosario y post-procesamiento en ejecución IA", () => {
+  const esquemaTicketPrueba = z.strictObject({
+    lineas: z.array(z.strictObject({ descripcion: z.string(), cantidad: z.number() })),
+  });
+
+  it("inyecta el glosario de belleza mexicana cuando la instrucción es de ticket", async () => {
+    const run = vi.fn<RunFn>(async () => ({
+      response: '{"lineas":[{"descripcion":"Tte 8.1","cantidad":1}]}',
+    }));
+    env.AI = { run };
+
+    await ejecutarVisionJson({
+      modelo: "@cf/meta/llama-4-scout-17b-16e-instruct",
+      system: "Eres un asistente que lee tickets",
+      instruccion: "Lee el ticket y extrae las líneas",
+      jsonSchema: { type: "object" },
+      zod: esquemaTicketPrueba,
+      imagen: IMAGEN,
+    });
+
+    const messages = run.mock.calls[0]![1].messages as { content: Array<{ type: string; text?: string }> }[];
+    const textoUsuario = messages[1]!.content[0]!.text ?? "";
+    expect(textoUsuario).toContain("Glosario de abreviaturas mexicanas");
+  });
+
+  it("aplica normalizarAbreviaturasBellezaMexico a las líneas extraídas por la IA", async () => {
+    env.AI = {
+      run: vi.fn<RunFn>(async () => ({
+        response: {
+          lineas: [
+            { descripcion: "Tte 8.1", cantidad: 2 },
+            { descripcion: "Deco azul 500grs", cantidad: 1 },
+            { descripcion: "Perox 30v 1000mls", cantidad: 1 },
+          ],
+        },
+      })),
+    };
+
+    const salida = await ejecutarVisionJson({
+      modelo: "@cf/meta/llama-4-scout-17b-16e-instruct",
+      system: "system ticket",
+      instruccion: "instruccion ticket",
+      jsonSchema: { type: "object" },
+      zod: esquemaTicketPrueba,
+      imagen: IMAGEN,
+    });
+
+    expect(salida.lineas[0]!.descripcion).toBe("Tinte 8.1");
+    expect(salida.lineas[1]!.descripcion).toBe("Decolorante azul 500g");
+    expect(salida.lineas[2]!.descripcion).toBe("Peróxido 30 vol 1000ml");
+  });
+
+  it("maneja fallback cuando la IA devuelve líneas vacías o respuesta parcial", async () => {
+    env.AI = {
+      run: vi.fn<RunFn>(async () => ({
+        response: {
+          lineas: [],
+        },
+      })),
+    };
+
+    const salida = await ejecutarVisionJson({
+      modelo: "@cf/meta/llama-4-scout-17b-16e-instruct",
+      system: "system ticket",
+      instruccion: "instruccion ticket",
+      jsonSchema: { type: "object" },
+      zod: esquemaTicketPrueba,
+      imagen: IMAGEN,
+    });
+
+    expect(salida.lineas).toEqual([]);
   });
 });

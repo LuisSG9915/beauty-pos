@@ -12,6 +12,7 @@ import {
   citaRecursos,
   citas,
   citasHistorial,
+  clientesFichasTecnicas,
   detalleCitasServicios,
   horariosSucursales,
   recursos,
@@ -54,6 +55,10 @@ import { emitirTokenGestion } from "@/modules/reservas/gestion";
 import { enviarAvisoDiferido } from "@/lib/email/aviso-email";
 import { encolarAvisoCita } from "@/modules/notificaciones/service";
 import { TIPO_CAMBIO, TIPO_CANCELACION, TIPO_CONFIRMACION, type TipoNotificacion } from "@/modules/notificaciones/rules";
+import {
+  construirResumenFormulaRapida,
+  type ResumenFormulaRapida,
+} from "@/modules/expedientes/formulas";
 
 const CITA_ESTADOS = ["pendiente", "confirmada", "en_proceso", "completada", "cancelada", "no_asistio"] as const;
 
@@ -1698,3 +1703,194 @@ export async function toggleRecursoCita(formData: FormData): Promise<CitaMutatio
 
 export const crearCitaAction = saveCita;
 export const moverCitaAction = moveCita;
+
+/**
+ * Obtiene la última fórmula química registrada para un cliente.
+ * Usado por el panel lateral de la agenda para mostrar la pastilla de resumen rápido.
+ */
+export async function obtenerUltimaFormulaClienteAction(
+  params: { organizacionId: string; clienteId: string } | FormData,
+): Promise<{ success: boolean; data?: ResumenFormulaRapida | null; error?: string }> {
+  let organizacionId = "";
+  let clienteId = "";
+
+  if (params instanceof FormData) {
+    organizacionId = String(params.get("organizacionId") ?? "").trim();
+    clienteId = String(params.get("clienteId") ?? "").trim();
+  } else if (params && typeof params === "object") {
+    organizacionId = params.organizacionId?.trim() ?? "";
+    clienteId = params.clienteId?.trim() ?? "";
+  }
+
+  if (!organizacionId || !clienteId) {
+    return { success: false, data: null };
+  }
+
+  const access = await checkPermission(organizacionId, "agenda.ver");
+  if (!access) {
+    return { success: false, error: "Sin permiso para consultar expedientes." };
+  }
+
+  const db = getDatabase();
+  const [ficha] = await db
+    .select({
+      id: clientesFichasTecnicas.id,
+      formula: clientesFichasTecnicas.formula,
+      tiempoPoseMinutos: clientesFichasTecnicas.tiempoPoseMinutos,
+      notas: clientesFichasTecnicas.notas,
+      createdAt: clientesFichasTecnicas.createdAt,
+    })
+    .from(clientesFichasTecnicas)
+    .where(
+      and(
+        eq(clientesFichasTecnicas.clienteId, clienteId),
+        eq(clientesFichasTecnicas.organizacionId, organizacionId),
+        eq(clientesFichasTecnicas.activo, true),
+        inArray(clientesFichasTecnicas.tipo, ["color", "tratamiento"]),
+      ),
+    )
+    .orderBy(desc(clientesFichasTecnicas.createdAt))
+    .limit(1);
+
+  if (!ficha) {
+    return { success: true, data: null };
+  }
+
+  const resumen = construirResumenFormulaRapida({
+    id: ficha.id,
+    creadoEn: ficha.createdAt,
+    mezcla: ficha.formula || ficha.notas || "Fórmula técnica",
+    tiempoPoseMinutos: ficha.tiempoPoseMinutos,
+  });
+
+  return { success: true, data: resumen };
+}
+
+/**
+ * Anexa de forma idempotente la última fórmula química del cliente a las notas de la cita.
+ */
+export async function repetirUltimaFormulaEnCitaAction(
+  input: string | FormData | { citaId: string; organizacionId?: string },
+): Promise<CitaMutationResult> {
+  let citaId = "";
+  let organizacionId: string | undefined;
+
+  if (typeof input === "string") {
+    citaId = input.trim();
+  } else if (input instanceof FormData) {
+    citaId = String(input.get("citaId") ?? "").trim();
+    const org = input.get("organizacionId");
+    if (org) organizacionId = String(org).trim();
+  } else if (input && typeof input === "object") {
+    citaId = input.citaId?.trim() ?? "";
+    organizacionId = input.organizacionId?.trim();
+  }
+
+  if (!citaId) {
+    return { success: false, error: "ID de cita requerido." };
+  }
+
+  const db = getDatabase();
+
+  const [cita] = await db
+    .select({
+      id: citas.id,
+      organizacionId: citas.organizacionId,
+      sucursalId: citas.sucursalId,
+      clienteId: citas.clienteId,
+      notas: citas.notas,
+      version: citas.version,
+      activo: citas.activo,
+    })
+    .from(citas)
+    .where(
+      organizacionId
+        ? and(eq(citas.id, citaId), eq(citas.organizacionId, organizacionId))
+        : eq(citas.id, citaId),
+    )
+    .limit(1);
+
+  if (!cita || !cita.activo) {
+    return { success: false, error: "La cita no existe o está inactiva." };
+  }
+
+  const access = await checkPermission(cita.organizacionId, "agenda.editar");
+  if (!access) {
+    return { success: false, error: "No tienes permiso para editar la agenda." };
+  }
+  if (!(await assertBranchScope(access, cita.sucursalId))) {
+    return { success: false, error: "No tienes acceso a esta sucursal." };
+  }
+
+  if (!cita.clienteId) {
+    return { success: false, error: "La cita no tiene un cliente asignado." };
+  }
+
+  const [ultimaFicha] = await db
+    .select({
+      id: clientesFichasTecnicas.id,
+      formula: clientesFichasTecnicas.formula,
+      tiempoPoseMinutos: clientesFichasTecnicas.tiempoPoseMinutos,
+      notas: clientesFichasTecnicas.notas,
+      createdAt: clientesFichasTecnicas.createdAt,
+    })
+    .from(clientesFichasTecnicas)
+    .where(
+      and(
+        eq(clientesFichasTecnicas.clienteId, cita.clienteId),
+        eq(clientesFichasTecnicas.organizacionId, cita.organizacionId),
+        eq(clientesFichasTecnicas.activo, true),
+        inArray(clientesFichasTecnicas.tipo, ["color", "tratamiento"]),
+      ),
+    )
+    .orderBy(desc(clientesFichasTecnicas.createdAt))
+    .limit(1);
+
+  if (!ultimaFicha) {
+    return { success: false, error: "El cliente no tiene fórmulas químicas previas." };
+  }
+
+  const resumen = construirResumenFormulaRapida({
+    id: ultimaFicha.id,
+    creadoEn: ultimaFicha.createdAt,
+    mezcla: ultimaFicha.formula || ultimaFicha.notas || "Fórmula técnica",
+    tiempoPoseMinutos: ultimaFicha.tiempoPoseMinutos,
+  });
+
+  const lineaRepetida = `[Fórmula repetida]: ${resumen.textoPastilla}`;
+  const notasActuales = cita.notas?.trim() || "";
+
+  if (!notasActuales.includes(lineaRepetida)) {
+    const nuevasNotas = notasActuales ? `${notasActuales}\n${lineaRepetida}` : lineaRepetida;
+    await db.transaction(async (tx) => {
+      await tx
+        .update(citas)
+        .set({
+          notas: nuevasNotas,
+          version: cita.version + 1,
+          updatedBy: access.user.id,
+        })
+        .where(eq(citas.id, cita.id));
+
+      await registrarHistorialCita(tx, {
+        citaId: cita.id,
+        organizacionId: cita.organizacionId,
+        usuarioId: access.user.id,
+        accion: "editada",
+        detalle: {
+          motivo: "formula_repetida",
+          formulaId: ultimaFicha.id,
+          textoPastilla: resumen.textoPastilla,
+        },
+      });
+    });
+  }
+
+  revalidatePath("/admin/agenda");
+  revalidatePath("/admin/mi-dia");
+
+  return {
+    success: true,
+    message: "Fórmula repetida en las notas de la cita.",
+  };
+}

@@ -40,6 +40,56 @@ const MAX_TOKENS_DEFAULT = 800;
 const TIMEOUT_MS_DEFAULT = 45_000;
 const TEMPERATURA = 0.1;
 
+export const GLOSARIO_REMISION_BELLEZA_MX = `Glosario de abreviaturas mexicanas en notas de remisión de belleza:
+- Tte / Tte. = Tinte
+- Deco / Polvo deco = Decolorante
+- Perox / Oxig = Peróxido
+- 10v / 20v / 30v / 40v = 10 vol / 20 vol / 30 vol / 40 vol
+- Sh / Shamp = Shampoo
+- Trat = Tratamiento
+- Amp = Ampolleta
+- Acic / Acril = Acrílico
+- Unidades: gr/grs/g. -> g, mls/ml. -> ml, pza/pzas/pz. -> pz, oz. -> oz.`;
+
+/**
+ * Normaliza abreviaturas comunes en notas de remisión de distribuidores de belleza en México.
+ * Estandariza conceptos (Tte -> Tinte, Deco -> Decolorante, Perox -> Peróxido, etc.) y unidades (grs -> g, mls -> ml, pzas -> pz).
+ */
+export function normalizarAbreviaturasBellezaMexico(texto: string): string {
+  if (!texto) return "";
+  let t = texto;
+
+  // Conceptos compuestos primero
+  t = t.replace(/\bpolvo\s+deco(?!\w)/gi, "Decolorante");
+
+  // Conceptos individuales
+  t = t.replace(/\bdeco(?!\w)/gi, "Decolorante");
+  t = t.replace(/\btte\.?(?!\w)/gi, "Tinte");
+  t = t.replace(/\bperox\.?(?!\w)/gi, "Peróxido");
+  t = t.replace(/\boxig\.?(?!\w)/gi, "Peróxido");
+  t = t.replace(/\b(10|20|30|40)\s*v(?!\w)/gi, "$1 vol");
+  t = t.replace(/\bshamp\.?(?!\w)/gi, "Shampoo");
+  t = t.replace(/\bsh(?!\w)/gi, "Shampoo");
+  t = t.replace(/\btrat\.?(?!\w)/gi, "Tratamiento");
+  t = t.replace(/\bamp\.?(?!\w)/gi, "Ampolleta");
+  t = t.replace(/\bacic\.?(?!\w)/gi, "Acrílico");
+  t = t.replace(/\bacril\.?(?!\w)/gi, "Acrílico");
+
+  // Unidades con número pegado o separado (ej: 500grs -> 500g, 1000mls -> 1000ml, 12pzas -> 12pz, 2oz. -> 2oz)
+  t = t.replace(/(\d+)\s*(?:grs?|g\.)(?!\w)/gi, "$1g");
+  t = t.replace(/(\d+)\s*(?:mls|ml\.)(?!\w)/gi, "$1ml");
+  t = t.replace(/(\d+)\s*(?:pzas?|pz\.)(?!\w)/gi, "$1pz");
+  t = t.replace(/(\d+)\s*(?:oz\.)(?!\w)/gi, "$1oz");
+
+  // Unidades sueltas
+  t = t.replace(/\b(?:grs?|g\.)(?!\w)/gi, "g");
+  t = t.replace(/\b(?:mls|ml\.)(?!\w)/gi, "ml");
+  t = t.replace(/\b(?:pzas?|pz\.)(?!\w)/gi, "pz");
+  t = t.replace(/\boz\.(?!\w)/gi, "oz");
+
+  return t;
+}
+
 /** ArrayBuffer → base64 por bloques (spread directo desborda la pila >64 KB). */
 function aBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
@@ -83,8 +133,19 @@ async function ejecutar<T>(
   const ai = env.AI;
   if (!ai) throw new IaNoDisponible();
 
+  const esTicket =
+    opts.instruccion.toLowerCase().includes("ticket") ||
+    opts.system.toLowerCase().includes("ticket") ||
+    opts.instruccion.toLowerCase().includes("remisión") ||
+    opts.instruccion.toLowerCase().includes("remision") ||
+    opts.instruccion.toLowerCase().includes("compra");
+
+  const instruccionFinal = esTicket
+    ? `${opts.instruccion}\n\n${GLOSARIO_REMISION_BELLEZA_MX}`
+    : opts.instruccion;
+
   const contenidoUsuario: Record<string, unknown>[] = [
-    { type: "text", text: opts.instruccion },
+    { type: "text", text: instruccionFinal },
   ];
   if (imagen) {
     contenidoUsuario.push({
@@ -125,7 +186,21 @@ async function ejecutar<T>(
       ) => Promise<unknown>)(opts.modelo, inputs, options),
       limite,
     ]);
-    return opts.zod.parse(extraerJson(salida));
+    const payload = extraerJson(salida);
+    if (
+      payload &&
+      typeof payload === "object" &&
+      "lineas" in payload &&
+      Array.isArray((payload as { lineas?: unknown }).lineas)
+    ) {
+      const lineas = (payload as { lineas: Array<Record<string, unknown>> }).lineas;
+      for (const linea of lineas) {
+        if (typeof linea?.descripcion === "string") {
+          linea.descripcion = normalizarAbreviaturasBellezaMexico(linea.descripcion);
+        }
+      }
+    }
+    return opts.zod.parse(payload);
   } finally {
     clearTimeout(timer);
   }

@@ -634,3 +634,167 @@ export async function comparativoSucursales(
     }))
     .sort((a, b) => b.vendido - a.vendido || a.nombre.localeCompare(b.nombre, "es"));
 }
+
+export interface ResumenGananciaNeta {
+  totalIngresadoCentavos: number;
+  efectivoCentavos: number;
+  tarjetaCentavos: number;
+  transferenciaCentavos: number;
+  comisionesEquipoCentavos: number;
+  gastosOperativosCentavos: number;
+  utilidadNetaCentavos: number;
+}
+
+export function calcularUtilidadNeta(
+  totalIngresadoCentavos: number,
+  comisionesEquipoCentavos: number,
+  gastosOperativosCentavos: number,
+): number {
+  return totalIngresadoCentavos - comisionesEquipoCentavos - gastosOperativosCentavos;
+}
+
+/**
+ * Consulta fusionada en 1 sola ronda SQL para calcular la ganancia real (caja neta)
+ * en el período indicado: Total Ingresado - Comisiones Devengadas - Gastos Operativos.
+ */
+export async function obtenerGananciaNetaPeriodo(params: {
+  organizacionId: string;
+  sucursalId?: string | null;
+  desde: Date;
+  hasta: Date;
+}): Promise<ResumenGananciaNeta> {
+  const db = getDatabase();
+  const { organizacionId, sucursalId, desde, hasta } = params;
+
+  type GananciaNetaRow = {
+    totalIngresadoCentavos: string | number | null;
+    efectivoCentavos: string | number | null;
+    tarjetaCentavos: string | number | null;
+    transferenciaCentavos: string | number | null;
+    comisionesEquipoCentavos: string | number | null;
+    gastosOperativosCentavos: string | number | null;
+  };
+
+  const sucursalFilter = sucursalId ? sql`and v.sucursal_id = ${sucursalId}` : sql``;
+  const sucursalGastoFilter = sucursalId ? sql`and g.sucursal_id = ${sucursalId}` : sql``;
+
+  const result = await db.execute<GananciaNetaRow>(sql`
+    select
+      coalesce(
+        (
+          select round(sum(dvmp.monto) * 100)::bigint
+            from ventas v
+            join detalle_ventas_medios_pagos dvmp on dvmp.venta_id = v.id and dvmp.activo
+           where v.organizacion_id = ${organizacionId}
+             ${sucursalFilter}
+             and v.estado = 'completada'
+             and v.activo
+             and coalesce(v.cobrada_at, v.created_at) >= ${desde}
+             and coalesce(v.cobrada_at, v.created_at) < ${hasta}
+        ),
+        0
+      ) as "totalIngresadoCentavos",
+      coalesce(
+        (
+          select round(sum(dvmp.monto) * 100)::bigint
+            from ventas v
+            join detalle_ventas_medios_pagos dvmp on dvmp.venta_id = v.id and dvmp.activo
+            join cat_medios_pago mp on mp.id = dvmp.medio_pago_id
+           where v.organizacion_id = ${organizacionId}
+             ${sucursalFilter}
+             and v.estado = 'completada'
+             and v.activo
+             and mp.categoria = 'efectivo'
+             and coalesce(v.cobrada_at, v.created_at) >= ${desde}
+             and coalesce(v.cobrada_at, v.created_at) < ${hasta}
+        ),
+        0
+      ) as "efectivoCentavos",
+      coalesce(
+        (
+          select round(sum(dvmp.monto) * 100)::bigint
+            from ventas v
+            join detalle_ventas_medios_pagos dvmp on dvmp.venta_id = v.id and dvmp.activo
+            join cat_medios_pago mp on mp.id = dvmp.medio_pago_id
+           where v.organizacion_id = ${organizacionId}
+             ${sucursalFilter}
+             and v.estado = 'completada'
+             and v.activo
+             and mp.categoria = 'tarjeta'
+             and coalesce(v.cobrada_at, v.created_at) >= ${desde}
+             and coalesce(v.cobrada_at, v.created_at) < ${hasta}
+        ),
+        0
+      ) as "tarjetaCentavos",
+      coalesce(
+        (
+          select round(sum(dvmp.monto) * 100)::bigint
+            from ventas v
+            join detalle_ventas_medios_pagos dvmp on dvmp.venta_id = v.id and dvmp.activo
+            join cat_medios_pago mp on mp.id = dvmp.medio_pago_id
+           where v.organizacion_id = ${organizacionId}
+             ${sucursalFilter}
+             and v.estado = 'completada'
+             and v.activo
+             and (mp.categoria in ('transferencia', 'spei') or lower(mp.nombre) like '%spei%' or lower(mp.nombre) like '%transfer%')
+             and coalesce(v.cobrada_at, v.created_at) >= ${desde}
+             and coalesce(v.cobrada_at, v.created_at) < ${hasta}
+        ),
+        0
+      ) as "transferenciaCentavos",
+      coalesce(
+        (
+          select round(sum(dvc.monto) * 100)::bigint
+            from detalle_ventas_comisiones dvc
+            join ventas v on dvc.venta_id = v.id
+           where v.organizacion_id = ${organizacionId}
+             ${sucursalFilter}
+             and v.estado = 'completada'
+             and v.activo
+             and dvc.activo
+             and coalesce(v.cobrada_at, v.created_at) >= ${desde}
+             and coalesce(v.cobrada_at, v.created_at) < ${hasta}
+        ),
+        0
+      ) as "comisionesEquipoCentavos",
+      coalesce(
+        (
+          select round(sum(g.importe) * 100)::bigint
+            from gastos g
+           where g.organizacion_id = ${organizacionId}
+             ${sucursalGastoFilter}
+             and g.estado = 'confirmado'
+             and g.activo
+             and (
+               (g.created_at >= ${desde} and g.created_at < ${hasta})
+               or (g.fecha_gasto >= (${desde}::timestamptz)::date and g.fecha_gasto < (${hasta}::timestamptz)::date)
+             )
+        ),
+        0
+      ) as "gastosOperativosCentavos"
+  `);
+
+  const row = result.rows[0];
+  const totalIngresadoCentavos = Number(row?.totalIngresadoCentavos ?? 0);
+  const efectivoCentavos = Number(row?.efectivoCentavos ?? 0);
+  const tarjetaCentavos = Number(row?.tarjetaCentavos ?? 0);
+  const transferenciaCentavos = Number(row?.transferenciaCentavos ?? 0);
+  const comisionesEquipoCentavos = Number(row?.comisionesEquipoCentavos ?? 0);
+  const gastosOperativosCentavos = Number(row?.gastosOperativosCentavos ?? 0);
+  const utilidadNetaCentavos = calcularUtilidadNeta(
+    totalIngresadoCentavos,
+    comisionesEquipoCentavos,
+    gastosOperativosCentavos,
+  );
+
+  return {
+    totalIngresadoCentavos,
+    efectivoCentavos,
+    tarjetaCentavos,
+    transferenciaCentavos,
+    comisionesEquipoCentavos,
+    gastosOperativosCentavos,
+    utilidadNetaCentavos,
+  };
+}
+
