@@ -1,6 +1,6 @@
 "use client";
 
-import { Minus, PackageCheck, Plus, ReceiptText, Trash2 } from "lucide-react";
+import { ChevronDown, Minus, PackageCheck, Plus, ReceiptText, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useRef, useState, useTransition } from "react";
@@ -566,6 +566,16 @@ export function VentaTicket({
   const cubiertoPorPaquete = lineasServicios
     .filter((l) => l.paqueteUsado)
     .reduce((s, l) => s + Number(l.precio) * l.cantidad, 0);
+  const tieneLineasPostTotal =
+    anticipoAplicado > 0 || (editable && anticipoPorAplicar > 0) || totalDevuelto > 0 || propinaNum > 0;
+  const tieneAjustesResumen =
+    cubiertoPorPaquete > 0 ||
+    Number(venta.descuento) > 0 ||
+    Number(venta.descuentoPromocion ?? 0) > 0 ||
+    Number(venta.descuentoMembresia ?? 0) > 0 ||
+    tieneLineasPostTotal;
+  const tieneBeneficioActivo =
+    Number(venta.descuento) > 0 || Boolean(venta.promocionId) || Boolean(venta.membresiaId);
 
   // En modo inline el descuento también debe provocar el refetch del ticket.
   const handledDescuento = useRef<ActionState | null>(null);
@@ -806,270 +816,115 @@ export function VentaTicket({
             </span>
           </div>
 
-          <div className="mt-3 divide-y divide-border/60 rounded-xl bg-accent/40 p-4 transition-all">
-            <div className="space-y-2 pb-3 text-sm">
-              <div className="flex justify-between text-muted-foreground">
-                <span>Subtotal</span>
-                <span className="font-mono tabular-nums text-foreground">
-                  {formatCurrency(venta.subtotal, { currency })}
-                </span>
-              </div>
-              {cubiertoPorPaquete > 0 ? (
-                <div className="flex justify-between text-op-xs text-success">
-                  <span>Cubierto por paquete (no cobrado)</span>
-                  <span className="font-mono tabular-nums">
-                    {formatCurrency(cubiertoPorPaquete, { currency })}
-                  </span>
-                </div>
-              ) : null}
-              {Number(venta.descuento) > 0 ? (
-                <div className="flex justify-between text-op-xs text-muted-foreground">
-                  <span>Descuento directo</span>
-                  <span className="font-mono tabular-nums text-foreground">
-                    -{formatCurrency(venta.descuento, { currency })}
-                  </span>
-                </div>
-              ) : null}
-              {Number(venta.descuentoPromocion ?? 0) > 0 ? (
-                <div className="flex justify-between text-op-xs font-medium text-success">
-                  <span>Promoción{venta.promocionNombre ? ` · ${venta.promocionNombre}` : ""}</span>
-                  <span className="font-mono tabular-nums">
-                    -{formatCurrency(venta.descuentoPromocion ?? "0", { currency })}
-                  </span>
-                </div>
-              ) : null}
-              {Number(venta.descuentoMembresia ?? 0) > 0 ? (
-                <div className="flex justify-between text-op-xs font-medium text-primary">
-                  <span>Membresía{venta.membresiaNombre ? ` · ${venta.membresiaNombre}` : ""}</span>
-                  <span className="font-mono tabular-nums">
-                    -{formatCurrency(venta.descuentoMembresia ?? "0", { currency })}
-                  </span>
-                </div>
-              ) : null}
-              {propinaNum > 0 ? (
-                <div className="flex justify-between text-op-xs text-muted-foreground">
-                  <span>Propina</span>
-                  <span className="font-mono tabular-nums text-foreground">
-                    +{formatCurrency(propinaNum, { currency })}
-                  </span>
-                </div>
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/10 p-4">
+            <div>
+              <span className="text-op-xs font-semibold uppercase tracking-wider text-primary">Total</span>
+              {anticipoAplicado > 0 ? (
+                <p className="text-op-xs text-muted-foreground">
+                  Anticipo: -{formatCurrency(anticipoAplicado, { currency })}
+                </p>
               ) : null}
             </div>
+            <span className="font-mono text-2xl sm:text-3xl font-extrabold tracking-tight tabular-nums text-primary">
+              {formatCurrency(venta.total, { currency })}
+            </span>
+          </div>
 
-            <div className="space-y-2 pt-3">
-              <div className="flex items-center justify-between rounded-xl border border-primary/25 bg-primary/10 p-3.5">
-                <div>
-                  <span className="text-op-xs font-semibold uppercase tracking-wider text-primary">Total</span>
-                  {anticipoAplicado > 0 ? (
-                    <p className="text-op-xs text-muted-foreground">
-                      Anticipo: -{formatCurrency(anticipoAplicado, { currency })}
-                    </p>
-                  ) : null}
+          <details className="group mt-3" open={tieneAjustesResumen}>
+            <summary className="cursor-pointer text-op-xs font-medium text-muted-foreground hover:text-foreground">
+              Ver desglose detallado
+            </summary>
+            <div className="mt-2 divide-y divide-border/60 rounded-xl bg-accent/40 p-4 transition-all">
+              <div className="space-y-2 pb-3 text-sm">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span className="font-mono tabular-nums text-foreground">
+                    {formatCurrency(venta.subtotal, { currency })}
+                  </span>
                 </div>
-                <span className="font-mono text-2xl font-bold tracking-tight text-primary">
-                  {formatCurrency(venta.total, { currency })}
-                </span>
-              </div>
-
-              {anticipoAplicado > 0 ? (
-                <div className="flex justify-between text-op-xs font-medium text-success">
-                  <span>Anticipo aplicado</span>
-                  <span className="font-mono tabular-nums">-{formatCurrency(anticipoAplicado, { currency })}</span>
-                </div>
-              ) : null}
-              {editable && anticipoPorAplicar > 0 ? (
-                <div className="flex justify-between text-op-xs font-medium text-success">
-                  <span>Anticipo por aplicar</span>
-                  <span className="font-mono tabular-nums">-{formatCurrency(anticipoPorAplicar, { currency })}</span>
-                </div>
-              ) : null}
-              {totalDevuelto > 0 ? (
-                <div className="space-y-1.5 pt-1">
-                  <div className="flex justify-between text-op-xs text-destructive">
-                    <span>Devuelto</span>
-                    <span className="font-mono tabular-nums">-{formatCurrency(totalDevuelto, { currency })}</span>
-                  </div>
-                  <div className="flex justify-between text-sm font-semibold text-foreground">
-                    <span>Neto cobrado</span>
+                {cubiertoPorPaquete > 0 ? (
+                  <div className="flex justify-between text-op-xs text-success">
+                    <span>Cubierto por paquete (no cobrado)</span>
                     <span className="font-mono tabular-nums">
-                      {formatCurrency(Math.max(Number(venta.total) - totalDevuelto, 0), { currency })}
+                      {formatCurrency(cubiertoPorPaquete, { currency })}
                     </span>
                   </div>
-                </div>
-              ) : null}
-              {propinaNum > 0 ? (
-                <div className="flex justify-between text-op-xs font-semibold text-primary pt-1">
-                  <span>Total + propina</span>
-                  <span className="font-mono tabular-nums">
-                    {formatCurrency(Number(venta.total) + propinaNum, { currency })}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </section>
-
-        {editable ? (
-          <form
-            action={descuentoAction}
-            className="space-y-3 rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md"
-          >
-            <input name="organizacionId" type="hidden" value={organizationId} />
-            <input name="ventaId" type="hidden" value={venta.id} />
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-foreground">Descuento</h2>
-              <span className="text-op-xs text-muted-foreground">Directo</span>
-            </div>
-            <div className="flex flex-wrap items-end gap-2">
-              <Field className="w-32">
-                <FieldLabel className="text-op-xs">Monto ($)</FieldLabel>
-                <Input
-                  className="font-mono"
-                  defaultValue={venta.descuento}
-                  key={venta.descuento}
-                  min="0"
-                  name="descuento"
-                  step="0.01"
-                  type="number"
-                />
-              </Field>
-              <Button
-                className="rounded-xl active:scale-95 transition-transform"
-                disabled={descuentoPending}
-                type="submit"
-                variant="outline"
-              >
-                {descuentoPending ? "Aplicando…" : "Aplicar"}
-              </Button>
-              <div aria-label="Descuento rápido" className="flex flex-wrap gap-1.5" role="group">
-                {[5, 10, 15, 20].map((pct) => (
-                  <Button
-                    className="min-h-11 rounded-xl border border-border/60 hover:border-primary/50 hover:bg-primary/5 text-primary text-op-xs font-semibold active:scale-90 transition-all duration-150 px-2.5"
-                    disabled={descuentoPending}
-                    key={pct}
-                    onClick={() => aplicarPorcentaje(pct)}
-                    type="button"
-                    variant="ghost"
-                  >
-                    {pct}%
-                  </Button>
-                ))}
+                ) : null}
+                {Number(venta.descuento) > 0 ? (
+                  <div className="flex justify-between text-op-xs text-muted-foreground">
+                    <span>Descuento directo</span>
+                    <span className="font-mono tabular-nums text-foreground">
+                      -{formatCurrency(venta.descuento, { currency })}
+                    </span>
+                  </div>
+                ) : null}
+                {Number(venta.descuentoPromocion ?? 0) > 0 ? (
+                  <div className="flex justify-between text-op-xs font-medium text-success">
+                    <span>Promoción{venta.promocionNombre ? ` · ${venta.promocionNombre}` : ""}</span>
+                    <span className="font-mono tabular-nums">
+                      -{formatCurrency(venta.descuentoPromocion ?? "0", { currency })}
+                    </span>
+                  </div>
+                ) : null}
+                {Number(venta.descuentoMembresia ?? 0) > 0 ? (
+                  <div className="flex justify-between text-op-xs font-medium text-primary">
+                    <span>Membresía{venta.membresiaNombre ? ` · ${venta.membresiaNombre}` : ""}</span>
+                    <span className="font-mono tabular-nums">
+                      -{formatCurrency(venta.descuentoMembresia ?? "0", { currency })}
+                    </span>
+                  </div>
+                ) : null}
+                {propinaNum > 0 ? (
+                  <div className="flex justify-between text-op-xs text-muted-foreground">
+                    <span>Propina</span>
+                    <span className="font-mono tabular-nums text-foreground">
+                      +{formatCurrency(propinaNum, { currency })}
+                    </span>
+                  </div>
+                ) : null}
               </div>
+
+              {tieneLineasPostTotal ? (
+                <div className="space-y-2 pt-3">
+                  {anticipoAplicado > 0 ? (
+                    <div className="flex justify-between text-op-xs font-medium text-success">
+                      <span>Anticipo aplicado</span>
+                      <span className="font-mono tabular-nums">-{formatCurrency(anticipoAplicado, { currency })}</span>
+                    </div>
+                  ) : null}
+                  {editable && anticipoPorAplicar > 0 ? (
+                    <div className="flex justify-between text-op-xs font-medium text-success">
+                      <span>Anticipo por aplicar</span>
+                      <span className="font-mono tabular-nums">-{formatCurrency(anticipoPorAplicar, { currency })}</span>
+                    </div>
+                  ) : null}
+                  {totalDevuelto > 0 ? (
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex justify-between text-op-xs text-destructive">
+                        <span>Devuelto</span>
+                        <span className="font-mono tabular-nums">-{formatCurrency(totalDevuelto, { currency })}</span>
+                      </div>
+                      <div className="flex justify-between text-sm font-semibold text-foreground">
+                        <span>Neto cobrado</span>
+                        <span className="font-mono tabular-nums">
+                          {formatCurrency(Math.max(Number(venta.total) - totalDevuelto, 0), { currency })}
+                        </span>
+                      </div>
+                    </div>
+                  ) : null}
+                  {propinaNum > 0 ? (
+                    <div className="flex justify-between text-op-xs font-semibold text-primary pt-1">
+                      <span>Total + propina</span>
+                      <span className="font-mono tabular-nums">
+                        {formatCurrency(Number(venta.total) + propinaNum, { currency })}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
-            <ActionFeedback state={descuentoState} />
-          </form>
-        ) : null}
-
-        {editable && (promocionesDisponibles.length > 0 || venta.promocionId) ? (
-          <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md">
-            <h2 className="text-sm font-semibold text-foreground">Promoción</h2>
-            {venta.promocionId ? (
-              <form action={quitarPromoAction} className="flex items-center justify-between gap-3 rounded-xl border border-success/20 bg-success-soft p-3">
-                <input name="organizacionId" type="hidden" value={organizationId} />
-                <input name="ventaId" type="hidden" value={venta.id} />
-                <p className="min-w-0 flex-1 text-sm text-success-soft-foreground">
-                  <span className="font-semibold">{venta.promocionNombre ?? "Aplicada"}</span>
-                  <span className="ml-2 font-mono tabular-nums">-{formatCurrency(venta.descuentoPromocion ?? "0", { currency })}</span>
-                </p>
-                <Button
-                  className="rounded-xl text-destructive hover:bg-destructive/10 active:scale-95 transition-all"
-                  disabled={quitarPromoPending}
-                  size="sm"
-                  type="submit"
-                  variant="ghost"
-                >
-                  {quitarPromoPending ? "Quitando…" : "Quitar"}
-                </Button>
-              </form>
-            ) : (
-              <form action={promoAction} className="flex flex-wrap items-end gap-2">
-                <input name="organizacionId" type="hidden" value={organizationId} />
-                <input name="ventaId" type="hidden" value={venta.id} />
-                <div className="min-w-0 flex-1">
-                  <Combobox
-                    clearable={false}
-                    emptyMessage="Sin promociones vigentes"
-                    items={promocionesDisponibles.map((p) => ({
-                      value: p.id,
-                      label: p.nombre,
-                      description:
-                        p.tipo === "porcentaje"
-                          ? `${Number(p.valor)}% ${p.aplica === "ambos" ? "en todo" : `en ${p.aplica}`}`
-                          : `-${formatCurrency(p.valor, { currency })} ${p.aplica === "ambos" ? "en todo" : `en ${p.aplica}`}`,
-                    }))}
-                    label="Promoción vigente"
-                    name="promocionId"
-                    placeholder="Buscar promoción…"
-                    required
-                  />
-                </div>
-                <Button
-                  className="rounded-xl active:scale-95 transition-transform"
-                  disabled={promoPending}
-                  type="submit"
-                  variant="outline"
-                >
-                  {promoPending ? "Aplicando…" : "Aplicar promoción"}
-                </Button>
-              </form>
-            )}
-            <ActionFeedback state={promoState.success || promoState.error ? promoState : quitarPromoState} />
-          </section>
-        ) : null}
-
-        {editable && (membresiasCliente.length > 0 || venta.membresiaId) ? (
-          <section className="space-y-3 rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md">
-            <h2 className="text-sm font-semibold text-foreground">Membresía del cliente</h2>
-            {venta.membresiaId ? (
-              <form action={quitarMembresiaAction} className="flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/10 p-3">
-                <input name="organizacionId" type="hidden" value={organizationId} />
-                <input name="ventaId" type="hidden" value={venta.id} />
-                <p className="min-w-0 flex-1 text-sm text-primary">
-                  <span className="font-semibold">{venta.membresiaNombre ?? "Aplicada"}</span>
-                  <span className="ml-2 font-mono tabular-nums">-{formatCurrency(venta.descuentoMembresia ?? "0", { currency })}</span>
-                </p>
-                <Button
-                  className="rounded-xl text-destructive hover:bg-destructive/10 active:scale-95 transition-all"
-                  disabled={quitarMembresiaPending}
-                  size="sm"
-                  type="submit"
-                  variant="ghost"
-                >
-                  {quitarMembresiaPending ? "Quitando…" : "Quitar"}
-                </Button>
-              </form>
-            ) : (
-              <form action={membresiaAction} className="flex flex-wrap items-end gap-2">
-                <input name="organizacionId" type="hidden" value={organizationId} />
-                <input name="ventaId" type="hidden" value={venta.id} />
-                <div className="min-w-0 flex-1">
-                  <Combobox
-                    clearable={false}
-                    emptyMessage="Sin membresías vigentes"
-                    items={membresiasCliente.map((m) => ({
-                      value: m.id,
-                      label: m.nombre,
-                      description: `${Number(m.descuentoPorcentaje)}% ${m.aplica === "ambos" ? "en todo" : `en ${m.aplica}`} · hasta ${m.vigenciaHasta}`,
-                    }))}
-                    label="Membresía vigente"
-                    name="clienteMembresiaId"
-                    placeholder="Buscar membresía…"
-                    required
-                  />
-                </div>
-                <Button
-                  className="rounded-xl active:scale-95 transition-transform"
-                  disabled={membresiaPending}
-                  type="submit"
-                  variant="outline"
-                >
-                  {membresiaPending ? "Aplicando…" : "Aplicar membresía"}
-                </Button>
-              </form>
-            )}
-            <ActionFeedback state={membresiaState.success || membresiaState.error ? membresiaState : quitarMembresiaState} />
-          </section>
-        ) : null}
+          </details>
+        </section>
 
         {anticipos.length > 0 ? (
           <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -1180,6 +1035,177 @@ export function VentaTicket({
             </div>
           </section>
         )}
+
+        {editable ? (
+          <details
+            className="rounded-2xl border border-border/80 bg-card shadow-sm transition-all duration-200 hover:shadow-md"
+            data-testid="pos-beneficios-details"
+            open={tieneBeneficioActivo}
+          >
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-5 py-3.5 text-sm font-semibold text-foreground">
+              Descuentos, promoción y membresía
+              <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="divide-y divide-border/60 border-t border-border/60">
+              <form action={descuentoAction} className="space-y-3 px-5 py-4">
+                <input name="organizacionId" type="hidden" value={organizationId} />
+                <input name="ventaId" type="hidden" value={venta.id} />
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-semibold text-foreground">Descuento</h2>
+                  <span className="text-op-xs text-muted-foreground">Directo</span>
+                </div>
+                <div className="flex flex-wrap items-end gap-2">
+                  <Field className="w-32">
+                    <FieldLabel className="text-op-xs">Monto ($)</FieldLabel>
+                    <Input
+                      className="font-mono"
+                      defaultValue={venta.descuento}
+                      key={venta.descuento}
+                      min="0"
+                      name="descuento"
+                      step="0.01"
+                      type="number"
+                    />
+                  </Field>
+                  <Button
+                    className="rounded-xl active:scale-95 transition-transform"
+                    disabled={descuentoPending}
+                    type="submit"
+                    variant="outline"
+                  >
+                    {descuentoPending ? "Aplicando…" : "Aplicar"}
+                  </Button>
+                  <div aria-label="Descuento rápido" className="flex flex-wrap gap-1.5" role="group">
+                    {[5, 10, 15, 20].map((pct) => (
+                      <Button
+                        className="min-h-11 rounded-xl border border-border/60 hover:border-primary/50 hover:bg-primary/5 text-primary text-op-xs font-semibold active:scale-90 transition-all duration-150 px-2.5"
+                        disabled={descuentoPending}
+                        key={pct}
+                        onClick={() => aplicarPorcentaje(pct)}
+                        type="button"
+                        variant="ghost"
+                      >
+                        {pct}%
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                <ActionFeedback state={descuentoState} />
+              </form>
+
+              {promocionesDisponibles.length > 0 || venta.promocionId ? (
+                <section className="space-y-3 px-5 py-4">
+                  <h2 className="text-sm font-semibold text-foreground">Promoción</h2>
+                  {venta.promocionId ? (
+                    <form action={quitarPromoAction} className="flex items-center justify-between gap-3 rounded-xl border border-success/20 bg-success-soft p-3">
+                      <input name="organizacionId" type="hidden" value={organizationId} />
+                      <input name="ventaId" type="hidden" value={venta.id} />
+                      <p className="min-w-0 flex-1 text-sm text-success-soft-foreground">
+                        <span className="font-semibold">{venta.promocionNombre ?? "Aplicada"}</span>
+                        <span className="ml-2 font-mono tabular-nums">-{formatCurrency(venta.descuentoPromocion ?? "0", { currency })}</span>
+                      </p>
+                      <Button
+                        className="rounded-xl text-destructive hover:bg-destructive/10 active:scale-95 transition-all"
+                        disabled={quitarPromoPending}
+                        size="sm"
+                        type="submit"
+                        variant="ghost"
+                      >
+                        {quitarPromoPending ? "Quitando…" : "Quitar"}
+                      </Button>
+                    </form>
+                  ) : (
+                    <form action={promoAction} className="flex flex-wrap items-end gap-2">
+                      <input name="organizacionId" type="hidden" value={organizationId} />
+                      <input name="ventaId" type="hidden" value={venta.id} />
+                      <div className="min-w-0 flex-1">
+                        <Combobox
+                          clearable={false}
+                          emptyMessage="Sin promociones vigentes"
+                          items={promocionesDisponibles.map((p) => ({
+                            value: p.id,
+                            label: p.nombre,
+                            description:
+                              p.tipo === "porcentaje"
+                                ? `${Number(p.valor)}% ${p.aplica === "ambos" ? "en todo" : `en ${p.aplica}`}`
+                                : `-${formatCurrency(p.valor, { currency })} ${p.aplica === "ambos" ? "en todo" : `en ${p.aplica}`}`,
+                          }))}
+                          label="Promoción vigente"
+                          name="promocionId"
+                          placeholder="Buscar promoción…"
+                          required
+                        />
+                      </div>
+                      <Button
+                        className="rounded-xl active:scale-95 transition-transform"
+                        disabled={promoPending}
+                        type="submit"
+                        variant="outline"
+                      >
+                        {promoPending ? "Aplicando…" : "Aplicar promoción"}
+                      </Button>
+                    </form>
+                  )}
+                  <ActionFeedback state={promoState.success || promoState.error ? promoState : quitarPromoState} />
+                </section>
+              ) : null}
+
+              {Boolean(venta.clienteId) && (membresiasCliente.length > 0 || venta.membresiaId) ? (
+                <section className="space-y-3 px-5 py-4">
+                  <h2 className="text-sm font-semibold text-foreground">Membresía del cliente</h2>
+                  {venta.membresiaId ? (
+                    <form action={quitarMembresiaAction} className="flex items-center justify-between gap-3 rounded-xl border border-primary/20 bg-primary/10 p-3">
+                      <input name="organizacionId" type="hidden" value={organizationId} />
+                      <input name="ventaId" type="hidden" value={venta.id} />
+                      <p className="min-w-0 flex-1 text-sm text-primary">
+                        <span className="font-semibold">{venta.membresiaNombre ?? "Aplicada"}</span>
+                        <span className="ml-2 font-mono tabular-nums">-{formatCurrency(venta.descuentoMembresia ?? "0", { currency })}</span>
+                      </p>
+                      <Button
+                        className="rounded-xl text-destructive hover:bg-destructive/10 active:scale-95 transition-all"
+                        disabled={quitarMembresiaPending}
+                        size="sm"
+                        type="submit"
+                        variant="ghost"
+                      >
+                        {quitarMembresiaPending ? "Quitando…" : "Quitar"}
+                      </Button>
+                    </form>
+                  ) : (
+                    <form action={membresiaAction} className="flex flex-wrap items-end gap-2">
+                      <input name="organizacionId" type="hidden" value={organizationId} />
+                      <input name="ventaId" type="hidden" value={venta.id} />
+                      <div className="min-w-0 flex-1">
+                        <Combobox
+                          clearable={false}
+                          emptyMessage="Sin membresías vigentes"
+                          items={membresiasCliente.map((m) => ({
+                            value: m.id,
+                            label: m.nombre,
+                            description: `${Number(m.descuentoPorcentaje)}% ${m.aplica === "ambos" ? "en todo" : `en ${m.aplica}`} · hasta ${m.vigenciaHasta}`,
+                          }))}
+                          label="Membresía vigente"
+                          name="clienteMembresiaId"
+                          placeholder="Buscar membresía…"
+                          required
+                        />
+                      </div>
+                      <Button
+                        className="rounded-xl active:scale-95 transition-transform"
+                        disabled={membresiaPending}
+                        type="submit"
+                        variant="outline"
+                      >
+                        {membresiaPending ? "Aplicando…" : "Aplicar membresía"}
+                      </Button>
+                    </form>
+                  )}
+                  <ActionFeedback state={membresiaState.success || membresiaState.error ? membresiaState : quitarMembresiaState} />
+                </section>
+              ) : null}
+            </div>
+          </details>
+        ) : null}
 
         {devoluciones.length > 0 ? (
           <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">

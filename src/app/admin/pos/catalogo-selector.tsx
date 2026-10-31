@@ -69,8 +69,12 @@ export function CatalogoSelector({
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
+  const tabsVisibles = hasCliente ? TABS : TABS.filter((t) => t.value === "servicios" || t.value === "productos");
+  const tabEfectivo: CatalogoTab =
+    !hasCliente && (tab === "paquetes" || tab === "membresias") ? "servicios" : tab;
+
   const items: CatalogoItem[] =
-    tab === "servicios" ? servicios : tab === "productos" ? productos : tab === "membresias" ? membresias : paquetes;
+    tabEfectivo === "servicios" ? servicios : tabEfectivo === "productos" ? productos : tabEfectivo === "membresias" ? membresias : paquetes;
 
   const categorias = useMemo(() => {
     const map = new Map<string, string>();
@@ -153,9 +157,9 @@ export function CatalogoSelector({
           className="flex flex-wrap sm:flex-nowrap rounded-xl border border-border bg-muted/60 p-1 w-full sm:w-auto"
           role="group"
         >
-          {TABS.map((opcion) => {
+          {tabsVisibles.map((opcion) => {
             const Icon = opcion.icon;
-            const activo = tab === opcion.value;
+            const activo = tabEfectivo === opcion.value;
             return (
               <button
                 aria-pressed={activo}
@@ -190,12 +194,18 @@ export function CatalogoSelector({
             className="h-11 min-h-11 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm outline-none transition-all duration-150 focus:border-primary focus:ring-3 focus:ring-primary/20 hover:border-border"
             id="pos-catalogo-buscar"
             onChange={(event) => setQuery(event.target.value)}
-            placeholder={tab === "servicios" ? "Buscar servicio" : tab === "paquetes" ? "Buscar paquete" : tab === "membresias" ? "Buscar membresía" : "Buscar por clave o nombre"}
+            placeholder={tabEfectivo === "servicios" ? "Buscar servicio" : tabEfectivo === "paquetes" ? "Buscar paquete" : tabEfectivo === "membresias" ? "Buscar membresía" : "Buscar por clave o nombre"}
             type="search"
             value={query}
           />
         </div>
       </div>
+
+      {!hasCliente && (paquetes.length > 0 || membresias.length > 0) ? (
+        <p className="text-op-xs text-muted-foreground">
+          Asigna un cliente en el encabezado del ticket para vender paquetes o membresías.
+        </p>
+      ) : null}
 
       {categorias.length > 0 ? (
         <div aria-label="Filtrar por categoría" className="flex flex-wrap gap-2 max-w-full" role="group">
@@ -221,19 +231,13 @@ export function CatalogoSelector({
         </div>
       ) : null}
 
-      {(tab === "paquetes" || tab === "membresias") && !hasCliente ? (
-        <p className="rounded-xl bg-accent/70 px-4 py-3 text-op-xs text-primary">
-          Asigna un cliente a la venta para vender {tab === "paquetes" ? "paquetes: el saldo" : "membresías: la vigencia"} se crea a su nombre al cobrar.
-        </p>
-      ) : null}
-
       {filtrados.length === 0 ? (
         <p className="rounded-xl bg-muted/60 px-4 py-3 text-sm text-muted-foreground">
-          {tab === "servicios"
+          {tabEfectivo === "servicios"
             ? "No hay servicios que coincidan."
-            : tab === "paquetes"
+            : tabEfectivo === "paquetes"
               ? "No hay paquetes que coincidan."
-              : tab === "membresias"
+              : tabEfectivo === "membresias"
                 ? "No hay membresías que coincidan."
                 : "No hay productos que coincidan."}
         </p>

@@ -849,6 +849,7 @@ async function main() {
     ]);
     await waitForTextReload(page, "Agregar al ticket");
     await agregarAlTicket("Servicios", "CORTE DE DAMA");
+    await page.evaluate(() => document.querySelector('details[data-testid="pos-beneficios-details"]')?.setAttribute("open", ""));
     await setNativeInput(page, 'input[name="descuento"]', "50");
     await clickByText(page, 'button[type="submit"]', "Aplicar");
     await waitPendingClear();
@@ -1299,6 +1300,7 @@ async function main() {
     await agregarAlTicket("Servicios", "CORTE DE DAMA");
 
     // Promoción vigente del catálogo (10% sobre todo): $300 → $270.
+    await page.evaluate(() => document.querySelector('details[data-testid="pos-beneficios-details"]')?.setAttribute("open", ""));
     await pickCombobox(page, "Promoción vigente", `E2E Promo ${runId}`);
     await clickByText(page, 'button[type="submit"]', "Aplicar promoción");
     await waitPendingClear();
@@ -1435,6 +1437,7 @@ async function main() {
 
     // El selector "Membresía vigente" solo lista la membresía vigente: la
     // vencida (vigencia 2020) queda fuera aunque su estado sea "vigente".
+    await page.evaluate(() => document.querySelector('details[data-testid="pos-beneficios-details"]')?.setAttribute("open", ""));
     const membresiaInputId = await page.evaluate(() => {
       const lab = Array.from(document.querySelectorAll("label")).find((l) =>
         l.textContent?.toLowerCase().includes("membresía vigente"),
