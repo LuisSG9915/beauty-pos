@@ -51,4 +51,46 @@ export const GLOSARIO = {
   ubicacion: "ubicación",
   mobiliario: "mobiliario",
   sinUbicar: "Sin ubicar",
+  aquiCobras: "Aquí cobras los servicios y productos del salón.",
+  conteoCajaTitulo: "Cuenta el dinero de la caja",
+  conteoCajaDescripcion:
+    "Escribe cuánto dinero en efectivo hay en el cajón y cuánto sumaron los cobros con tarjeta o transferencia. Al confirmar, verás si la cuenta cuadra.",
+  otrosMediosCajaTitulo: "Cobros con tarjeta y transferencia",
+  otrosMediosCajaDescripcion:
+    "Suma los comprobantes cobrados con tarjeta o transferencia durante el turno.",
 } as const;
+
+/**
+ * Mensajes de error de acceso con responsable claro: cada texto le dice a la
+ * persona del salón a quién pedirle ayuda. La clave es el código estable del
+ * error, no el mensaje crudo.
+ */
+export const MENSAJES_ERROR_ACCESO: Record<string, string> = {
+  "permiso-denegado":
+    "No tienes permiso para entrar a esta sección. Pídele a la dueña o encargada del salón que te dé acceso desde Roles.",
+  "organization-access-denied":
+    "Tu cuenta no tiene acceso a este salón. Pídele a la dueña o encargada que revise tu invitación en Equipo.",
+};
+
+/**
+ * Heurística de presentación/copy para la UI: traduce el texto de un error
+ * operativo a un mensaje llano que indica quién puede resolverlo en el salón.
+ * Solo sirve para mostrar texto amable; NUNCA para lógica de negocio ni para
+ * decidir permisos (eso se valida en el servidor).
+ */
+export function explicarErrorOperativo(mensaje?: string | null): string {
+  const texto = (mensaje ?? "").toLowerCase();
+  if (texto.includes("permiso") || texto.includes("autoriz")) {
+    return MENSAJES_ERROR_ACCESO["permiso-denegado"];
+  }
+  if (
+    texto.includes("caja") &&
+    (texto.includes("abiert") || texto.includes("cerrad") || texto.includes("turno"))
+  ) {
+    return "La caja está cerrada. Pídele a recepción o a la encargada que toque «Abrir caja» para poder cobrar.";
+  }
+  if (texto.includes("stock") || texto.includes("existencia")) {
+    return "No hay suficientes piezas registradas en el inventario. Pídele a la encargada o a almacén que registre la entrada del producto.";
+  }
+  return "No se pudo completar la acción. Intenta de nuevo; si vuelve a pasar, avísale a la encargada del salón o escribe a soporte.";
+}

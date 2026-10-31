@@ -16,7 +16,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { getDatabase } from "@/db/client";
 import { getAdminContext } from "@/lib/admin-context";
-import { requireAccessPermission } from "@/lib/auth/authorization";
+import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDateTime, formatQuantity } from "@/lib/format";
 import { buildAdminHref, normalizeView } from "@/lib/url-context";
 import { cargarPanelInventario } from "@/modules/inventory";
@@ -41,9 +41,9 @@ const TIPO_LABEL: Record<string, string> = {
 };
 
 function stockTone(stock: number, minimo: number) {
-  if (stock <= 0) return { label: "Agotado", tone: "destructive" as const };
-  if (stock < minimo) return { label: "Bajo", tone: "warning" as const };
-  return { label: "OK", tone: "success" as const };
+  if (stock <= 0) return { label: "🔴 Agotado", tone: "destructive" as const };
+  if (stock < minimo) return { label: "🟡 Bajo", tone: "warning" as const };
+  return { label: "🟢 Disponible", tone: "success" as const };
 }
 
 /** Color de barra por estado de stock (misma semántica que `stockTone`). */
@@ -77,6 +77,9 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
   }
 
   requireAccessPermission(context.access, "inventario.ver");
+  // Costos y valores de inventario son datos financieros: solo salen del
+  // servidor con `reportes.financieros` (ni a la UI ni a props de cliente).
+  const puedeVerFinanzas = hasPermission(context.access, "reportes.financieros");
 
   // Alcance del panel (solo las secciones nuevas; la tabla sigue con la
   // sucursal activa del contexto). "Todas" agrega por producto sobre las
@@ -129,7 +132,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
               p.sku,
               p.nombre,
               p.tipo,
-              p.costo::text as costo,
+              ${puedeVerFinanzas ? sql`p.costo::text` : sql`'0'::text`} as costo,
               p.stock_minimo::text as "stockMinimo",
               um.clave as unidad,
               coalesce(st.stock_actual, 0)::text as "stockActual"
@@ -257,12 +260,14 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
                   {stock.toFixed(3)}{producto.unidad ? ` ${producto.unidad}` : ""}
                 </dd>
               </div>
-              <div className="flex items-baseline justify-between gap-3 text-sm min-w-0">
-                <dt className="shrink-0 text-op-xs text-muted-foreground">Valor en stock</dt>
-                <dd className="min-w-0 text-right text-op-xs tabular-nums text-muted-foreground">
-                  {formatCurrency(stock * Number(producto.costo), { currency: context.currency })}
-                </dd>
-              </div>
+              {puedeVerFinanzas ? (
+                <div className="flex items-baseline justify-between gap-3 text-sm min-w-0">
+                  <dt className="shrink-0 text-op-xs text-muted-foreground">Valor en stock</dt>
+                  <dd className="min-w-0 text-right text-op-xs tabular-nums text-muted-foreground">
+                    {formatCurrency(stock * Number(producto.costo), { currency: context.currency })}
+                  </dd>
+                </div>
+              ) : null}
               <div className="flex items-baseline justify-between gap-3 text-sm min-w-0">
                 <dt className="shrink-0 text-op-xs text-muted-foreground">Mínimo</dt>
                 <dd className="min-w-0 text-right text-op-xs tabular-nums text-muted-foreground">{minimo.toFixed(3)}</dd>
@@ -326,19 +331,23 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
       },
       align: "right",
     },
-    {
-      id: "valor",
-      header: "Valor en stock",
-      cell: (producto) => {
-        const stock = stockPorProducto.get(producto.id) ?? 0;
-        return (
-          <span className="tabular-nums">
-            {formatCurrency(stock * Number(producto.costo), { currency: context.currency })}
-          </span>
-        );
-      },
-      align: "right",
-    },
+    ...(puedeVerFinanzas
+      ? [
+          {
+            id: "valor",
+            header: "Valor en stock",
+            cell: (producto: ProductoItem) => {
+              const stock = stockPorProducto.get(producto.id) ?? 0;
+              return (
+                <span className="tabular-nums">
+                  {formatCurrency(stock * Number(producto.costo), { currency: context.currency })}
+                </span>
+              );
+            },
+            align: "right",
+          } satisfies DataTableColumn<ProductoItem>,
+        ]
+      : []),
     {
       id: "minimo",
       header: "Mínimo",
@@ -477,12 +486,14 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
             ) : (
               <>
                 <StatCardGrid>
-                  <StatCard
-                    hint={`${panel.kpis.productos} producto(s) activos · costo × existencias`}
-                    icon={Wallet}
-                    label="Valor del inventario"
-                    value={formatCurrency(panel.kpis.valorTotal, { currency: context.currency })}
-                  />
+                  {puedeVerFinanzas ? (
+                    <StatCard
+                      hint={`${panel.kpis.productos} producto(s) activos · costo × existencias`}
+                      icon={Wallet}
+                      label="Valor del inventario"
+                      value={formatCurrency(panel.kpis.valorTotal, { currency: context.currency })}
+                    />
+                  ) : null}
                   <StatCard
                     hint="Con existencias por debajo del mínimo"
                     icon={AlertTriangle}
@@ -495,15 +506,17 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
                     label="Sin stock"
                     value={String(panel.kpis.sinStock)}
                   />
-                  <StatCard
-                    hint="Entradas, salidas y ajustes valorizados al costo"
-                    icon={ArrowLeftRight}
-                    label="Movido en 30 días"
-                    value={formatCurrency(panel.valorMovimiento30d, { currency: context.currency })}
-                  />
+                  {puedeVerFinanzas ? (
+                    <StatCard
+                      hint="Entradas, salidas y ajustes valorizados al costo"
+                      icon={ArrowLeftRight}
+                      label="Movido en 30 días"
+                      value={formatCurrency(panel.valorMovimiento30d, { currency: context.currency })}
+                    />
+                  ) : null}
                 </StatCardGrid>
 
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div className={`grid grid-cols-1 gap-6${puedeVerFinanzas ? " lg:grid-cols-2" : ""}`}>
                   {/* Plan 11 (ubicaciones en el mapa): PuntoGrafica.id ya lleva
                       el productoId — ahí se anclará «Ver en el mapa» por barra. */}
                   <AdminCard
@@ -529,7 +542,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
                           marca: item.minimo,
                           color: STOCK_TONO_COLOR[stockTone(item.stock, item.minimo).tone],
                           detalle: [
-                            `valor ${formatCurrency(item.valor, { currency: context.currency })}`,
+                            ...(puedeVerFinanzas ? [`valor ${formatCurrency(item.valor, { currency: context.currency })}`] : []),
                             ...(vistaTodas && item.porSucursal
                               ? item.porSucursal.map((s) => `${s.sucursal}: ${formatQuantity(s.stock)}`)
                               : []),
@@ -538,28 +551,30 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
                       />
                     )}
                   </AdminCard>
-                  <AdminCard
-                    description="En qué categorías está invertido el valor del inventario."
-                    title="Valor por categoría"
-                  >
-                    {panel.valorCategoria.length === 0 ? (
-                      <EmptyState
-                        className="border-0 bg-transparent py-8"
-                        description="Aún no hay existencias valorizadas por categoría en el alcance elegido."
-                        icon={Package}
-                        title="Sin datos para graficar"
-                      />
-                    ) : (
-                      <DonutChart
-                        etiquetaAccesible="Distribución del valor del inventario por categoría"
-                        formato={(valor) => formatCurrency(valor, { currency: context.currency })}
-                        puntos={panel.valorCategoria.map((item) => ({
-                          etiqueta: item.categoria,
-                          valor: item.valor,
-                        }))}
-                      />
-                    )}
-                  </AdminCard>
+                  {puedeVerFinanzas ? (
+                    <AdminCard
+                      description="En qué categorías está invertido el valor del inventario."
+                      title="Valor por categoría"
+                    >
+                      {panel.valorCategoria.length === 0 ? (
+                        <EmptyState
+                          className="border-0 bg-transparent py-8"
+                          description="Aún no hay existencias valorizadas por categoría en el alcance elegido."
+                          icon={Package}
+                          title="Sin datos para graficar"
+                        />
+                      ) : (
+                        <DonutChart
+                          etiquetaAccesible="Distribución del valor del inventario por categoría"
+                          formato={(valor) => formatCurrency(valor, { currency: context.currency })}
+                          puntos={panel.valorCategoria.map((item) => ({
+                            etiqueta: item.categoria,
+                            valor: item.valor,
+                          }))}
+                        />
+                      )}
+                    </AdminCard>
+                  ) : null}
                 </div>
               </>
             )}

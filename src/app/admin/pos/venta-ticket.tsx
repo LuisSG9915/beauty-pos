@@ -29,6 +29,16 @@ import { CobroForm } from "@/app/admin/pos/cobro-form";
 import { FacturarPanel } from "@/app/admin/pos/facturar-panel";
 import { TicketActionsBar } from "@/app/admin/pos/printable-ticket";
 import { StatusBadge } from "@/components/status-badge";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
 import { RemoteCombobox } from "@/components/ui/remote-combobox";
@@ -1027,8 +1037,10 @@ export function VentaTicket({
               ) : null}
               {puedeCancelar ? (
                 <CancelarVentaButton
+                  currency={currency}
                   onChanged={onChanged}
                   organizationId={organizationId}
+                  total={venta.total}
                   ventaId={venta.id}
                 />
               ) : null}
@@ -1344,12 +1356,16 @@ export function VentaTicket({
  * action que genera la devolución compensatoria.
  */
 function CancelarVentaButton({
+  currency,
   onChanged,
   organizationId,
+  total,
   ventaId,
 }: {
+  currency: string;
   onChanged?: () => void;
   organizationId: string;
+  total: string;
   ventaId: string;
 }) {
   const router = useRouter();
@@ -1370,59 +1386,47 @@ function CancelarVentaButton({
     router.refresh();
   }, [state, toast, onChanged, router]);
 
-  if (!abierto) {
-    return (
-      <button
-        className="inline-flex min-h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10"
-        onClick={() => setAbierto(true)}
-        type="button"
-      >
-        Cancelar venta…
-      </button>
-    );
-  }
-
   return (
-    <form
-      action={formAction}
-      className="w-full space-y-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4"
-    >
-      <input name="organizacionId" type="hidden" value={organizationId} />
-      <input name="ventaId" type="hidden" value={ventaId} />
-      <p className="text-op-xs font-medium text-destructive">
-        La venta se cancelará con devolución compensatoria (no se puede deshacer).
-      </p>
-      <Field>
-        <FieldLabel className="text-op-xs">Motivo</FieldLabel>
-        <Input
-          aria-label="Motivo de cancelación"
-          maxLength={500}
-          name="motivo"
-          placeholder="Ej. cobro duplicado, error de captura"
-          required
-        />
-      </Field>
-      <ActionFeedback state={state} />
-      <div className="flex gap-2">
-        <Button
-          className="rounded-xl"
-          disabled={pending}
-          type="submit"
-          variant="destructive"
-        >
-          {pending ? "Cancelando…" : "Confirmar cancelación"}
-        </Button>
-        <Button
-          className="rounded-xl"
-          disabled={pending}
-          onClick={() => setAbierto(false)}
-          type="button"
-          variant="ghost"
-        >
-          Volver
-        </Button>
-      </div>
-    </form>
+    <AlertDialog onOpenChange={setAbierto} open={abierto}>
+      <AlertDialogTrigger className="inline-flex min-h-11 items-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10">
+        Cancelar venta…
+      </AlertDialogTrigger>
+      <AlertDialogContent destructive>
+        <form action={formAction} className="space-y-4">
+          <input name="organizacionId" type="hidden" value={organizationId} />
+          <input name="ventaId" type="hidden" value={ventaId} />
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">
+              {`¿Cancelar venta de ${formatCurrency(total, { currency })}?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Se registrará la devolución del dinero en la caja, los productos
+              regresarán al inventario y se anularán las propinas y comisiones
+              de esta venta. Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Field>
+            <FieldLabel required>Motivo</FieldLabel>
+            <Input
+              aria-label="Motivo de cancelación"
+              maxLength={500}
+              name="motivo"
+              placeholder="Ej. cobro duplicado, error de captura"
+              required
+            />
+          </Field>
+          <ActionFeedback state={state} />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending} type="button">
+              No, volver
+            </AlertDialogCancel>
+            <Button className="min-h-11" disabled={pending} type="submit" variant="destructive">
+              {pending ? "Cancelando…" : "Sí, cancelar venta"}
+            </Button>
+          </AlertDialogFooter>
+        </form>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 

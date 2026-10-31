@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
-import { requireAccessPermission } from "@/lib/auth/authorization";
+import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate, formatQuantity } from "@/lib/format";
 import { getAi } from "@/lib/ia/cliente";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
@@ -35,11 +35,21 @@ function margenPorcentaje(costo: string, precioVenta: string): number | null {
   return ((precio - Number(costo)) / precio) * 100;
 }
 
+/** Semáforo de stock: agotado en cero, bajo en/bajo el mínimo, disponible arriba. */
+function stockSemaforo(stock: number, minimo: number) {
+  if (stock <= 0) return { label: "🔴 Agotado (0)", tone: "destructive" as const };
+  if (stock <= minimo) return { label: `🟡 Bajo (${formatQuantity(stock)})`, tone: "warning" as const };
+  return { label: `🟢 ${formatQuantity(stock)} disp.`, tone: "success" as const };
+}
+
 export default async function ProductsPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const context = await getAdminContext(params, { loadBranches: false });
   if (!context.organization) notFound();
   requireAccessPermission(context.access, "catalogos.ver");
+  // Costos, márgenes y últimas compras solo salen del servidor con
+  // `reportes.financieros`; el resto de roles ve precio y stock.
+  const puedeVerFinanzas = hasPermission(context.access, "reportes.financieros");
   const organizationId = context.organization.id;
   const db = getDatabase();
 
@@ -72,6 +82,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
     categoriaNombre: string | null;
     costo: string;
     precioVenta: string;
+    stockMinimo: string;
     visiblePos: boolean;
     activo: boolean;
     stockTotal: string;
@@ -123,6 +134,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         cp.nombre as "categoriaNombre",
         p.costo::text as costo,
         p.precio_venta::text as "precioVenta",
+        p.stock_minimo::text as "stockMinimo",
         p.visible_pos as "visiblePos",
         p.activo,
         p.created_at
@@ -167,6 +179,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
             'categoriaNombre', pp."categoriaNombre",
             'costo', pp.costo,
             'precioVenta', pp."precioVenta",
+            'stockMinimo', pp."stockMinimo",
             'visiblePos', pp."visiblePos",
             'activo', pp.activo,
             'stockTotal', coalesce(sp.stock_total, '0')
@@ -247,7 +260,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         nombre: editing.nombre,
         descripcion: editing.descripcion,
         tipo: editing.tipo,
-        costo: editing.costo,
+        costo: puedeVerFinanzas ? editing.costo : "0",
         precioVenta: editing.precioVenta,
         stockMinimo: editing.stockMinimo,
         visiblePos: editing.visiblePos,
@@ -255,12 +268,14 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       }
     : undefined;
 
-  const ultimasCompras = (datos?.ultimas_compras ?? []).map((fila) => ({
-    proveedor: fila.proveedorNombre ?? fila.proveedorTexto ?? "Sin proveedor",
-    fecha: formatDate(fila.fechaCompra ?? (fila.recibidaAt ? new Date(fila.recibidaAt) : null), { timeZone: context.timeZone }),
-    cantidad: formatQuantity(fila.cantidadRecibida ?? fila.cantidad),
-    costo: formatCurrency(fila.costoUnitario, { currency: context.currency }),
-  }));
+  const ultimasCompras = puedeVerFinanzas
+    ? (datos?.ultimas_compras ?? []).map((fila) => ({
+        proveedor: fila.proveedorNombre ?? fila.proveedorTexto ?? "Sin proveedor",
+        fecha: formatDate(fila.fechaCompra ?? (fila.recibidaAt ? new Date(fila.recibidaAt) : null), { timeZone: context.timeZone }),
+        cantidad: formatQuantity(fila.cantidadRecibida ?? fila.cantidad),
+        costo: formatCurrency(fila.costoUnitario, { currency: context.currency }),
+      }))
+    : [];
 
   const preserved = { q: query || null, tipo: tipo || null, categoriaId: categoriaId || null, estado: estado || null };
   const hasFilters = Boolean(query || tipo || categoriaId || estado);
@@ -289,37 +304,48 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
       ),
       hideBelow: "lg",
     },
-    {
-      id: "costo",
-      header: "Costo",
-      cell: (product) => <span className="tabular-nums">{formatCurrency(product.costo, { currency: context.currency })}</span>,
-      align: "right",
-      hideBelow: "lg",
-    },
+    ...(puedeVerFinanzas
+      ? [
+          {
+            id: "costo",
+            header: "Costo",
+            cell: (product: ProductRow) => <span className="tabular-nums">{formatCurrency(product.costo, { currency: context.currency })}</span>,
+            align: "right",
+            hideBelow: "lg",
+          } satisfies DataTableColumn<ProductRow>,
+        ]
+      : []),
     {
       id: "precio",
       header: "Precio",
       cell: (product) => <span className="tabular-nums">{formatCurrency(product.precioVenta, { currency: context.currency })}</span>,
       align: "right",
     },
-    {
-      id: "margen",
-      header: "Margen",
-      cell: (product) => {
-        const margen = margenPorcentaje(product.costo, product.precioVenta);
-        return margen === null ? (
-          <span className="text-muted-foreground">—</span>
-        ) : (
-          <span className="tabular-nums">{Math.round(margen)}%</span>
-        );
-      },
-      align: "right",
-      hideBelow: "lg",
-    },
+    ...(puedeVerFinanzas
+      ? [
+          {
+            id: "margen",
+            header: "Margen",
+            cell: (product: ProductRow) => {
+              const margen = margenPorcentaje(product.costo, product.precioVenta);
+              return margen === null ? (
+                <span className="text-muted-foreground">—</span>
+              ) : (
+                <span className="tabular-nums">{Math.round(margen)}%</span>
+              );
+            },
+            align: "right",
+            hideBelow: "lg",
+          } satisfies DataTableColumn<ProductRow>,
+        ]
+      : []),
     {
       id: "stock",
       header: "Stock total",
-      cell: (product) => <span className="tabular-nums">{formatQuantity(product.stockTotal)}</span>,
+      cell: (product) => {
+        const estado = stockSemaforo(Number(product.stockTotal), Number(product.stockMinimo));
+        return <StatusBadge tone={estado.tone}>{estado.label}</StatusBadge>;
+      },
       align: "right",
     },
     {
@@ -465,46 +491,62 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         ) : (
           <VistaAdaptativa>
             <RegistroList>
-              {productRows.map((product) => (
-                <RegistroCard
-                  acciones={
-                    <div className="flex flex-wrap gap-2">
-                      <Link
-                        className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60"
-                        data-action-id="catalogo.productos.editar"
-                        href={buildAdminHref("/productos", { organizationId, extra: { ...preserved, edit: product.id } })}
-                      >
-                        Editar
-                      </Link>
-                      <ToggleActivo
-                        action={toggleProduct}
-                        activo={product.activo}
-                        confirmHint="Dejará de aparecer en el punto de venta."
-                        entidad="producto"
-                        id={product.id}
-                        nombre={product.nombre}
-                        organizationId={organizationId}
-                        telemetryBase="catalogo.productos"
-                      />
-                    </div>
-                  }
-                  badge={<StatusBadge active={product.activo} />}
-                  campos={[
-                    { label: "Tipo", value: TIPO_LABEL[product.tipo] ?? product.tipo },
-                    ...(product.categoriaNombre ? [{ label: "Categoría", value: product.categoriaNombre }] : []),
-                    { label: "Costo", value: formatCurrency(product.costo, { currency: context.currency }) },
-                    { label: "Precio", value: formatCurrency(product.precioVenta, { currency: context.currency }) },
-                    ...(margenPorcentaje(product.costo, product.precioVenta) !== null
-                      ? [{ label: "Margen", value: `${Math.round(margenPorcentaje(product.costo, product.precioVenta)!)}%` }]
-                      : []),
-                    { label: "Stock total", value: formatQuantity(product.stockTotal) },
-                    { label: "En el punto de venta", value: product.visiblePos ? "Sí" : "No" },
-                  ]}
-                  key={product.id}
-                  subtitulo={<span className="font-mono">{product.sku}</span>}
-                  titulo={product.nombre}
-                />
-              ))}
+              {productRows.map((product) => {
+                const semaforo = stockSemaforo(Number(product.stockTotal), Number(product.stockMinimo));
+                const margen = margenPorcentaje(product.costo, product.precioVenta);
+                return (
+                  <RegistroCard
+                    acciones={
+                      <div className="flex flex-wrap gap-2">
+                        <Link
+                          className="inline-flex min-h-9 items-center rounded-lg border border-border px-2.5 text-op-xs text-muted-foreground hover:bg-muted/60"
+                          data-action-id="catalogo.productos.editar"
+                          href={buildAdminHref("/productos", { organizationId, extra: { ...preserved, edit: product.id } })}
+                        >
+                          Editar
+                        </Link>
+                        <ToggleActivo
+                          action={toggleProduct}
+                          activo={product.activo}
+                          confirmHint="Dejará de aparecer en el punto de venta."
+                          entidad="producto"
+                          id={product.id}
+                          nombre={product.nombre}
+                          organizationId={organizationId}
+                          telemetryBase="catalogo.productos"
+                        />
+                      </div>
+                    }
+                    badge={
+                      <div className="flex flex-col items-end gap-1">
+                        <StatusBadge tone={semaforo.tone}>{semaforo.label}</StatusBadge>
+                        {product.activo ? null : <StatusBadge active={false} />}
+                      </div>
+                    }
+                    campos={[
+                      {
+                        label: "Precio",
+                        value: (
+                          <span className="font-bold tabular-nums text-primary">
+                            {formatCurrency(product.precioVenta, { currency: context.currency })}
+                          </span>
+                        ),
+                      },
+                      ...(product.categoriaNombre ? [{ label: "Categoría", value: product.categoriaNombre }] : []),
+                      ...(puedeVerFinanzas
+                        ? [
+                            { label: "Costo", value: formatCurrency(product.costo, { currency: context.currency }) },
+                            ...(margen !== null ? [{ label: "Margen", value: `${Math.round(margen)}%` }] : []),
+                          ]
+                        : []),
+                      { label: "En el punto de venta", value: product.visiblePos ? "Sí" : "No" },
+                    ]}
+                    key={product.id}
+                    subtitulo={<span className="font-mono">{product.sku} · {TIPO_LABEL[product.tipo] ?? product.tipo}</span>}
+                    titulo={product.nombre}
+                  />
+                );
+              })}
             </RegistroList>
             <DataTable
               className="hidden md:block"
@@ -523,7 +565,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
           title={editing ? "Editar producto" : "Nuevo producto"}
           wide
         >
-          <ProductForm capturaIa={Boolean(getAi())} categories={categories} initial={editingData} key={`${editing?.id ?? "nuevo"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} ultimasCompras={ultimasCompras} units={units} />
+          <ProductForm capturaIa={Boolean(getAi())} categories={categories} initial={editingData} key={`${editing?.id ?? "nuevo"}-${editing?.updatedAt?.getTime() ?? ""}`} organizationId={organizationId} puedeVerFinanzas={puedeVerFinanzas} ultimasCompras={ultimasCompras} units={units} />
         </FormSheet>
       ) : null}
     </div>

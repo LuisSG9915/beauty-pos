@@ -153,4 +153,31 @@ Riesgo abierto: <ninguno | qué falta y quién lo cierra>
 
 ## Desviaciones (las escribe el implementador)
 
-Ninguna.
+1. Decisiones de detalle no especificadas, elegidas por consistencia con la
+   semántica decidida (monto autocompletado → el primer billete reemplaza):
+   - `quitarPago` limpia las marcas de acumulación (los índices se recorren y
+     heredarían estado ajeno).
+   - El botón `Resto` y la resincronización por cambio de propina marcan la
+     fila como "no acumulando" al fijar un monto automático.
+2. Fuera de alcance (contrato de 4 archivos): `src/app/admin/caja/page.tsx`
+   conserva "arqueo ciego" (descripción de "Cortes recientes", línea ~367),
+   "arqueo" (empty state, ~369) y "Arqueo cuadrado" (badge, ~402);
+   `src/app/offline/venta/offline-venta.tsx` menciona voucher/pasarela
+   (~712, ~719). Recomendación: micro-misión de 1 archivo para completar el
+   criterio S3 en `/admin/caja`.
+3. `usability-check` en `/admin/caja` reporta 1 aviso preexistente:
+   "sin acción `data-action-clave`" — la cuenta E2E no tiene turno abierto,
+   así que el formulario de cierre (que sí trae el marcador) no se renderiza.
+   `page.tsx` no marca acción primaria en ese estado; no lo toqué por el
+   contrato de archivos.
+
+## Reporte
+
+```
+Misión: 28 — Glosario llano, errores con responsable claro y botones acumulativos de billetes
+Cambios: glosario.ts → +5 textos llanos, MENSAJES_ERROR_ACCESO y explicarErrorOperativo (heurística de copy) | cobro-form.tsx → botonera acumulativa +$50…+$1,000 + Exacto + Borrar (min-h-11, flags por fila) | cierre-caja-form.tsx → textos desde GLOSARIO, min-h-11, "Confirmando cierre…" | error.tsx → explicarErrorOperativo(error.message) + botones min-h-11
+Verificación: typecheck ✔ | lint ✔ | test 577 ✔ (4 omitidas conocidas) | usability móvil /admin/pos 0 errores | /admin/caja 0 errores, 1 aviso preexistente
+Antes → después: 4 chips fijos que fallan en totales > $1,000 y jerga de arqueo/vouchers → billetes acumulativos (+$50…+$1,000, Exacto, Borrar) y textos de GLOSARIO
+Desviaciones: 3 arriba (detalles de flags, jerga residual en caja/page.tsx + offline-venta, aviso preexistente de data-action-clave)
+Riesgo abierto: "arqueo"/"Arqueo cuadrado" siguen visibles en /admin/caja (page.tsx, fuera del contrato de 4 archivos) — lo cierra una micro-misión de copy en ese archivo.
+```

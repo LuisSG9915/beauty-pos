@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
+import { explicarErrorOperativo } from "@/lib/glosario";
 import { reportarErrorCliente } from "@/lib/observability/reportar-error";
 
 /**
@@ -32,8 +33,7 @@ export default function AdminError({
         No se pudo cargar esta sección
       </h2>
       <p className="mt-3 text-sm leading-6 text-muted-foreground">
-        Ocurrió un problema al cargar el contenido. Intenta de nuevo; si el
-        problema persiste, vuelve al panel o contacta a soporte.
+        {explicarErrorOperativo(error?.message)}
       </p>
       {error.digest ? (
         <p className="mt-2 text-op-xs text-muted-foreground">
@@ -42,14 +42,14 @@ export default function AdminError({
       ) : null}
       <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
         <Button
-          className="min-h-10 rounded-xl"
+          className="min-h-11 rounded-xl"
           onClick={() => retry()}
           type="button"
         >
           Reintentar
         </Button>
         <Link
-          className="inline-flex min-h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-primary"
+          className="inline-flex min-h-11 items-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-primary"
           href="/admin"
         >
           Ir al panel

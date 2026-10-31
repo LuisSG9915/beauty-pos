@@ -1,45 +1,86 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 
 import { revertirGastoAction } from "@/app/admin/gastos/actions";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input } from "@/components/ui/field";
-import { ActionFeedback } from "@/components/ui/toast";
-import { initialActionState } from "@/lib/action-state";
+import { ActionFeedback, useToast } from "@/components/ui/toast";
+import { initialActionState, type ActionState } from "@/lib/action-state";
 
 /**
- * Reversión con motivo obligatorio. Usa <details> nativo: funciona sin
- * depender de un modal y el formulario conserva su estado.
+ * Reversión con motivo obligatorio dentro del diálogo destructivo estándar:
+ * el título lleva el importe y la descripción explica la consecuencia en caja.
  */
 export function RevertirGastoForm({
   organizationId,
   gastoId,
   concepto,
+  importeFormateado,
+  cajaVinculada = false,
 }: {
   organizationId: string;
   gastoId: string;
   concepto: string;
+  importeFormateado?: string;
+  cajaVinculada?: boolean;
 }) {
+  const toast = useToast();
+  const [abierto, setAbierto] = useState(false);
   const [state, action, pending] = useActionState(revertirGastoAction, initialActionState);
 
+  const handled = useRef<ActionState | null>(null);
+  useEffect(() => {
+    if (!state.success || handled.current === state) return;
+    handled.current = state;
+    toast.success(state.message ?? "Gasto revertido.");
+    setAbierto(false);
+  }, [state, toast]);
+
   return (
-    <details className="group">
-      <summary className="cursor-pointer list-none text-op-xs font-medium text-destructive hover:underline">
-        Revertir
-      </summary>
-      <form action={action} className="mt-2 w-56 space-y-2 rounded-xl border border-border bg-muted/60 p-3">
-        <input name="organizacionId" type="hidden" value={organizationId} />
-        <input name="gastoId" type="hidden" value={gastoId} />
-        <Field>
-          <FieldLabel required>Motivo</FieldLabel>
-          <Input name="motivo" placeholder={`Por qué se revierte «${concepto}»`} required />
-        </Field>
-        <ActionFeedback state={state} />
-        <Button disabled={pending} size="sm" type="submit" variant="destructive">
-          {pending ? "Revirtiendo…" : "Confirmar reversión"}
-        </Button>
-      </form>
-    </details>
+    <AlertDialog onOpenChange={setAbierto} open={abierto}>
+      <AlertDialogTrigger className="inline-flex min-h-11 items-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10">
+        Revertir gasto…
+      </AlertDialogTrigger>
+      <AlertDialogContent destructive>
+        <form action={action} className="space-y-4">
+          <input name="organizacionId" type="hidden" value={organizationId} />
+          <input name="gastoId" type="hidden" value={gastoId} />
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive">
+              {`¿Revertir gasto ${importeFormateado ? `de ${importeFormateado}` : `«${concepto}»`}?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {cajaVinculada
+                ? `El gasto «${concepto}» quedará marcado como revertido y el dinero regresará al efectivo esperado de la caja abierta. Esta acción no se puede deshacer.`
+                : `El gasto «${concepto}» quedará marcado como revertido en los reportes. Esta acción no se puede deshacer.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Field>
+            <FieldLabel required>Motivo</FieldLabel>
+            <Input name="motivo" placeholder={`Por qué se revierte «${concepto}»`} required />
+          </Field>
+          <ActionFeedback state={state} />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={pending} type="button">
+              No, volver
+            </AlertDialogCancel>
+            <Button className="min-h-11" disabled={pending} type="submit" variant="destructive">
+              {pending ? "Revirtiendo…" : "Sí, revertir gasto"}
+            </Button>
+          </AlertDialogFooter>
+        </form>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

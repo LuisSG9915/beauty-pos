@@ -126,6 +126,7 @@ export function ProductForm({
   capturaIa = false,
   onCreated,
   ultimasCompras,
+  puedeVerFinanzas = true,
 }: {
   organizationId: string;
   categories: Option[];
@@ -144,6 +145,12 @@ export function ProductForm({
    * producto (proveedor, fecha y costo). Solo llega en edición.
    */
   ultimasCompras?: UltimaCompra[];
+  /**
+   * `false` cuando el rol no tiene `reportes.financieros`: el servidor ya
+   * envía `costo` neutro y sin `ultimasCompras`; aquí solo se ocultan los
+   * campos financieros del formulario.
+   */
+  puedeVerFinanzas?: boolean;
 }) {
   const [state, formAction, pending] = useActionState<ProductActionState, FormData>(saveProduct, {});
   const value = (key: keyof ProductData) => initial?.[key] ?? "";
@@ -476,10 +483,12 @@ export function ProductForm({
           Más opciones
         </summary>
         <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field>
-            <FieldLabel>Costo (MXN)</FieldLabel>
-            <Input defaultValue={String(value("costo") || "0")} min="0" name="costo" placeholder="0.00" step="0.01" type="number" />
-          </Field>
+          {puedeVerFinanzas ? (
+            <Field>
+              <FieldLabel>Costo (MXN)</FieldLabel>
+              <Input defaultValue={String(value("costo") || "0")} min="0" name="costo" placeholder="0.00" step="0.01" type="number" />
+            </Field>
+          ) : null}
           <Field>
             <FieldLabel>Código de barras</FieldLabel>
             <Input className={marcaDudoso("codigoBarras")} defaultValue={String(value("codigoBarras"))} name="codigoBarras" placeholder="7501234567890" ref={codigoBarrasRef} />
@@ -520,7 +529,7 @@ export function ProductForm({
             </Field>
           ) : null}
         </div>
-        {ultimasCompras && ultimasCompras.length > 0 ? (
+        {puedeVerFinanzas && ultimasCompras && ultimasCompras.length > 0 ? (
           <div className="mt-4 border-t border-border pt-3">
             <h3 className="text-sm font-medium text-foreground">Últimas compras</h3>
             <ul className="mt-2 space-y-1.5">

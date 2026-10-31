@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Textarea } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
 import { formatCurrency } from "@/lib/format";
+import { GLOSARIO } from "@/lib/glosario";
 
 const initialState: CajaActionState = {};
 
@@ -101,10 +102,9 @@ export function CierreCajaForm({
       <div className="flex items-start gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-4 text-sm text-foreground">
         <ShieldCheck className="size-5 shrink-0 text-primary mt-0.5" />
         <div className="space-y-1 text-op-xs sm:text-sm">
-          <p className="font-semibold text-foreground">Arqueo Ciego de Seguridad</p>
+          <p className="font-semibold text-foreground">{GLOSARIO.conteoCajaTitulo}</p>
           <p className="text-muted-foreground leading-relaxed">
-            Cuenta el dinero físico y los vouchers de tus terminales bancarias sin ver los números esperados por el sistema.
-            Al confirmar, el sistema contrastará el dinero con las ventas y movimientos del turno para calcular si la caja está cuadrada o si existe sobrante o faltante.
+            {GLOSARIO.conteoCajaDescripcion}
           </p>
         </div>
       </div>
@@ -119,7 +119,7 @@ export function CierreCajaForm({
               </FieldLabel>
             </div>
             <button
-              className="inline-flex min-h-10 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-op-xs font-medium text-primary hover:bg-primary/10 hover:underline self-start sm:self-auto"
+              className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-op-xs font-medium text-primary hover:bg-primary/10 hover:underline self-start sm:self-auto"
               data-action-id="caja.cierre.toggle_desglose"
               onClick={() => setMostrarDesglose(!mostrarDesglose)}
               type="button"
@@ -237,10 +237,10 @@ export function CierreCajaForm({
         <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
           <div className="flex items-center gap-2">
             <CreditCard className="size-4 text-muted-foreground" />
-            <h3 className="text-sm font-semibold text-foreground">Terminales y otros medios de pago</h3>
+            <h3 className="text-sm font-semibold text-foreground">{GLOSARIO.otrosMediosCajaTitulo}</h3>
           </div>
           <p className="text-op-xs text-muted-foreground">
-            Ingresa el importe total acumulado en el voucher o resumen de cierre de cada terminal bancaria / pasarela.
+            {GLOSARIO.otrosMediosCajaDescripcion}
           </p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 pt-1">
             {otrosMedios.map((medio) => (
@@ -279,7 +279,7 @@ export function CierreCajaForm({
         size="touch"
         type="submit"
       >
-        {pending ? "Cerrando y auditando arqueo…" : "Confirmar cierre de caja"}
+        {pending ? "Confirmando cierre…" : "Confirmar cierre de caja"}
       </Button>
     </form>
   );

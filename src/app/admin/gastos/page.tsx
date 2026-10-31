@@ -289,8 +289,10 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
                     {puedeEditar && gasto.estado === "confirmado" ? (
                       <div className="mt-3 border-t border-border pt-3">
                         <RevertirGastoForm
+                          cajaVinculada={gasto.cajaVinculada}
                           concepto={gasto.concepto}
                           gastoId={gasto.id}
+                          importeFormateado={fmt(gasto.importe)}
                           organizationId={organizationId}
                         />
                       </div>
@@ -341,8 +343,10 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
                         <td className="py-3">
                           {gasto.estado === "confirmado" ? (
                             <RevertirGastoForm
+                              cajaVinculada={gasto.cajaVinculada}
                               concepto={gasto.concepto}
                               gastoId={gasto.id}
+                              importeFormateado={fmt(gasto.importe)}
                               organizationId={organizationId}
                             />
                           ) : null}

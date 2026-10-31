@@ -10,10 +10,14 @@ const AlertDialog = AlertDialogPrimitive.Root;
 const AlertDialogTrigger = AlertDialogPrimitive.Trigger;
 const AlertDialogClose = AlertDialogPrimitive.Close;
 
-type AlertDialogContentProps = ComponentProps<typeof AlertDialogPrimitive.Popup>;
+type AlertDialogContentProps = ComponentProps<typeof AlertDialogPrimitive.Popup> & {
+  /** `true` marca el borde en rojo para confirmaciones destructivas. */
+  destructive?: boolean;
+};
 
 function AlertDialogContent({
   className,
+  destructive = false,
   ...props
 }: AlertDialogContentProps) {
   return (
@@ -21,7 +25,8 @@ function AlertDialogContent({
       <AlertDialogPrimitive.Backdrop className="fixed inset-0 z-50 min-h-dvh bg-black/35 backdrop-blur-[2px] transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute" />
       <AlertDialogPrimitive.Popup
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 flex w-[min(92vw,28rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-xl outline-none transition-[scale,opacity] duration-150 data-ending-style:scale-[0.97] data-ending-style:opacity-0 data-starting-style:scale-[0.97] data-starting-style:opacity-0",
+          "fixed left-1/2 top-1/2 z-50 flex w-[min(92vw,28rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 rounded-2xl border bg-card p-6 text-card-foreground shadow-xl outline-none transition-[scale,opacity] duration-150 data-ending-style:scale-[0.97] data-ending-style:opacity-0 data-starting-style:scale-[0.97] data-starting-style:opacity-0",
+          destructive ? "border-destructive/40" : "border-border",
           className,
         )}
         {...props}
@@ -82,7 +87,7 @@ function AlertDialogCancel({
 }: ComponentProps<typeof AlertDialogPrimitive.Close>) {
   return (
     <AlertDialogPrimitive.Close
-      className={cn(buttonVariants({ variant: "outline" }), "min-h-10", className)}
+      className={cn(buttonVariants({ variant: "outline" }), "min-h-11", className)}
       {...props}
     />
   );
@@ -101,7 +106,7 @@ function AlertDialogAction({
   const resolved = variant ?? (destructive ? "destructive" : "default");
   return (
     <AlertDialogPrimitive.Close
-      className={cn(buttonVariants({ variant: resolved }), "min-h-10", className)}
+      className={cn(buttonVariants({ variant: resolved }), "min-h-11", className)}
       {...props}
     />
   );

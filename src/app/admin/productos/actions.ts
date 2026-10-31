@@ -6,7 +6,7 @@ import { z } from "zod";
 
 import { getDatabase } from "@/db/client";
 import { productos } from "@/db/schema/catalogs";
-import { checkPermission, sucursalesActivasDelAcceso } from "@/lib/auth/authorization";
+import { checkPermission, hasPermission, sucursalesActivasDelAcceso } from "@/lib/auth/authorization";
 import { revalidateCatalogos } from "@/lib/catalogo-cache";
 import { claveDisponible } from "@/lib/clave";
 import { leerSucursalCookie } from "@/lib/sucursal-cookie";
@@ -56,6 +56,9 @@ export async function saveProduct(_previousState: ProductActionState, formData: 
   if (!access) return { error: "No tienes permiso para editar catálogos." };
   const { user } = access;
   const db = getDatabase();
+  // El costo es un dato financiero: solo lo modifica quien tiene
+  // `reportes.financieros` (sin el permiso el formulario ni lo renderiza).
+  const puedeVerFinanzas = hasPermission(access, "reportes.financieros");
   // SKU manual (opcional): el único (org, sku) no filtra por activo — el
   // chequeo cubre inactivas e ignora mayúsculas (skus históricos).
   const skuManual = input.sku || undefined;
@@ -74,7 +77,6 @@ export async function saveProduct(_previousState: ProductActionState, formData: 
     nombre: input.nombre,
     descripcion: input.descripcion || null,
     tipo: input.tipo ?? "producto",
-    costo: input.costo || "0",
     precioVenta: input.precioVenta,
     stockMinimo: input.stockMinimo || "0",
     visiblePos: input.visiblePos === "true",
@@ -83,7 +85,16 @@ export async function saveProduct(_previousState: ProductActionState, formData: 
 
   let createdId = input.id || "";
   if (input.id) {
-    await db.update(productos).set(skuManual ? { ...values, sku: skuManual } : values).where(and(eq(productos.id, input.id), eq(productos.organizacionId, input.organizacionId)));
+    // En edición `costo` solo se escribe con permiso financiero y cuando el
+    // formulario lo envía; si no, se conserva el valor ya guardado.
+    await db
+      .update(productos)
+      .set({
+        ...values,
+        ...(puedeVerFinanzas && input.costo !== undefined ? { costo: input.costo || "0" } : {}),
+        ...(skuManual ? { sku: skuManual } : {}),
+      })
+      .where(and(eq(productos.id, input.id), eq(productos.organizacionId, input.organizacionId)));
   } else {
     const sku = skuManual ?? (await claveDisponible(db, productos, input.organizacionId, input.nombre, 80));
     // El stock inicial del alta rápida entra como movimiento "entrada" sobre
@@ -105,7 +116,7 @@ export async function saveProduct(_previousState: ProductActionState, formData: 
       createdId = await db.transaction(async (tx) => {
         const [created] = await tx
           .insert(productos)
-          .values({ ...values, sku, createdBy: user.id })
+          .values({ ...values, costo: puedeVerFinanzas ? input.costo || "0" : "0", sku, createdBy: user.id })
           .returning({ id: productos.id });
         if (created && stockInicial > 0 && sucursalId) {
           const outcome = await applyInventoryMovement(tx, {

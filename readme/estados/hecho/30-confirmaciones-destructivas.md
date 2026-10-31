@@ -168,13 +168,25 @@ pnpm tsx scripts/usability-check.ts --viewport=movil --only=/admin/facturacion
 
 ```
 Misión: 30 — Diálogo modal rojo único para confirmaciones destructivas con monto y consecuencia
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔ | usability /admin/gastos y /admin/facturacion 0 errores
+Cambios: src/components/ui/alert-dialog.tsx → min-h-11 en Cancel/Action + prop destructive en Content (border-destructive/40); src/app/admin/pos/venta-ticket.tsx → CancelarVentaButton recibe total/currency y migra a AlertDialog rojo con monto y consecuencia en caja/stock/comisiones; src/app/admin/gastos/revertir-gasto-form.tsx → de <details> inline a AlertDialog rojo con importe y consecuencia según cajaVinculada; src/app/admin/gastos/page.tsx → pasa importeFormateado/cajaVinculada; src/app/admin/facturacion/cancelar-form.tsx → form inline envuelto en AlertDialog rojo disparado por "Cancelar comprobante…" con prop folioLabel opcional.
+Verificación: typecheck ✔ | lint ✔ | test 577 ✔ | usability móvil /admin/gastos + /admin/facturacion 0 errores/avisos | smoke Puppeteer móvil: diálogo abre con título "¿Revertir gasto de $123.45?", borde rojo, motivo en FormData, reversión real OK y diálogo cerrado
 Antes → después: 3 formularios inline dispares (<details> y forms abiertos) → 1 patrón único de AlertDialog rojo con monto/concepto y consecuencia explícita
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <ninguno | qué falta y quién lo cierra>
+Desviaciones: ver sección abajo
+Riesgo abierto: ninguno
 ```
 
 ## Desviaciones (las escribe el implementador)
 
-Ninguna.
+- **Efecto de cierre con toast + ref-guard** (`revertir-gasto-form.tsx`,
+  `cancelar-form.tsx`): la regla `react-hooks/set-state-in-effect` exige que
+  el efecto también sincronice con un sistema externo; se replicó el patrón
+  de `CancelarVentaButton` (`toast.success` + `useRef` contra doble disparo).
+  En gastos el `revalidatePath` desmonta el formulario en el mismo commit del
+  éxito, así que el toast puede no renderizarse — el feedback visible real es
+  el badge "Revertido" + "Reversión: {motivo}" en la fila.
+- **`compact` conservado solo en el tipo** de `CancelarFacturaForm`: los call
+  sites (`facturacion/page.tsx`, `facturar-panel.tsx`, fuera del alcance de la
+  misión) lo pasan; dentro del modal ya no afecta el layout.
+- **`folioLabel` aún sin emisor**: los call sites existentes no lo pasan, así
+  el título sale como "¿Cancelar comprobante?" genérico hasta que otra misión
+  propague el folio.

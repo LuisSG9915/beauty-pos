@@ -15,6 +15,8 @@ type PagoRow = { medioPagoId: string; monto: string; referencia: string };
 
 const MAX_PAGOS = 4;
 
+const BILLETES_MXN = [50, 100, 200, 500, 1000] as const;
+
 const PROPINA_OPCIONES = [
   { value: "0", label: "Sin propina" },
   { value: "10", label: "10%" },
@@ -65,6 +67,10 @@ export function CobroForm({
   ]);
   const [propinaOpcion, setPropinaOpcion] = useState("0");
   const [propinaOtro, setPropinaOtro] = useState("");
+  // Rastrea si la fila ya empezó a sumar billetes por toque: mientras el
+  // monto es el prellenado automático (exacto o resto), el primer billete
+  // reemplaza; a partir de ahí cada toque suma.
+  const acumuloBilletesPorPago = useRef<Record<number, boolean>>({});
   // Una clave por instancia del formulario: si el request se repite (doble
   // click, retry de red) el servidor devuelve el cobro original sin duplicar.
   const [idempotencia] = useState(() => crypto.randomUUID());
@@ -119,8 +125,12 @@ export function CobroForm({
       current.map((pago, i) => (i === index ? { ...pago, ...patch } : pago)),
     );
 
-  const quitarPago = (index: number) =>
+  const quitarPago = (index: number) => {
+    // Los índices se recorren al quitar la fila: se limpian las marcas para
+    // que ningún pago herede el estado de acumulación de otro.
+    acumuloBilletesPorPago.current = {};
     setPagos((current) => current.filter((_, i) => i !== index));
+  };
 
   const restoPara = (index: number) =>
     Math.max(
@@ -148,6 +158,7 @@ export function CobroForm({
     setPagos((current) => {
       if (current.length !== 1) return current;
       if (Math.abs((Number(current[0].monto) || 0) - previo) >= 0.005) return current;
+      acumuloBilletesPorPago.current[0] = false;
       return [{ ...current[0], monto: aCubrir.toFixed(2) }];
     });
   }, [aCubrir]);
@@ -167,20 +178,36 @@ export function CobroForm({
   const inputClass =
     "h-11 min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm outline-none transition-all duration-150 focus:border-primary focus:ring-3 focus:ring-primary/20 hover:border-border";
 
-  const quickCashOptions = useMemo(() => {
-    if (aCubrir <= 0) return [];
-    const set = new Set<number>();
-    set.add(aCubrir);
-    const commonBills = [50, 100, 200, 500, 1000];
-    for (const b of commonBills) {
-      if (b > aCubrir) set.add(b);
-      else if (aCubrir > b) {
-        const nextMultiple = Math.ceil(aCubrir / b) * b;
-        if (nextMultiple > aCubrir) set.add(nextMultiple);
-      }
-    }
-    return [...set].sort((a, b) => a - b).slice(0, 4);
-  }, [aCubrir]);
+  const tocarBillete = (index: number, denom: number) => {
+    const yaAcumulando = acumuloBilletesPorPago.current[index] === true;
+    acumuloBilletesPorPago.current[index] = true;
+    setPagos((current) =>
+      current.map((pago, i) =>
+        i === index
+          ? {
+              ...pago,
+              monto: (yaAcumulando
+                ? redondear((Number(pago.monto) || 0) + denom)
+                : denom
+              ).toFixed(2),
+            }
+          : pago,
+      ),
+    );
+  };
+
+  const fijarMontoExacto = (index: number) => {
+    acumuloBilletesPorPago.current[index] = false;
+    updatePago(index, { monto: aCubrir.toFixed(2) });
+  };
+
+  const borrarMonto = (index: number) => {
+    acumuloBilletesPorPago.current[index] = true;
+    updatePago(index, { monto: "0" });
+  };
+
+  const botonBilleteClass =
+    "inline-flex min-h-11 items-center rounded-lg border border-border bg-card px-2.5 text-op-xs font-semibold tabular-nums text-muted-foreground transition-all duration-150 active:scale-[0.98] cursor-pointer select-none hover:border-primary/50 hover:text-foreground";
 
   return (
     <form
@@ -314,25 +341,41 @@ export function CobroForm({
                 ))}
               </div>
 
-              {esEfectivo && quickCashOptions.length > 0 ? (
-                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                  <span className="text-op-xs font-medium text-muted-foreground">Billetes rápidos:</span>
-                  {quickCashOptions.map((opt) => (
+              {esEfectivo ? (
+                <div
+                  aria-label={`Billetes para el pago ${index + 1}`}
+                  className="flex flex-wrap items-center gap-1.5 pt-0.5"
+                  role="group"
+                >
+                  {BILLETES_MXN.map((denom) => (
                     <button
-                      className={cn(
-                        "inline-flex min-h-11 items-center rounded-lg border px-2.5 text-op-xs font-semibold tabular-nums transition-all duration-150 active:scale-[0.98] cursor-pointer select-none",
-                        Math.abs((Number(pago.monto) || 0) - opt) < 0.005
-                          ? "border-primary bg-primary text-primary-foreground shadow-xs"
-                          : "border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground",
-                      )}
+                      aria-label={`Sumar ${formatCurrency(denom)} al pago ${index + 1}`}
+                      className={botonBilleteClass}
                       data-action-id="pos.cobro.billete_rapido"
-                      key={opt}
-                      onClick={() => updatePago(index, { monto: opt.toFixed(2) })}
+                      key={denom}
+                      onClick={() => tocarBillete(index, denom)}
                       type="button"
                     >
-                      {opt === aCubrir ? `Exacto (${formatCurrency(opt)})` : formatCurrency(opt)}
+                      +${denom.toLocaleString("es-MX")}
                     </button>
                   ))}
+                  <button
+                    className={botonBilleteClass}
+                    data-action-id="pos.cobro.billete_exacto"
+                    onClick={() => fijarMontoExacto(index)}
+                    type="button"
+                  >
+                    Exacto ({formatCurrency(aCubrir)})
+                  </button>
+                  <button
+                    aria-label={`Borrar monto del pago ${index + 1}`}
+                    className={botonBilleteClass}
+                    data-action-id="pos.cobro.billete_borrar"
+                    onClick={() => borrarMonto(index)}
+                    type="button"
+                  >
+                    Borrar
+                  </button>
                 </div>
               ) : null}
 
@@ -342,7 +385,11 @@ export function CobroForm({
                   className={cn(inputClass, "min-w-0 flex-1 tabular-nums")}
                   inputMode="decimal"
                   min="0"
-                  onChange={(event) => updatePago(index, { monto: event.target.value })}
+                  onChange={(event) => {
+                    // Edición manual: el siguiente billete suma sobre lo escrito.
+                    acumuloBilletesPorPago.current[index] = true;
+                    updatePago(index, { monto: event.target.value });
+                  }}
                   placeholder="Monto"
                   step="0.01"
                   type="number"
@@ -352,7 +399,11 @@ export function CobroForm({
                   aria-label={`Resto a cubrir: ${formatCurrency(resto)}`}
                   className="min-h-11 h-11 rounded-xl border border-border bg-card px-3 text-op-xs font-medium text-primary transition-all hover:bg-accent/70 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   disabled={resto <= 0}
-                  onClick={() => updatePago(index, { monto: resto.toFixed(2) })}
+                  onClick={() => {
+                    // Monto autocompletado: el primer billete reemplaza.
+                    acumuloBilletesPorPago.current[index] = false;
+                    updatePago(index, { monto: resto.toFixed(2) });
+                  }}
                   type="button"
                 >
                   Resto · {formatCurrency(resto)}

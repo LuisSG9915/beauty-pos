@@ -149,13 +149,30 @@ pnpm tsx scripts/usability-check.ts --viewport=movil --only=/admin/inventario
 
 ```
 Misión: 27 — Tarjetas móviles con semáforo de stock y ocultación de costos por permiso de rol
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔ | usability /admin/productos y /admin/inventario 0 errores
-Antes → después: Costos visibles para todo rol con catalogos.ver → Costos/márgenes/valores restringidos en servidor a reportes.financieros + semáforo 🔴/🟡/🟢
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <ninguno | qué falta y quién lo cierra>
+Cambios: productos/actions.ts → saveProduct no escribe costo sin reportes.financieros (edición conserva, alta fija "0"); productos/product-form.tsx → prop puedeVerFinanzas oculta Costo (MXN) y Últimas compras; productos/page.tsx → stockMinimo en el CTE, stockSemaforo 🔴/🟡/🟢 en badge de tarjeta y columna Stock, Costo/Margen y ?edit= compuertados por permiso; inventario/page.tsx → stockTone con emoji, costo '0' en SQL sin permiso, ocultos Valor en stock / Valor del inventario / Movido en 30 días / Valor por categoría / detalle valor en gráfica
+Verificación: typecheck ✔ | lint ✔ | test 577 ✔ | usability movil /admin/productos 0 errores | usability movil /admin/inventario 0 errores
+Antes → después: Costos/márgenes/valores visibles para todo rol con catalogos.ver o inventario.ver → restringidos en servidor a reportes.financieros; tarjeta móvil de 7 campos → Nombre + Precio destacado + semáforo de stock de un vistazo
+Desviaciones: 5 (ver abajo)
+Riesgo abierto: ninguno
 ```
 
 ## Desviaciones (las escribe el implementador)
 
-Ninguna.
+1. **`costo` se neutraliza en SQL en inventario** (`'0'::text` sin permiso):
+   `catalogoProductos` se serializa a `MovimientoForm` (cliente) al abrir
+   `?nuevo=movimiento`; proyectar `'0'` evita que el costo salga de la BD o
+   viaje en props. La consulta sigue siendo UNA ronda.
+2. **Detalle de "Stock vs mínimo" sin `valor`** cuando no hay permiso: el
+   `detalle` de cada barra imprimía el valor en existencia del producto (el
+   mismo dato que "Valor en stock"); se omite y queda solo el desglose por
+   sucursal en vista "Todas".
+3. **Badge "Oculto" conservado** en `RegistroCard`: el badge pasó a ser el
+   semáforo; para no perder la señal de producto oculto se apila
+   `<StatusBadge active={false} />` solo cuando `!activo`.
+4. **`Tipo` y "En el punto de venta" reacomodados, no eliminados**: `Tipo`
+   pasa al subtítulo (`sku · Tipo`, mismo patrón que las tarjetas de
+   inventario) y "En el punto de venta" queda como último campo, para no
+   perder datos no financieros que en escritorio siguen visibles.
+5. **El alta sin permiso también fija `costo: "0"`** en `saveProduct`: la
+   misión solo pedía blindar la edición, pero dejar el insert abierto
+   permitiría crear productos con costo enviando el campo a mano.
