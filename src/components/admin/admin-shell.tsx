@@ -24,6 +24,7 @@ import { ThemeModeSelector } from "@/components/theme-mode-selector";
 import { ToastProvider } from "@/components/ui/toast";
 import { PoseTimerBar } from "@/components/pose-timer-bar";
 import { getClientSucursalCookie, setClientSucursalCookie } from "@/lib/sucursal-cookie-client";
+import { NAV_PENDING_EVENT, reportarNavegacionPendiente } from "@/lib/nav-pending";
 import { trackPerformance } from "@/lib/telemetry/cliente";
 import { buildAdminHref, buildHref, firstParam } from "@/lib/url-context";
 
@@ -103,7 +104,7 @@ function OrganizationSelector({
   const currentId = organization?.id ?? "";
   const sidebarLabel =
     variant === "sidebar" ? (
-      <span className="mb-1 block text-op-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+      <span className="mb-1 block text-op-xs font-medium text-muted-foreground">
         Tu negocio
       </span>
     ) : null;
@@ -162,13 +163,13 @@ function OrganizationSelector({
         }
         id={selectId}
         onChange={(event) => {
-          router.push(
-            buildHref(pathname, {
-              params: searchParams,
-              organizationId: event.target.value,
-              sucursalId: null,
-            }),
-          );
+          const href = buildHref(pathname, {
+            params: searchParams,
+            organizationId: event.target.value,
+            sucursalId: null,
+          });
+          reportarNavegacionPendiente(href);
+          router.push(href);
         }}
         value={currentId}
       >
@@ -254,7 +255,7 @@ function BranchSelector({
         <span
           className={
             variant === "sidebar"
-              ? "mb-1 block text-op-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground"
+              ? "mb-1 block text-op-xs font-medium text-muted-foreground"
               : "sr-only"
           }
         >
@@ -274,9 +275,16 @@ function BranchSelector({
           name="sucursalId"
           onChange={(event) => {
             const nuevaSucursalId = event.target.value;
+            // El server action redirige a returnTo conservando todos los
+            // parámetros y actualizando organizationId/sucursalId: se reporta
+            // ese mismo destino para que la red de navegación lo vigile.
             if (organization.id) {
               onSucursalChange?.(organization.id, nuevaSucursalId);
               setClientSucursalCookie(organization.id, nuevaSucursalId);
+              const search = new URLSearchParams(searchParams.toString());
+              search.set("organizationId", organization.id);
+              search.set("sucursalId", nuevaSucursalId);
+              reportarNavegacionPendiente(`${pathname}?${search.toString()}`);
             }
             event.currentTarget.form?.requestSubmit();
           }}
@@ -405,10 +413,16 @@ function initials(name: string) {
 const NAVIGATION_TIMEOUT_MS = 6_000;
 
 /**
- * Barra de progreso persistente para navegaciones del App Router. El shell no
- * se desmonta entre rutas, así que puede confirmar el toque aunque el destino
- * tarde en resolver sus datos. Si la navegación cliente tarda más de 6 s o
- * el usuario reintenta activamente, se ejecuta navegación nativa de rescate.
+ * Red de seguridad para navegaciones del App Router. El shell no se desmonta
+ * entre rutas, así que puede vigilar el toque aunque el destino tarde en
+ * resolver sus datos.
+ *
+ * La barra de progreso se limpia cuando cambian pathname/searchParams (el
+ * router confirma el commit, a veces de forma optimista al mostrar el
+ * loading.tsx), pero el rescate NO depende de ese commit: a los 6 s se revisa
+ * el DOM — si el skeleton del `loading.tsx` (`[data-loading-state]`) sigue en
+ * `#contenido-admin` o la URL no alcanzó el destino (navegaciones por server
+ * action), se fuerza navegación completa (equivalente al F5 del usuario).
  */
 function NavigationActivity() {
   const pathname = usePathname();
@@ -416,43 +430,96 @@ function NavigationActivity() {
   const searchKey = searchParams.toString();
   const [pendingLabel, setPendingLabel] = useState<string | null>(null);
   const startedAt = useRef<number | null>(null);
+  const netStartAt = useRef<number | null>(null);
   const targetPath = useRef<string | null>(null);
   const targetKey = useRef<string | null>(null);
   const targetHref = useRef<string | null>(null);
+  const netTargetHref = useRef<string | null>(null);
   const tapTimes = useRef(new WeakMap<HTMLAnchorElement, number>());
-  const timeoutRef = useRef<number | null>(null);
+  const netTimeoutRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
   const feedbackSent = useRef(false);
 
-  const finish = useCallback((completed: boolean) => {
+  const reportar = useCallback((metrica: "nav_complete_ms" | "nav_timeout_ms") => {
     if (startedAt.current === null) return;
-    const elapsed = performance.now() - startedAt.current;
-    const destination = targetHref.current;
     trackPerformance(
-      completed ? "nav_complete_ms" : "nav_timeout_ms",
-      elapsed,
+      metrica,
+      performance.now() - startedAt.current,
       targetPath.current ?? undefined,
     );
+  }, []);
+
+  const finish = useCallback(() => {
+    if (startedAt.current === null) return;
+    reportar("nav_complete_ms");
     startedAt.current = null;
     targetPath.current = null;
     targetKey.current = null;
     targetHref.current = null;
     setPendingLabel(null);
-    if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
     if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
-    timeoutRef.current = null;
     frameRef.current = null;
+  }, [reportar]);
 
-    // Rescate automático: si la navegación del cliente se quedó colgada
-    // (RSC bloqueado, error o red inestable), forzar navegación completa directa
-    // (equivalente automático al F5 del usuario) para no dejar la pantalla trabada.
-    if (!completed && destination && typeof window !== "undefined" && destination !== window.location.href) {
-      window.location.assign(destination);
-    }
-  }, []);
+  const iniciarNav = useCallback(
+    (key: string, path: string, href: string, label: string) => {
+      if (startedAt.current !== null && targetKey.current === key) return;
+      if (netTimeoutRef.current !== null) window.clearTimeout(netTimeoutRef.current);
+      if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
+      feedbackSent.current = false;
+      startedAt.current = performance.now();
+      netStartAt.current = startedAt.current;
+      targetPath.current = path;
+      targetKey.current = key;
+      targetHref.current = href;
+      netTargetHref.current = href;
+      setPendingLabel(label);
+
+      frameRef.current = window.requestAnimationFrame(() => {
+        if (startedAt.current === null || feedbackSent.current) return;
+        trackPerformance(
+          "nav_feedback_ms",
+          performance.now() - startedAt.current,
+          targetPath.current ?? undefined,
+        );
+        feedbackSent.current = true;
+      });
+
+      netTimeoutRef.current = window.setTimeout(() => {
+        netTimeoutRef.current = null;
+        const destino = netTargetHref.current
+          ? new URL(netTargetHref.current, window.location.origin).href
+          : null;
+        const urlDistinta = destino !== null && destino !== window.location.href;
+        const colgada =
+          document.querySelector("#contenido-admin [data-loading-state]") !== null ||
+          urlDistinta;
+        if (!colgada) {
+          netStartAt.current = null;
+          netTargetHref.current = null;
+          return;
+        }
+        if (netStartAt.current !== null) {
+          trackPerformance(
+            "nav_timeout_ms",
+            performance.now() - netStartAt.current,
+            targetPath.current ?? path,
+          );
+          netStartAt.current = null;
+        }
+        netTargetHref.current = null;
+        if (destino && destino !== window.location.href) {
+          window.location.assign(destino);
+        } else {
+          window.location.reload();
+        }
+      }, NAVIGATION_TIMEOUT_MS);
+    },
+    [],
+  );
 
   useEffect(() => {
-    finish(true);
+    finish();
   }, [finish, pathname, searchKey]);
 
   useEffect(() => {
@@ -510,35 +577,49 @@ function NavigationActivity() {
       }
       tapTimes.current.set(anchor, now);
 
-      if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
-      if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
-      feedbackSent.current = false;
-      startedAt.current = performance.now();
-      targetPath.current = url.pathname;
-      targetKey.current = key;
-      targetHref.current = anchor.href;
       const label = anchor.textContent?.replace(/\s+/g, " ").trim().slice(0, 40) || "sección";
-      setPendingLabel(label);
+      iniciarNav(key, url.pathname, anchor.href, label);
+    };
 
-      frameRef.current = window.requestAnimationFrame(() => {
-        if (startedAt.current === null || feedbackSent.current) return;
-        trackPerformance(
-          "nav_feedback_ms",
-          performance.now() - startedAt.current,
-          targetPath.current ?? undefined,
-        );
-        feedbackSent.current = true;
-      });
-      timeoutRef.current = window.setTimeout(() => finish(false), NAVIGATION_TIMEOUT_MS);
+    // Navegaciones programáticas (router.push/replace, selects con redirect de
+    // server action): el destino llega por `melena:nav-pending`.
+    const onNavPending = (event: Event) => {
+      const href = (event as CustomEvent<{ href?: string }>).detail?.href;
+      if (typeof href !== "string" || !href) return;
+      let url: URL;
+      try {
+        url = new URL(href, window.location.origin);
+      } catch {
+        return;
+      }
+      if (url.origin !== window.location.origin) return;
+      const key = `${url.pathname}${url.search}`;
+      if (url.pathname === window.location.pathname && url.search === window.location.search) return;
+      iniciarNav(key, url.pathname, url.href, "sección");
+    };
+
+    // Atrás/adelante del navegador: la URL ya cambió, así que el rescate se
+    // apoya en el skeleton o recarga la URL actual.
+    const onPopState = () => {
+      iniciarNav(
+        `${window.location.pathname}${window.location.search}`,
+        window.location.pathname,
+        window.location.href,
+        "página anterior",
+      );
     };
 
     document.addEventListener("click", onClick, true);
+    window.addEventListener(NAV_PENDING_EVENT, onNavPending);
+    window.addEventListener("popstate", onPopState);
     return () => {
       document.removeEventListener("click", onClick, true);
-      if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
+      window.removeEventListener(NAV_PENDING_EVENT, onNavPending);
+      window.removeEventListener("popstate", onPopState);
+      if (netTimeoutRef.current !== null) window.clearTimeout(netTimeoutRef.current);
       if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
     };
-  }, [finish]);
+  }, [iniciarNav]);
 
   return (
     <>

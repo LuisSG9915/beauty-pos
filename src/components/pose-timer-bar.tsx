@@ -157,7 +157,7 @@ export function PoseTimerBar() {
                   <Clock aria-hidden="true" className="size-5" />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <p className="truncate text-op-xs font-medium text-muted-foreground">
                     Tiempo de Pose · {timer.clienteNombre}
                   </p>
                   <p className="flex items-baseline gap-2">

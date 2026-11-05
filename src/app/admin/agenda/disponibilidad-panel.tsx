@@ -351,7 +351,7 @@ export function DisponibilidadPanel({
       <div className="grid gap-6 border-t border-border pt-5">
         {/* ------------------------- Horario semanal ------------------------- */}
         <section className="space-y-3">
-          <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+          <h3 className="text-op-xs font-medium text-muted-foreground">
             Horario de atención
           </h3>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
@@ -402,7 +402,7 @@ export function DisponibilidadPanel({
         <div className="space-y-6">
           {/* --------------------- Capacidad sin asignar --------------------- */}
           <section className="space-y-2">
-            <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+            <h3 className="text-op-xs font-medium text-muted-foreground">
               Citas sin profesional asignado
             </h3>
             <div className="flex items-end gap-2">
@@ -434,7 +434,7 @@ export function DisponibilidadPanel({
 
           {/* ---------------------- Reservas en línea ---------------------- */}
           <section className="space-y-2">
-            <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+            <h3 className="text-op-xs font-medium text-muted-foreground">
               Reservas en línea
             </h3>
             <label className="flex items-start gap-2 text-sm text-foreground">
@@ -560,7 +560,7 @@ export function DisponibilidadPanel({
 
           {/* --------------------- Recordatorios por correo --------------------- */}
           <section className="space-y-2">
-            <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+            <h3 className="text-op-xs font-medium text-muted-foreground">
               Recordatorios por correo
             </h3>
             <label className="flex items-start gap-2 text-sm text-foreground">
@@ -615,7 +615,7 @@ export function DisponibilidadPanel({
 
           {/* --------------------- Últimos avisos de cita --------------------- */}
           <section className="space-y-2">
-            <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+            <h3 className="text-op-xs font-medium text-muted-foreground">
               Últimos avisos de cita
             </h3>
             {avisos.length === 0 ? (
@@ -651,7 +651,7 @@ export function DisponibilidadPanel({
 
           {/* ---------------------------- Bloqueos ---------------------------- */}
           <section className="space-y-3">
-            <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+            <h3 className="text-op-xs font-medium text-muted-foreground">
               Bloqueos de agenda
             </h3>
             <form className="grid gap-2 rounded-xl border border-border bg-muted/60 p-3" onSubmit={guardarBloqueo}>
@@ -746,7 +746,7 @@ export function DisponibilidadPanel({
 
           {/* ---------------------------- Recursos ---------------------------- */}
           <section className="space-y-3">
-            <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+            <h3 className="text-op-xs font-medium text-muted-foreground">
               Recursos (cabinas, sillas, equipo)
             </h3>
             <form className="grid gap-2 rounded-xl border border-border bg-muted/60 p-3" onSubmit={guardarRecurso}>

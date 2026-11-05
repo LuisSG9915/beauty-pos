@@ -33,7 +33,7 @@ export default function SoportePage() {
         </p>
 
         <div className="mt-10 grid gap-5 sm:grid-cols-3">
-          <div className="rounded-3xl border border-border bg-card p-6">
+          <div className="rounded-2xl border border-border bg-card p-6">
             <LifeBuoy className="size-5 text-primary" />
             <h2 className="mt-4 font-semibold">Dentro del sistema</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -41,7 +41,7 @@ export default function SoportePage() {
               y el modo práctica para aprender sin riesgo.
             </p>
           </div>
-          <div className="rounded-3xl border border-border bg-card p-6">
+          <div className="rounded-2xl border border-border bg-card p-6">
             <Mail className="size-5 text-primary" />
             <h2 className="mt-4 font-semibold">Correo</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
@@ -52,7 +52,7 @@ export default function SoportePage() {
               y te respondemos en horario laboral.
             </p>
           </div>
-          <div className="rounded-3xl border border-border bg-card p-6">
+          <div className="rounded-2xl border border-border bg-card p-6">
             <MessageCircleQuestion className="size-5 text-primary" />
             <h2 className="mt-4 font-semibold">Preguntas frecuentes</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">

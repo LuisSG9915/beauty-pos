@@ -135,7 +135,7 @@ export function MemberCard({
         <form action={rolesAction} className="space-y-2">
           <input name="organizacionId" type="hidden" value={organizationId} />
           <input name="miembroId" type="hidden" value={member.miembroId} />
-          <p className="flex items-center gap-1.5 text-op-xs font-semibold uppercase tracking-[0.12em] text-primary">
+          <p className="flex items-center gap-1.5 text-op-xs font-medium text-muted-foreground">
             <ShieldCheck aria-hidden="true" className="size-3.5" /> Roles
           </p>
           <CheckboxList
@@ -155,7 +155,7 @@ export function MemberCard({
         </form>
 
         <section className="space-y-2" aria-label={`Sucursales de ${member.nombre}`}>
-          <p className="flex items-center gap-1.5 text-op-xs font-semibold uppercase tracking-[0.12em] text-primary">
+          <p className="flex items-center gap-1.5 text-op-xs font-medium text-muted-foreground">
             <Store aria-hidden="true" className="size-3.5" /> Sucursales
           </p>
           <MiembroSucursalesForm

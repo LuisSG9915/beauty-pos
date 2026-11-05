@@ -1,6 +1,5 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { drizzle } from "drizzle-orm/node-postgres";
-import { after } from "next/server";
 import { Pool } from "pg";
 
 import * as schema from "@/db/schema";
@@ -70,6 +69,17 @@ function drizzleFor(pool: Pool) {
   });
 }
 
+// Un socket ocioso puede morir en cualquier momento (Hyperdrive/runtime reaps,
+// FIN/RST del intermediario). pg-pool lo purga y re-emite `error` en el Pool:
+// sin listener, EventEmitter lanza el error como excepción no capturada que
+// mata el request en vuelo (stream RSC roto → skeleton). Solo se registra.
+function conManejadorErrores(pool: Pool): Pool {
+  pool.on("error", (error) => {
+    console.warn("[db] conexión ociosa perdida:", error?.message ?? error);
+  });
+  return pool;
+}
+
 export function getDatabase() {
   const cloudflare = getCloudflare();
   const connectionString = getConnectionString(cloudflare?.env);
@@ -82,33 +92,20 @@ export function getDatabase() {
     const isHyperdrive = Boolean(cloudflare.env?.HYPERDRIVE?.connectionString || process.env.HYPERDRIVE_CONNECTION_STRING);
     // max 2 cuando proviene de HYPERDRIVE (Hyperdrive gestiona el pool en edge; abrir más sockets desperdicia descriptores).
     // Fuera de Hyperdrive se permiten hasta 8 para consultas paralelas.
-    const pool = new Pool({
+    const pool = conManejadorErrores(new Pool({
       connectionString,
       max: isHyperdrive ? 2 : 8,
       connectionTimeoutMillis: 5000,
       query_timeout: 10000,
       idleTimeoutMillis: 5000,
-    });
+    }));
     workerPools.set(cloudflare.ctx, { connectionString, pool });
-    // `after` corre cuando la respuesta ya se envió: allí es seguro drenar el
-    // pool sin cortar consultas en vuelo (pool.end espera a los clientes).
-    // Se silencia cualquier error de socket cerrado y se registra en ctx.waitUntil.
-    const ctx = cloudflare.ctx as { waitUntil?: (promise: Promise<unknown>) => void } | undefined;
-    const endPool = () => pool.end().catch(() => {});
-    try {
-      after(async () => {
-        const p = endPool();
-        if (typeof ctx?.waitUntil === "function") {
-          ctx.waitUntil(p);
-        }
-        await p;
-      });
-    } catch {
-      // Sin contexto de request (prerender de build): registrar en waitUntil si está disponible.
-      if (typeof ctx?.waitUntil === "function") {
-        ctx.waitUntil(endPool());
-      }
-    }
+    // No drenar con after(): los callbacks after() corren en paralelo (p-queue
+    // con concurrencia infinita), así que un pool.end() registrado dentro de un
+    // after() corre concurrente con el callback que creó el pool y lo cierra a
+    // mitad de sus consultas ("Cannot use a pool after calling end"). El pool
+    // se acota solo: idleTimeoutMillis destruye clientes ociosos y el WeakMap
+    // por ExecutionContext garantiza que nada se reutilice entre invocaciones.
     return drizzleFor(pool);
   }
 
@@ -119,13 +116,13 @@ export function getDatabase() {
   const pools = (runtimeGlobal.__beautyPosPools ??= new Map());
   const pool =
     pools.get(connectionString) ??
-    new Pool({
+    conManejadorErrores(new Pool({
       connectionString,
       max: isHyperdrive ? 2 : 5,
       connectionTimeoutMillis: 5000,
       query_timeout: 10000,
       idleTimeoutMillis: 5000,
-    });
+    }));
   pools.set(connectionString, pool);
 
   return drizzleFor(pool);

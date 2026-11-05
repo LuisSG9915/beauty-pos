@@ -89,7 +89,7 @@
  */
 :root {
   color-scheme: light;
-  --background: #faf9fb;
+  --background: #faf7f8;
   --foreground: #241922;
   --card: #ffffff;
   --card-foreground: #241922;
@@ -127,8 +127,8 @@
   --chart-3: #77510a;
   --chart-4: #305f86;
   --chart-5: #6f6069;
-  --radius: 0.625rem;
-  --sidebar: #fdfbfc;
+  --radius: 0.5rem;
+  --sidebar: #fdf8f9;
   --sidebar-foreground: #241922;
   --sidebar-primary: #a91d5d;
   --sidebar-primary-foreground: #fff7fb;

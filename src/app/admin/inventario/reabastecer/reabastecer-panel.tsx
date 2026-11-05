@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { useToast } from "@/components/ui/toast";
 import { formatCurrency, formatQuantity } from "@/lib/format";
+import { reportarNavegacionPendiente } from "@/lib/nav-pending";
 import { buildAdminHref } from "@/lib/url-context";
 import {
   PRIORIDAD_REABASTO_LABEL,
@@ -127,12 +128,12 @@ export function ReabastecerPanel({
       const state = await crearCompraDesdeReabasto(data);
       if (state.success && state.data?.compraId) {
         toast.success(state.message ?? "Compra creada como borrador.");
-        router.push(
-          buildAdminHref(`/compras/${state.data.compraId}`, {
-            organizationId: organizacionId,
-            sucursalId,
-          }),
-        );
+        const href = buildAdminHref(`/compras/${state.data.compraId}`, {
+          organizationId: organizacionId,
+          sucursalId,
+        });
+        reportarNavegacionPendiente(href);
+        router.push(href);
       } else {
         toast.error(state.error ?? "No se pudo crear la compra.");
       }

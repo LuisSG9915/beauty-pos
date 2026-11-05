@@ -29,6 +29,7 @@ import {
 import { useToast } from "@/components/ui/toast";
 import { initialActionState, type ActionState } from "@/lib/action-state";
 import { formatCurrency, formatDate, formatTime } from "@/lib/format";
+import { reportarNavegacionPendiente } from "@/lib/nav-pending";
 import { buildAdminHref } from "@/lib/url-context";
 import { cn } from "@/lib/utils";
 import { TRANSICION_LABEL } from "@/modules/agenda/estados";
@@ -138,16 +139,16 @@ export function MiDiaBoard({
         toast.error(result.error ?? "No se pudo abrir la venta.");
         return;
       }
-      router.push(
-        buildAdminHref("/pos", {
-          organizationId,
-          sucursalId,
-          extra: {
-            ventaId: result.data.ventaId,
-            returnTo: buildAdminHref("/mi-dia", { organizationId, sucursalId }),
-          },
-        }),
-      );
+      const href = buildAdminHref("/pos", {
+        organizationId,
+        sucursalId,
+        extra: {
+          ventaId: result.data.ventaId,
+          returnTo: buildAdminHref("/mi-dia", { organizationId, sucursalId }),
+        },
+      });
+      reportarNavegacionPendiente(href);
+      router.push(href);
     });
   };
 

@@ -20,6 +20,16 @@ export const onRequestError: Instrumentation.onRequestError = async (
     const { extraerHeadersCloudflare, registrarError } = await import("@/lib/observability/error-core");
 
     const err = error instanceof Error ? error : new Error(String(error));
+    // Drizzle envuelve el error real de pg en `cause` ("Failed query: <sql>");
+    // sin la causa el incidente muestra solo el SQL y no el motivo de red.
+    let mensaje = err.message || String(error);
+    let causa: unknown = err.cause;
+    let niveles = 0;
+    while (causa instanceof Error && causa.message && niveles < 3) {
+      mensaje = `[causa] ${causa.message} | ${mensaje}`;
+      causa = causa.cause;
+      niveles += 1;
+    }
     const digest =
       typeof error === "object" && error !== null && "digest" in error
         ? String((error as { digest?: unknown }).digest)
@@ -31,7 +41,7 @@ export const onRequestError: Instrumentation.onRequestError = async (
     await registrarError(getDatabase(), {
       fuente: context.routeType === "action" ? "server_action" : "server",
       tipo: err.name || "Error",
-      mensaje: err.message || String(error),
+      mensaje,
       stack: err.stack ?? null,
       digest,
       // routePath es el patrón de archivo (/app/blog/[slug]) — ya normalizado.

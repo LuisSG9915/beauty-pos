@@ -149,7 +149,7 @@ export function CierreCajaForm({
           {mostrarDesglose ? (
             <div className="rounded-xl border border-border/70 bg-muted/30 p-3.5 space-y-4 pt-4 anim-entrada">
               <div className="flex items-center justify-between">
-                <span className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <span className="text-op-xs font-medium text-muted-foreground">
                   Desglose de efectivo
                 </span>
                 <button

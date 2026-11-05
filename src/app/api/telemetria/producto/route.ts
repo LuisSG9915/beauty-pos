@@ -32,7 +32,18 @@ const eventoSchema = z.object({
     .max(100)
     .optional(),
   accionClave: z.boolean().optional(),
-  metrica: z.enum(["ttfb", "fcp", "lcp", "cls", "inp"]).optional(),
+  metrica: z
+    .enum([
+      "ttfb",
+      "fcp",
+      "lcp",
+      "cls",
+      "inp",
+      "nav_feedback_ms",
+      "nav_complete_ms",
+      "nav_timeout_ms",
+    ])
+    .optional(),
   valor: z.number().min(0).max(600_000).optional(),
   clientAt: z.number().optional(),
 });
@@ -239,8 +250,9 @@ export async function POST(request: NextRequest) {
         );
       }
     } catch (error) {
-      // Telemetría best-effort: log y no reintentar
-      console.error("telemetria/producto POST", error);
+      // Telemetría best-effort: log con la causa subyacente (pg/hyperdrive) y no reintentar
+      const cause = error instanceof Error && error.cause ? ` | causa: ${String(error.cause)}` : "";
+      console.error(`telemetria/producto POST${cause}`, error);
     }
   });
 

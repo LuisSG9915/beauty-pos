@@ -1007,7 +1007,7 @@ export function PlanoBoard({
         {piso ? (
           <div className="mt-4 grid grid-cols-1 gap-6 md:grid-cols-2">
             <section aria-label={`Ubicaciones de ${piso.nombre}`}>
-              <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">Mercancía</h3>
+              <h3 className="text-op-xs font-medium text-muted-foreground">Mercancía</h3>
               {ubicacionesPiso.length === 0 ? (
                 <p className="mt-2 text-op-xs text-muted-foreground">Sin ubicaciones en este piso.</p>
               ) : (
@@ -1054,7 +1054,7 @@ export function PlanoBoard({
               )}
             </section>
             <section aria-label={`Muebles de ${piso.nombre}`}>
-              <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">Muebles</h3>
+              <h3 className="text-op-xs font-medium text-muted-foreground">Muebles</h3>
               {mobiliarioPiso.length === 0 && mueblesSinColocar.length === 0 ? (
                 <p className="mt-2 text-op-xs text-muted-foreground">Sin muebles registrados.</p>
               ) : (

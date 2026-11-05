@@ -81,7 +81,7 @@ function TarjetaGananciaNeta({
               : "border-destructive/30 bg-destructive/10 text-destructive-foreground dark:bg-destructive/15"
           }`}
         >
-          <p className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <p className="text-op-xs font-medium text-muted-foreground">
             Utilidad Neta en Mano
           </p>
           <p

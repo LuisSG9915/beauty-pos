@@ -162,7 +162,7 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
         {siguientePaso ? (
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3">
             <div className="min-w-0">
-              <p className="text-op-xs font-semibold uppercase tracking-wider text-primary">
+              <p className="text-op-xs font-medium text-primary">
                 Siguiente paso recomendado
               </p>
               <p className="text-sm font-medium text-foreground">{siguientePaso.titulo}</p>

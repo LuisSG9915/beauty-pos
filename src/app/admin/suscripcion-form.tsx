@@ -89,7 +89,7 @@ export function SuscripcionAdminRow({
     new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 2 }).format(v);
 
   return (
-    <div className="rounded-xl border border-border px-4 py-3">
+    <div className="mt-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className={`inline-flex rounded-full border px-2.5 py-1 text-op-xs font-semibold ${badge.tono}`}>
           {badge.texto}

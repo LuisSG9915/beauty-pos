@@ -180,7 +180,7 @@ export function ReservaFlow({
   if (resultado?.tipo === "confirmada" || resultado?.tipo === "pendiente") {
     return (
       <section className="mx-auto w-full max-w-3xl px-6 pb-16">
-        <div className="rounded-3xl border border-border bg-card p-8 text-center shadow-sm anim-entrada">
+        <div className="rounded-2xl border border-border bg-card p-8 text-center shadow-sm anim-entrada">
           <CheckCircle2 aria-hidden="true" className="mx-auto size-12 text-success anim-pulso-svg" />
           <h1 className="mt-4 text-2xl font-semibold tracking-tight">
             {resultado.tipo === "confirmada" ? "¡Cita confirmada!" : "Reserva recibida"}
@@ -425,7 +425,7 @@ export function ReservaFlow({
 
       {/* Paso 5: datos */}
       {slotIso ? (
-        <form className="rounded-3xl border border-border bg-card p-6 shadow-sm anim-entrada" onSubmit={enviar}>
+        <form className="rounded-2xl border border-border bg-card p-6 shadow-sm anim-entrada" onSubmit={enviar}>
           <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-primary">
             <CalendarCheck2 aria-hidden="true" className="size-4" /> Tus datos
           </h2>

@@ -221,11 +221,11 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="anim-entrada rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <p className="text-op-xs font-semibold uppercase tracking-wide text-muted-foreground">Gastos confirmados</p>
+          <p className="text-op-xs font-medium text-muted-foreground">Gastos confirmados</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-foreground">{fmt(resumen.totalConfirmado)}</p>
         </div>
         <div className="anim-entrada rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <p className="text-op-xs font-semibold uppercase tracking-wide text-muted-foreground">Revertidos en el periodo</p>
+          <p className="text-op-xs font-medium text-muted-foreground">Revertidos en el periodo</p>
           <p className="mt-2 text-2xl font-semibold tabular-nums text-destructive">{fmt(resumen.totalRevertido)}</p>
         </div>
       </section>

@@ -199,7 +199,7 @@ export function RecetarioEditor({
 
       {/* Selector modo recetario estructurado vs texto libre */}
       <div className="flex items-center justify-between">
-        <span className="text-op-xs font-semibold uppercase tracking-wide text-foreground">
+        <span className="text-op-xs font-medium text-muted-foreground">
           {modoTextoLibre ? "Fórmula en texto libre" : "Recetario de mezcla al gramo"}
         </span>
         <button

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { AdminPageHeader, AdminSection } from "@/components/admin/page-header";
 import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { BarChart, HBarChart } from "@/components/charts";
 import { EmptyState } from "@/components/empty-state";
@@ -121,75 +121,66 @@ function TarjetaGananciaNeta({
 }) {
   const fmt = (centavos: number) => formatCurrency(centavos / 100, { currency });
   const esPositivo = ganancia.utilidadNetaCentavos >= 0;
+  const componentes = [
+    {
+      detalle: `Efectivo ${fmt(ganancia.efectivoCentavos)} · Tarjeta ${fmt(ganancia.tarjetaCentavos)} · SPEI ${fmt(ganancia.transferenciaCentavos)}`,
+      etiqueta: "Total ingresado",
+      valor: fmt(ganancia.totalIngresadoCentavos),
+    },
+    {
+      detalle: "Comisiones devengadas",
+      etiqueta: "Por pagar a equipo",
+      valor: fmt(ganancia.comisionesEquipoCentavos),
+    },
+    {
+      detalle: "Salidas de caja / gastos",
+      etiqueta: "Gastos operativos",
+      valor: fmt(ganancia.gastosOperativosCentavos),
+    },
+  ];
 
   return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-6">
-      <div className="mb-4">
-        <h2 className="text-base font-semibold text-foreground">{titulo}</h2>
-        <p className="text-xs text-muted-foreground">{subtitulo}</p>
+    <section className="rounded-2xl bg-accent/60 px-5 py-6 sm:px-7">
+      <div className="mb-5">
+        <h2 className="text-lg font-semibold tracking-tight text-accent-foreground">{titulo}</h2>
+        <p className="mt-1 text-sm text-accent-foreground/80">{subtitulo}</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {/* 1. Total Ingresado */}
-        <div className="rounded-xl border border-border/80 bg-muted/30 p-4">
-          <p className="text-op-xs font-medium text-muted-foreground">Total Ingresado</p>
-          <p className="mt-1 text-xl font-bold tracking-tight text-foreground tabular-nums">
-            {fmt(ganancia.totalIngresadoCentavos)}
-          </p>
-          <p className="mt-1.5 truncate text-[11px] text-muted-foreground">
-            Efectivo {fmt(ganancia.efectivoCentavos)} · Tarjeta {fmt(ganancia.tarjetaCentavos)} · SPEI {fmt(ganancia.transferenciaCentavos)}
-          </p>
-        </div>
-
-        {/* 2. Por Pagar a Equipo */}
-        <div className="rounded-xl border border-border/80 bg-muted/30 p-4">
-          <p className="text-op-xs font-medium text-muted-foreground">Por Pagar a Equipo</p>
-          <p className="mt-1 text-xl font-bold tracking-tight text-foreground tabular-nums">
-            {fmt(ganancia.comisionesEquipoCentavos)}
-          </p>
-          <p className="mt-1.5 text-[11px] text-muted-foreground">Comisiones devengadas</p>
-        </div>
-
-        {/* 3. Gastos Operativos */}
-        <div className="rounded-xl border border-border/80 bg-muted/30 p-4">
-          <p className="text-op-xs font-medium text-muted-foreground">Gastos Operativos</p>
-          <p className="mt-1 text-xl font-bold tracking-tight text-foreground tabular-nums">
-            {fmt(ganancia.gastosOperativosCentavos)}
-          </p>
-          <p className="mt-1.5 text-[11px] text-muted-foreground">Salidas de caja / gastos</p>
-        </div>
-
-        {/* 4. Utilidad Neta en Mano */}
-        <div
-          className={`rounded-xl border p-4 ${
-            esPositivo
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-950 dark:bg-emerald-500/15 dark:text-emerald-100"
-              : "border-destructive/30 bg-destructive/10 text-destructive-foreground dark:bg-destructive/15"
-          }`}
-        >
-          <p className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            Utilidad Neta en Mano
-          </p>
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] lg:items-center">
+        <div className="rounded-xl bg-card px-5 py-4 shadow-xs sm:px-6 sm:py-5">
+          <p className="text-op-xs font-medium text-muted-foreground">Utilidad neta en mano</p>
           <p
-            className={`mt-1 text-2xl font-black tracking-tight tabular-nums ${
+            className={`mt-1 text-3xl font-black tracking-tight tabular-nums sm:text-4xl ${
               esPositivo ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
             }`}
           >
             {fmt(ganancia.utilidadNetaCentavos)}
           </p>
-          <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">
+          <p className="mt-1.5 text-op-xs font-medium text-muted-foreground">
             {esPositivo ? "Disponible libre de compromisos" : "Déficit en el período"}
           </p>
         </div>
+
+        <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+          {componentes.map((componente) => (
+            <div className="min-w-0" key={componente.etiqueta}>
+              <dt className="text-op-xs font-medium text-accent-foreground/80">{componente.etiqueta}</dt>
+              <dd className="mt-0.5 truncate text-xl font-bold tracking-tight tabular-nums text-accent-foreground">
+                {componente.valor}
+              </dd>
+              <dd className="mt-1 truncate text-op-xs text-accent-foreground/80">{componente.detalle}</dd>
+            </div>
+          ))}
+        </dl>
       </div>
-    </div>
+    </section>
   );
 }
 
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="anim-entrada min-w-0 overflow-hidden rounded-xl border border-border bg-muted/60 px-4 py-3">
-      <p className="truncate text-op-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+    <div className="anim-entrada min-w-0 overflow-hidden rounded-xl bg-muted/60 px-4 py-3">
+      <p className="truncate text-op-xs font-medium text-muted-foreground">{label}</p>
       <p className="mt-1 truncate text-xl font-semibold tabular-nums text-foreground">{value}</p>
       {hint ? <p className="mt-0.5 line-clamp-2 text-op-xs text-muted-foreground">{hint}</p> : null}
     </div>
@@ -360,13 +351,13 @@ export default async function ReportesPage({ searchParams }: Props) {
   const presets = presetsPeriodo(hoy);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <AdminPageHeader
         description={`${sucursalNombre} · ${desde} → ${hasta}${consolidado ? ` · zona del reporte: ${reportTimeZone}` : ""}`}
         title="Reportes"
       />
 
-      <form className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm w-full min-w-0" method="get">
+      <form className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-end gap-3 rounded-2xl bg-muted/50 p-4 w-full min-w-0" method="get">
         <input name="organizationId" type="hidden" value={organization.id} />
         {context.branches.length > 1 ? (
           <Field className="w-full sm:w-56">
@@ -444,7 +435,7 @@ export default async function ReportesPage({ searchParams }: Props) {
       ) : null}
 
       {consolidado ? (
-        <AdminCard
+        <AdminSection
           description={`Ventas cobradas y citas por sucursal, en la zona del reporte (${reportTimeZone}). El consolidado es la suma de estas filas.`}
           title="Comparativo por sucursal"
         >
@@ -461,7 +452,7 @@ export default async function ReportesPage({ searchParams }: Props) {
             ])}
             vacio="Sin operaciones en el rango."
           />
-        </AdminCard>
+        </AdminSection>
       ) : null}
 
       {puedeOperativos ? (
@@ -491,7 +482,7 @@ export default async function ReportesPage({ searchParams }: Props) {
           </section>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <AdminCard description="Citas activas por estado en el período" title="Citas por estado">
+            <AdminSection description="Citas activas por estado en el período" title="Citas por estado">
               <Tabla
                 encabezados={["Estado", "Citas"]}
                 filas={citasPorEstado
@@ -499,8 +490,8 @@ export default async function ReportesPage({ searchParams }: Props) {
                   .map((row) => [ESTADO_LABEL[row.estado] ?? row.estado, String(row.total)])}
                 vacio="Sin citas en el rango."
               />
-            </AdminCard>
-            <AdminCard
+            </AdminSection>
+            <AdminSection
               actions={
                 consolidado ? null : (
                   <Link className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline" href={`/admin/ventas?${filtrosExport}`}>
@@ -516,10 +507,10 @@ export default async function ReportesPage({ searchParams }: Props) {
                 filas={topServicios.map((row) => [row.nombre ?? "Servicio", String(row.unidades), fmt(row.importe)])}
                 vacio="Sin servicios vendidos en el rango."
               />
-            </AdminCard>
+            </AdminSection>
           </div>
 
-          <AdminCard
+          <AdminSection
             actions={
               consolidado ? null : (
                 <Link className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline" href={`/admin/agenda?${filtrosExport}`}>
@@ -540,10 +531,10 @@ export default async function ReportesPage({ searchParams }: Props) {
               ])}
               vacio="Sin citas asignadas en el rango."
             />
-          </AdminCard>
+          </AdminSection>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <AdminCard description="De dónde vienen las citas del período" title="Origen de las citas">
+            <AdminSection description="De dónde vienen las citas del período" title="Origen de las citas">
               <Tabla
                 encabezados={["Origen", "Citas"]}
                 filas={citasPorOrigen
@@ -551,8 +542,8 @@ export default async function ReportesPage({ searchParams }: Props) {
                   .map((row) => [ORIGEN_LABEL[row.origen] ?? row.origen, String(row.total)])}
                 vacio="Sin citas en el rango."
               />
-            </AdminCard>
-            <AdminCard
+            </AdminSection>
+            <AdminSection
               description="Avisos de correo generados en el período. «Aceptado» significa que el proveedor recibió el envío; no garantiza lectura."
               title="Avisos por correo"
             >
@@ -572,7 +563,7 @@ export default async function ReportesPage({ searchParams }: Props) {
                   {avisosFallidos} aviso(s) agotaron sus reintentos. Revisa los correos de tus clientes o contacta soporte.
                 </p>
               ) : null}
-            </AdminCard>
+            </AdminSection>
           </div>
         </>
       ) : null}
@@ -627,7 +618,7 @@ export default async function ReportesPage({ searchParams }: Props) {
           ) : null}
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <AdminCard
+            <AdminSection
               actions={
                 consolidado ? null : (
                   <Link className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline" href={`/admin/ventas?${filtrosExport}`}>
@@ -661,8 +652,8 @@ export default async function ReportesPage({ searchParams }: Props) {
                 ])}
                 vacio="Sin ventas cobradas en el rango."
               />
-            </AdminCard>
-            <AdminCard description="Monto cobrado por medio de pago" title="Cobros por medio de pago">
+            </AdminSection>
+            <AdminSection description="Monto cobrado por medio de pago" title="Cobros por medio de pago">
               <div className="mb-4">
                 <HBarChart
                   color="var(--chart-4)"
@@ -679,11 +670,11 @@ export default async function ReportesPage({ searchParams }: Props) {
                 filas={pagosPorMedio.map((row) => [row.nombre, String(row.operaciones), fmt(row.total)])}
                 vacio="Sin cobros en el rango."
               />
-            </AdminCard>
+            </AdminSection>
           </div>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <AdminCard
+            <AdminSection
               actions={
                 consolidado ? null : (
                   <Link className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline" href={`/admin/comisiones?${filtrosExport}`}>
@@ -704,8 +695,8 @@ export default async function ReportesPage({ searchParams }: Props) {
                 ])}
                 vacio="Sin comisiones ni propinas en el rango."
               />
-            </AdminCard>
-            <AdminCard
+            </AdminSection>
+            <AdminSection
               actions={
                 consolidado ? null : (
                   <Link className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline" href={`/admin/gastos?${filtrosExport}`}>
@@ -731,8 +722,8 @@ export default async function ReportesPage({ searchParams }: Props) {
                 filas={gastosResumen.porCategoria.map((row) => [row.nombre, fmt(row.total)])}
                 vacio="Sin gastos confirmados en el rango."
               />
-            </AdminCard>
-            <AdminCard description="Cierres cuyo conteo no cuadró con el esperado" title="Diferencias de corte">
+            </AdminSection>
+            <AdminSection description="Cierres cuyo conteo no cuadró con el esperado" title="Diferencias de corte">
               <Tabla
                 encabezados={["Cierre", "Cajero", "Medio", "Esperado", "Contado", "Diferencia"]}
                 filas={diferenciasCorte.map((row) => [
@@ -745,12 +736,12 @@ export default async function ReportesPage({ searchParams }: Props) {
                 ])}
                 vacio="Todos los cierres cuadraron en el rango."
               />
-            </AdminCard>
+            </AdminSection>
           </div>
         </>
       ) : null}
 
-      <details className="rounded-2xl border border-border bg-card px-5 py-4 text-sm shadow-sm">
+      <details className="rounded-2xl bg-muted/50 px-5 py-4 text-sm">
         <summary className="cursor-pointer font-semibold text-foreground select-none">
           ¿Cómo se calculan estas cifras?
         </summary>

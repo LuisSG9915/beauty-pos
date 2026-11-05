@@ -626,7 +626,7 @@ export function AntesDespuesFotosField({
       <div className="grid grid-cols-2 gap-3">
         {/* Ranura Antes */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <span className="text-op-xs font-medium text-muted-foreground">
             Antes
           </span>
           {fotoAntes ? (
@@ -668,7 +668,7 @@ export function AntesDespuesFotosField({
 
         {/* Ranura Después */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          <span className="text-op-xs font-medium text-muted-foreground">
             Después
           </span>
           {fotoDespues ? (

@@ -87,7 +87,7 @@ export function RoleCard({
           <input name="rolId" type="hidden" value={role.id} />
           {modulos.map((modulo) => (
             <div key={modulo}>
-              <p className="text-op-xs font-semibold uppercase tracking-[0.12em] text-primary">{modulo}</p>
+              <p className="text-op-xs font-medium text-muted-foreground">{modulo}</p>
               <div className="mt-2 flex flex-wrap gap-2">
                 {permisos
                   .filter((permiso) => permiso.modulo === modulo)

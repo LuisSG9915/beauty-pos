@@ -18,7 +18,7 @@ export function RoleForm({ organizationId }: { organizationId: string }) {
         <Input name="nombre" placeholder="ej. Supervisor de piso, Recepción turno tarde" required />
       </Field>
       <details className="rounded-xl border border-border bg-muted/40 px-4 py-3">
-        <summary className="cursor-pointer list-none text-op-xs font-semibold uppercase tracking-wider text-muted-foreground hover:text-primary">
+        <summary className="cursor-pointer list-none text-op-xs font-medium text-muted-foreground hover:text-primary">
           Opciones avanzadas
         </summary>
         <div className="mt-3">

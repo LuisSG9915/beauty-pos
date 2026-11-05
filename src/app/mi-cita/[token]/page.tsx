@@ -52,7 +52,7 @@ export default async function MiCitaPage({ params }: { params: Promise<{ token: 
   if (!reserva) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-background px-6 text-foreground">
-        <div className="w-full max-w-md rounded-3xl border border-border bg-card p-8 text-center shadow-sm">
+        <div className="w-full max-w-md rounded-2xl border border-border bg-card p-8 text-center shadow-sm">
           <h1 className="text-xl font-semibold tracking-tight">Enlace no válido</h1>
           <p className="mt-3 text-sm leading-6 text-muted-foreground">
             Este enlace no corresponde a ninguna cita, fue revocado o se usó demasiadas veces en
@@ -80,7 +80,7 @@ export default async function MiCitaPage({ params }: { params: Promise<{ token: 
       </header>
 
       <section className="mx-auto w-full max-w-3xl px-6 pb-16">
-        <div className="rounded-3xl border border-border bg-card p-8 shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">Tu cita</h1>
             <span className={`rounded-full border px-3 py-1 text-op-xs font-semibold ${estilo}`}>
@@ -123,7 +123,7 @@ export default async function MiCitaPage({ params }: { params: Promise<{ token: 
           />
 
           {reserva.pasaporteBelleza ? (
-            <section className="mt-8 space-y-6 rounded-3xl border border-primary/20 bg-gradient-to-b from-primary/5 via-card to-card p-6 shadow-sm sm:p-8">
+            <section className="mt-8 space-y-6 rounded-2xl border border-primary/20 bg-gradient-to-b from-primary/5 via-card to-card p-6 shadow-sm sm:p-8">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">

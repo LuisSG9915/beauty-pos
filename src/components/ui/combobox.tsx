@@ -112,7 +112,7 @@ export function Combobox({
       >
         <ComboboxPrimitive.InputGroup
           className={cn(
-            "relative flex h-10 w-full items-center rounded-xl border bg-background transition-colors",
+            "relative flex h-10 w-full items-center rounded-lg border bg-background transition-colors",
             "focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30",
             error
               ? "border-destructive/60"
@@ -123,7 +123,7 @@ export function Combobox({
             aria-describedby={describedBy}
             aria-invalid={error ? true : undefined}
             className={cn(
-              "h-full w-full rounded-xl bg-transparent px-3 pr-16 text-sm text-foreground outline-none placeholder:text-muted-foreground",
+              "h-full w-full rounded-lg bg-transparent px-3 pr-16 text-sm text-foreground outline-none placeholder:text-muted-foreground",
               inputClassName,
             )}
             id={inputId}

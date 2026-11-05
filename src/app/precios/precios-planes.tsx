@@ -110,7 +110,7 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
 
           return (
             <article
-              className={`flex flex-col rounded-3xl border bg-card p-7 ${
+              className={`flex flex-col rounded-2xl border bg-card p-7 ${
                 plan.destacado
                   ? "border-primary shadow-xl"
                   : "border-border"

@@ -173,7 +173,7 @@ export function AntesDespuesSlider({
         className="pointer-events-none absolute top-0 bottom-0 z-20 w-0.5 bg-white shadow-[0_0_8px_rgba(0,0,0,0.5)] transition-shadow group-hover:shadow-[0_0_12px_rgba(255,255,255,0.8)]"
         style={{ left: `${posicion}%` }}
       >
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex size-10 items-center justify-center rounded-full border border-white/40 bg-white text-zinc-900 shadow-xl backdrop-blur-sm transition-transform group-hover:scale-105 active:scale-95">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex size-10 items-center justify-center rounded-full border border-white/40 bg-white text-[#241922] shadow-xl backdrop-blur-sm transition-transform group-hover:scale-105 active:scale-95">
           <ChevronsLeftRight aria-hidden="true" className="size-5" />
         </div>
       </div>

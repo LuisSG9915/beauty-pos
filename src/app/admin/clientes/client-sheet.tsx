@@ -10,6 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { reportarNavegacionPendiente } from "@/lib/nav-pending";
 
 type ClientSheetProps = {
   /** La URL a la que volver al cerrar (sin `nuevo`/`edit`/`importar`). */
@@ -32,6 +33,7 @@ export function ClientSheet({ closeHref, description, open, title, children }: C
       onOpenChange={(next) => {
         if (!next) {
           setCerrado(true);
+          reportarNavegacionPendiente(closeHref);
           router.push(closeHref);
         }
       }}

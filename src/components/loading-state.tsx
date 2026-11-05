@@ -13,7 +13,12 @@ export function LoadingState({
   className?: string;
 }) {
   return (
-    <div aria-label={label} className={cn("space-y-3", className)} role="status">
+    <div
+      aria-label={label}
+      className={cn("space-y-3", className)}
+      data-loading-state=""
+      role="status"
+    >
       {Array.from({ length: rows }).map((_, index) => (
         <div
           aria-hidden="true"

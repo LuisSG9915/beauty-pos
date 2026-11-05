@@ -27,7 +27,7 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
       <div className="absolute right-6 top-6">
         <ThemeModeSelector iconOnly />
       </div>
-      <section className="w-full max-w-md rounded-3xl border border-border bg-card p-8 shadow-2xl">
+      <section className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-2xl">
         <BrandMark size={40} />
         <p className="mt-8 text-sm font-semibold uppercase tracking-[0.2em] text-primary">{BRAND.name}</p>
         <h1 className="mt-3 font-serif text-3xl font-semibold tracking-[-0.03em]">Acepta tu invitación</h1>

@@ -110,7 +110,7 @@ export function OfflineSyncBadge() {
           </p>
         </div>
         <span
-          className={`rounded-full px-2 py-0.5 text-op-xs font-semibold uppercase ${
+          className={`rounded-full px-2 py-0.5 text-op-xs font-semibold ${
             enLinea ? "bg-success-soft text-success" : "bg-warning-soft text-warning"
           }`}
         >

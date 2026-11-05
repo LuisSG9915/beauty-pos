@@ -12,7 +12,7 @@ export function OrganizationForm() {
   const [state, formAction, isPending] = useActionState(createOrganization, {});
 
   return (
-    <form action={formAction} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+    <form action={formAction} className="rounded-2xl border border-border bg-card p-6">
       <div className="flex items-start gap-3">
         <div className="flex size-10 items-center justify-center rounded-xl bg-muted/60 text-primary">
           <Building2 aria-hidden="true" className="size-5" />

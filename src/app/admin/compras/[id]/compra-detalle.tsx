@@ -39,6 +39,7 @@ import {
 import { useToast } from "@/components/ui/toast";
 import type { CompraEstado } from "@/db/schema/compras";
 import { formatCurrency, formatDate, formatQuantity } from "@/lib/format";
+import { reportarNavegacionPendiente } from "@/lib/nav-pending";
 import { buildAdminHref } from "@/lib/url-context";
 import { cn } from "@/lib/utils";
 import {
@@ -476,7 +477,9 @@ export function CompraDetalle({
       const state = await cancelarCompra(data);
       if (state.success) {
         toast.success("Compra cancelada.");
-        router.push(buildAdminHref("/compras", { organizationId: organizacionId, sucursalId }));
+        const href = buildAdminHref("/compras", { organizationId: organizacionId, sucursalId });
+        reportarNavegacionPendiente(href);
+        router.push(href);
       } else {
         toast.error(state.error ?? "No se pudo cancelar la compra.");
       }

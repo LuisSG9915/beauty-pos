@@ -1,5 +1,3 @@
-import { createHash } from "node:crypto";
-
 import { and, countDistinct, eq, gt, sql } from "drizzle-orm";
 
 import { after } from "next/server";
@@ -84,8 +82,12 @@ export type ErrorReporte = {
   contexto?: Record<string, unknown>;
 };
 
-/** Huella estable: mismo tipo + causa (frame o digest) + módulo → un incidente. */
-export function fingerprintDe(reporte: ErrorReporte): string {
+/** Huella estable: mismo tipo + causa (frame o digest) + módulo → un incidente.
+ * SHA-256 vía Web Crypto (`crypto.subtle`): disponible en edge, workerd y
+ * Node — `node:crypto` no puede entrar al bundle de instrumentación edge.
+ * Produce el mismo digest que `createHash("sha256")`, así que los fingerprints
+ * históricos de `incidentes_error` siguen agrupando igual. */
+export async function fingerprintDe(reporte: ErrorReporte): Promise<string> {
   const stack = reporte.stack ? sanitizarStack(reporte.stack) : null;
   const base = [
     reporte.fuente,
@@ -93,7 +95,14 @@ export function fingerprintDe(reporte: ErrorReporte): string {
     reporte.digest ?? primerFrameApp(stack),
     moduloDeRuta(reporte.ruta ? normalizarRuta(reporte.ruta) : null),
   ].join("|");
-  return createHash("sha256").update(base).digest("hex").slice(0, 48);
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(base),
+  );
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 48);
 }
 
 /**
@@ -152,7 +161,7 @@ async function organizacionesAfectadas(db: Db, incidenteId: string): Promise<num
  */
 export async function registrarError(db: Db, reporte: ErrorReporte): Promise<string | null> {
   try {
-    const fingerprint = fingerprintDe(reporte);
+    const fingerprint = await fingerprintDe(reporte);
     const mensaje = sanitizarTexto(reporte.mensaje || "Error sin mensaje");
     const stack = reporte.stack ? sanitizarStack(reporte.stack) : null;
     const ruta = reporte.ruta ? normalizarRuta(reporte.ruta) : null;

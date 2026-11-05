@@ -199,7 +199,7 @@ export function RemoteCombobox({
       >
         <ComboboxPrimitive.InputGroup
           className={cn(
-            "relative flex h-10 w-full items-center rounded-xl border bg-background transition-colors",
+            "relative flex h-10 w-full items-center rounded-lg border bg-background transition-colors",
             "focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30",
             "border-input hover:border-muted-foreground/40",
             inputClassName,
@@ -208,7 +208,7 @@ export function RemoteCombobox({
           <ComboboxPrimitive.Input
             aria-describedby={ariaDescribedBy}
             className={cn(
-              "h-full w-full rounded-xl bg-transparent px-3 pr-16 text-sm text-foreground outline-none placeholder:text-muted-foreground",
+              "h-full w-full rounded-lg bg-transparent px-3 pr-16 text-sm text-foreground outline-none placeholder:text-muted-foreground",
               inputClassName?.includes("text-op-xs") && "text-op-xs",
             )}
             id={inputId}

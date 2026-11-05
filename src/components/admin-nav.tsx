@@ -50,6 +50,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { authClient } from "@/lib/auth/client";
+import { reportarNavegacionPendiente } from "@/lib/nav-pending";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { cn } from "@/lib/utils";
 
@@ -75,6 +76,12 @@ export type AdminNavSection = {
   items: AdminNavItem[];
   /** Sección plegable: se muestra contraída salvo que contenga la ruta activa. */
   collapsible?: boolean;
+  /**
+   * Oculta el encabezado visual cuando solo repetiría el nombre de su único
+   * acceso (p. ej. sección "Ayuda" → acceso "Ayuda"); `title` se conserva
+   * como nombre accesible del grupo vía `aria-label`.
+   */
+  hideTitle?: boolean;
 };
 
 const OPERACION: AdminNavItem[] = [
@@ -434,6 +441,15 @@ export function getAdminNavSections(
     { title: "Ayuda", items: visible(AYUDA) },
   ].filter((section) => section.items.length > 0);
   if (platformAdmin) sections.push({ title: "Plataforma", items: PLATAFORMA });
+  for (const section of sections) {
+    if (
+      !section.collapsible &&
+      section.items.length === 1 &&
+      section.items[0]?.label === section.title
+    ) {
+      section.hideTitle = true;
+    }
+  }
   return sections;
 }
 
@@ -679,9 +695,11 @@ function SidebarSection({
   if (!section.collapsible) {
     return (
       <section aria-label={section.title}>
-        <h3 className="px-3 text-op-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          {section.title}
-        </h3>
+        {section.hideTitle ? null : (
+          <h3 className="px-3 text-op-xs font-medium text-muted-foreground">
+            {section.title}
+          </h3>
+        )}
         {items}
       </section>
     );
@@ -691,7 +709,7 @@ function SidebarSection({
     <section aria-label={section.title}>
       <button
         aria-expanded={abierta}
-        className="flex min-h-8 w-full items-center justify-between rounded-lg px-3 text-op-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground transition-colors hover:text-primary"
+        className="flex min-h-8 w-full items-center justify-between rounded-lg px-3 text-op-xs font-medium text-muted-foreground transition-colors hover:text-primary"
         onClick={() => setManual(!abierta)}
         type="button"
       >
@@ -758,6 +776,7 @@ export function SignOutButton({ className, onNavigate }: { className?: string; o
         setSaliendo(true);
         onNavigate?.();
         await authClient.signOut();
+        reportarNavegacionPendiente("/login");
         router.push("/login");
         router.refresh();
       }}

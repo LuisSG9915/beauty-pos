@@ -447,7 +447,7 @@ export function CobroForm({
             )}
           >
             <div className="flex items-center justify-between">
-              <span className="text-op-xs font-bold uppercase tracking-wider">
+              <span className="text-op-xs font-medium">
                 {cambio > 0.005 ? "Cambio a entregar" : "Monto cubierto"}
               </span>
               <span className="text-lg font-extrabold tabular-nums">
@@ -458,7 +458,7 @@ export function CobroForm({
         ) : (
           <div className="rounded-2xl border border-warning/40 bg-warning-soft p-3.5 text-warning-soft-foreground shadow-xs anim-entrada">
             <div className="flex items-center justify-between">
-              <span className="text-op-xs font-bold uppercase tracking-wider">Falta por cubrir</span>
+              <span className="text-op-xs font-medium">Falta por cubrir</span>
               <span className="text-lg font-extrabold tabular-nums">{formatCurrency(faltante)}</span>
             </div>
           </div>

@@ -244,7 +244,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
         ["Régimen fiscal", cliente.regimenFiscal],
       ].map(([label, value]) => (
         <div key={label}>
-          <dt className="text-op-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</dt>
+          <dt className="text-op-xs text-muted-foreground">{label}</dt>
           <dd className="mt-1 text-sm text-foreground">{value || "—"}</dd>
         </div>
       ))}
@@ -254,7 +254,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
   const historialTab = (
     <div className="space-y-6">
       <section>
-        <h3 className="text-op-xs font-semibold uppercase tracking-wide text-muted-foreground">Citas</h3>
+        <h3 className="text-op-xs font-medium text-muted-foreground">Citas</h3>
         {citaRows.length === 0 ? (
           <EmptyState
             className="mt-3 px-4 py-6"
@@ -276,7 +276,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
         )}
       </section>
       <section>
-        <h3 className="text-op-xs font-semibold uppercase tracking-wide text-muted-foreground">Ventas</h3>
+        <h3 className="text-op-xs font-medium text-muted-foreground">Ventas</h3>
         {ventaRows.length === 0 ? (
           <EmptyState
             className="mt-3 px-4 py-6"
@@ -430,7 +430,7 @@ export default async function ClienteDetallePage({ params, searchParams }: Props
           <div className="min-w-0 space-y-1">
             <div className="flex flex-wrap items-center gap-2">
               <CalendarHeart className="size-4 text-primary" />
-              <span className="text-op-xs font-bold uppercase tracking-wider text-primary">
+              <span className="text-op-xs font-medium text-primary">
                 Radar de Retención Predictiva
               </span>
               <span

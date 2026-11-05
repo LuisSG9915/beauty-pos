@@ -102,7 +102,7 @@ export function MoveCitaDialog({
           </Field>
           {sugerencias.length > 0 ? (
             <div className="rounded-xl border border-border bg-muted/60 p-3">
-              <p className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+              <p className="text-op-xs font-medium text-muted-foreground">
                 Horarios libres sugeridos
               </p>
               <div className="mt-2 flex flex-wrap gap-2">

@@ -14,6 +14,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, useTransition, type MouseEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { reportarNavegacionPendiente } from "@/lib/nav-pending";
 import { buildHref } from "@/lib/url-context";
 import { cn } from "@/lib/utils";
 import { shiftDateKey } from "@/modules/agenda";
@@ -113,6 +114,7 @@ export function AgendaToolbar({
   const navigate = (control: PendingControl, href: string) => {
     if (navigationPending && pendingControl === control) return;
     setPendingControl(control);
+    reportarNavegacionPendiente(href);
     startNavigation(() => router.push(href));
   };
 
@@ -120,15 +122,13 @@ export function AgendaToolbar({
     if (searchTimeout.current !== null) window.clearTimeout(searchTimeout.current);
     searchTimeout.current = window.setTimeout(() => {
       setPendingControl("buscar");
-      startNavigation(() =>
-        router.replace(
-          buildHref(pathname, {
-            params: searchParams,
-            preserve: ["fecha", "vista", "sucursalId", "q"],
-            extra: { q: value || null },
-          }),
-        ),
-      );
+      const href = buildHref(pathname, {
+        params: searchParams,
+        preserve: ["fecha", "vista", "sucursalId", "q"],
+        extra: { q: value || null },
+      });
+      reportarNavegacionPendiente(href);
+      startNavigation(() => router.replace(href));
     }, 300);
   };
 

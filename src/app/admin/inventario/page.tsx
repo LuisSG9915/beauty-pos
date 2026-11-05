@@ -605,7 +605,7 @@ export default async function InventarioPage({ searchParams }: { searchParams: S
                             {stockTable(backbar)}
                           </VistaAdaptativa>
                           <div className="border-t border-border px-4 pb-4 pt-3">
-                            <h4 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+                            <h4 className="text-op-xs font-medium text-muted-foreground">
                               Consumo por servicio · 30 días
                             </h4>
                             {consumoPorServicio.length === 0 ? (

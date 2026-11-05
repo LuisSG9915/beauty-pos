@@ -10,6 +10,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { reportarNavegacionPendiente } from "@/lib/nav-pending";
 
 /**
  * Formulario de catálogo en panel lateral. La página (server) lo monta solo
@@ -38,7 +39,10 @@ export function FormSheet({
   return (
     <Sheet
       onOpenChange={(open) => {
-        if (!open) router.replace(closeHref);
+        if (!open) {
+          reportarNavegacionPendiente(closeHref);
+          router.replace(closeHref);
+        }
       }}
       open
     >

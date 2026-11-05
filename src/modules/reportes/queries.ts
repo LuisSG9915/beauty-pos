@@ -764,7 +764,6 @@ export async function obtenerGananciaNetaPeriodo(params: {
            where g.organizacion_id = ${organizacionId}
              ${sucursalGastoFilter}
              and g.estado = 'confirmado'
-             and g.activo
              and (
                (g.created_at >= ${desde} and g.created_at < ${hasta})
                or (g.fecha_gasto >= (${desde}::timestamptz)::date and g.fecha_gasto < (${hasta}::timestamptz)::date)

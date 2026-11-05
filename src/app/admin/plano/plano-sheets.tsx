@@ -387,7 +387,7 @@ export function MobiliarioSheet({
               {mueble.sesionActiva ? (
                 <div className="space-y-3.5 rounded-2xl border border-primary/25 bg-primary/5 p-4 shadow-sm">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2 text-op-xs font-bold uppercase tracking-wider text-primary">
+                    <span className="flex items-center gap-2 text-op-xs font-medium text-primary">
                       <span className="relative flex size-2">
                         <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary opacity-75" />
                         <span className="relative inline-flex size-2 rounded-full bg-primary" />

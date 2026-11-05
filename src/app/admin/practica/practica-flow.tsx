@@ -232,15 +232,15 @@ export function PracticaFlow({
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="rounded-xl border border-border bg-muted/40 p-3.5">
-                <p className="text-op-xs font-semibold uppercase tracking-wider text-primary">1. Agenda</p>
+                <p className="text-op-xs font-medium text-muted-foreground">1. Agenda</p>
                 <p className="mt-1 text-op-xs text-muted-foreground">Elige un espacio libre y asigna estilista.</p>
               </div>
               <div className="rounded-xl border border-border bg-muted/40 p-3.5">
-                <p className="text-op-xs font-semibold uppercase tracking-wider text-primary">2. Cobro en caja</p>
+                <p className="text-op-xs font-medium text-muted-foreground">2. Cobro en caja</p>
                 <p className="mt-1 text-op-xs text-muted-foreground">Agrega productos sugeridos y propina.</p>
               </div>
               <div className="rounded-xl border border-border bg-muted/40 p-3.5">
-                <p className="text-op-xs font-semibold uppercase tracking-wider text-primary">3. Ticket</p>
+                <p className="text-op-xs font-medium text-muted-foreground">3. Ticket</p>
                 <p className="mt-1 text-op-xs text-muted-foreground">Calcula el cambio y emite el recibo final.</p>
               </div>
             </div>
@@ -396,7 +396,7 @@ export function PracticaFlow({
 
             {/* Selector de Cliente */}
             <div className="space-y-2">
-              <label className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <label className="text-op-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <User className="size-3.5" /> Clienta de ejemplo
               </label>
               <div className="flex flex-wrap gap-2">
@@ -426,7 +426,7 @@ export function PracticaFlow({
 
             {/* Selector de Servicio */}
             <div className="space-y-2">
-              <label className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label className="text-op-xs font-medium text-muted-foreground">
                 Servicio a realizar
               </label>
               <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
@@ -464,7 +464,7 @@ export function PracticaFlow({
             {/* Selector de Especialista y Hora */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <label className="text-op-xs font-medium text-muted-foreground flex items-center gap-1.5">
                   <Users className="size-3.5" /> Profesional asignado
                 </label>
                 <div className="space-y-1.5">
@@ -488,7 +488,7 @@ export function PracticaFlow({
               </div>
 
               <div className="space-y-2">
-                <label className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <label className="text-op-xs font-medium text-muted-foreground flex items-center gap-1.5">
                   <Clock className="size-3.5" /> Hora de inicio
                 </label>
                 <div className="grid grid-cols-2 gap-2">
@@ -608,7 +608,7 @@ export function PracticaFlow({
 
             {/* Líneas del ticket */}
             <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-              <p className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">Líneas del ticket</p>
+              <p className="text-op-xs font-medium text-muted-foreground">Líneas del ticket</p>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm py-1 border-b border-border/50">
                   <div>
@@ -664,7 +664,7 @@ export function PracticaFlow({
 
             {/* Propina */}
             <div className="space-y-2">
-              <label className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+              <label className="text-op-xs font-medium text-muted-foreground flex items-center justify-between">
                 <span>Propina para {especialistaActual.nombre}</span>
                 <span className="text-primary font-bold">{money.format(montoPropina)}</span>
               </label>
@@ -689,7 +689,7 @@ export function PracticaFlow({
 
             {/* Medio de Pago */}
             <div className="space-y-3">
-              <label className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <label className="text-op-xs font-medium text-muted-foreground">
                 Medio de pago
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -715,7 +715,7 @@ export function PracticaFlow({
             {medioPagoId === "efectivo" && (
               <div className="rounded-2xl border border-border bg-muted/30 p-4 space-y-3">
                 <div className="flex items-center justify-between">
-                  <label className="text-op-xs font-bold uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                  <label className="text-op-xs font-medium text-muted-foreground flex items-center gap-1.5">
                     <DollarSign className="size-4 text-success" />
                     Calculadora de cambio (Efectivo)
                   </label>
@@ -751,7 +751,7 @@ export function PracticaFlow({
                   </div>
 
                   <div className="rounded-xl border border-border bg-background p-3 flex flex-col justify-center">
-                    <span className="text-op-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <span className="text-op-xs font-medium text-muted-foreground">
                       Cambio a devolver
                     </span>
                     <span

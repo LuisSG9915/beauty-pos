@@ -489,7 +489,7 @@ export function CitaForm({
                     value={recurso.id}
                   />
                   <span className="flex-1 font-medium">{recurso.nombre}</span>
-                  <span className="text-op-xs uppercase tracking-wide text-muted-foreground">{recurso.tipo}</span>
+                  <span className="text-op-xs text-muted-foreground">{recurso.tipo}</span>
                 </label>
               ))}
             </div>
@@ -532,7 +532,7 @@ export function CitaForm({
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-op-xs font-bold uppercase tracking-wider text-primary">
+                    <span className="text-op-xs font-medium text-primary">
                       Profesional sugerido:
                     </span>
                     <span className="font-semibold text-foreground text-sm">
@@ -664,7 +664,7 @@ export function CitaForm({
       </details>
 
       <div className="rounded-xl border border-border bg-muted/60 p-4">
-        <h4 className="text-op-xs font-semibold uppercase tracking-wide text-primary">Resumen</h4>
+        <h4 className="text-op-xs font-medium text-muted-foreground">Resumen</h4>
         <div className="mt-2 grid grid-cols-3 gap-3 text-sm">
           <div>
             <p className="text-op-xs text-muted-foreground">Inicio</p>
@@ -684,7 +684,7 @@ export function CitaForm({
       <ActionFeedback state={state} successMessage="Cita guardada correctamente." />
       {state.sugerencias && state.sugerencias.length > 0 ? (
         <div className="rounded-xl border border-border bg-muted/60 p-3">
-          <p className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+          <p className="text-op-xs font-medium text-muted-foreground">
             Horarios libres sugeridos
           </p>
           <div className="mt-2 flex flex-wrap gap-2">

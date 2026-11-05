@@ -7,6 +7,7 @@ import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { reportarNavegacionPendiente } from "@/lib/nav-pending";
 import { buildAdminHref } from "@/lib/url-context";
 
 /**
@@ -105,7 +106,9 @@ export function NuevaCompra({
       if (!resultado.fotoOk) {
         toast.warning("La compra se creó pero la foto no se pudo guardar; captura las líneas a mano.");
       }
-      router.push(detalleHref(resultado.id!, resultado.fotoOk === true));
+      const href = detalleHref(resultado.id!, resultado.fotoOk === true);
+      reportarNavegacionPendiente(href);
+      router.push(href);
     } catch (exception) {
       const mensaje = exception instanceof Error ? exception.message : "No se pudo registrar la compra.";
       setError(mensaje);
@@ -121,7 +124,9 @@ export function NuevaCompra({
     setError(null);
     try {
       const resultado = await crearCompra(null);
-      router.push(detalleHref(resultado.id!, false));
+      const href = detalleHref(resultado.id!, false);
+      reportarNavegacionPendiente(href);
+      router.push(href);
     } catch (exception) {
       const mensaje = exception instanceof Error ? exception.message : "No se pudo registrar la compra.";
       setError(mensaje);

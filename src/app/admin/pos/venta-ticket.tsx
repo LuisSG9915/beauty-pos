@@ -651,7 +651,7 @@ export function VentaTicket({
 
         {editable ? (
           <div className="mt-5">
-            <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+            <h3 className="text-op-xs font-medium text-muted-foreground">
               Agregar al ticket
             </h3>
             <CatalogoSelector
@@ -671,7 +671,7 @@ export function VentaTicket({
 
         <div className="mt-6 space-y-6">
           <section>
-            <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+            <h3 className="text-op-xs font-medium text-muted-foreground">
               Servicios
             </h3>
             <div className="mt-3 space-y-2">
@@ -707,7 +707,7 @@ export function VentaTicket({
           </section>
 
           <section>
-            <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+            <h3 className="text-op-xs font-medium text-muted-foreground">
               Productos
             </h3>
             <div className="mt-3 space-y-2">
@@ -736,7 +736,7 @@ export function VentaTicket({
 
           {lineasPaquetes.length > 0 ? (
             <section>
-              <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+              <h3 className="text-op-xs font-medium text-muted-foreground">
                 Paquetes
               </h3>
               <div className="mt-3 space-y-2">
@@ -776,7 +776,7 @@ export function VentaTicket({
 
           {lineasMembresias.length > 0 ? (
             <section>
-              <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+              <h3 className="text-op-xs font-medium text-muted-foreground">
                 Membresías
               </h3>
               <div className="mt-3 space-y-2">
@@ -821,14 +821,14 @@ export function VentaTicket({
         <section className="rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-wide text-foreground">Resumen de cobro</h2>
-            <span className="rounded-full bg-accent px-2.5 py-0.5 text-op-xs font-medium text-muted-foreground uppercase tracking-wider">
+            <span className="rounded-full bg-accent px-2.5 py-0.5 text-op-xs font-medium text-muted-foreground">
               {venta.estado === "en_proceso" ? "Pendiente" : venta.estado === "completada" ? "Cobrado" : "Cancelado"}
             </span>
           </div>
 
           <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-primary/25 bg-primary/10 p-4">
             <div>
-              <span className="text-op-xs font-semibold uppercase tracking-wider text-primary">Total</span>
+              <span className="text-op-xs font-medium text-muted-foreground">Total</span>
               {anticipoAplicado > 0 ? (
                 <p className="text-op-xs text-muted-foreground">
                   Anticipo: -{formatCurrency(anticipoAplicado, { currency })}

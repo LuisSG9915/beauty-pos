@@ -54,6 +54,14 @@ describe("getAdminNavSections", () => {
     expect(paths).not.toContain("/admin/servicios");
   });
 
+  it("sección de un solo acceso homónimo oculta el encabezado que lo repite", () => {
+    const sections = getAdminNavSections(false, null);
+    expect(sections.find((s) => s.title === "Equipo")?.hideTitle).toBe(true);
+    expect(sections.find((s) => s.title === "Ayuda")?.hideTitle).toBe(true);
+    expect(sections.find((s) => s.title === "Operación")?.hideTitle).toBeUndefined();
+    expect(sections.find((s) => s.title === "Finanzas y ajustes")?.hideTitle).toBeUndefined();
+  });
+
   it("permissions null sin ser plataforma muestra módulos pero no Plataforma", () => {
     const sections = getAdminNavSections(false, null);
     const paths = allPaths(sections);

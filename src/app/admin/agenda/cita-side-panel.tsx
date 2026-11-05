@@ -114,7 +114,7 @@ function CitaHistorial({
         if (event.currentTarget.open) cargar();
       }}
     >
-      <summary className="cursor-pointer text-op-xs font-semibold uppercase tracking-wide text-primary select-none">
+      <summary className="cursor-pointer text-op-xs font-medium text-muted-foreground select-none">
         Historial de la cita
       </summary>
       <ul className="mt-3 space-y-2">
@@ -264,7 +264,7 @@ function CitaAnticipos({
   return (
     <section className="space-y-2">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+        <h3 className="text-op-xs font-medium text-muted-foreground">
           Anticipos
         </h3>
         {vigenteTotal > 0 ? (
@@ -676,7 +676,7 @@ export function CitaSidePanel({
 
       <section className="space-y-2">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+          <h3 className="text-op-xs font-medium text-muted-foreground">
             Servicios
           </h3>
           <span className="text-op-xs font-semibold tabular-nums text-muted-foreground">
@@ -739,7 +739,7 @@ export function CitaSidePanel({
 
       {cita.recursos.length > 0 || (editable && recursosDisponibles.length > 0) ? (
         <section className="space-y-2">
-          <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+          <h3 className="text-op-xs font-medium text-muted-foreground">
             Recursos
           </h3>
           {cita.recursos.length === 0 ? (
@@ -800,7 +800,7 @@ export function CitaSidePanel({
 
       {cita.notas ? (
         <section>
-          <h3 className="text-op-xs font-semibold uppercase tracking-wide text-primary">
+          <h3 className="text-op-xs font-medium text-muted-foreground">
             Notas de la cita
           </h3>
           <p className="mt-2 rounded-xl bg-muted/60 px-4 py-3 text-sm leading-6 text-muted-foreground">
@@ -811,7 +811,7 @@ export function CitaSidePanel({
 
       {cita.clienteNotas ? (
         <section>
-          <h3 className="text-op-xs font-semibold uppercase tracking-wide text-warning">
+          <h3 className="text-op-xs font-medium text-warning">
             Notas del cliente / alergias
           </h3>
           <p className="mt-2 rounded-xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm leading-6 text-warning-soft-foreground">
@@ -861,7 +861,7 @@ export function CitaSidePanel({
           className="rounded-xl border border-border bg-card p-4 shadow-sm"
           open={cita.estado === "en_proceso"}
         >
-          <summary className="cursor-pointer text-op-xs font-semibold uppercase tracking-wide text-primary select-none flex items-center justify-between">
+          <summary className="cursor-pointer text-op-xs font-medium text-muted-foreground select-none flex items-center justify-between">
             <span>Ficha técnica & Fórmulas</span>
             <span className="text-op-xs font-normal text-muted-foreground">
               {cita.estado === "en_proceso" ? "servicio en curso" : "ver o registrar"}

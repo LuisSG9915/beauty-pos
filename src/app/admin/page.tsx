@@ -8,7 +8,8 @@ import { InvitationForm } from "@/app/admin/invitation-form";
 import { OrganizationForm } from "@/app/admin/organization-form";
 import { RenombrarSucursalCard } from "@/app/admin/renombrar-sucursal-card";
 import { SuscripcionAdminRow, type EstadoSuscripcionAdmin } from "@/app/admin/suscripcion-form";
-import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { AdminCard, AdminPageHeader, AdminSection } from "@/components/admin/page-header";
+import { StatCard, StatCardGrid } from "@/components/admin/stat-card";
 import { EmptyState } from "@/components/empty-state";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -152,7 +153,7 @@ function MemberDashboard({
                 key={`${item.organizationId}-${item.branchId}`}
               >
                 <div className="flex items-center justify-between">
-                  <p className="text-op-xs font-semibold uppercase tracking-[0.16em] text-primary">{item.organization}</p>
+                  <p className="text-op-xs font-medium text-muted-foreground">{item.organization}</p>
                   {isSelected ? (
                     <span className="rounded-full bg-primary/10 px-2 py-0.5 text-op-xs font-medium text-primary">
                       Activa
@@ -452,11 +453,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const pct = (parte: number, total: number) => (total > 0 ? Math.round((parte / total) * 100) : 0);
   const embudo = [
     { etiqueta: "Registradas", valor: registradas },
-    { etiqueta: "En prueba ahora", valor: trialsVigentes, pct: pct(trialsVigentes, registradas) },
-    { etiqueta: "Activadas (1er cobro)", valor: activadas, pct: pct(activadas, registradas) },
+    { etiqueta: "En prueba ahora", valor: trialsVigentes, detalle: `${pct(trialsVigentes, registradas)}% de las registradas` },
+    { etiqueta: "Activadas (1er cobro)", valor: activadas, detalle: `${pct(activadas, registradas)}% de las registradas` },
     // Conversión sobre las activadas: de las que ya cobraron algo, cuántas
-    // quedaron pagando. Es la tasa que importa comercialmente.
-    { etiqueta: "Convertidas (pagando)", valor: convertidas, pct: pct(convertidas, Math.max(activadas, 1)) },
+    // quedaron pagando. Es la tasa que importa comercialmente → destacada.
+    { etiqueta: "Convertidas (pagando)", valor: convertidas, detalle: `${pct(convertidas, Math.max(activadas, 1))}% de las activadas`, destacada: true },
     { etiqueta: "Vencidas / canceladas", valor: vencidasOCanceladas },
   ];
 
@@ -467,23 +468,25 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         description={`Hola, ${platformSession.user.name}. Crea negocios y prepara su primera sucursal.`}
         title="Organizaciones y sucursales"
       />
-      <AdminCard
+      {/* Métricas del piloto: secciones sin caja; las cifras llevan la
+          jerarquía (StatCard canónico). La etapa de conversión va destacada. */}
+      <AdminSection
         description="Registro → prueba → primer cobro → pago. Sobre datos reales de suscripciones y ventas."
         title="Embudo del piloto"
       >
-        <dl className="grid grid-cols-1 gap-3 sm:grid-cols-5">
+        <StatCardGrid className="sm:grid-cols-3 lg:grid-cols-5">
           {embudo.map((etapa) => (
-            <div className="rounded-xl bg-muted/60 px-3 py-2" key={etapa.etiqueta}>
-              <dt className="text-op-xs uppercase tracking-wide text-muted-foreground">{etapa.etiqueta}</dt>
-              <dd className="mt-0.5 text-lg font-semibold text-foreground">
-                {etapa.valor}
-                {etapa.pct != null ? <span className="ml-1 text-op-xs font-normal text-muted-foreground">{etapa.pct}%</span> : null}
-              </dd>
-            </div>
+            <StatCard
+              className={etapa.destacada ? "border-primary/30 bg-accent shadow-none" : "shadow-none"}
+              hint={etapa.detalle}
+              key={etapa.etiqueta}
+              label={etapa.etiqueta}
+              value={etapa.valor}
+            />
           ))}
-        </dl>
-      </AdminCard>
-      <AdminCard
+        </StatCardGrid>
+      </AdminSection>
+      <AdminSection
         description="Visitas al landing/precios → registro completado. Atribución por visitante anónimo (sin IPs ni datos personales)."
         title="Adquisición (últimos 30 días)"
       >
@@ -492,19 +495,21 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           const conversion = tot.visitas > 0 ? Math.round((tot.atribuidos / tot.visitas) * 100) : 0;
           return (
             <>
-              <dl className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+              <StatCardGrid>
                 {[
                   { etiqueta: "Visitas únicas", valor: tot.visitas },
                   { etiqueta: "Registros", valor: tot.registros },
                   { etiqueta: "Atribuidos a visita", valor: tot.atribuidos },
-                  { etiqueta: "Conversión visita→registro", valor: `${conversion}%` },
+                  { etiqueta: "Conversión visita→registro", valor: `${conversion}%`, destacada: true },
                 ].map((etapa) => (
-                  <div className="rounded-xl bg-muted/60 px-3 py-2" key={etapa.etiqueta}>
-                    <dt className="text-op-xs uppercase tracking-wide text-muted-foreground">{etapa.etiqueta}</dt>
-                    <dd className="mt-0.5 text-lg font-semibold text-foreground">{etapa.valor}</dd>
-                  </div>
+                  <StatCard
+                    className={etapa.destacada ? "border-primary/30 bg-accent shadow-none" : "shadow-none"}
+                    key={etapa.etiqueta}
+                    label={etapa.etiqueta}
+                    value={etapa.valor}
+                  />
                 ))}
-              </dl>
+              </StatCardGrid>
               {adquisicionPorOrigen.length > 0 ? (
                 <p className="mt-3 text-op-xs text-muted-foreground">
                   Por origen:{" "}
@@ -514,14 +519,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             </>
           );
         })()}
-      </AdminCard>
+      </AdminSection>
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
         <OrganizationForm />
-        <AdminCard description={`${organizations.length} organización(es)`} title="Organizaciones registradas">
+        {/* Superficie de trabajo: la única tarjeta con caja de la página.
+            Las organizaciones van en lista con divisores, sin cajas anidadas. */}
+        <AdminCard className="shadow-none" description={`${organizations.length} organización(es)`} title="Organizaciones registradas">
           {organizations.length === 0 ? (
             <EmptyState description="Todavía no hay organizaciones. Crea la primera desde el formulario." title="Sin organizaciones" />
           ) : (
-            <div className="space-y-3">
+            <ul className="divide-y divide-border">
               {organizations.map((organization) => {
                 const suscripcion = suscripcionPorOrg.get(organization.id);
                 const efectivo = estadoEfectivoSuscripcion(suscripcion ?? null, ahora);
@@ -538,34 +545,32 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                         }
                       : { tipo: "vencida" };
                 return (
-                  <div className="rounded-xl border border-border px-4 py-3" key={organization.id}>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium">{organization.nombre}</p>
-                        <p className="mt-1 text-op-xs text-muted-foreground">{organization.slug}</p>
+                  <li className="py-4 first:pt-0 last:pb-0" key={organization.id}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-foreground">{organization.nombre}</p>
+                        <p className="mt-0.5 text-op-xs text-muted-foreground">{organization.slug}</p>
                       </div>
                       <StatusBadge tone={organization.activo ? "success" : "neutral"}>
                         {organization.activo ? "Activa" : "Inactiva"}
                       </StatusBadge>
                     </div>
-                    <div className="mt-3">
-                      <SuscripcionAdminRow
-                        estado={estado}
-                        organizationId={organization.id}
-                        planes={planesCatalogo}
-                        sugerida={solicitudPorOrg.get(organization.id)}
-                      />
-                    </div>
-                  </div>
+                    <SuscripcionAdminRow
+                      estado={estado}
+                      organizationId={organization.id}
+                      planes={planesCatalogo}
+                      sugerida={solicitudPorOrg.get(organization.id)}
+                    />
+                  </li>
                 );
               })}
-            </div>
+            </ul>
           )}
         </AdminCard>
       </div>
       {solicitudes.length > 0 ? (
-        <AdminCard description="Últimas solicitudes de las organizaciones" title="Solicitudes de suscripción">
-          <ul className="divide-y divide-border text-sm">
+        <AdminSection description="Últimas solicitudes de las organizaciones" title="Solicitudes de suscripción">
+          <ul className="divide-y divide-border border-t border-border text-sm">
             {solicitudes.map((solicitud) => {
               const payload = (solicitud.payload ?? {}) as Record<string, unknown>;
               return (
@@ -583,7 +588,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               );
             })}
           </ul>
-        </AdminCard>
+        </AdminSection>
       ) : null}
       <InvitationForm branches={branches} organizations={organizations} roles={roles} />
     </div>

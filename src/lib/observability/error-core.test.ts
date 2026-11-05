@@ -54,15 +54,16 @@ describe("fingerprintDe", () => {
     ruta: "/admin/pos",
   };
 
-  it("agrupa el mismo error aunque cambie el UUID de la ruta", () => {
-    const a = fingerprintDe({ ...base, ruta: "/admin/clientes/8f3a2b1c-4d5e-4f6a-9b8c-0d1e2f3a4b5c" });
-    const b = fingerprintDe({ ...base, ruta: "/admin/clientes/11111111-2222-3333-4444-555555555555" });
+  it("agrupa el mismo error aunque cambie el UUID de la ruta", async () => {
+    const a = await fingerprintDe({ ...base, ruta: "/admin/clientes/8f3a2b1c-4d5e-4f6a-9b8c-0d1e2f3a4b5c" });
+    const b = await fingerprintDe({ ...base, ruta: "/admin/clientes/11111111-2222-3333-4444-555555555555" });
     expect(a).toBe(b);
   });
 
-  it("distingue fuentes y tipos distintos", () => {
-    expect(fingerprintDe(base)).not.toBe(fingerprintDe({ ...base, fuente: "server" }));
-    expect(fingerprintDe(base)).not.toBe(fingerprintDe({ ...base, tipo: "RangeError" }));
+  it("distingue fuentes y tipos distintos", async () => {
+    const fp = await fingerprintDe(base);
+    expect(fp).not.toBe(await fingerprintDe({ ...base, fuente: "server" }));
+    expect(fp).not.toBe(await fingerprintDe({ ...base, tipo: "RangeError" }));
   });
 });
 
