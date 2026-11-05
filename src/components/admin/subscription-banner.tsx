@@ -20,15 +20,55 @@ export type BillingBadge = {
 export function SubscriptionBanner({
   billingByOrg,
   organizations,
+  permissionsByOrg,
 }: {
   billingByOrg: Record<string, BillingBadge>;
   organizations: Array<{ id: string }>;
+  permissionsByOrg?: Record<string, string[]> | null;
 }) {
   const searchParams = useSearchParams();
   const organizationId =
     firstParam(searchParams.get("organizationId")) ?? organizations[0]?.id;
   const badge = organizationId ? billingByOrg[organizationId] : undefined;
   if (!badge) return null;
+
+  // El personal operativo no administra el plan: en trial solo ve aviso
+  // cuando falta poco para el vencimiento, y en pausa un aviso para escalar
+  // a la dueña — nunca el CTA comercial "Ver planes".
+  const permisos =
+    organizationId && permissionsByOrg
+      ? (permissionsByOrg[organizationId] ?? null)
+      : null;
+  const puedeAdministrarPlan =
+    permisos === null ||
+    permisos.includes("organizaciones.editar") ||
+    permisos.includes("sucursales.editar");
+
+  if (!puedeAdministrarPlan) {
+    if (badge.estado === "vencida") {
+      return (
+        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-soft-foreground">
+          <LockKeyhole aria-hidden="true" className="size-4 shrink-0" />
+          <p>
+            La suscripción del salón está en pausa (solo lectura) — avísale a
+            la dueña o encargada para reactivarla.
+          </p>
+        </div>
+      );
+    }
+    const dias = badge.diasRestantes;
+    if (dias === null || dias > 3) return null;
+    return (
+      <div className="mb-4 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-soft-foreground">
+        <Clock3 aria-hidden="true" className="size-4 shrink-0" />
+        <p>
+          El periodo de prueba del salón vence en {dias}{" "}
+          {dias === 1 ? "día" : "días"} — recuérdale a la dueña o encargada
+          para evitar pausas.
+        </p>
+      </div>
+    );
+  }
 
   if (badge.estado === "vencida") {
     return (
@@ -40,7 +80,7 @@ export function SubscriptionBanner({
           están a salvo.
         </p>
         <Link
-          className="ml-auto inline-flex min-h-6 shrink-0 items-center rounded-full border border-destructive-soft-foreground/40 px-3 text-op-xs font-semibold"
+          className="ml-auto inline-flex min-h-11 shrink-0 items-center rounded-full border border-destructive-soft-foreground/40 px-3 text-op-xs font-semibold"
           href="/precios"
         >
           Ver planes
@@ -60,7 +100,7 @@ export function SubscriptionBanner({
         . Todo lo que registres se conserva al contratar.
       </p>
       <Link
-        className="ml-auto inline-flex min-h-6 shrink-0 items-center rounded-full border border-warning-soft-foreground/40 px-3 text-op-xs font-semibold"
+        className="ml-auto inline-flex min-h-11 shrink-0 items-center rounded-full border border-warning-soft-foreground/40 px-3 text-op-xs font-semibold"
         href="/precios"
       >
         Ver planes

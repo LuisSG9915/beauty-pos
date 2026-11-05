@@ -52,11 +52,13 @@ vi.mock("@/db/client", () => ({ getDatabase: () => mocks.db }));
 import {
   assertBranchScope,
   canAccessBranch,
+  esRolOperativoMiDia,
   hasPermission,
   resolveAccessSafe,
   type ResolvedAccess,
 } from "@/lib/auth/authorization";
 import { esRutaPublicaAccess } from "@/lib/auth/access";
+import { defaultRoles } from "@/lib/auth/defaults";
 
 const ORG_A = "11111111-1111-4111-8111-111111111111";
 const ORG_B = "22222222-2222-4222-8222-222222222222";
@@ -123,6 +125,42 @@ describe("canAccessBranch", () => {
     expect(canAccessBranch(access, SUC_A1)).toBe(true);
     expect(canAccessBranch(access, SUC_A2)).toBe(false);
     expect(canAccessBranch(access, SUC_B1)).toBe(false);
+  });
+});
+
+describe("esRolOperativoMiDia", () => {
+  const esperado: Record<string, boolean> = {
+    propietario: false,
+    administrador: false,
+    gerente: false,
+    recepcion: false,
+    cajero: false,
+    especialista: true,
+    almacen: false,
+  };
+
+  it.each(defaultRoles.map((rol) => [rol.clave, rol.permissions] as const))(
+    "rol %s → %s",
+    (clave, permissions) => {
+      expect(esRolOperativoMiDia(permissions)).toBe(esperado[clave]);
+    },
+  );
+
+  it("agenda.ver junto a trabajo de mostrador no es operativo de mi día", () => {
+    expect(esRolOperativoMiDia(["agenda.ver", "ventas.crear"])).toBe(false);
+    expect(esRolOperativoMiDia(["agenda.ver", "caja.ver"])).toBe(false);
+    expect(esRolOperativoMiDia(["agenda.ver", "sucursales.editar"])).toBe(false);
+  });
+
+  it("sin agenda.ver nunca es operativo de mi día", () => {
+    expect(esRolOperativoMiDia(["clientes.ver", "ventas.ver"])).toBe(false);
+    expect(esRolOperativoMiDia([])).toBe(false);
+  });
+
+  it("acepta Set además de arreglos", () => {
+    expect(
+      esRolOperativoMiDia(new Set(["agenda.ver", "agenda.editar"])),
+    ).toBe(true);
   });
 });
 

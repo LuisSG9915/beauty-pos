@@ -1,6 +1,7 @@
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { Calendar, CalendarPlus, ShoppingCart, Users, Wallet, type LucideIcon } from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { GuiaChecklistCard } from "@/app/admin/guia/checklist-card";
 import { InvitationForm } from "@/app/admin/invitation-form";
@@ -19,7 +20,7 @@ import { ventas } from "@/db/schema/operations";
 import { telemetriaEventos } from "@/db/schema/telemetry";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { requirePlatformAdmin } from "@/lib/auth/access";
-import { canAccessBranch, hasPermission, resolveAccessSafe } from "@/lib/auth/authorization";
+import { canAccessBranch, esRolOperativoMiDia, hasPermission, resolveAccessSafe } from "@/lib/auth/authorization";
 import { leerNombreSucursalOmitida } from "@/lib/sucursal-cookie";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { cargarAlertas, type AlertaOperativa } from "@/modules/alertas/queries";
@@ -240,6 +241,19 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
     // Pasos de guía sobre la sucursal activa conocida
     const permisosActivos = new Set(adminContext.access.permissions ?? []);
+
+    // El personal operativo (agenda.ver sin gestión ni mostrador) entra
+    // directo a su día: sin checklist de onboarding ni consultas de alertas.
+    // `!error` evita el bucle si llegó redirigido con ?error=.
+    if (!error && orgPrincipal && sucursalActivaId && esRolOperativoMiDia(permisosActivos)) {
+      redirect(
+        buildAdminHref("/mi-dia", {
+          organizationId: orgPrincipal.id,
+          sucursalId: sucursalActivaId,
+        }),
+      );
+    }
+
     const pasosGuia = sucursalActivaId ? pasosParaPermisos(permisosActivos) : [];
 
     // Consolidación a <= 2 consultas SQL en paralelo en Promise.all:

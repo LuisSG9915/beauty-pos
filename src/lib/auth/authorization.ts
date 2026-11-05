@@ -62,6 +62,32 @@ export function canAccessBranch(access: ResolvedAccess, sucursalId: string): boo
 }
 
 /**
+ * Permisos que sacan al usuario del "modo agenda": gestión del negocio o
+ * trabajo de mostrador con dinero. Quien tiene `agenda.ver` y ninguno de
+ * estos es personal operativo (p. ej. especialista) y aterriza en "Mi día".
+ */
+const PERMISOS_GESTION_O_MOSTRADOR = [
+  "organizaciones.editar",
+  "sucursales.editar",
+  "usuarios.invitar",
+  "roles.editar",
+  "caja.ver",
+  "caja.abrir",
+  "ventas.crear",
+  "ventas.cobrar",
+  "facturacion.emitir",
+  "compras.editar",
+  "inventario.editar",
+  "reportes.financieros",
+] as const;
+
+export function esRolOperativoMiDia(permissions: Iterable<string>): boolean {
+  const set = permissions instanceof Set ? permissions : new Set(permissions);
+  if (!set.has("agenda.ver")) return false;
+  return !PERMISOS_GESTION_O_MOSTRADOR.some((permiso) => set.has(permiso));
+}
+
+/**
  * Resuelve membresía, roles→permisos y sucursales asignadas del usuario en la
  * organización. Reglas:
  * - Administrador de plataforma: todos los permisos y todas las sucursales.

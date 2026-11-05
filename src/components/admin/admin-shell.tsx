@@ -739,6 +739,7 @@ export function AdminShell({
                 <SubscriptionBanner
                   billingByOrg={billingByOrg}
                   organizations={organizations}
+                  permissionsByOrg={permissionsByOrg}
                 />
               </Suspense>
             ) : null}
