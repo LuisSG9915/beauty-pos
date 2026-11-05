@@ -172,13 +172,18 @@ pnpm typecheck && pnpm lint && pnpm test src/lib/auth/authorization.test.ts --ru
 
 ```
 Misión: 29 — Redirección automática a "Mi día" y avisos sin ruido comercial para roles operativos
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test authorization.test.ts ✔
-Antes → después: Especialista aterrizaba en /admin viendo checklist y banner de compra → Redirige a /admin/mi-dia en 1 consulta y sin CTA comercial
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <ninguno | qué falta y quién lo cierra>
+Cambios: src/lib/auth/authorization.ts → exporta esRolOperativoMiDia (agenda.ver sin permisos de gestión/mostrador); src/app/admin/page.tsx → redirect temprano a /mi-dia antes del Promise.all de alertas+onboarding cuando !error y rol operativo (misma consulta de contexto, 0 rondas extra); src/components/admin/admin-shell.tsx → pasa permissionsByOrg a SubscriptionBanner; src/components/admin/subscription-banner.tsx → sin "Ver planes" para roles sin organizaciones.editar/sucursales.editar (trial solo avisa a ≤3 días, vencida muestra aviso de escalamiento a la dueña); min-h-11 en ambos CTAs; src/lib/auth/authorization.test.ts → matriz de los 7 roles de defaultRoles + casos de mostrador, sin agenda.ver y Set (10 pruebas nuevas)
+Verificación: typecheck ✔ | lint ✔ | test 587 ✔ (authorization.test.ts 26/26) | test:usability completo: 2 errores preexistentes reproducidos sin mis cambios vía git stash (agenda layout-movil dependiente de la hora, reabastecer axe target-size)
+Antes → después: Especialista aterrizaba en /admin ejecutando consultas de alertas/onboarding y viendo banner "Ver planes" → Redirige a /admin/mi-dia en la misma consulta de contexto y el banner comercial se oculta a roles operativos
+Desviaciones: ver sección abajo
+Riesgo abierto: el arnés E2E usa cuenta propietaria; el redirect con usuario especialista real y la rama !puedeAdministrarPlan del banner están cubiertos por pruebas unitarias, no por recorrido E2E
 ```
 
 ## Desviaciones (las escribe el implementador)
 
-Ninguna.
+- `min-h-11` aplicado a **ambos** enlaces "Ver planes" (trial y vencida): la
+  misión decía "el enlace" en singular, pero el componente tiene dos
+  instancias del mismo CTA; se subió por simetría de objetivo táctil.
+- `permissionsByOrg[organizationId] ?? null`: además del `null` previsto para
+  admin de plataforma, una organización ausente del mapa se trata igual
+  (muestra el banner completo) en vez de lanzar `TypeError` en `.includes`.
