@@ -25,6 +25,23 @@ export function getCacheKv(): KVNamespaceLike | null {
 }
 
 /**
+ * Techo para las operaciones del binding KV. Es la única E/S sin timeout en
+ * el camino del render (pg ya tiene `connectionTimeoutMillis`/`query_timeout`):
+ * una llamada atorada bloqueaba la respuesta entera. Al expirar, el caller
+ * degrada a la base de datos — igual que un miss.
+ */
+const KV_TIMEOUT_MS = 3_000;
+
+function conLimite<T>(promesa: Promise<T>): Promise<T> {
+  return Promise.race([
+    promesa,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`kv: operación excedió ${KV_TIMEOUT_MS}ms`)), KV_TIMEOUT_MS),
+    ),
+  ]);
+}
+
+/**
  * Read-through sobre KV: devuelve el valor cacheado o ejecuta `loader`,
  * guarda su resultado y lo devuelve. Cualquier fallo de KV se degrada a la
  * fuente — el caché nunca puede romper la lectura.
@@ -37,19 +54,19 @@ export async function kvReadThrough<T>(
   const kv = getCacheKv();
   if (kv) {
     try {
-      const cached = (await kv.get(key, { type: "json" })) as { v: T } | null;
+      const cached = (await conLimite(kv.get(key, { type: "json" }))) as { v: T } | null;
       // Envoltura `{v}`: distingue "sin dato" (miss) de "dato = null"
       // (hit negativo — organizaciones sin suscripción, p. ej.).
       if (cached && typeof cached === "object" && "v" in cached) return cached.v;
     } catch {
-      // KV no disponible o dato corrupto: seguimos a la fuente.
+      // KV no disponible, atorado o dato corrupto: seguimos a la fuente.
     }
   }
 
   const value = await loader();
   if (kv) {
     try {
-      await kv.put(key, JSON.stringify({ v: value ?? null }), { expirationTtl: ttlSeconds });
+      await conLimite(kv.put(key, JSON.stringify({ v: value ?? null }), { expirationTtl: ttlSeconds }));
     } catch {
       // Escritura de caché fallida: el valor ya se obtuvo de la fuente.
     }
@@ -64,7 +81,7 @@ export async function kvGetJson<T>(key: string): Promise<T | null> {
   const kv = getCacheKv();
   if (!kv) return null;
   try {
-    const cached = (await kv.get(key, { type: "json" })) as { v: T } | null;
+    const cached = (await conLimite(kv.get(key, { type: "json" }))) as { v: T } | null;
     if (cached && typeof cached === "object" && "v" in cached) return cached.v;
     return null;
   } catch {
@@ -83,7 +100,7 @@ export async function kvPutJson<T>(
   const kv = getCacheKv();
   if (!kv) return;
   try {
-    await kv.put(key, JSON.stringify({ v: value ?? null }), options);
+    await conLimite(kv.put(key, JSON.stringify({ v: value ?? null }), options));
   } catch {
     // Silencioso: la degradación es segura
   }
@@ -99,7 +116,7 @@ export async function kvInvalidate(key: string): Promise<void> {
   const kv = getCacheKv();
   if (!kv) return;
   try {
-    await kv.delete(key);
+    await conLimite(kv.delete(key));
   } catch {
     // La clave expira por TTL de todos modos.
   }

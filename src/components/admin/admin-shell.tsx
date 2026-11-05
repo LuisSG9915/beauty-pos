@@ -411,6 +411,14 @@ function initials(name: string) {
 }
 
 const NAVIGATION_TIMEOUT_MS = 6_000;
+/**
+ * Post-commit: una vez que la URL ya cambió, el contenido puede seguir
+ * llegando (skeleton + stream RSC). Se le da margen mayor que al rescate de
+ * 6 s para no recargar una página que está a punto de pintar: solo si el
+ * skeleton sigue montado pasado este plazo se asume stream atorado y se
+ * recarga — equivalente al F5 que haría el usuario.
+ */
+const STALLED_STREAM_TIMEOUT_MS = 12_000;
 
 /**
  * Red de seguridad para navegaciones del App Router. El shell no se desmonta
@@ -419,10 +427,10 @@ const NAVIGATION_TIMEOUT_MS = 6_000;
  *
  * La barra de progreso se limpia cuando cambian pathname/searchParams (el
  * router confirma el commit, a veces de forma optimista al mostrar el
- * loading.tsx), pero el rescate NO depende de ese commit: a los 6 s se revisa
- * el DOM — si el skeleton del `loading.tsx` (`[data-loading-state]`) sigue en
- * `#contenido-admin` o la URL no alcanzó el destino (navegaciones por server
- * action), se fuerza navegación completa (equivalente al F5 del usuario).
+ * loading.tsx). El rescate de 6 s solo aplica mientras la navegación NO ha
+ * comprometido la URL; después del commit lo vigila `STALLED_STREAM_TIMEOUT_MS`,
+ * porque recargar a los 6 s tiraba el contenido que seguía llegando y duplicaba
+ * la espera (medido: nav completa a los ~5.9 s → recarga forzada a los 6 s).
  */
 function NavigationActivity() {
   const pathname = usePathname();
@@ -437,6 +445,7 @@ function NavigationActivity() {
   const netTargetHref = useRef<string | null>(null);
   const tapTimes = useRef(new WeakMap<HTMLAnchorElement, number>());
   const netTimeoutRef = useRef<number | null>(null);
+  const stallCheckRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
   const feedbackSent = useRef(false);
 
@@ -459,12 +468,32 @@ function NavigationActivity() {
     setPendingLabel(null);
     if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
     frameRef.current = null;
+
+    // La URL ya comprometió: desarmar el rescate de 6 s. Recargar aquí tiraba
+    // el contenido en vuelo (skeleton → datos que seguían llegando) y forzaba
+    // una carga de documento completa extra. Si el stream se atora de verdad,
+    // lo decide un chequeo posterior más tolerante.
+    if (netTimeoutRef.current !== null) window.clearTimeout(netTimeoutRef.current);
+    netTimeoutRef.current = null;
+    netStartAt.current = null;
+    netTargetHref.current = null;
+    if (stallCheckRef.current !== null) window.clearTimeout(stallCheckRef.current);
+    stallCheckRef.current = window.setTimeout(() => {
+      stallCheckRef.current = null;
+      if (document.querySelector("#contenido-admin [data-loading-state]") !== null) {
+        window.location.reload();
+      }
+    }, STALLED_STREAM_TIMEOUT_MS);
   }, [reportar]);
 
   const iniciarNav = useCallback(
     (key: string, path: string, href: string, label: string) => {
       if (startedAt.current !== null && targetKey.current === key) return;
       if (netTimeoutRef.current !== null) window.clearTimeout(netTimeoutRef.current);
+      // Una navegación nueva invalida el chequeo post-commit anterior: el
+      // skeleton en pantalla ya corresponde al destino nuevo.
+      if (stallCheckRef.current !== null) window.clearTimeout(stallCheckRef.current);
+      stallCheckRef.current = null;
       if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
       feedbackSent.current = false;
       startedAt.current = performance.now();
@@ -617,6 +646,7 @@ function NavigationActivity() {
       window.removeEventListener(NAV_PENDING_EVENT, onNavPending);
       window.removeEventListener("popstate", onPopState);
       if (netTimeoutRef.current !== null) window.clearTimeout(netTimeoutRef.current);
+      if (stallCheckRef.current !== null) window.clearTimeout(stallCheckRef.current);
       if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
     };
   }, [iniciarNav]);
