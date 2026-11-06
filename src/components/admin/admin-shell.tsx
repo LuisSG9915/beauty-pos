@@ -410,27 +410,16 @@ function initials(name: string) {
     .join("") || "·";
 }
 
-const NAVIGATION_TIMEOUT_MS = 6_000;
 /**
- * Post-commit: una vez que la URL ya cambió, el contenido puede seguir
- * llegando (skeleton + stream RSC). Se le da margen mayor que al rescate de
- * 6 s para no recargar una página que está a punto de pintar: solo si el
- * skeleton sigue montado pasado este plazo se asume stream atorado y se
- * recarga — equivalente al F5 que haría el usuario.
- */
-const STALLED_STREAM_TIMEOUT_MS = 12_000;
-
-/**
- * Red de seguridad para navegaciones del App Router. El shell no se desmonta
- * entre rutas, así que puede vigilar el toque aunque el destino tarde en
- * resolver sus datos.
+ * Indicador de navegación del App Router. El shell no se desmonta entre
+ * rutas, así que puede mostrar la barra de progreso mientras el destino
+ * resuelve sus datos.
  *
- * La barra de progreso se limpia cuando cambian pathname/searchParams (el
- * router confirma el commit, a veces de forma optimista al mostrar el
- * loading.tsx). El rescate de 6 s solo aplica mientras la navegación NO ha
- * comprometido la URL; después del commit lo vigila `STALLED_STREAM_TIMEOUT_MS`,
- * porque recargar a los 6 s tiraba el contenido que seguía llegando y duplicaba
- * la espera (medido: nav completa a los ~5.9 s → recarga forzada a los 6 s).
+ * La barra se limpia cuando cambian pathname/searchParams (el router confirma
+ * el commit, a veces de forma optimista al mostrar el loading.tsx). No recarga
+ * la página por su cuenta: una recarga a mitad de la navegación cancelaba la
+ * respuesta en curso y duplicaba la espera (medido: la navegación a POS se
+ * completó a los 5.9 s y aun así se recargó a los 6 s).
  */
 function NavigationActivity() {
   const pathname = usePathname();
@@ -438,18 +427,14 @@ function NavigationActivity() {
   const searchKey = searchParams.toString();
   const [pendingLabel, setPendingLabel] = useState<string | null>(null);
   const startedAt = useRef<number | null>(null);
-  const netStartAt = useRef<number | null>(null);
   const targetPath = useRef<string | null>(null);
   const targetKey = useRef<string | null>(null);
   const targetHref = useRef<string | null>(null);
-  const netTargetHref = useRef<string | null>(null);
   const tapTimes = useRef(new WeakMap<HTMLAnchorElement, number>());
-  const netTimeoutRef = useRef<number | null>(null);
-  const stallCheckRef = useRef<number | null>(null);
   const frameRef = useRef<number | null>(null);
   const feedbackSent = useRef(false);
 
-  const reportar = useCallback((metrica: "nav_complete_ms" | "nav_timeout_ms") => {
+  const reportar = useCallback((metrica: "nav_complete_ms") => {
     if (startedAt.current === null) return;
     trackPerformance(
       metrica,
@@ -468,40 +453,17 @@ function NavigationActivity() {
     setPendingLabel(null);
     if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
     frameRef.current = null;
-
-    // La URL ya comprometió: desarmar el rescate de 6 s. Recargar aquí tiraba
-    // el contenido en vuelo (skeleton → datos que seguían llegando) y forzaba
-    // una carga de documento completa extra. Si el stream se atora de verdad,
-    // lo decide un chequeo posterior más tolerante.
-    if (netTimeoutRef.current !== null) window.clearTimeout(netTimeoutRef.current);
-    netTimeoutRef.current = null;
-    netStartAt.current = null;
-    netTargetHref.current = null;
-    if (stallCheckRef.current !== null) window.clearTimeout(stallCheckRef.current);
-    stallCheckRef.current = window.setTimeout(() => {
-      stallCheckRef.current = null;
-      if (document.querySelector("#contenido-admin [data-loading-state]") !== null) {
-        window.location.reload();
-      }
-    }, STALLED_STREAM_TIMEOUT_MS);
   }, [reportar]);
 
   const iniciarNav = useCallback(
     (key: string, path: string, href: string, label: string) => {
       if (startedAt.current !== null && targetKey.current === key) return;
-      if (netTimeoutRef.current !== null) window.clearTimeout(netTimeoutRef.current);
-      // Una navegación nueva invalida el chequeo post-commit anterior: el
-      // skeleton en pantalla ya corresponde al destino nuevo.
-      if (stallCheckRef.current !== null) window.clearTimeout(stallCheckRef.current);
-      stallCheckRef.current = null;
       if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
       feedbackSent.current = false;
       startedAt.current = performance.now();
-      netStartAt.current = startedAt.current;
       targetPath.current = path;
       targetKey.current = key;
       targetHref.current = href;
-      netTargetHref.current = href;
       setPendingLabel(label);
 
       frameRef.current = window.requestAnimationFrame(() => {
@@ -513,36 +475,6 @@ function NavigationActivity() {
         );
         feedbackSent.current = true;
       });
-
-      netTimeoutRef.current = window.setTimeout(() => {
-        netTimeoutRef.current = null;
-        const destino = netTargetHref.current
-          ? new URL(netTargetHref.current, window.location.origin).href
-          : null;
-        const urlDistinta = destino !== null && destino !== window.location.href;
-        const colgada =
-          document.querySelector("#contenido-admin [data-loading-state]") !== null ||
-          urlDistinta;
-        if (!colgada) {
-          netStartAt.current = null;
-          netTargetHref.current = null;
-          return;
-        }
-        if (netStartAt.current !== null) {
-          trackPerformance(
-            "nav_timeout_ms",
-            performance.now() - netStartAt.current,
-            targetPath.current ?? path,
-          );
-          netStartAt.current = null;
-        }
-        netTargetHref.current = null;
-        if (destino && destino !== window.location.href) {
-          window.location.assign(destino);
-        } else {
-          window.location.reload();
-        }
-      }, NAVIGATION_TIMEOUT_MS);
     },
     [],
   );
@@ -591,13 +523,6 @@ function NavigationActivity() {
         return;
       }
 
-      // Si el usuario vuelve a presionar el mismo enlace tras 1200 ms porque la
-      // navegación cliente sigue pendiente, forzar navegación directa inmediata.
-      if (startedAt.current !== null && targetKey.current === key && (now - lastGlobalTap >= 1200)) {
-        window.location.assign(anchor.href);
-        return;
-      }
-
       if (startedAt.current !== null && targetKey.current === key) {
         // En capture todavía no corre el onClick de Next Link; prevenir aquí
         // evita que un segundo toque encole la misma navegación.
@@ -627,8 +552,8 @@ function NavigationActivity() {
       iniciarNav(key, url.pathname, url.href, "sección");
     };
 
-    // Atrás/adelante del navegador: la URL ya cambió, así que el rescate se
-    // apoya en el skeleton o recarga la URL actual.
+    // Atrás/adelante del navegador: la URL ya cambió; la barra se limpia
+    // cuando el router confirma la navegación.
     const onPopState = () => {
       iniciarNav(
         `${window.location.pathname}${window.location.search}`,
@@ -645,8 +570,6 @@ function NavigationActivity() {
       document.removeEventListener("click", onClick, true);
       window.removeEventListener(NAV_PENDING_EVENT, onNavPending);
       window.removeEventListener("popstate", onPopState);
-      if (netTimeoutRef.current !== null) window.clearTimeout(netTimeoutRef.current);
-      if (stallCheckRef.current !== null) window.clearTimeout(stallCheckRef.current);
       if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
     };
   }, [iniciarNav]);

@@ -198,9 +198,9 @@ export async function webVitals(dias: number) {
     .select({
       metrica: telemetriaProductoEventos.metrica,
       muestras: sql<number>`count(*)::int`,
-      p50: sql<number>`percentile_cont(0.5) within group (order by ${telemetriaProductoEventos.valor})::float`,
-      p75: sql<number>`percentile_cont(0.75) within group (order by ${telemetriaProductoEventos.valor})::float`,
-      p95: sql<number>`percentile_cont(0.95) within group (order by ${telemetriaProductoEventos.valor})::float`,
+      p50: sql<number>`percentile_cont(0.5) within group (order by ${telemetriaProductoEventos.valor}::float8)::float`,
+      p75: sql<number>`percentile_cont(0.75) within group (order by ${telemetriaProductoEventos.valor}::float8)::float`,
+      p95: sql<number>`percentile_cont(0.95) within group (order by ${telemetriaProductoEventos.valor}::float8)::float`,
     })
     .from(telemetriaProductoEventos)
     .where(
@@ -343,9 +343,9 @@ export async function cargarTableroTelemetria(dias: number): Promise<TableroTele
           select
             e.metrica,
             count(*)::int as muestras,
-            percentile_cont(0.5) within group (order by e.valor)::float as p50,
-            percentile_cont(0.75) within group (order by e.valor)::float as p75,
-            percentile_cont(0.95) within group (order by e.valor)::float as p95
+            percentile_cont(0.5) within group (order by e.valor::float8)::float as p50,
+            percentile_cont(0.75) within group (order by e.valor::float8)::float as p75,
+            percentile_cont(0.95) within group (order by e.valor::float8)::float as p95
           from telemetria_producto_eventos e
           where e.tipo = 'performance' and e.created_at >= ${corte}
           group by e.metrica

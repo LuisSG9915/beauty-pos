@@ -165,7 +165,7 @@ export async function cargarPlano(
                      where dcs.cita_id = c.id
                      limit 1
                   ),
-                  'ventaId', c.venta_id,
+                  'ventaId', v.id,
                   'ventaEstado', v.estado,
                   'poseMinutos', (
                     select ft.tiempo_pose_minutos
@@ -179,7 +179,7 @@ export async function cargarPlano(
                 join citas c on c.id = cr.cita_id and c.activo and c.estado in ('en_proceso', 'confirmada', 'completada')
                 left join clientes cl on cl.id = c.cliente_id
                 left join usuarios u on u.id = c.usuario_id
-                left join ventas v on v.id = c.venta_id and v.activo
+                left join ventas v on v.cita_id = c.id and v.activo
                where cr.recurso_id = m.recurso_id
                  and c.fecha_hora >= now() - interval '6 hours'
                  and c.fecha_hora <= now() + interval '6 hours'

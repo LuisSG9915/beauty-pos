@@ -91,7 +91,6 @@ const OPERACION: AdminNavItem[] = [
     description: "Citas, estados y venta en proceso",
     icon: Calendar,
     permiso: "agenda.ver",
-    prefetch: true,
   },
   {
     path: "/admin/mi-dia",
@@ -99,7 +98,6 @@ const OPERACION: AdminNavItem[] = [
     description: "Tus citas, propinas y comisiones de hoy",
     icon: CalendarCheck,
     permiso: "agenda.ver",
-    prefetch: true,
   },
   {
     path: "/admin/pos",
@@ -107,7 +105,6 @@ const OPERACION: AdminNavItem[] = [
     description: "Terminal POS, historial y caja",
     icon: ShoppingCart,
     permiso: ["ventas.ver", "caja.ver"],
-    prefetch: true,
     matchPaths: ["/admin/pos", "/admin/ventas", "/admin/caja"],
     children: [
       {
