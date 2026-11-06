@@ -13,6 +13,12 @@ import { ThemeModeSelector } from "@/components/theme-mode-selector";
 import { Button } from "@/components/ui/button";
 import { TelemetriaPing } from "@/components/telemetria-ping";
 import { BRAND } from "@/lib/brand";
+import {
+  ESTADO_VISTA_CARD,
+  ESTADO_VISTA_DOT,
+  ESTADO_VISTA_LABEL,
+  type EstadoVista,
+} from "@/modules/agenda/estados";
 
 const benefits = [
   {
@@ -62,6 +68,36 @@ const steps = [
     step: "3",
     title: "Cierra con claridad",
     description: "Corte de caja, gastos y comisiones al día — sin libreta ni Excel.",
+  },
+];
+
+const demoAppointments: ReadonlyArray<{
+  time: string;
+  initials: string;
+  name: string;
+  service: string;
+  estado: EstadoVista;
+}> = [
+  {
+    time: "09:30",
+    initials: "ML",
+    name: "Mariana López",
+    service: "Color y corte",
+    estado: "en_atencion",
+  },
+  {
+    time: "10:15",
+    initials: "SR",
+    name: "Sofía Ramírez",
+    service: "Manicure gel",
+    estado: "confirmada",
+  },
+  {
+    time: "11:00",
+    initials: "CT",
+    name: "Camila Torres",
+    service: "Facial hidratante",
+    estado: "por_cobrar",
   },
 ];
 
@@ -130,9 +166,9 @@ export default function Home() {
         </div>
 
         <div className="relative min-w-0">
-          <div className="absolute -inset-5 rounded-[2.5rem] bg-accent blur-3xl" />
-          <div className="relative overflow-hidden rounded-[2rem] border border-border bg-card p-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border pb-4">
+          <div className="pointer-events-none absolute -inset-5 rounded-[2.5rem] bg-accent/80 blur-3xl dark:bg-accent/40" />
+          <div className="surface-elevated anim-entrada relative overflow-hidden rounded-[2rem] border border-border bg-card p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-4">
               <div>
                 <p className="text-op-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Resumen del día</p>
                 <p className="mt-1 font-serif text-xl font-semibold">Casa Magnolia</p>
@@ -145,36 +181,51 @@ export default function Home() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 py-5">
-              <div className="rounded-2xl bg-muted p-4">
-                <p className="text-op-xs text-muted-foreground">Ventas</p>
-                <p className="mt-2 text-2xl font-semibold">$18,450</p>
-                <p className="mt-1 text-op-xs text-success">+12.8% vs. ayer</p>
+              <div className="rounded-2xl border border-border/60 bg-muted/60 p-4">
+                <p className="text-op-xs font-medium text-muted-foreground">Ventas</p>
+                <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">$18,450</p>
+                <p className="mt-1 text-op-xs font-medium text-success">+12.8% vs. ayer</p>
               </div>
-              <div className="rounded-2xl bg-muted p-4">
-                <p className="text-op-xs text-muted-foreground">Citas de hoy</p>
-                <p className="mt-2 text-2xl font-semibold">24</p>
+              <div className="rounded-2xl border border-border/60 bg-muted/60 p-4">
+                <p className="text-op-xs font-medium text-muted-foreground">Citas de hoy</p>
+                <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">24</p>
                 <p className="mt-1 text-op-xs text-muted-foreground">18 confirmadas</p>
               </div>
             </div>
-            <div className="rounded-2xl border border-border p-4">
-              <div className="mb-4 flex items-center justify-between">
+            <div className="rounded-2xl border border-border bg-background/50 p-4">
+              <div className="mb-3.5 flex items-center justify-between">
                 <p className="text-sm font-semibold">Próximas citas</p>
-                <span className="text-op-xs text-primary">Ver agenda</span>
+                <span className="text-op-xs font-medium text-primary">Ver agenda</span>
               </div>
-              <div className="space-y-3">
-                {[
-                  ["09:30", "Mariana López", "Color y corte", "En espera"],
-                  ["10:15", "Sofía Ramírez", "Manicure gel", "Confirmada"],
-                  ["11:00", "Camila Torres", "Facial hidratante", "Confirmada"],
-                ].map(([time, name, service, status]) => (
-                  <div className="flex items-center gap-3" key={`${time}-${name}`}>
-                    <span className="w-12 text-op-xs font-semibold text-primary">{time}</span>
-                    <div className="size-8 rounded-full bg-accent" />
+              <div className="space-y-2.5">
+                {demoAppointments.map(({ time, initials, name, service, estado }, index) => (
+                  <div
+                    className="anim-entrada flex items-center gap-3 rounded-xl border border-border/70 bg-card px-3 py-2.5"
+                    key={`${time}-${name}`}
+                    style={{ animationDelay: `${(index + 1) * 70}ms` }}
+                  >
+                    <span className="w-11 shrink-0 font-mono text-op-xs font-semibold tabular-nums text-primary">
+                      {time}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className="flex size-8 shrink-0 items-center justify-center rounded-full bg-accent text-op-xs font-semibold text-accent-foreground"
+                    >
+                      {initials}
+                    </span>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">{name}</p>
                       <p className="truncate text-op-xs text-muted-foreground">{service}</p>
                     </div>
-                    <span className="rounded-full bg-muted px-2 py-1 text-op-xs text-muted-foreground">{status}</span>
+                    <span
+                      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-op-xs font-semibold ${ESTADO_VISTA_CARD[estado]}`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`size-1.5 rounded-full ${ESTADO_VISTA_DOT[estado]}`}
+                      />
+                      {ESTADO_VISTA_LABEL[estado]}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -186,8 +237,16 @@ export default function Home() {
       <section className="border-t border-border bg-card/70">
         <div className="mx-auto grid w-full max-w-7xl gap-4 px-6 py-12 sm:grid-cols-2 lg:grid-cols-3 lg:px-10">
           {benefits.map(({ icon: Icon, title, description }) => (
-            <div className="rounded-2xl p-4" key={title}>
-              <Icon className="size-5 text-primary" strokeWidth={1.8} />
+            <div
+              className="surface-card rounded-2xl border border-border/70 bg-card p-5 transition-colors duration-150"
+              key={title}
+            >
+              <span
+                aria-hidden="true"
+                className="inline-flex size-9 items-center justify-center rounded-xl bg-accent text-accent-foreground"
+              >
+                <Icon className="size-4.5" strokeWidth={1.8} />
+              </span>
               <h2 className="mt-4 font-semibold">{title}</h2>
               <p className="mt-2 text-sm leading-6 text-muted-foreground">{description}</p>
             </div>

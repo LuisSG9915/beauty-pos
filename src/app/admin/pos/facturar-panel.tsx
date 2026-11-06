@@ -87,7 +87,7 @@ export function FacturarPanel({
           </div>
           {comprobante.uuid ? (
             <div className="flex justify-between gap-3">
-              <span className="text-muted-foreground">UUID simulado</span>
+              <span className="text-muted-foreground">Folio fiscal simulado</span>
               <span className="max-w-56 truncate font-mono text-op-xs" title={comprobante.uuid}>{comprobante.uuid}</span>
             </div>
           ) : null}

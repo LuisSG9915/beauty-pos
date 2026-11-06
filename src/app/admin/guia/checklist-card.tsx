@@ -129,7 +129,7 @@ export function GuiaChecklistCard({
                       const cargando = isPackPending && pendingPackId === pack.id;
                       return (
                         <Button
-                          className="min-h-[44px] w-full justify-center px-3 py-2.5 text-center text-xs font-medium"
+                          className="min-h-[44px] w-full justify-center px-3 py-2.5 text-center text-op-xs font-medium"
                           disabled={isPackPending}
                           key={pack.id}
                           onClick={() => handleAplicarPack(pack.id)}
@@ -145,7 +145,7 @@ export function GuiaChecklistCard({
                     })}
                   </div>
                   {packError ? (
-                    <p className="mt-2 text-xs text-destructive" role="alert">
+                    <p className="mt-2 text-op-xs text-destructive" role="alert">
                       {packError}
                     </p>
                   ) : null}

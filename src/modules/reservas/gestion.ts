@@ -23,12 +23,13 @@ import {
 import { resolveTimeZone, dayBoundsUtc } from "@/modules/agenda/timezone";
 import { enviarAvisoDiferido } from "@/lib/email/aviso-email";
 import { encolarAvisoCita } from "@/modules/notificaciones/service";
-import { TIPO_CAMBIO, TIPO_CANCELACION } from "@/modules/notificaciones/rules";
+import { TIPO_CAMBIO, TIPO_CANCELACION, TIPO_CONFIRMACION } from "@/modules/notificaciones/rules";
 import {
   dentroDeVentanaReserva,
   LIMITES_RESERVAS,
   normalizarContacto,
   puedeGestionarCita,
+  resolverConfirmacion,
   slotsDisponiblesDia,
   type PoliticaReservas,
 } from "./rules";
@@ -260,6 +261,7 @@ export type ReservaGestionPublica = {
   zonaHoraria: string;
   /** Puede cancelar/reagendar ahora mismo según la política. */
   gestionable: boolean;
+  confirmable: boolean;
   motivoNoGestionable: string | null;
   cancelacionHoras: number;
   horizonteDias: number;
@@ -378,6 +380,7 @@ export async function obtenerReservaPorToken(
     clienteNombre: row.cliente?.nombre ?? null,
     zonaHoraria: resolveTimeZone(row.sucursal.zonaHoraria, row.organizacion.zonaHoraria),
     gestionable: gestion.puede,
+    confirmable: gestion.puede && resolverConfirmacion(row.cita).accion === "confirmar",
     motivoNoGestionable: gestion.puede ? null : gestion.motivo,
     cancelacionHoras: politica.cancelacionHoras,
     horizonteDias: politica.horizonteDias,
@@ -477,6 +480,88 @@ export async function cancelarReservaPublica(token: string, telefono?: string): 
   } catch (error) {
     console.error("cancelarReservaPublica", error);
     return { ok: false, error: "No se pudo cancelar la cita. Inténtalo de nuevo." };
+  }
+}
+
+export async function confirmarReservaPublica(token: string, telefono?: string): Promise<GestionResult> {
+  if (!/^[0-9a-f]{64}$/i.test(token)) return { ok: false, error: "Enlace inválido." };
+  const db = getDatabase();
+  const ahora = new Date();
+  const tokenHash = hashTokenGestion(token);
+
+  let avisoDiferido: {
+    organizacionId: string;
+    citaId: string;
+    tipo: typeof TIPO_CONFIRMACION;
+  } | null = null;
+
+  try {
+    const resultado = await withDbRetry(() =>
+      db.transaction(async (tx): Promise<GestionResult> => {
+        const row = await reservaPorHash(tx, tokenHash);
+        if (!row || row.revocadoAt) return { ok: false, error: "Enlace inválido o revocado." };
+
+        const excede = await excedeRateLimit(tx, {
+          bucket: "reserva_manage",
+          clave: `token:${tokenHash.slice(0, 24)}`,
+          ...LIMITES_RESERVAS.gestionPorTokenHora,
+        }, ahora);
+        if (excede) return { ok: false, error: "Demasiados cambios en poco tiempo. Comunícate con el negocio." };
+        if (!telefonoCoincide(row, telefono)) {
+          return { ok: false, error: "El teléfono no coincide con el registrado en la reserva." };
+        }
+
+        const decision = resolverConfirmacion(row.cita);
+        if (decision.accion === "rechazar") return { ok: false, error: decision.motivo };
+        if (decision.accion === "ya_confirmada") return { ok: true };
+        const gestion = puedeGestionarCita(row.cita, politicaDe(row), ahora);
+        if (!gestion.puede) return { ok: false, error: gestion.motivo };
+
+        await lockSucursalAgenda(tx, row.cita.organizacionId, row.cita.sucursalId);
+        const [actual] = await tx
+          .select({ estado: citas.estado, activo: citas.activo, fechaHora: citas.fechaHora, origen: citas.origen })
+          .from(citas)
+          .where(eq(citas.id, row.cita.id))
+          .limit(1);
+        if (!actual) return { ok: false, error: "La cita ya no existe." };
+        const revalida = resolverConfirmacion(actual);
+        if (revalida.accion === "rechazar") return { ok: false, error: revalida.motivo };
+        if (revalida.accion === "ya_confirmada") return { ok: true };
+        const ventana = puedeGestionarCita(actual, politicaDe(row), ahora);
+        if (!ventana.puede) return { ok: false, error: ventana.motivo };
+
+        await tx.update(citas).set({ estado: "confirmada" }).where(eq(citas.id, row.cita.id));
+        await registrarHistorialCita(tx, {
+          citaId: row.cita.id,
+          organizacionId: row.cita.organizacionId,
+          usuarioId: null,
+          accion: "confirmada",
+          detalle: { de: actual.estado, a: "confirmada", origen: "web" },
+        });
+        await auditEvent(tx, {
+          organizacionId: row.cita.organizacionId,
+          sucursalId: row.cita.sucursalId,
+          usuarioId: null,
+          accion: "cita.confirmada_web",
+          entidad: "cita",
+          entidadId: row.cita.id,
+          detalle: { estadoPrevio: actual.estado },
+        });
+        avisoDiferido = { organizacionId: row.cita.organizacionId, citaId: row.cita.id, tipo: TIPO_CONFIRMACION };
+        return { ok: true };
+      }),
+    );
+
+    if (resultado.ok && avisoDiferido) {
+      enviarAvisoDiferido(async () => {
+        await encolarAvisoCita(getDatabase(), avisoDiferido!);
+      });
+    }
+
+    return resultado;
+  } catch (error) {
+    console.error("confirmarReservaPublica", error);
+    return { ok: false, error: "No se pudo confirmar la cita. Inténtalo de nuevo." };
   }
 }
 

@@ -65,12 +65,12 @@ cualquier fórmula, la exportación CSV, permisos ni la capacidad
 
 ## Criterios de aceptación\*
 
-- [ ] `pnpm typecheck && pnpm lint && pnpm test` → 0 errores.
-- [ ] `pnpm test:usability --only=reportes` (ambos viewports, con
+- [x] `pnpm typecheck && pnpm lint && pnpm test` → 0 errores.
+- [x] `pnpm test:usability --only=reportes` (ambos viewports, con
       `pnpm dev`) → 0 errores y 0 avisos nuevos.
-- [ ] En 390 px, "Utilidad Neta en Mano" es visible sin scroll tras
+- [x] En 390 px, "Utilidad Neta en Mano" es visible sin scroll tras
       abrir la página (verificación manual o con Puppeteer).
-- [ ] Ninguna etiqueta visible usa términos fuera de `glosario.ts`.
+- [x] Ninguna etiqueta visible usa términos fuera de `glosario.ts`.
 
 ## Verificación
 
@@ -99,13 +99,13 @@ pnpm test:usability --only=reportes
 
 ```
 Misión: 32 — Reportes responde «¿cuánto gané?» antes que cualquier filtro
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔ | usability 0 errores
-Antes → después: resultado bajo el formulario en móvil → visible al abrir
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <ninguno | qué falta y quién lo cierra>
+Cambios: src/app/admin/reportes/page.tsx → tarjeta de ganancia antes del formulario; desglose plegable en móvil; fechas Desde/Hasta en dos columnas en móvil; "SPEI" → "Transferencia"; "devengadas" → "ganadas"; detalle sin truncar.
+Verificación: typecheck ✔ | lint ✔ | test 588 ✔ | usability --only=reportes 0 errores, 0 avisos (desktop y móvil) | medición 390 px: utilidad 374–392 px, Aplicar 772–816 px
+Antes → después: tarjeta bajo los filtros (≈920 px la utilidad en 390 px, estimado con la altura medida del formulario) → utilidad a 374 px y Aplicar a 816 px como máximo
+Desviaciones: (1) el desglose (Total ingresado, Por pagar, Gastos) queda plegado en móvil con "Ver ingresos, comisiones y gastos"; sin eso "Aplicar" quedaba a 1052 px y la usabilidad marcaba aviso. En escritorio no cambia. (2) Fechas en dos columnas en móvil para ganar una fila. (3) El glosario no define efectivo, tarjeta, transferencia ni comisiones ganadas: se usaron las palabras más llanas. (4) Se ejecutó en la misma sesión que otras mejoras fuera del plan (caja, vocabulario y tipografía).
+Riesgo abierto: ninguno en reportes. El permiso de caja lo decidió el dueño: la ganancia se ve solo con reportes.financieros, también con turno abierto.
 ```
 
 ## Desviaciones (las escribe el implementador)
 
-Ninguna.
+Ver la línea «Desviaciones» del reporte de arriba: desglose plegado en móvil, fechas en dos columnas y etiquetas sin término de glosario.

@@ -503,7 +503,7 @@ export function CompraDetalle({
           </div>
           {editable ? (
             <Button
-              className="mt-2.5 w-full text-xs font-semibold"
+              className="mt-2.5 w-full text-op-xs font-semibold"
               data-action-id="compras.linea.captura_asistida"
               onClick={agregarLinea}
               size="sm"
@@ -754,7 +754,7 @@ export function CompraDetalle({
               </div>
               {editable ? (
                 <Button
-                  className="text-xs font-semibold"
+                  className="text-op-xs font-semibold"
                   data-action-id="compras.linea.captura_asistida"
                   onClick={agregarLinea}
                   size="sm"

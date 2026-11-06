@@ -53,7 +53,7 @@ const HISTORIAL_LABEL: Record<string, string> = {
   editada: "Datos editados",
   movida: "Movida de horario",
   duracion: "Duración ajustada",
-  reagendada: "Reagendada a pendiente",
+  reagendada: "Cambió de fecha y quedó pendiente",
   estado: "Cambio de estado",
   servicio_agregado: "Servicio agregado",
   servicio_quitado: "Servicio quitado",
@@ -824,7 +824,7 @@ export function CitaSidePanel({
       {ultimaFormula ? (
         <section className="space-y-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3.5">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-op-xs font-semibold text-primary">
               <Sparkles aria-hidden="true" className="size-3.5" />
               Última fórmula: {ultimaFormula.textoPastilla}
             </span>

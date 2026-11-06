@@ -67,7 +67,7 @@ datos ya existen en `organizaciones` y `ventas`.
 - [ ] `/admin` con sesión de plataforma muestra la tarjeta con números
       coherentes con las ventas reales (verificable con una consulta SQL
       de contraste).
-- [ ] Una organización sin ventas no rompe la tarjeta ni cuenta como
+- [x] Una organización sin ventas no rompe la tarjeta ni cuenta como
       "≤ 10 min".
 
 ## Verificación
@@ -98,13 +98,13 @@ pnpm dev   # recorrido manual: /admin con sesión de plataforma
 
 ```
 Misión: 31 — Tiempo a la primera venta en el panel de plataforma
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔
-Antes → después: embudo solo contaba activaciones → p50/p95/%≤10min visibles
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <ninguno | qué falta y quién lo cierra>
+Cambios: src/modules/billing/activacion.ts (+ activacion.test.ts) → cálculo puro de mediana, p90, % en 10 min y activos sin cobro; src/app/admin/page.tsx → createdAt de organizaciones y min(coalesce(cobradaAt, createdAt)) dentro de la consulta agrupada que ya existía (0 rondas nuevas), y la sección "Tiempo a la primera venta".
+Verificación: typecheck ✔ | lint ✔ | test 602 ✔ (6 pruebas nuevas) | contraste contra la base (solo lectura): 3 negocios con venta, mediana 5 días, p90 38 días, 0 % en 10 min o menos y 1 activo sin cobro; coincide con el cálculo manual | UI: pendiente
+Antes → después: el embudo solo contaba activaciones → la sección muestra mediana, p90 y % en 10 min o menos
+Desviaciones: (1) la métrica usa cobradaAt (momento confirmado del cobro) con createdAt de respaldo, no createdAt: una venta de cita se abre antes de cobrarse. (2) "9 de cada 10" es el percentil 90. (3) la cifra incluye todas las organizaciones, igual que el embudo existente, así que también cuenta cuentas de prueba.
+Riesgo abierto: falta ver la tarjeta en /admin con sesión de plataforma (criterio 2). La cuenta de pruebas no es de plataforma; la confirma el dueño. Estado: implementada, no cerrada.
 ```
 
 ## Desviaciones (las escribe el implementador)
 
-Ninguna.
+Ver la línea «Desviaciones» del reporte de arriba: cobradaAt en lugar de createdAt, percentil 90 para «9 de cada 10» y cuentas de prueba incluidas.

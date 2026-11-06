@@ -47,7 +47,7 @@ export function SubscriptionBanner({
   if (!puedeAdministrarPlan) {
     if (badge.estado === "vencida") {
       return (
-        <div className="mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-soft-foreground">
+        <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-destructive-soft-foreground">
           <LockKeyhole aria-hidden="true" className="size-4 shrink-0" />
           <p>
             La suscripción del salón está en pausa (solo lectura) — avísale a
@@ -59,7 +59,7 @@ export function SubscriptionBanner({
     const dias = badge.diasRestantes;
     if (dias === null || dias > 3) return null;
     return (
-      <div className="mb-4 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-soft-foreground">
+      <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning-soft-foreground">
         <Clock3 aria-hidden="true" className="size-4 shrink-0" />
         <p>
           El periodo de prueba del salón vence en {dias}{" "}
@@ -72,7 +72,7 @@ export function SubscriptionBanner({
 
   if (badge.estado === "vencida") {
     return (
-      <div className="mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive-soft-foreground">
+      <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-destructive-soft-foreground">
         <LockKeyhole aria-hidden="true" className="size-4 shrink-0" />
         <p>
           Tu suscripción está en pausa: puedes consultar tu información, pero no
@@ -80,7 +80,7 @@ export function SubscriptionBanner({
           están a salvo.
         </p>
         <Link
-          className="ml-auto inline-flex min-h-11 shrink-0 items-center rounded-full border border-destructive-soft-foreground/40 px-3 text-op-xs font-semibold"
+          className="ml-auto inline-flex min-h-11 shrink-0 items-center rounded-full border border-destructive-soft-foreground/40 bg-card/60 px-3.5 text-op-xs font-semibold transition-colors hover:bg-card"
           href="/precios"
         >
           Ver planes
@@ -90,7 +90,7 @@ export function SubscriptionBanner({
   }
 
   return (
-    <div className="mb-4 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning-soft-foreground">
+    <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning-soft-foreground">
       <Clock3 aria-hidden="true" className="size-4 shrink-0" />
       <p>
         Estás en tu periodo de prueba
@@ -100,7 +100,7 @@ export function SubscriptionBanner({
         . Todo lo que registres se conserva al contratar.
       </p>
       <Link
-        className="ml-auto inline-flex min-h-11 shrink-0 items-center rounded-full border border-warning-soft-foreground/40 px-3 text-op-xs font-semibold"
+        className="ml-auto inline-flex min-h-11 shrink-0 items-center rounded-full border border-warning-soft-foreground/40 bg-card/60 px-3.5 text-op-xs font-semibold transition-colors hover:bg-card"
         href="/precios"
       >
         Ver planes

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AdminPageHeader, AdminSection } from "@/components/admin/page-header";
+import { TarjetaGananciaNeta } from "@/components/admin/tarjeta-ganancia-neta";
 import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { BarChart, HBarChart } from "@/components/charts";
 import { EmptyState } from "@/components/empty-state";
@@ -12,6 +13,7 @@ import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate, formatTime, todayDateInput } from "@/lib/format";
 import { firstParam, normalizeDateInput } from "@/lib/url-context";
+import { leerViewportPreference } from "@/lib/viewport-preference";
 import { dayBoundsUtc, resolveTimeZone, shiftDateKey } from "@/modules/agenda";
 import { contextoSuscripcionCache, tieneCapacidad } from "@/modules/billing/queries";
 import {
@@ -20,7 +22,6 @@ import {
   comparativoSucursales,
   num,
   obtenerGananciaNetaPeriodo,
-  type ResumenGananciaNeta,
 } from "@/modules/reportes/queries";
 import {
   deltaKpi,
@@ -108,75 +109,6 @@ function Tabla({
   );
 }
 
-function TarjetaGananciaNeta({
-  ganancia,
-  currency,
-  titulo,
-  subtitulo,
-}: {
-  ganancia: ResumenGananciaNeta;
-  currency: string;
-  titulo: string;
-  subtitulo: string;
-}) {
-  const fmt = (centavos: number) => formatCurrency(centavos / 100, { currency });
-  const esPositivo = ganancia.utilidadNetaCentavos >= 0;
-  const componentes = [
-    {
-      detalle: `Efectivo ${fmt(ganancia.efectivoCentavos)} · Tarjeta ${fmt(ganancia.tarjetaCentavos)} · SPEI ${fmt(ganancia.transferenciaCentavos)}`,
-      etiqueta: "Total ingresado",
-      valor: fmt(ganancia.totalIngresadoCentavos),
-    },
-    {
-      detalle: "Comisiones devengadas",
-      etiqueta: "Por pagar a equipo",
-      valor: fmt(ganancia.comisionesEquipoCentavos),
-    },
-    {
-      detalle: "Salidas de caja / gastos",
-      etiqueta: "Gastos operativos",
-      valor: fmt(ganancia.gastosOperativosCentavos),
-    },
-  ];
-
-  return (
-    <section className="rounded-2xl bg-accent/60 px-5 py-6 sm:px-7">
-      <div className="mb-5">
-        <h2 className="text-lg font-semibold tracking-tight text-accent-foreground">{titulo}</h2>
-        <p className="mt-1 text-sm text-accent-foreground/80">{subtitulo}</p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] lg:items-center">
-        <div className="rounded-xl bg-card px-5 py-4 shadow-xs sm:px-6 sm:py-5">
-          <p className="text-op-xs font-medium text-muted-foreground">Utilidad neta en mano</p>
-          <p
-            className={`mt-1 text-3xl font-black tracking-tight tabular-nums sm:text-4xl ${
-              esPositivo ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
-            }`}
-          >
-            {fmt(ganancia.utilidadNetaCentavos)}
-          </p>
-          <p className="mt-1.5 text-op-xs font-medium text-muted-foreground">
-            {esPositivo ? "Disponible libre de compromisos" : "Déficit en el período"}
-          </p>
-        </div>
-
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
-          {componentes.map((componente) => (
-            <div className="min-w-0" key={componente.etiqueta}>
-              <dt className="text-op-xs font-medium text-accent-foreground/80">{componente.etiqueta}</dt>
-              <dd className="mt-0.5 truncate text-xl font-bold tracking-tight tabular-nums text-accent-foreground">
-                {componente.valor}
-              </dd>
-              <dd className="mt-1 truncate text-op-xs text-accent-foreground/80">{componente.detalle}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
-    </section>
-  );
-}
-
 function Kpi({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="anim-entrada min-w-0 overflow-hidden rounded-xl bg-muted/60 px-4 py-3">
@@ -198,6 +130,7 @@ export default async function ReportesPage({ searchParams }: Props) {
   const puedeFinancieros = hasPermission(context.access, "reportes.financieros");
   const puedeExportar = hasPermission(context.access, "reportes.exportar");
   if (!puedeOperativos && !puedeFinancieros) notFound();
+  const detalleAbierto = (await leerViewportPreference()) !== "movil";
 
   const db = getDatabase();
   // Vista consolidada (Profesional): `sucursalId=todas` suma todas las
@@ -357,6 +290,16 @@ export default async function ReportesPage({ searchParams }: Props) {
         title="Reportes"
       />
 
+      {gananciaNeta && puedeFinancieros ? (
+        <TarjetaGananciaNeta
+          currency={currency}
+          detalleAbierto={detalleAbierto}
+          ganancia={gananciaNeta}
+          subtitulo={`Ventas cobradas menos comisiones ganadas por el equipo y gastos operativos en el período (${desde} → ${hasta}).`}
+          titulo="Tu Ganancia Real del Período"
+        />
+      ) : null}
+
       <form className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-end gap-3 rounded-2xl bg-muted/50 p-4 w-full min-w-0" method="get">
         <input name="organizationId" type="hidden" value={organization.id} />
         {context.branches.length > 1 ? (
@@ -374,14 +317,16 @@ export default async function ReportesPage({ searchParams }: Props) {
         ) : (
           <input name="sucursalId" type="hidden" value={branch.id} />
         )}
-        <Field className="w-full sm:w-40">
-          <FieldLabel htmlFor="reportes-desde">Desde</FieldLabel>
-          <Input className="min-h-11" defaultValue={desde} id="reportes-desde" name="desde" type="date" />
-        </Field>
-        <Field className="w-full sm:w-40">
-          <FieldLabel htmlFor="reportes-hasta">Hasta</FieldLabel>
-          <Input className="min-h-11" defaultValue={hasta} id="reportes-hasta" name="hasta" type="date" />
-        </Field>
+        <div className="grid grid-cols-2 gap-3 sm:contents">
+          <Field className="w-full min-w-0 sm:w-40">
+            <FieldLabel htmlFor="reportes-desde">Desde</FieldLabel>
+            <Input className="min-h-11" defaultValue={desde} id="reportes-desde" name="desde" type="date" />
+          </Field>
+          <Field className="w-full min-w-0 sm:w-40">
+            <FieldLabel htmlFor="reportes-hasta">Hasta</FieldLabel>
+            <Input className="min-h-11" defaultValue={hasta} id="reportes-hasta" name="hasta" type="date" />
+          </Field>
+        </div>
         <Button className="min-h-11 rounded-xl w-full sm:w-auto" data-action-clave="1" data-action-id="reportes.filtro.aplicar" size="lg" type="submit">Aplicar</Button>
         {puedeExportar ? (
           <a
@@ -424,15 +369,6 @@ export default async function ReportesPage({ searchParams }: Props) {
           ) : null}
         </div>
       </form>
-
-      {gananciaNeta && puedeFinancieros ? (
-        <TarjetaGananciaNeta
-          currency={currency}
-          ganancia={gananciaNeta}
-          subtitulo={`Ventas cobradas menos comisiones devengadas y gastos operativos en el período seleccionado (${desde} → ${hasta}).`}
-          titulo="Tu Ganancia Real del Período"
-        />
-      ) : null}
 
       {consolidado ? (
         <AdminSection

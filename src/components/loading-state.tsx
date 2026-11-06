@@ -22,8 +22,9 @@ export function LoadingState({
       {Array.from({ length: rows }).map((_, index) => (
         <div
           aria-hidden="true"
-          className="h-16 animate-pulse rounded-xl border border-border bg-card"
+          className="surface-card h-16 animate-pulse rounded-xl border border-border bg-card"
           key={index}
+          style={{ animationDelay: `${index * 75}ms` }}
         />
       ))}
       <span className="sr-only">{label}…</span>

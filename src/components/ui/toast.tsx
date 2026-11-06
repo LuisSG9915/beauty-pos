@@ -17,17 +17,17 @@ const toastIcons: Record<ToastType, typeof Info> = {
 };
 
 const toastToneStyles: Record<ToastType, string> = {
-  success: "border-success/40 text-foreground",
-  error: "border-destructive/40 text-foreground",
-  warning: "border-warning/40 text-foreground",
-  info: "border-info/40 text-foreground",
+  success: "border-success/40 bg-card text-foreground",
+  error: "border-destructive/40 bg-card text-foreground",
+  warning: "border-warning/40 bg-card text-foreground",
+  info: "border-info/40 bg-card text-foreground",
 };
 
 const toastIconStyles: Record<ToastType, string> = {
-  success: "text-success",
-  error: "text-destructive",
-  warning: "text-warning",
-  info: "text-info",
+  success: "bg-success-soft text-success-soft-foreground",
+  error: "bg-destructive-soft text-destructive-soft-foreground",
+  warning: "bg-warning-soft text-warning-soft-foreground",
+  info: "bg-info-soft text-info-soft-foreground",
 };
 
 function ToastList() {
@@ -38,16 +38,21 @@ function ToastList() {
     return (
       <ToastPrimitive.Root
         className={cn(
-          "flex w-full items-start gap-3 rounded-xl border bg-card p-3.5 shadow-lg transition-[opacity,transform] duration-200 data-ending-style:translate-y-2 data-ending-style:opacity-0 data-starting-style:translate-y-2 data-starting-style:opacity-0",
+          "surface-elevated flex w-full items-start gap-3 rounded-xl border p-3.5 transition-[opacity,transform] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] data-ending-style:translate-y-2 data-ending-style:opacity-0 data-starting-style:translate-y-2 data-starting-style:opacity-0",
           toastToneStyles[type],
         )}
         key={toast.id}
         toast={toast}
       >
-        <Icon
+        <span
           aria-hidden="true"
-          className={cn("mt-0.5 size-4.5 shrink-0", toastIconStyles[type])}
-        />
+          className={cn(
+            "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg",
+            toastIconStyles[type],
+          )}
+        >
+          <Icon className="size-4" />
+        </span>
         <ToastPrimitive.Content className="flex min-w-0 flex-1 flex-col gap-0.5">
           <ToastPrimitive.Title className="text-sm font-semibold" />
           <ToastPrimitive.Description className="text-sm leading-5 text-muted-foreground" />
@@ -139,7 +144,7 @@ export function ActionFeedback({
     return (
       <p
         className={cn(
-          "rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive",
+          "anim-entrada rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm font-medium text-destructive-soft-foreground",
           className,
         )}
         role="alert"
@@ -153,7 +158,7 @@ export function ActionFeedback({
     return (
       <p
         className={cn(
-          "rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning",
+          "anim-entrada rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 text-sm font-medium text-warning-soft-foreground",
           className,
         )}
         role="status"
@@ -167,7 +172,7 @@ export function ActionFeedback({
     return (
       <p
         className={cn(
-          "rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success",
+          "anim-entrada rounded-xl border border-success/30 bg-success-soft px-4 py-3 text-sm font-medium text-success-soft-foreground",
           className,
         )}
         role="status"

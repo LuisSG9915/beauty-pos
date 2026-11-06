@@ -13,7 +13,7 @@ import { getZonedParts } from "@/modules/agenda/timezone";
 import { intervalFromDates } from "@/modules/agenda/types";
 import { enviarAvisoDiferido } from "@/lib/email/aviso-email";
 import { encolarAvisoCita } from "@/modules/notificaciones/service";
-import { TIPO_CONFIRMACION, TIPO_SOLICITUD } from "@/modules/notificaciones/rules";
+import { TIPO_CONFIRMACION, TIPO_RECORDATORIO, TIPO_SOLICITUD } from "@/modules/notificaciones/rules";
 import { emitirTokenGestion, verificarAbusoReserva } from "./gestion";
 import { esProfesionalReservable } from "./queries";
 import {
@@ -282,6 +282,12 @@ export async function crearReservaPublica(input: {
           organizacionId: input.organizacionId,
           citaId: resultado.citaId,
           tipo: resultado.confirmada ? TIPO_CONFIRMACION : TIPO_SOLICITUD,
+          gestionUrl: resultado.gestionUrl,
+        });
+        await encolarAvisoCita(getDatabase(), {
+          organizacionId: input.organizacionId,
+          citaId: resultado.citaId,
+          tipo: TIPO_RECORDATORIO,
           gestionUrl: resultado.gestionUrl,
         });
       });

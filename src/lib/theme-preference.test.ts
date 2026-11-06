@@ -84,10 +84,10 @@ describe("theme preference", () => {
   });
 
   it("expone los colores de chrome coherentes con globals.css", () => {
-    expect(THEME_COLOR.light).toBe("#faf9fb");
+    expect(THEME_COLOR.light).toBe("#faf7f8");
     expect(THEME_COLOR.dark).toBe("#1a1117");
     expect(themeColorFor("dark")).toBe("#1a1117");
-    expect(themeColorFor("light")).toBe("#faf9fb");
+    expect(themeColorFor("light")).toBe("#faf7f8");
   });
 
   it("BOOTSTRAP_SCRIPT es autocontenido y cubre el flujo completo", () => {

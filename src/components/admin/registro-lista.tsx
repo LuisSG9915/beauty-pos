@@ -46,7 +46,7 @@ export function RegistroCard({
   return (
     <article
       className={cn(
-        "anim-entrada min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-card p-4 shadow-sm",
+        "surface-card anim-entrada min-w-0 max-w-full overflow-hidden rounded-xl border border-border bg-card p-4",
         className,
       )}
     >

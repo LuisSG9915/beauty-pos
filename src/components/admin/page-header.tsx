@@ -2,6 +2,7 @@ import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import type { ComponentProps, ReactNode } from "react";
 
+import { AyudaContextualBoton } from "@/components/admin/ayuda-contextual";
 import { cn } from "@/lib/utils";
 
 export type AdminBreadcrumb = {
@@ -76,9 +77,12 @@ export function AdminPageHeader({
           {breadcrumbs && breadcrumbs.length > 0 ? (
             <AdminBreadcrumbs className="mb-1.5 sm:mb-2" items={breadcrumbs} />
           ) : null}
-          <h1 className="text-xl font-semibold tracking-[-0.02em] text-foreground sm:text-2xl">
-            {title}
-          </h1>
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="min-w-0 text-xl font-semibold tracking-[-0.02em] text-foreground sm:text-2xl">
+              {title}
+            </h1>
+            <AyudaContextualBoton />
+          </div>
           {description ? (
             <p className="mt-1 max-w-2xl text-op-xs leading-5 text-muted-foreground sm:mt-1.5 sm:text-sm sm:leading-6">
               {description}
@@ -160,7 +164,7 @@ export function AdminCard({
   return (
     <section
       className={cn(
-        "rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6",
+        "surface-card rounded-2xl border border-border bg-card p-5 sm:p-6",
         animate && "anim-entrada",
         className,
       )}

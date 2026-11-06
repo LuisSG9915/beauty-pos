@@ -54,7 +54,7 @@ import { requiereCapacidad } from "@/modules/billing/queries";
 import { emitirTokenGestion } from "@/modules/reservas/gestion";
 import { enviarAvisoDiferido } from "@/lib/email/aviso-email";
 import { encolarAvisoCita } from "@/modules/notificaciones/service";
-import { TIPO_CAMBIO, TIPO_CANCELACION, TIPO_CONFIRMACION, type TipoNotificacion } from "@/modules/notificaciones/rules";
+import { TIPO_CAMBIO, TIPO_CANCELACION, TIPO_CONFIRMACION, TIPO_RECORDATORIO, type TipoNotificacion } from "@/modules/notificaciones/rules";
 import {
   construirResumenFormulaRapida,
   type ResumenFormulaRapida,
@@ -417,6 +417,14 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
         const aviso = outcome.avisoDiferido;
         enviarAvisoDiferido(async () => {
           await encolarAvisoCita(getDatabase(), aviso);
+          if (aviso.tipo === TIPO_CONFIRMACION) {
+            await encolarAvisoCita(getDatabase(), {
+              organizacionId: aviso.organizacionId,
+              citaId: aviso.citaId,
+              tipo: TIPO_RECORDATORIO,
+              gestionUrl: aviso.gestionUrl,
+            });
+          }
         });
       }
       revalidatePath("/admin/agenda");

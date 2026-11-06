@@ -23,10 +23,10 @@ function DialogContent({
 }: DialogContentProps) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Backdrop className="fixed inset-0 z-50 min-h-dvh bg-black/35 backdrop-blur-[2px] transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute" />
+      <DialogPrimitive.Backdrop className="fixed inset-0 z-50 min-h-dvh bg-black/40 backdrop-blur-[2px] transition-opacity duration-180 ease-[cubic-bezier(0.22,1,0.36,1)] data-ending-style:opacity-0 data-starting-style:opacity-0 dark:bg-black/65 supports-[-webkit-touch-callout:none]:absolute" />
       <DialogPrimitive.Popup
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 flex max-h-[85dvh] w-[min(92vw,32rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-xl outline-none transition-[scale,opacity] duration-150 data-ending-style:scale-[0.97] data-ending-style:opacity-0 data-starting-style:scale-[0.97] data-starting-style:opacity-0",
+          "surface-elevated fixed left-1/2 top-1/2 z-50 flex max-h-[85dvh] w-[min(92vw,32rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-4 overflow-y-auto rounded-2xl border border-border bg-card p-6 text-card-foreground outline-none transition-[scale,opacity] duration-180 ease-[cubic-bezier(0.22,1,0.36,1)] data-ending-style:scale-[0.96] data-ending-style:opacity-0 data-starting-style:scale-[0.96] data-starting-style:opacity-0",
           className,
         )}
         {...props}

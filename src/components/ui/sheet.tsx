@@ -27,10 +27,10 @@ function SheetContent({
 }: SheetContentProps) {
   return (
     <DialogPrimitive.Portal>
-      <DialogPrimitive.Backdrop className="fixed inset-0 z-50 min-h-dvh bg-black/35 backdrop-blur-[2px] transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 supports-[-webkit-touch-callout:none]:absolute" />
+      <DialogPrimitive.Backdrop className="fixed inset-0 z-50 min-h-dvh bg-black/40 backdrop-blur-[2px] transition-opacity duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] data-ending-style:opacity-0 data-starting-style:opacity-0 dark:bg-black/65 supports-[-webkit-touch-callout:none]:absolute" />
       <DialogPrimitive.Popup
         className={cn(
-          "fixed inset-y-0 right-0 z-50 flex h-dvh w-[min(100vw,26rem)] flex-col gap-4 overflow-y-auto border-l border-border bg-card p-5 text-card-foreground shadow-2xl outline-none transition-transform duration-200 data-ending-style:translate-x-full data-starting-style:translate-x-full supports-[-webkit-touch-callout:none]:absolute",
+          "surface-elevated fixed inset-y-0 right-0 z-50 flex h-dvh w-[min(100vw,26rem)] flex-col gap-4 overflow-y-auto border-l border-border bg-card p-5 text-card-foreground outline-none transition-transform duration-220 ease-[cubic-bezier(0.22,1,0.36,1)] data-ending-style:translate-x-full data-starting-style:translate-x-full supports-[-webkit-touch-callout:none]:absolute",
           className,
         )}
         {...props}

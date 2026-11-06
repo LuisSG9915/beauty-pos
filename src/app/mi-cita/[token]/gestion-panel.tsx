@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { CalendarClock, CircleAlert, XCircle } from "lucide-react";
+import { CalendarClock, CircleAlert, CheckCircle2, XCircle } from "lucide-react";
 import Link from "next/link";
 
 import type { ReservaGestionPublica } from "@/modules/reservas/gestion";
 import { dayKey } from "@/modules/agenda/timezone";
-import { cancelarMiCita, reagendarMiCita, slotsMiCita } from "./actions";
+import { cancelarMiCita, confirmarMiCita, reagendarMiCita, slotsMiCita } from "./actions";
 
 type Aviso = { tipo: "ok" | "error"; mensaje: string } | null;
 
@@ -46,7 +46,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
   const [slots, setSlots] = useState<string[] | null>(null);
   const [slotsError, setSlotsError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<Aviso>(null);
-  const [hecho, setHecho] = useState<"cancelada" | "reagendada" | null>(null);
+  const [hecho, setHecho] = useState<"cancelada" | "reagendada" | "confirmada" | null>(null);
   const [pending, startTransition] = useTransition();
 
   const dias = useMemo(() => {
@@ -88,6 +88,14 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
       </div>
     );
   }
+  if (hecho === "confirmada") {
+    return (
+      <div className="anim-entrada mt-6 rounded-2xl border border-success/30 bg-success-soft p-5 text-sm text-success-soft-foreground">
+        <p className="font-semibold">Tu cita quedó confirmada.</p>
+        <p className="mt-1">Te esperamos. Si necesitas cambiarla, usa este mismo enlace.</p>
+      </div>
+    );
+  }
   if (hecho === "reagendada") {
     return (
       <div className="anim-entrada mt-6 rounded-2xl border border-success/30 bg-success-soft p-5 text-sm text-success-soft-foreground">
@@ -113,6 +121,17 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
       </div>
     );
   }
+
+  const confirmarAsistencia = () => {
+    startTransition(async () => {
+      const res = await confirmarMiCita(token, telefono);
+      if (res.ok) {
+        setHecho("confirmada");
+      } else {
+        setAviso({ tipo: "error", mensaje: res.error });
+      }
+    });
+  };
 
   const confirmarCancelacion = () => {
     startTransition(async () => {
@@ -155,9 +174,39 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
 
       {modo === "menu" ? (
         <div className="flex flex-wrap gap-3">
+          {reserva.confirmable ? (
+            <div className="w-full rounded-2xl border border-primary/30 bg-accent/60 p-4">
+              <p className="text-sm font-semibold text-accent-foreground">¿Vas a asistir a tu cita?</p>
+              {reserva.verificacionContacto ? (
+                <label className="mt-3 block text-sm text-accent-foreground">
+                  Teléfono con el que reservaste
+                  <input
+                    autoComplete="tel"
+                    className="mt-1 min-h-11 w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground"
+                    inputMode="tel"
+                    onChange={(event) => setTelefono(event.target.value)}
+                    placeholder="55 1234 5678"
+                    type="tel"
+                    value={telefono}
+                  />
+                </label>
+              ) : null}
+              <button
+                className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 active:scale-[0.98] disabled:opacity-50"
+                data-action-clave="1"
+                data-action-id="mi_cita.confirmar"
+                disabled={pending || (reserva.verificacionContacto && !telefono.trim())}
+                onClick={confirmarAsistencia}
+                type="button"
+              >
+                <CheckCircle2 aria-hidden="true" className="size-4" />
+                {pending ? "Confirmando…" : "Confirmar mi cita"}
+              </button>
+            </div>
+          ) : null}
           <button
             className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-medium transition-colors hover:border-primary hover:bg-accent active:scale-[0.98]"
-            data-action-clave="1"
+            data-action-clave={reserva.confirmable ? undefined : "1"}
             data-action-id="mi_cita.cambiar_fecha.abrir"
             onClick={() => {
               setModo("reagendar");

@@ -35,7 +35,7 @@ export const THEME_COOKIE_MAX_AGE = 60 * 60 * 24 * 365;
  * con `--background` de globals.css.
  */
 export const THEME_COLOR: Record<ResolvedTheme, string> = {
-  light: "#faf9fb",
+  light: "#faf7f8",
   dark: "#1a1117",
 };
 
@@ -168,7 +168,12 @@ export function persistThemePreference(preference: ThemePreference): ResolvedThe
   } catch {
     // localStorage puede estar bloqueado; la cookie basta.
   }
+  const root = document.documentElement;
+  root.setAttribute("data-theme-transitioning", "true");
   const resolved = applyThemePreference(value);
+  window.setTimeout(() => {
+    root.removeAttribute("data-theme-transitioning");
+  }, 220);
   window.dispatchEvent(new CustomEvent<ThemePreference>(THEME_CHANGE_EVENT, { detail: value }));
   return resolved;
 }

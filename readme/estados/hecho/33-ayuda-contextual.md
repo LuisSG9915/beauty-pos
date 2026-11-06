@@ -66,13 +66,13 @@ o `/admin/practica`, ni tocar el menú de navegación.
 
 ## Criterios de aceptación\*
 
-- [ ] `pnpm typecheck && pnpm lint && pnpm test` → 0 errores.
-- [ ] `pnpm test:usability` (ambos viewports, con `pnpm dev`) → 0 errores
+- [x] `pnpm typecheck && pnpm lint && pnpm test` → 0 errores.
+- [x] `pnpm test:usability` (ambos viewports, con `pnpm dev`) → 0 errores
       y 0 avisos nuevos; el botón mide ≥ 44 px.
-- [ ] En `/admin/pos` el botón lleva a `/admin/practica`; en
+- [x] En `/admin/pos` el botón lleva a `/admin/practica`; en
       `/admin/reportes` a `/admin/guia`; en una ruta no mapeada a
       `/admin/ayuda`; en `/admin/incidentes` no aparece.
-- [ ] El botón conserva `organizationId`/`sucursalId` en el href.
+- [x] El botón conserva `organizationId`/`sucursalId` en el href.
 
 ## Verificación
 
@@ -102,13 +102,13 @@ pnpm test:usability
 
 ```
 Misión: 33 — Ayuda a un toque desde cualquier pantalla del panel
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔ | usability 0 errores
-Antes → después: ayuda solo en el menú lateral → botón "?" contextual por ruta
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <ninguno | qué falta y quién lo cierra>
+Cambios: src/components/admin/ayuda-contextual.tsx → botón "Ayuda" por ruta (resolverAyudaRuta + AyudaContextualBoton, cliente); src/components/admin/page-header.tsx → el botón va junto al título; src/components/admin/ayuda-contextual.test.ts → mapa por ruta (4 casos).
+Verificación: typecheck ✔ | lint ✔ | test 602 ✔ (4 pruebas nuevas) | usability 0 errores en escritorio y móvil (los avisos que quedan son de /precios y /offline/venta, ya existentes) | navegador: botón de 81–84 × 44 px, href con organizationId y sucursalId, sin botón en /admin/incidentes
+Antes → después: ayuda solo en el menú lateral (en móvil, detrás de "Más") → botón "Ayuda" visible junto al título en las 39 páginas del panel
+Desviaciones: (1) el botón lleva el texto "Ayuda" además del icono, para que se entienda sin conocer el icono; su nombre accesible es "Ayuda de esta pantalla". (2) el mapa aplica por prefijo: /admin/clientes/[id] también va a la guía. (3) las 39 páginas del panel usan AdminPageHeader, así que ninguna quedó fuera. (4) se ejecutó en la misma sesión que otras mejoras fuera del plan.
+Riesgo abierto: ninguno en el panel. El contenido de guía, práctica y ayuda no cambió.
 ```
 
 ## Desviaciones (las escribe el implementador)
 
-Ninguna.
+Ver la línea «Desviaciones» del reporte de arriba: texto "Ayuda" visible junto al icono, mapa por prefijo de ruta y las 39 páginas del panel cubiertas.

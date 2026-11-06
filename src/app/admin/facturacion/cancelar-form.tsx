@@ -73,7 +73,7 @@ export function CancelarFacturaForm({
           </Field>
           {motivo === "01" ? (
             <Field>
-              <FieldLabel required>UUID que lo sustituye</FieldLabel>
+              <FieldLabel required>Folio fiscal que lo sustituye</FieldLabel>
               <Input name="uuidSustitucion" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX" required />
             </Field>
           ) : (

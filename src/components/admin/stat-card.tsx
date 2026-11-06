@@ -20,7 +20,7 @@ export function StatCard({ label, value, hint, icon: Icon, className }: StatCard
   return (
     <div
       className={cn(
-        "min-w-0 overflow-hidden rounded-2xl border border-border bg-card px-4 py-3.5 shadow-sm",
+        "surface-card min-w-0 overflow-hidden rounded-2xl border border-border bg-card px-4 py-3.5 transition-colors duration-150",
         className,
       )}
     >

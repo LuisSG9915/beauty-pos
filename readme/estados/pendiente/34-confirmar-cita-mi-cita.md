@@ -92,7 +92,7 @@ Recordatorios por WhatsApp o SMS, encuestas post-cita, cambios al correo
 
 ## Criterios de aceptación\*
 
-- [ ] `pnpm typecheck && pnpm lint && pnpm test` → 0 errores.
+- [x] `pnpm typecheck && pnpm lint && pnpm test` → 0 errores.
 - [ ] `/mi-cita/[token]` de una cita `pendiente` muestra "Confirmar mi
       cita"; tras confirmar, la agenda la muestra `confirmada` y queda
       correo de confirmación encolado.
@@ -130,13 +130,13 @@ pnpm dev   # recorrido manual: /mi-cita/<token> con cita pendiente
 
 ```
 Misión: 34 — La clienta confirma su cita desde el enlace del correo
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔
-Antes → después: solo cancelar/cambiar desde /mi-cita → confirmar en 1 toque
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <ninguno | qué falta y quién lo cierra>
+Cambios: src/modules/reservas/gestion.ts → confirmarReservaPublica (token, límite de intentos, teléfono, historial, auditoría y correo diferido); src/modules/reservas/rules.ts → resolverConfirmacion (+ confirmacion.test.ts); src/app/mi-cita/[token]/actions.ts → confirmarMiCita; src/app/mi-cita/[token]/gestion-panel.tsx → botón "Confirmar mi cita" para citas pendientes; src/app/admin/agenda/actions.ts y src/modules/reservas/service.ts → recordatorio con enlace encolado tras el commit; src/modules/notificaciones/service.ts → el recordatorio reprogramado conserva el enlace.
+Verificación: typecheck ✔ | lint ✔ | test 602 ✔ (4 pruebas nuevas de decisión) | navegador, con una cita de prueba que se borró al terminar: el botón aparece en una cita pendiente del panel y no en una reserva web en espera; al tocarlo la cita pasa a confirmada, la página muestra el mensaje y el historial registra "confirmada" | usability 0 errores
+Antes → después: solo cancelar o cambiar fecha → confirmar en 1 toque (con teléfono si el negocio lo pide)
+Desviaciones: (1) el recordatorio con enlace se encola después del commit, con el mismo patrón que los correos, para no sumar viajes a la base dentro de la transacción. (2) reagendar no encola otro recordatorio: el drenaje lo reprograma y ahora conserva el enlace, que antes se perdía. (3) el correo de confirmación no se duplica: si la cita ya tiene confirmación de creación para esa versión, no se encola otra. (4) una reserva web que espera aprobación del negocio no se confirma desde el enlace: esa decisión sigue siendo del negocio, y el botón no aparece.
+Riesgo abierto: verificado que confirmar desde el enlace encola el correo de confirmación (fila pendiente, con una cita de prueba que tiene correo). Falta el envío real (cron y Brevo) y comprobar que el recordatorio de una cita creada desde la agenda o desde la reserva web lleve el enlace. Estado: implementada, no cerrada.
 ```
 
 ## Desviaciones (las escribe el implementador)
 
-Ninguna.
+Ver la línea «Desviaciones» del reporte de arriba: envío del recordatorio tras el commit, reagendar sin encolar de más y correo de confirmación sin duplicar.

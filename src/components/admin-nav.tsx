@@ -491,10 +491,10 @@ function toPermissionSet(permissions: readonly string[] | null | undefined) {
 
 function navItemClasses(isActive: boolean) {
   return cn(
-    "relative flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm transition-colors",
+    "relative flex min-h-10 items-center gap-3 rounded-xl px-3 text-sm transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)]",
     isActive
       ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-full before:bg-sidebar-primary"
-      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
+      : "text-muted-foreground hover:bg-muted/70 hover:text-foreground active:scale-[0.99]",
   );
 }
 
@@ -616,7 +616,7 @@ function NavItemRow({
       </div>
 
       {tieneHijos && abierto ? (
-        <ul className="ml-4 border-l-2 border-border/60 pl-2 space-y-0.5">
+        <ul className="anim-entrada ml-4 border-l-2 border-border/60 pl-2 space-y-0.5">
           {item.children!.map((child) => {
             const isChildActive = isItemActive(pathname, child.path, child.matchPaths);
             return (
@@ -624,9 +624,9 @@ function NavItemRow({
                 <Link
                   aria-current={isChildActive ? "page" : undefined}
                   className={cn(
-                    "flex min-h-8 items-center gap-2 rounded-xl px-2.5 text-op-xs transition-colors",
+                    "flex min-h-8 items-center gap-2 rounded-xl px-2.5 text-op-xs transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)]",
                     isChildActive
-                      ? "bg-primary/10 font-semibold text-primary"
+                      ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
                       : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                   )}
                   href={buildAdminHref(toAdminPath(child.path), { organizationId, sucursalId })}
@@ -639,7 +639,7 @@ function NavItemRow({
                 >
                   <child.icon
                     aria-hidden="true"
-                    className={cn("size-3.5 shrink-0", isChildActive ? "text-primary" : "text-muted-foreground")}
+                    className={cn("size-3.5 shrink-0", isChildActive ? "text-sidebar-primary" : "text-muted-foreground")}
                     strokeWidth={isChildActive ? 2 : 1.8}
                   />
                   <span className="truncate">{child.label}</span>
@@ -706,17 +706,17 @@ function SidebarSection({
     <section aria-label={section.title}>
       <button
         aria-expanded={abierta}
-        className="flex min-h-8 w-full items-center justify-between rounded-lg px-3 text-op-xs font-medium text-muted-foreground transition-colors hover:text-primary"
+        className="flex min-h-8 w-full items-center justify-between rounded-lg px-3 text-op-xs font-medium text-muted-foreground transition-colors duration-150 hover:text-primary"
         onClick={() => setManual(!abierta)}
         type="button"
       >
         {section.title}
         <ChevronDown
           aria-hidden="true"
-          className={cn("size-3.5 transition-transform", abierta ? "rotate-0" : "-rotate-90")}
+          className={cn("size-3.5 transition-transform duration-200 ease-[cubic-bezier(0.22,1,0.36,1)]", abierta ? "rotate-0" : "-rotate-90")}
         />
       </button>
-      {abierta ? items : null}
+      {abierta ? <div className="anim-entrada">{items}</div> : null}
     </section>
   );
 }
@@ -815,8 +815,10 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
               <Link
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  "relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-op-xs font-medium transition-colors",
-                  isActive ? "text-primary" : "text-muted-foreground hover:text-primary",
+                  "relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-op-xs font-medium transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-95",
+                  isActive
+                    ? "font-semibold text-primary before:absolute before:top-0 before:h-0.5 before:w-7 before:rounded-full before:bg-primary"
+                    : "text-muted-foreground hover:text-primary",
                 )}
                 data-action-id="nav.tab"
                 href={buildAdminHref(toAdminPath(item.path), {
@@ -826,7 +828,7 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
                 key={item.path}
                 onClick={guardNavTap}
               >
-                <item.icon aria-hidden="true" className="size-5" strokeWidth={isActive ? 2.2 : 1.8} />
+                <item.icon aria-hidden="true" className="size-5 transition-transform duration-150" strokeWidth={isActive ? 2.2 : 1.8} />
                 {item.label}
                 <LinkPendingIndicator compact label={item.label} />
               </Link>

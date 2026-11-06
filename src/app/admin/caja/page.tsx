@@ -8,13 +8,15 @@ import { MovimientoCajaForm } from "@/app/admin/caja/movimiento-caja-form";
 import { PoliticaCajaToggle } from "@/app/admin/caja/politica-caja-toggle";
 import { AdminNavTabs, CAJA_VENTAS_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
+import { TarjetaGananciaNeta } from "@/components/admin/tarjeta-ganancia-neta";
 import { EmptyState } from "@/components/empty-state";
 import { getDatabase } from "@/db/client";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { formatCurrency, formatDate, formatTime, todayDateInput } from "@/lib/format";
+import { leerViewportPreference } from "@/lib/viewport-preference";
 import { dayBoundsUtc } from "@/modules/agenda";
-import { obtenerGananciaNetaPeriodo, type ResumenGananciaNeta } from "@/modules/reportes/queries";
+import { obtenerGananciaNetaPeriodo } from "@/modules/reportes/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -22,89 +24,13 @@ type SearchParams = Promise<AdminSearchParams>;
 
 const num = (v: string | number | null | undefined) => Number(v ?? 0);
 
-function TarjetaGananciaNeta({
-  ganancia,
-  currency,
-  titulo,
-  subtitulo,
-}: {
-  ganancia: ResumenGananciaNeta;
-  currency: string;
-  titulo: string;
-  subtitulo: string;
-}) {
-  const fmt = (centavos: number) => formatCurrency(centavos / 100, { currency });
-  const esPositivo = ganancia.utilidadNetaCentavos >= 0;
-
-  return (
-    <div className="rounded-2xl border border-border bg-card p-5 shadow-xs sm:p-6">
-      <div className="mb-4">
-        <h2 className="text-base font-semibold text-foreground">{titulo}</h2>
-        <p className="text-xs text-muted-foreground">{subtitulo}</p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {/* 1. Total Ingresado */}
-        <div className="rounded-xl border border-border/80 bg-muted/30 p-4">
-          <p className="text-op-xs font-medium text-muted-foreground">Total Ingresado</p>
-          <p className="mt-1 text-xl font-bold tracking-tight text-foreground tabular-nums">
-            {fmt(ganancia.totalIngresadoCentavos)}
-          </p>
-          <p className="mt-1.5 truncate text-[11px] text-muted-foreground">
-            Efectivo {fmt(ganancia.efectivoCentavos)} · Tarjeta {fmt(ganancia.tarjetaCentavos)} · SPEI {fmt(ganancia.transferenciaCentavos)}
-          </p>
-        </div>
-
-        {/* 2. Por Pagar a Equipo */}
-        <div className="rounded-xl border border-border/80 bg-muted/30 p-4">
-          <p className="text-op-xs font-medium text-muted-foreground">Por Pagar a Equipo</p>
-          <p className="mt-1 text-xl font-bold tracking-tight text-foreground tabular-nums">
-            {fmt(ganancia.comisionesEquipoCentavos)}
-          </p>
-          <p className="mt-1.5 text-[11px] text-muted-foreground">Comisiones devengadas</p>
-        </div>
-
-        {/* 3. Gastos Operativos */}
-        <div className="rounded-xl border border-border/80 bg-muted/30 p-4">
-          <p className="text-op-xs font-medium text-muted-foreground">Gastos Operativos</p>
-          <p className="mt-1 text-xl font-bold tracking-tight text-foreground tabular-nums">
-            {fmt(ganancia.gastosOperativosCentavos)}
-          </p>
-          <p className="mt-1.5 text-[11px] text-muted-foreground">Salidas de caja / gastos</p>
-        </div>
-
-        {/* 4. Utilidad Neta en Mano */}
-        <div
-          className={`rounded-xl border p-4 ${
-            esPositivo
-              ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-950 dark:bg-emerald-500/15 dark:text-emerald-100"
-              : "border-destructive/30 bg-destructive/10 text-destructive-foreground dark:bg-destructive/15"
-          }`}
-        >
-          <p className="text-op-xs font-medium text-muted-foreground">
-            Utilidad Neta en Mano
-          </p>
-          <p
-            className={`mt-1 text-2xl font-black tracking-tight tabular-nums ${
-              esPositivo ? "text-emerald-600 dark:text-emerald-400" : "text-destructive"
-            }`}
-          >
-            {fmt(ganancia.utilidadNetaCentavos)}
-          </p>
-          <p className="mt-1.5 text-[11px] font-medium text-muted-foreground">
-            {esPositivo ? "Disponible libre de compromisos" : "Déficit en el turno / día"}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default async function CajaPage({ searchParams }: { searchParams: SearchParams }) {
   const context = await getAdminContext(await searchParams);
   const { organization, branch, timeZone, currency } = context;
   if (!organization || !branch) notFound();
   requireAccessPermission(context.access, "caja.ver");
+  const puedeFinancieros = hasPermission(context.access, "reportes.financieros");
+  const detalleAbierto = (await leerViewportPreference()) !== "movil";
 
   const db = getDatabase();
 
@@ -258,12 +184,14 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
          where mc.corte_id = (select id from corte_abierto)
       ), '[]'::jsonb) as "movimientosTurno"
   `),
-    obtenerGananciaNetaPeriodo({
-      organizacionId: organization.id,
-      sucursalId: branch.id,
-      desde: desdeHoy,
-      hasta: hastaHoy,
-    }),
+    puedeFinancieros
+      ? obtenerGananciaNetaPeriodo({
+          organizacionId: organization.id,
+          sucursalId: branch.id,
+          desde: desdeHoy,
+          hasta: hastaHoy,
+        })
+      : Promise.resolve(null),
   ]);
 
   const data = result.rows[0];
@@ -277,7 +205,7 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
   const fmt = (v: string | number | null | undefined) => formatCurrency(num(v), { currency });
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <AdminPageHeader
         description={`${branch.nombre} · cierre ciego por turno`}
         tabs={
@@ -298,12 +226,18 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
         />
       ) : null}
 
-      <TarjetaGananciaNeta
-        currency={currency}
-        ganancia={gananciaHoy}
-        subtitulo="Ventas cobradas menos comisiones devengadas y gastos del día en esta sucursal."
-        titulo="Tu Ganancia Real de Hoy (Caja Neta)"
-      />
+      {gananciaHoy ? (
+        <div className="order-last lg:order-none">
+          <TarjetaGananciaNeta
+            currency={currency}
+            detalleAbierto={detalleAbierto}
+            ganancia={gananciaHoy}
+            subtitulo="Ventas cobradas menos comisiones del equipo y gastos del día en esta sucursal."
+            titulo="Tu Ganancia Real de Hoy (Caja Neta)"
+            variante="compacta"
+          />
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
         {corteAbierto ? (

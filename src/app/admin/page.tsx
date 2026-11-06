@@ -25,6 +25,7 @@ import { canAccessBranch, esRolOperativoMiDia, hasPermission, resolveAccessSafe 
 import { leerNombreSucursalOmitida } from "@/lib/sucursal-cookie";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { cargarAlertas, type AlertaOperativa } from "@/modules/alertas/queries";
+import { formatearMinutos, resumenActivacion } from "@/modules/billing/activacion";
 import { diasRestantesTrial, estadoEfectivoSuscripcion } from "@/modules/billing/rules";
 import { cargarEstadoYProgresoGuia } from "@/modules/onboarding/queries";
 import { evaluarPasos, pasosParaPermisos, resumenGuia } from "@/modules/onboarding/rules";
@@ -348,7 +349,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const hace30d = new Date(ahora.getTime() - 30 * 24 * 60 * 60_000);
   const [organizations, roles, branches, suscripcionRows, solicitudes, planesCatalogo, orgsConVenta, adquisicionRows, adquisicionPorOrigen] = await Promise.all([
     db
-      .select({ id: organizaciones.id, nombre: organizaciones.nombre, slug: organizaciones.slug, activo: organizaciones.activo })
+      .select({ id: organizaciones.id, nombre: organizaciones.nombre, slug: organizaciones.slug, activo: organizaciones.activo, createdAt: organizaciones.createdAt })
       .from(organizaciones)
       .orderBy(desc(organizaciones.createdAt)),
     db.select({ id: catRoles.id, organizacionId: catRoles.organizacionId, nombre: catRoles.nombre }).from(catRoles),
@@ -390,7 +391,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       .orderBy(planes.orden),
     // Activación: organizaciones que ya cobraron al menos una venta.
     db
-      .select({ organizacionId: ventas.organizacionId })
+      .select({
+        organizacionId: ventas.organizacionId,
+        primeraVentaAt: sql<Date>`min(coalesce(${ventas.cobradaAt}, ${ventas.createdAt}))`,
+      })
       .from(ventas)
       .where(and(eq(ventas.estado, "completada"), eq(ventas.activo, true)))
       .groupBy(ventas.organizacionId),
@@ -437,6 +441,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   // conversión (suscripción activa). Métricas derivadas de datos reales —
   // sin eventos sintéticos.
   const activadas = new Set(orgsConVenta.map((row) => row.organizacionId)).size;
+  const primeraVentaPorOrg = new Map(
+    orgsConVenta.map((row) => [row.organizacionId, row.primeraVentaAt ? new Date(row.primeraVentaAt) : null] as const),
+  );
+  const activacion = resumenActivacion(
+    organizations.map((org) => ({
+      creadaAt: org.createdAt,
+      activa: org.activo,
+      primeraVentaAt: primeraVentaPorOrg.get(org.id) ?? null,
+    })),
+  );
   let trialsVigentes = 0;
   let convertidas = 0;
   let vencidasOCanceladas = 0;
@@ -485,6 +499,38 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             />
           ))}
         </StatCardGrid>
+      </AdminSection>
+      <AdminSection
+        description="Minutos desde el registro hasta el primer cobro de cada negocio."
+        title="Tiempo a la primera venta"
+      >
+        {activacion.conPrimeraVenta === 0 ? (
+          <EmptyState
+            description="Cuando un negocio cobre su primera venta, verás aquí cuánto tardó."
+            title="Aún no hay ventas cobradas"
+          />
+        ) : (
+          <StatCardGrid className="sm:grid-cols-3">
+            <StatCard
+              className="shadow-none"
+              hint={`${activacion.conPrimeraVenta} negocio(s) con venta · ${activacion.sinPrimerCobro} activo(s) sin cobro`}
+              label="Primera venta típica"
+              value={formatearMinutos(activacion.medianaMinutos)}
+            />
+            <StatCard
+              className="shadow-none"
+              hint="el 90 % de los negocios con venta"
+              label="9 de cada 10 lo logran en"
+              value={formatearMinutos(activacion.p90Minutos)}
+            />
+            <StatCard
+              className="shadow-none"
+              hint="de los negocios con venta"
+              label="% en 10 min o menos"
+              value={activacion.pctHasta10Min === null ? "—" : `${activacion.pctHasta10Min}%`}
+            />
+          </StatCardGrid>
+        )}
       </AdminSection>
       <AdminSection
         description="Visitas al landing/precios → registro completado. Atribución por visitante anónimo (sin IPs ni datos personales)."

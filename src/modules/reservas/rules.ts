@@ -186,6 +186,20 @@ export function puedeGestionarCita(
   return { puede: true };
 }
 
+export function resolverConfirmacion(
+  cita: { estado: string; activo: boolean; origen: string },
+): { accion: "confirmar" } | { accion: "ya_confirmada" } | { accion: "rechazar"; motivo: string } {
+  if (!cita.activo) return { accion: "rechazar", motivo: "Esta cita ya no está disponible." };
+  if (cita.estado === "confirmada") return { accion: "ya_confirmada" };
+  if (cita.estado !== "pendiente") {
+    return { accion: "rechazar", motivo: "Esta cita ya no se puede confirmar en línea. Comunícate con el negocio." };
+  }
+  if (cita.origen === "web") {
+    return { accion: "rechazar", motivo: "Tu reserva todavía espera la aprobación del negocio. Te avisaremos por correo cuando la confirmen." };
+  }
+  return { accion: "confirmar" };
+}
+
 /** Evalúa un límite de ventana deslizante sobre timestamps ya cargados. */
 export function rateLimitExcedido(
   eventos: readonly Date[],

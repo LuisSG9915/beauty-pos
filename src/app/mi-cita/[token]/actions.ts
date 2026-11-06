@@ -2,6 +2,7 @@
 
 import {
   cancelarReservaPublica,
+  confirmarReservaPublica,
   obtenerReservaPorToken,
   reagendarReservaPublica,
   slotsGestionReserva,
@@ -31,6 +32,13 @@ export async function cancelarMiCita(
   telefono: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   return cancelarReservaPublica(token, telefono);
+}
+
+export async function confirmarMiCita(
+  token: string,
+  telefono: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  return confirmarReservaPublica(token, telefono);
 }
 
 export async function reagendarMiCita(

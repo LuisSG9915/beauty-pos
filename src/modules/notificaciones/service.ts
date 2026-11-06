@@ -333,6 +333,7 @@ export async function procesarNotificaciones(ahora = new Date()): Promise<Result
               fechaHoraSnapshot: decision.fechaHoraSnapshot,
               versionCita: decision.versionCita,
               programadoPara: decision.programadoPara,
+              detalle: aviso.detalle,
             })
             .onConflictDoNothing({
               target: [notificacionesEnvios.citaId, notificacionesEnvios.tipo, notificacionesEnvios.versionCita],

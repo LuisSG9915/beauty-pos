@@ -90,9 +90,9 @@ export function AdminNavTabs({
                 className={cn(
                   "rounded-full px-1.5 py-0.5 text-op-xs font-semibold tabular-nums",
                   tab.badgeTone === "success"
-                    ? "bg-success/15 text-success"
+                    ? "bg-success-soft text-success-soft-foreground"
                     : tab.badgeTone === "warning"
-                      ? "bg-warning/15 text-warning"
+                      ? "bg-warning-soft text-warning-soft-foreground"
                       : "bg-muted text-muted-foreground",
                 )}
               >
