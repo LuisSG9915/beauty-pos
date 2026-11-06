@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       for (const evento of eventos) {
         const modulo = moduloDeRuta(evento.ruta ?? null) ?? "general";
         const ok = writeProductTelemetry({
-          evento: evento.actionId ?? evento.tipo,
+          evento: evento.metrica ?? evento.actionId ?? evento.tipo,
           modulo,
           organizacionId: sesion.organizacionId,
           sucursalId: sesion.sucursalId ?? null,

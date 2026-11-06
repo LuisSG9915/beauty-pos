@@ -27,8 +27,8 @@ export default async function TelemetriaPage({
   const params = await searchParams;
   const dias = Number(firstParam(params.dias) ?? "7") || 7;
 
-  // Una sola consulta SQL cuando lee de CockroachDB (6 antes); con Analytics
-  // Engine configurado usa el motor externo con su degradación interna.
+  // Una sola consulta SQL sobre CockroachDB (6 antes); los Web Vitals se leen
+  // de Analytics Engine cuando está configurado.
   const { resumen, paginas, acciones, rebotes, vitals, formularios } =
     await cargarTableroTelemetria(dias);
 

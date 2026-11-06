@@ -14,9 +14,9 @@ import { queryAnalyticsEngine } from "@/lib/telemetry/analytics-engine";
  * `telemetria_producto_eventos`; ninguna expone datos personales porque el
  * colector nunca los captura.
  *
- * Si están configuradas CF_ACCOUNT_ID y CF_API_TOKEN_ANALYTICS, consulta
- * prioritariamente la SQL API de Cloudflare Workers Analytics Engine; de lo
- * contrario degrada con elegancia a las tablas de CockroachDB.
+ * Si están configuradas CF_ACCOUNT_ID y CF_API_TOKEN_ANALYTICS, los Web Vitals
+ * y tiempos de navegación se leen de Workers Analytics Engine, donde llegan las
+ * métricas de producción; sin ellas, o si la consulta falla, se usa CockroachDB.
  */
 
 function isAeConfigured(): boolean {
@@ -28,36 +28,6 @@ function isAeConfigured(): boolean {
 }
 
 export async function resumenSesiones(dias: number) {
-  if (isAeConfigured()) {
-    const rows = await queryAnalyticsEngine<{
-      sesiones: number | string;
-      paginasTotales: number | string;
-      usuariosUnicos: number | string;
-    }>(`
-      SELECT
-        toUInt32(count()) as sesiones,
-        toUInt32(sum(_sample_interval)) as paginasTotales,
-        toUInt32(count(distinct index1)) as usuariosUnicos
-      FROM melena_telemetry
-      WHERE timestamp >= NOW() - INTERVAL '${dias}' DAY
-    `);
-    if (rows && rows.length > 0 && Number(rows[0].sesiones) > 0) {
-      const r = rows[0];
-      const sesiones = Number(r.sesiones);
-      const paginasTotales = Number(r.paginasTotales);
-      const usuariosUnicos = Number(r.usuariosUnicos);
-      return {
-        sesiones,
-        engaged: sesiones,
-        paginasTotales,
-        promedioPaginas: sesiones > 0 ? Number((paginasTotales / sesiones).toFixed(1)) : 0,
-        promedioActivoSeg: 0,
-        usuariosUnicos,
-        tasaRebote: 0,
-      };
-    }
-  }
-
   const db = getDatabase();
   const corte = new Date(Date.now() - dias * 24 * 60 * 60_000);
   const [fila] = await db
@@ -79,31 +49,6 @@ export async function resumenSesiones(dias: number) {
 }
 
 export async function paginasMasVistas(dias: number, limite = 20) {
-  if (isAeConfigured()) {
-    const rows = await queryAnalyticsEngine<{
-      ruta: string;
-      vistas: number | string;
-      sesiones: number | string;
-    }>(`
-      SELECT
-        blob2 as ruta,
-        toUInt32(sum(_sample_interval)) as vistas,
-        toUInt32(count(distinct index1)) as sesiones
-      FROM melena_telemetry
-      WHERE blob1 = 'nav' AND timestamp >= NOW() - INTERVAL '${dias}' DAY
-      GROUP BY ruta
-      ORDER BY vistas DESC
-      LIMIT ${limite}
-    `);
-    if (rows && rows.length > 0) {
-      return rows.map((r) => ({
-        ruta: r.ruta,
-        vistas: Number(r.vistas),
-        sesiones: Number(r.sesiones),
-      }));
-    }
-  }
-
   const db = getDatabase();
   const corte = new Date(Date.now() - dias * 24 * 60 * 60_000);
   return db
@@ -125,31 +70,6 @@ export async function paginasMasVistas(dias: number, limite = 20) {
 }
 
 export async function accionesMasUsadas(dias: number, limite = 20) {
-  if (isAeConfigured()) {
-    const rows = await queryAnalyticsEngine<{
-      actionId: string;
-      total: number | string;
-      clave: number | string;
-    }>(`
-      SELECT
-        blob2 as actionId,
-        toUInt32(sum(_sample_interval)) as total,
-        toUInt32(sum(if(blob3 = 'clave' or double2 = 1, 1, 0))) as clave
-      FROM melena_telemetry
-      WHERE blob1 = 'prod' AND timestamp >= NOW() - INTERVAL '${dias}' DAY
-      GROUP BY actionId
-      ORDER BY total DESC
-      LIMIT ${limite}
-    `);
-    if (rows && rows.length > 0) {
-      return rows.map((r) => ({
-        actionId: r.actionId,
-        total: Number(r.total),
-        clave: Number(r.clave),
-      }));
-    }
-  }
-
   const db = getDatabase();
   const corte = new Date(Date.now() - dias * 24 * 60 * 60_000);
   return db
@@ -251,24 +171,68 @@ export type TableroTelemetria = {
 };
 
 /**
- * Tablero completo del panel de telemetría. Con Analytics Engine configurado
- * usa las 6 consultas del motor (con su degradación interna); sin él ejecuta
- * UNA sola consulta SQL con subselects `jsonb` sobre CockroachDB (antes eran
- * 6 consultas en `Promise.all` que saturaban el pool max:2 de Hyperdrive).
+ * Tablero completo del panel de telemetría. Una sola consulta SQL con subselects
+ * `jsonb` sobre CockroachDB (antes eran 6 consultas en `Promise.all` que saturaban
+ * el pool max:2 de Hyperdrive). Con Analytics Engine configurado, los Web Vitals
+ * se leen de AE porque ahí llegan las métricas de producción.
  */
 export async function cargarTableroTelemetria(dias: number): Promise<TableroTelemetria> {
-  if (isAeConfigured()) {
-    const [resumen, paginas, acciones, rebotes, vitals, formularios] = await Promise.all([
-      resumenSesiones(dias),
-      paginasMasVistas(dias),
-      accionesMasUsadas(dias),
-      rebotePorEntrada(dias),
-      webVitals(dias),
-      resultadosFormularios(dias),
-    ]);
-    return { resumen, paginas, acciones, rebotes, vitals, formularios };
-  }
+  const [tablero, vitalsAe] = await Promise.all([
+    cargarTableroDesdeBaseDeDatos(dias),
+    isAeConfigured() ? webVitalsAe(dias) : Promise.resolve(null),
+  ]);
+  return vitalsAe ? { ...tablero, vitals: vitalsAe } : tablero;
+}
 
+const METRICAS_RENDIMIENTO = [
+  "ttfb",
+  "fcp",
+  "lcp",
+  "cls",
+  "inp",
+  "nav_feedback_ms",
+  "nav_complete_ms",
+  "nav_timeout_ms",
+] as const;
+
+/**
+ * Web Vitals y tiempos de navegación desde Analytics Engine. Devuelve `null` si
+ * AE no tiene datos de esas métricas o la consulta falla, para caer a CockroachDB.
+ * Solo cuentan los puntos escritos con el nombre de la métrica en `blob2`; los
+ * anteriores quedaron como "performance" sin distinguir métrica.
+ */
+async function webVitalsAe(dias: number): Promise<VitalMetrica[] | null> {
+  const ventana = Math.min(Math.max(Math.trunc(dias), 1), 90);
+  const listaMetricas = METRICAS_RENDIMIENTO.map((m) => `'${m}'`).join(", ");
+  const rows = await queryAnalyticsEngine<{
+    metrica: string;
+    muestras: number | string;
+    p50: number | string;
+    p75: number | string;
+    p95: number | string;
+  }>(`
+    SELECT
+      blob2 as metrica,
+      toUInt32(sum(_sample_interval)) as muestras,
+      quantileExactWeighted(0.5)(double1, _sample_interval) as p50,
+      quantileExactWeighted(0.75)(double1, _sample_interval) as p75,
+      quantileExactWeighted(0.95)(double1, _sample_interval) as p95
+    FROM melena_telemetry
+    WHERE blob1 = 'prod' AND blob2 IN (${listaMetricas})
+      AND timestamp >= NOW() - INTERVAL '${ventana}' DAY
+    GROUP BY metrica
+  `);
+  if (!rows || rows.length === 0) return null;
+  return rows.map((r) => ({
+    metrica: r.metrica,
+    muestras: Number(r.muestras),
+    p50: Number(r.p50),
+    p75: Number(r.p75),
+    p95: Number(r.p95),
+  }));
+}
+
+async function cargarTableroDesdeBaseDeDatos(dias: number): Promise<TableroTelemetria> {
   const db = getDatabase();
   const corte = new Date(Date.now() - dias * 24 * 60 * 60_000);
   const { rows } = await db.execute<{
