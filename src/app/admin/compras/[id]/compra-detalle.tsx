@@ -492,11 +492,11 @@ export function CompraDetalle({
     <div className="space-y-3">
       {activoAsistido ? (
         <div
-          className="rounded-xl border border-warning/40 bg-warning/10 p-3.5 text-sm text-foreground"
+          className="rounded-xl border border-warning/40 bg-warning-soft p-3.5 text-sm text-warning-soft-foreground"
           role="status"
         >
           <div className="flex items-start gap-2">
-            <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning" />
+            <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-warning-soft-foreground" />
             <p className="font-medium leading-snug">
               Nota manuscrita o parcial detectada: completa o corrige los renglones abajo mirando tu foto
             </p>
@@ -605,14 +605,14 @@ export function CompraDetalle({
             ) : null}
           </div>
           {compra.analisisError ? (
-            <p className="mt-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-foreground" role="alert">
+            <p className="mt-3 rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 text-sm font-medium text-warning-soft-foreground" role="alert">
               {compra.analisisError} Puedes reintentar o capturar las líneas a mano.
             </p>
           ) : null}
           {compra.dudas.length > 0 ? (
-            <div className="mt-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
-              <p className="font-medium text-foreground">Revisa estos puntos del ticket:</p>
-              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-muted-foreground">
+            <div className="mt-3 rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 text-sm text-warning-soft-foreground">
+              <p className="font-medium">Revisa estos puntos del ticket:</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 opacity-90">
                 {compra.dudas.map((duda) => (
                   <li key={duda}>{duda}</li>
                 ))}
@@ -743,11 +743,11 @@ export function CompraDetalle({
         >
           {activoAsistido ? (
             <div
-              className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-foreground"
+              className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 text-sm text-warning-soft-foreground"
               role="status"
             >
               <div className="flex items-center gap-2">
-                <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-warning" />
+                <CircleAlert aria-hidden="true" className="size-4 shrink-0 text-warning-soft-foreground" />
                 <span className="font-medium">
                   Nota manuscrita o parcial detectada: completa o corrige los renglones abajo mirando tu foto
                 </span>

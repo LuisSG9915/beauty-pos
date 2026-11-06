@@ -105,8 +105,8 @@ export function ClientForm({
               className={cn(
                 "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-op-xs font-semibold",
                 initial?.id
-                  ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-                  : "bg-primary/10 text-primary",
+                  ? "bg-success-soft text-success-soft-foreground"
+                  : "bg-accent text-accent-foreground",
               )}
             >
               <UserCheck className="size-3" />
@@ -124,7 +124,7 @@ export function ClientForm({
               </a>
               <span className="text-muted-foreground/30">·</span>
               <a
-                className="inline-flex items-center gap-1 text-op-xs font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+                className="inline-flex items-center gap-1 text-op-xs font-medium text-success hover:underline"
                 href={`https://wa.me/52${initial.telefono.replace(/\D/g, "")}`}
                 rel="noopener noreferrer"
                 target="_blank"
@@ -313,7 +313,7 @@ export function ClientForm({
       </details>
 
       {state.warning ? (
-        <label className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
+        <label className="anim-entrada flex items-start gap-3 rounded-xl border border-warning/30 bg-warning-soft p-4 text-sm font-medium text-warning-soft-foreground">
           <input className="mt-1" name="confirmarDuplicado" type="checkbox" value="true" />
           <span>{state.warning} Deseo guardar el cliente de todas formas.</span>
         </label>

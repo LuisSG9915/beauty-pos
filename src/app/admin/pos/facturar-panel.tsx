@@ -34,10 +34,10 @@ type ClienteFiscal = {
 } | null;
 
 const ESTADO_BADGE: Record<string, { label: string; className: string }> = {
-  borrador: { label: "Borrador", className: "bg-muted/60 text-warning" },
-  timbrada: { label: "Emitida", className: "bg-success/10 text-success" },
-  cancelada: { label: "Cancelada", className: "bg-muted/60 text-muted-foreground" },
-  error: { label: "Error", className: "bg-destructive/10 text-destructive" },
+  borrador: { label: "Borrador", className: "bg-warning-soft text-warning-soft-foreground" },
+  timbrada: { label: "Emitida", className: "bg-success-soft text-success-soft-foreground" },
+  cancelada: { label: "Cancelada", className: "bg-muted text-muted-foreground" },
+  error: { label: "Error", className: "bg-destructive-soft text-destructive-soft-foreground" },
 };
 
 /** Panel de comprobante del ticket: genera el comprobante interno de la venta cobrada o muestra su estado. */
@@ -91,9 +91,9 @@ export function FacturarPanel({
               <span className="max-w-56 truncate font-mono text-op-xs" title={comprobante.uuid}>{comprobante.uuid}</span>
             </div>
           ) : null}
-          {comprobante.error ? <p className="rounded-lg bg-destructive/10 px-3 py-2 text-op-xs text-destructive">{comprobante.error}</p> : null}
+          {comprobante.error ? <p className="rounded-lg bg-destructive-soft px-3 py-2 text-op-xs font-medium text-destructive-soft-foreground">{comprobante.error}</p> : null}
           {comprobante.estado === "timbrada" ? (
-            <p className="rounded-lg bg-warning/10 px-3 py-2 text-op-xs text-warning">
+            <p className="rounded-lg bg-warning-soft px-3 py-2 text-op-xs font-medium text-warning-soft-foreground">
               Folio simulado (sin PAC contratado) — documento interno, no tiene validez fiscal ante el SAT.
             </p>
           ) : null}

@@ -141,7 +141,7 @@ export function PoseTimerBar() {
 
           return (
             <div
-              className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 shadow-xl backdrop-blur-md transition-all ${
+              className={`surface-elevated anim-entrada flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3 backdrop-blur-md transition-all ${
                 esCritico
                   ? "border-warning/60 bg-warning-soft text-warning-soft-foreground animate-pulse"
                   : "border-primary/30 bg-card/95 text-card-foreground"
@@ -151,7 +151,7 @@ export function PoseTimerBar() {
               <div className="flex items-center gap-3 min-w-0">
                 <div
                   className={`flex size-10 shrink-0 items-center justify-center rounded-xl font-bold ${
-                    esCritico ? "bg-warning text-warning-foreground" : "bg-primary/10 text-primary"
+                    esCritico ? "bg-warning text-warning-foreground" : "bg-accent text-accent-foreground"
                   }`}
                 >
                   <Clock aria-hidden="true" className="size-5" />

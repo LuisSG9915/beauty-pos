@@ -73,8 +73,8 @@ export function RestablecerForm({ token }: { token: string }) {
       </Field>
 
       {errorMessage ? (
-        <div className="space-y-3">
-          <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+        <div className="anim-entrada space-y-3">
+          <p className="rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm font-medium text-destructive-soft-foreground" role="alert">
             {errorMessage}
           </p>
           {errorMessage.includes("enlace") ? (

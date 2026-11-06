@@ -98,7 +98,7 @@ export function TicketActionsBar({
         </Button>
 
         <Button
-          className="rounded-xl shadow-xs font-semibold border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
+          className="rounded-xl shadow-xs font-semibold border-success/30 bg-success-soft text-success-soft-foreground hover:bg-success-soft/80"
           data-action-id="pos.ticket.whatsapp"
           nativeButton={false}
           render={
@@ -111,7 +111,7 @@ export function TicketActionsBar({
           size="sm"
           variant="outline"
         >
-          <MessageCircle aria-hidden="true" className="size-4 mr-1.5 text-emerald-600 dark:text-emerald-400" />
+          <MessageCircle aria-hidden="true" className="size-4 mr-1.5 text-success-soft-foreground" />
           Enviar por WhatsApp
         </Button>
       </div>

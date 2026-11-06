@@ -52,7 +52,7 @@ export default async function LoginPage({
             <h1 className="mt-3 text-4xl font-semibold tracking-[-0.04em]">Ingresa a tu operación</h1>
             <p className="mt-4 text-sm leading-6 text-muted-foreground">Usa las credenciales de tu invitación administrativa para continuar.</p>
             {aviso ? (
-              <p className="mt-5 rounded-xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success" role="status">
+              <p className="anim-entrada mt-5 rounded-xl border border-success/30 bg-success-soft px-4 py-3 text-sm font-medium text-success-soft-foreground" role="status">
                 {aviso}
               </p>
             ) : null}

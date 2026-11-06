@@ -47,12 +47,12 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
   return (
     <div>
       <div className="mb-8 flex flex-col items-center justify-center gap-4 sm:flex-row sm:gap-8">
-        <div className="inline-flex rounded-full border border-border bg-card p-1">
+        <div className="surface-card inline-flex rounded-full border border-border bg-card p-1">
           {(["mensual", "anual"] as const).map((modo) => (
             <button
-              className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${
+              className={`rounded-full px-5 py-2 text-sm font-medium transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-95 ${
                 (modo === "anual") === anual
-                  ? "bg-foreground text-background"
+                  ? "bg-foreground text-background shadow-xs"
                   : "text-muted-foreground hover:text-foreground"
               }`}
               key={modo}
@@ -63,21 +63,21 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
             </button>
           ))}
         </div>
-        <div className="inline-flex items-center gap-3 rounded-full border border-border bg-card px-4 py-1.5">
+        <div className="surface-card inline-flex items-center gap-3 rounded-full border border-border bg-card px-4 py-1.5">
           <span className="text-sm text-muted-foreground">Sucursales:</span>
           <button
             aria-label="Quitar sucursal"
-            className="flex size-7 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-muted disabled:opacity-40"
+            className="flex size-7 items-center justify-center rounded-full border border-border text-foreground transition-all duration-150 hover:bg-muted active:scale-95 disabled:opacity-40"
             disabled={sucursales <= 1}
             onClick={() => setSucursales((n) => Math.max(1, n - 1))}
             type="button"
           >
             <Minus className="size-3.5" />
           </button>
-          <span className="w-6 text-center text-sm font-semibold">{sucursales}</span>
+          <span className="w-6 text-center text-sm font-semibold tabular-nums">{sucursales}</span>
           <button
             aria-label="Agregar sucursal"
-            className="flex size-7 items-center justify-center rounded-full border border-border text-foreground transition-colors hover:bg-muted disabled:opacity-40"
+            className="flex size-7 items-center justify-center rounded-full border border-border text-foreground transition-all duration-150 hover:bg-muted active:scale-95 disabled:opacity-40"
             disabled={sucursales >= MAX_SELECTOR}
             onClick={() => setSucursales((n) => Math.min(MAX_SELECTOR, n + 1))}
             type="button"
@@ -88,7 +88,7 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {planes.map((plan) => {
+        {planes.map((plan, index) => {
           const mensual = Number(plan.precioMensual);
           const anualMonto = plan.precioAnual ? Number(plan.precioAnual) : null;
           const extraMensual = plan.precioSucursalExtra ? Number(plan.precioSucursalExtra) : 0;
@@ -110,12 +110,13 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
 
           return (
             <article
-              className={`flex flex-col rounded-2xl border bg-card p-7 ${
+              className={`anim-entrada flex flex-col rounded-2xl border bg-card p-7 ${
                 plan.destacado
-                  ? "border-primary shadow-xl"
-                  : "border-border"
+                  ? "surface-elevated border-primary"
+                  : "surface-card border-border"
               }`}
               key={plan.clave}
+              style={{ animationDelay: `${index * 60}ms` }}
             >
               {plan.destacado ? (
                 <span className="mb-4 w-fit rounded-full bg-accent px-3 py-1 text-op-xs font-semibold text-accent-foreground">

@@ -67,10 +67,10 @@ export function OfflineSyncBadge() {
   if (!enLinea && pendientes.length === 0) {
     return (
       <div
-        className="fixed bottom-4 right-4 z-50 flex max-w-sm items-center gap-3 rounded-2xl border border-destructive/40 bg-card/95 p-3.5 shadow-xl backdrop-blur-sm"
+        className="surface-elevated anim-entrada fixed bottom-4 right-4 z-50 flex max-w-sm items-center gap-3 rounded-2xl border border-destructive/40 bg-card/95 p-3.5 backdrop-blur-sm"
         role="status"
       >
-        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-destructive-soft text-destructive-soft-foreground">
           <WifiOff className="size-5" />
         </div>
         <div className="min-w-0 flex-1">
@@ -93,7 +93,7 @@ export function OfflineSyncBadge() {
   // Hay ventas pendientes por sincronizar (con o sin internet)
   return (
     <div
-      className="fixed bottom-4 right-4 z-50 w-84 rounded-2xl border border-warning/40 bg-card/95 p-4 shadow-xl backdrop-blur-sm"
+      className="surface-elevated anim-entrada fixed bottom-4 right-4 z-50 w-84 rounded-2xl border border-warning/40 bg-card/95 p-4 backdrop-blur-sm"
       role="status"
     >
       <div className="flex items-center justify-between gap-2 mb-2">
@@ -111,7 +111,9 @@ export function OfflineSyncBadge() {
         </div>
         <span
           className={`rounded-full px-2 py-0.5 text-op-xs font-semibold ${
-            enLinea ? "bg-success-soft text-success" : "bg-warning-soft text-warning"
+            enLinea
+              ? "bg-success-soft text-success-soft-foreground"
+              : "bg-warning-soft text-warning-soft-foreground"
           }`}
         >
           {enLinea ? "En línea" : "Offline"}

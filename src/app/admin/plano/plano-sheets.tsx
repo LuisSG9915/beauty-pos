@@ -395,7 +395,7 @@ export function MobiliarioSheet({
                       Sesión en curso
                     </span>
                     {mueble.sesionActiva.poseMinutos ? (
-                      <span className="flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-op-xs font-semibold text-amber-700 dark:text-amber-300">
+                      <span className="flex items-center gap-1.5 rounded-full bg-warning-soft px-2.5 py-0.5 text-op-xs font-semibold text-warning-soft-foreground">
                         <Timer aria-hidden="true" className="size-3.5" />
                         Pose {mueble.sesionActiva.poseMinutos}m
                       </span>
@@ -461,7 +461,7 @@ export function MobiliarioSheet({
 
                     {mueble.sesionActiva.poseMinutos ? (
                       <Button
-                        className="h-8 gap-1.5 rounded-xl border-amber-500/30 bg-amber-500/10 text-op-xs font-semibold text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
+                        className="h-8 gap-1.5 rounded-xl border-warning/30 bg-warning-soft text-op-xs font-semibold text-warning-soft-foreground hover:bg-warning-soft/80"
                         onClick={() => {
                           const nuevo = crearPoseTimer({
                             citaId: mueble.sesionActiva?.citaId ?? mueble.id,
@@ -479,7 +479,7 @@ export function MobiliarioSheet({
                         type="button"
                         variant="outline"
                       >
-                        <Timer aria-hidden="true" className="size-3.5 text-amber-600 dark:text-amber-400" />
+                        <Timer aria-hidden="true" className="size-3.5 text-warning-soft-foreground" />
                         Cronómetro
                       </Button>
                     ) : null}

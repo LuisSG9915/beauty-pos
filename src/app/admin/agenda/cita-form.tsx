@@ -621,7 +621,7 @@ export function CitaForm({
                       <span
                         className={cn(
                           "size-2 rounded-full shrink-0",
-                          est.disponible ? "bg-emerald-500" : "bg-amber-500/80"
+                          est.disponible ? "bg-success" : "bg-warning"
                         )}
                         aria-hidden="true"
                       />

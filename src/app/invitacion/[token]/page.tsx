@@ -27,14 +27,14 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
       <div className="absolute right-6 top-6">
         <ThemeModeSelector iconOnly />
       </div>
-      <section className="w-full max-w-md rounded-2xl border border-border bg-card p-8 shadow-2xl">
+      <section className="surface-elevated anim-entrada w-full max-w-md rounded-2xl border border-border bg-card p-8">
         <BrandMark size={40} />
         <p className="mt-8 text-sm font-semibold uppercase tracking-[0.2em] text-primary">{BRAND.name}</p>
         <h1 className="mt-3 font-serif text-3xl font-semibold tracking-[-0.03em]">Acepta tu invitación</h1>
         {valid ? (
           <AcceptInvitationForm token={token} email={invitation.correo} name={invitation.nombre} />
         ) : (
-          <p className="mt-5 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm leading-6 text-destructive">Esta invitación no existe, expiró o ya fue utilizada.</p>
+          <p className="mt-5 rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm font-medium leading-6 text-destructive-soft-foreground">Esta invitación no existe, expiró o ya fue utilizada.</p>
         )}
       </section>
     </main>

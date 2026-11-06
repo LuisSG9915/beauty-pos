@@ -74,8 +74,8 @@ function CheckoutContent({
   }
   if (status === "error" || !ticket) {
     return (
-      <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-6 text-center">
-        <p className="text-sm text-destructive">{error ?? "No se pudo cargar el ticket."}</p>
+      <div className="anim-entrada rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-6 text-center">
+        <p className="text-sm font-medium text-destructive-soft-foreground">{error ?? "No se pudo cargar el ticket."}</p>
         <Button className="mt-3 rounded-xl" onClick={refetch} type="button" variant="outline">
           Reintentar
         </Button>

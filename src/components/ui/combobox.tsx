@@ -153,7 +153,7 @@ export function Combobox({
             className="z-50 outline-none"
             sideOffset={6}
           >
-            <ComboboxPrimitive.Popup className="w-[var(--anchor-width)] max-w-[var(--available-width)] origin-[var(--transform-origin)] rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-lg transition-[scale,opacity] duration-100 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
+            <ComboboxPrimitive.Popup className="surface-elevated w-[var(--anchor-width)] max-w-[var(--available-width)] origin-[var(--transform-origin)] rounded-xl border border-border bg-popover p-1 text-popover-foreground transition-[scale,opacity] duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0">
               <ComboboxPrimitive.Empty>
                 <div className="px-3 py-4 text-sm text-muted-foreground">
                   {emptyMessage}

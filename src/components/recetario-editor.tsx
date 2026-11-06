@@ -417,13 +417,13 @@ export function RecetarioEditor({
           value={tiempoPose}
         />
         {Number(tiempoPose) > 0 ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-2.5 text-op-xs text-amber-800 dark:text-amber-200">
+          <div className="anim-entrada flex flex-wrap items-center justify-between gap-2 rounded-xl border border-warning/30 bg-warning-soft p-2.5 text-op-xs text-warning-soft-foreground">
             <span className="flex items-center gap-1.5 font-medium">
-              <Timer aria-hidden="true" className="size-3.5 text-amber-600 dark:text-amber-400" />
+              <Timer aria-hidden="true" className="size-3.5 text-warning-soft-foreground" />
               Tiempo de pose: <strong>{tiempoPose} min</strong>
             </span>
             <Button
-              className="h-8 gap-1.5 rounded-lg border-amber-500/40 bg-card text-op-xs font-semibold text-foreground hover:bg-amber-500/20"
+              className="h-8 gap-1.5 rounded-lg border-warning/40 bg-card text-op-xs font-semibold text-foreground hover:bg-muted"
               onClick={() => {
                 const min = Number(tiempoPose);
                 if (!min || min <= 0) return;

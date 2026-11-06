@@ -32,8 +32,8 @@ export default async function RestablecerPage({
               <RestablecerForm token={token} />
             </>
           ) : (
-            <div className="mt-8 space-y-5">
-              <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+            <div className="anim-entrada mt-8 space-y-5">
+              <p className="rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm font-medium text-destructive-soft-foreground" role="alert">
                 Este enlace no es válido o ya se usó. Pide uno nuevo para crear tu contraseña.
               </p>
               <Link

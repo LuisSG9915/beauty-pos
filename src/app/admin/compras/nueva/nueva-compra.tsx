@@ -170,7 +170,7 @@ export function NuevaCompra({
 
       {error ? (
         <p
-          className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+          className="anim-entrada rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm font-medium text-destructive-soft-foreground"
           role="alert"
         >
           {error}

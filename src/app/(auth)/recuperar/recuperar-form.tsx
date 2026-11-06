@@ -35,8 +35,8 @@ export function RecuperarForm() {
 
   if (enviado) {
     return (
-      <div className="mt-8 space-y-5">
-        <p className="rounded-xl border border-success/30 bg-success-soft px-4 py-3 text-sm text-success" role="status">
+      <div className="anim-entrada mt-8 space-y-5">
+        <p className="rounded-xl border border-success/30 bg-success-soft px-4 py-3 text-sm font-medium text-success-soft-foreground" role="status">
           Listo — te enviamos un correo con el enlace para crear tu contraseña nueva. Si no lo ves en unos
           minutos, revisa tu carpeta de spam.
         </p>
@@ -67,7 +67,7 @@ export function RecuperarForm() {
       </Field>
 
       {errorMessage ? (
-        <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
+        <p className="anim-entrada rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm font-medium text-destructive-soft-foreground" role="alert">
           {errorMessage}
         </p>
       ) : null}

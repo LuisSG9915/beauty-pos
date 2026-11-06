@@ -21,7 +21,7 @@ export function AcceptInvitationForm({ token, email, name }: { token: string; em
         <FieldLabel required>Contraseña</FieldLabel>
         <Input minLength={12} name="password" required type="password" />
       </Field>
-      {state.error ? <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">{state.error}</p> : null}
+      {state.error ? <p className="anim-entrada rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm font-medium text-destructive-soft-foreground" role="alert">{state.error}</p> : null}
       <Button className="h-11 w-full rounded-xl" disabled={isPending} type="submit">
         {isPending ? "Creando acceso…" : "Aceptar invitación"}
       </Button>

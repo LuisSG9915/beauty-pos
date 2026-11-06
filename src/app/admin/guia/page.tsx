@@ -195,7 +195,7 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
                     aria-hidden="true"
                     className={`mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-full ${
                       paso.hecho
-                        ? "bg-success/10 text-success"
+                        ? "bg-success-soft text-success-soft-foreground"
                         : esSiguiente
                         ? "bg-primary text-primary-foreground font-semibold shadow-xs"
                         : "bg-muted/70 text-muted-foreground"
