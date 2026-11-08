@@ -302,6 +302,34 @@ técnicas (multisucursal, CFDI, tiempo real) para cuando haya demanda.
 | App nativa (solo si impresora Bluetooth/NFC) | (por definir) | Después de 100 salones activos |
 | Tiempo real multi-recepción (Durable Objects) | (por definir) | Quejas de citas duplicadas |
 
+### POS — cobro y ticket (auditoría 2026-11, misiones 72–79)
+
+Auditoría del flujo de cobro completo (`readme/analisis/norrhud-pos.md`,
+`responsivo-pos.md` y el plan de trabajo aprobado): botón "Cobrar" con
+contraste ~1:1, "Nueva venta" → 404, imagen del ticket que nunca se genera,
+columnas invertidas en escritorio, `/cobrado` y `/sencillo` sin guarda de
+permiso, folio con fragmentos de UUID. Dirección: bugambilia + orden norhud;
+WhatsApp con imagen y texto generados en el aparato (sin servidor).
+
+| # | Resultado | Misión | Estado |
+|---|---|---|---|
+| 72 | El arnés recorre ticket, ventana de cobro y confirmación | `pendiente/72` | Pendiente |
+| 73 | "Cobrar" visible y fijo en móvil; columnas correctas | `pendiente/73` | Pendiente |
+| 75 | Pantalla "Venta cobrada" con cambio real y acciones que funcionan | `pendiente/75` | Pendiente |
+| 74 | Imagen del ticket real + compartir por aparato + WhatsApp | `pendiente/74` | Pendiente |
+| 76 | Ventana de cobro en orden norhud con pie fijo | `pendiente/76` | Pendiente |
+| 77a | Folio consecutivo por sucursal (esquema + migración) | `pendiente/77a` | Pendiente — migrate requiere autorización |
+| 77b | Folio visible en ticket, comprobante, confirmación y listados | `pendiente/77b` | Pendiente |
+| 78 | Cobrar desde la agenda termina con la misma confirmación | `pendiente/78` | Pendiente |
+| 79 | Inicio de Cobrar sin acciones repetidas; sencillo sin jerga | `pendiente/79` | Pendiente |
+
+Orden de ejecución: 72 → 73 → 75 → 74 → 76 → 77a → 77b → 78 → 79. Las
+misiones 58 (imagen), 59 (acciones al cobrar) y 61 (layout norhud) se
+retiraron: las reemplazan la 74, la decisión de la 64 y la 76
+respectivamente. La 62 quedó en `hecho/` con desviaciones documentadas.
+Opcionales con aprobación: 80 (imagen en servidor con Browser Run + R2, solo
+si falla en iPhone) y 81 (enlace público del ticket / API de WhatsApp).
+
 ---
 
 ## 9. Índice real de documentos
@@ -316,9 +344,9 @@ readme/
     d1-vs-cockroach.md       ← por qué no migrar la base
     expo-vs-pwa.md           ← por qué no hay app nativa todavía
   estados/
-    pendiente/               ← (vacío) definir siguientes misiones
+    pendiente/               ← 72–79 (cobro POS y ticket)
     en-progreso/             ← (vacío) sin misión en curso
-    hecho/                   ← 01–37 terminadas y verificadas
+    hecho/                   ← 01–71 terminadas y verificadas
 ```
 
 **Flujo de estados:** una misión entra por `pendiente/`; al asignarla se mueve a
@@ -349,15 +377,13 @@ microservicios). El razonamiento está en `readme/analisis/`.
 
 ## 11. Próximos cinco pasos
 
-1. **Sincronizar y verificar**: mover 31 y 34 a `hecho/` (hecho), correr
-   `pnpm test:usability` y `pnpm test:perf` con `pnpm dev` y la cuenta E2E
-   para cerrar la verificación manual pendiente de 31 y 34.
-2. **Ejecutar 35** (ausencias y efecto de recordatorios) en una sesión
-   nueva, con `/clear` antes y después.
-3. **Ejecutar 36** (onboarding con datos de ejemplo) para bajar el tiempo
-   al primer cobro por debajo de 10 min.
-4. **Ejecutar 37** (landing y precios que convierten) antes de la primera
-   campaña o referido.
-5. **Medir con 5 salones reales** la activación (tiempo al primer cobro) y
-   la tasa de ausencias; con datos, decidir si se necesita WhatsApp o más
-   onboarding.
+1. **Ejecutar la 72** (arnés de usabilidad del cobro) en una sesión nueva,
+   con `/clear` antes y después: deja la línea base que miden las demás.
+2. **Ejecutar la 73** (botón "Cobrar" visible y fijo) — el defecto más
+   visible del flujo.
+3. **Ejecutar la 75** (pantalla "Venta cobrada") — arregla el 404 de "Nueva
+   venta", el "sin cambio" falso y las guardas de servidor.
+4. **Ejecutar la 74** (imagen del ticket + WhatsApp por aparato) — el PNG hoy
+   nunca se genera; es la pieza que el usuario pidió para WhatsApp.
+5. **Ejecutar la 76** (ventana de cobro norhud) y después 77a/77b (folio),
+   78 (agenda) y 79 (inicio/sencillo), en ese orden.

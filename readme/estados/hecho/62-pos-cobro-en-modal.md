@@ -62,9 +62,28 @@ pnpm typecheck && pnpm lint && pnpm test
 
 ```
 Misión: 62 — cobro en modal norhud
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔ | usability 0 errores
-Antes → después: <cobro inline en columna → modal centrado al pulsar Cobrar>
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <ninguno | qué falta>
+Cambios: venta-ticket.tsx → botón "Cobrar" abre <Dialog>; cobro-form.tsx → props enDialog/onClose, Esc cierra, CTA final sin sticky
+Verificación: typecheck ✔ | lint ✔ | test ✔ | usability 0 errores (en su momento)
+Antes → después: cobro inline en la columna derecha → modal centrado al pulsar Cobrar
+Desviaciones: ver abajo
+Riesgo abierto: ninguno estructural; pulido visual quedó para 69/76
 ```
+
+## Desviaciones (las escribe el implementador)
+
+- **Enter no quedó como atajo explícito**: no hay `keydown` para Enter; el
+  submit depende del foco nativo del formulario. Se evaluó en la auditoría
+  posterior y se reencuadra en la misión 76.
+- **Esc cierra aunque el cobro esté en curso** (`pending`): el handler no lo
+  verifica. Se corrige en la 76 (no cerrar mientras `pending`).
+- **"(Esc)" se muestra siempre**, también en pantallas táctiles. Se corrige en
+  la 76.
+- **El disparador conservó clases problemáticas** (`sticky bottom-0`,
+  `bg-card/95` que pisa `bg-primary` → contraste ~1:1). Se corrige en la 73.
+- **Dependencias no ejecutadas**: 58 (imagen) y 59 (acciones preliminares) no
+  se hicieron; la 64 decidió que imprimir/WhatsApp/imagen viven solo
+  post-cobro. La 58 se reemplazó por la 74 y la 59 se descartó.
+- **Duplicación de encabezado**: `DialogTitle`/`DialogDescription` repiten
+  "Cobrar" y el total que `CobroForm` ya muestra. Se simplifica en la 76.
+- **Responsive**: `DialogContent` quedó `p-0 sm:p-6` sin safe-area; la 69 y la
+  76 lo ajustan.
