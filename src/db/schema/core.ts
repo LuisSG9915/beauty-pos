@@ -183,3 +183,32 @@ export const relUsuariosSucursales = pgTable(
     index("rel_usuarios_sucursales_sucursal_idx").on(table.sucursalId),
   ],
 );
+
+/**
+ * Características activables del punto de venta por organización. Cada fila
+ * guarda si un módulo del POS (agenda y citas, cobro y caja, ventas y tienda,
+ * clientes y marketing, página y presencia, caja, impresión, gastos) se
+ * muestra u oculta para la dueña. El valor por defecto es true (activado).
+ */
+export const configuracionPos = pgTable(
+  "configuracion_pos",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizacionId: uuid("organizacion_id")
+      .notNull()
+      .references(() => organizaciones.id),
+    clave: varchar("clave", { length: 60 }).notNull(),
+    valor: boolean("valor").default(true).notNull(),
+    actualizadaAt: timestamp("actualizada_at", { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("configuracion_pos_organizacion_clave_uq").on(
+      table.organizacionId,
+      table.clave,
+    ),
+    index("configuracion_pos_organizacion_idx").on(table.organizacionId),
+  ],
+);
