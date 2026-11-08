@@ -87,7 +87,7 @@ detrás del mostrador.
 | Ritual | Ficha técnica, recetario químico, pasaporte de belleza, retención predictiva | fases 15, 17 |
 | Dinero | Gastos, comisiones, facturación, reportes y exportaciones | `src/modules/{gastos,comisiones,facturacion,reportes}` |
 | Operación | Telemetría de producto, pipeline de incidentes P0–P3, Sentry opcional, cron de recordatorios | `src/lib/telemetry`, `src/modules/incidentes`, `custom-worker.ts` |
-| Calidad | 562 pruebas en 58 archivos, typecheck y lint en verde, arneses de usabilidad/perf/carga | `pnpm test`, `.artifacts/` |
+| Calidad | ~585 pruebas en 62 archivos, typecheck y lint en verde, arneses de usabilidad/perf/carga | `pnpm test`, `.artifacts/` |
 | Comercial | Planes Esencial / Crecimiento / Profesional, trial, campaña fundador, capacidad por plan | `src/modules/billing/capacidades.ts` |
 
 ### Bloqueos de lanzamiento resueltos y verificados (2026-10-24)
@@ -245,7 +245,7 @@ No se "arregla" un bloqueo inventando: se documenta y se resuelve con el dueño.
 |---|---|---|
 | `pnpm typecheck` | Siempre | 0 errores |
 | `pnpm lint` | Siempre | 0 errores, 0 avisos nuevos |
-| `pnpm test` | Siempre | 562 pruebas en verde (4 omitidas conocidas) |
+| `pnpm test` | Siempre | ~585 pruebas en verde (4 omitidas conocidas) |
 | `pnpm db:check` | Si toca `src/db/schema/**` | 100 % sincronizado |
 | `pnpm test:usability` | Si toca UI (con `pnpm dev`) | 0 errores, 0 avisos nuevos |
 | `pnpm test:perf` | Si toca datos o navegación | Dentro del presupuesto de §4 |
@@ -268,23 +268,39 @@ omite en silencio.
 | 19 | Cero hallazgos de móvil en las 5 pantallas de dinero | `pnpm test:usability --viewport=movil` en 0 errores | `hecho/19` | Completado (0 errores) |
 | 20 | Presupuesto de latencia medido y cumplido | TTFB p75 ≤ 600 ms y ≤ 2 consultas/página en las rutas admin | `hecho/20` | Completado (p50 ≤ 281 ms) |
 
-### P1 — lo que hace que se queden
+### P1 — activación y retención (lo que hace que se queden)
 
-| Resultado | Por qué | Evidencia de partida |
+Enfoque: medir y mejorar la activación (≤ 10 min al primer cobro) y la
+retención (menos ausencias, soporte que escala). Las misiones 32, 33 y 34
+ya están hechas; 31 implementada pendiente de verificación manual.
+
+| # | Resultado | Misión | Estado |
+|---|---|---|---|
+| 31 | Tiempo a la primera venta medido (mediana, p90, % en 10 min) | `hecho/31` | Implementada, verificación manual pendiente |
+| 32 | Reportes responden "¿cuánto gané?" en el primer pantallazo | `hecho/32` | Hecha |
+| 33 | Ayuda a un toque en las 39 páginas del panel | `hecho/33` | Hecha |
+| 34 | La clienta confirma su cita desde el enlace del correo | `hecho/34` | Implementada, envío real pendiente |
+| 35 | Ausencias medidas y visibles (efecto de los recordatorios) | `hecho/35` | Hecha (604 pruebas) |
+| 36 | Onboarding con datos de ejemplo hasta el primer cobro | `hecho/36` | Hecha (607 pruebas) |
+
+### P2 — crecimiento y diferenciación
+
+Enfoque: convertir los diferenciadores ya existentes (pasaporte, recetario,
+plano, offline, IA) en crecimiento y adquisición. Mantener las bases
+técnicas (multisucursal, CFDI, tiempo real) para cuando haya demanda.
+
+| Resultado | Misión | Cuándo |
 |---|---|---|
-| Primera venta en ≤ 10 min, medida de punta a punta | El registro se abandona antes del primer cobro | Guía de 7 pasos (`src/modules/onboarding`) y telemetría ya existen |
-| Reportes que la dueña entienda sin explicación | "No sé cuánto gané" es el dolor que paga | `/admin/reportes`, gráficas propias |
-| Ayuda contextual en cada pantalla (1 toque) | El soporte humano no escala | `/admin/ayuda`, `/admin/guia` |
-| Recordatorios y confirmación de citas confiables | Reduce ausencias, el KPI del salón | Cron `*/15`, Brevo |
-
-### P2 — crecimiento
-
-| Resultado | Cuándo |
-|---|---|
-| Multisucursal con reportes consolidados y comparativos | Cuando haya clientes con 3+ sucursales |
-| Facturación electrónica completa (CFDI) | Cuando un cliente grande lo exija |
-| App nativa (solo si se necesita impresora Bluetooth/NFC) | Después de 100 salones activos |
-| Tiempo real multi-recepción (Durable Objects) | Si aparecen quejas de citas duplicadas |
+| Landing y precios convierten (CTA visible, demo, prueba social) | `hecho/37` | Hecha (607 pruebas) |
+| Pasaporte de belleza compartible como prueba social | (por definir) | Cuando haya 5 casos reales |
+| Recordatorios por WhatsApp (no solo email) | (por definir) | Cuando el email no baje ausencias |
+| Referidos medibles ($200 de crédito) | (por definir) | Tras 10 salones activos |
+| Reservas públicas con marca del salón y SEO | (por definir) | Tras 10 salones activos |
+| Impresión térmica por Bluetooth en PWA | (por definir) | Si se exige ticket físico |
+| Multisucursal con reportes consolidados | (por definir) | Clientes con 3+ sucursales |
+| Facturación electrónica completa (CFDI) | (por definir) | Cliente grande lo exija |
+| App nativa (solo si impresora Bluetooth/NFC) | (por definir) | Después de 100 salones activos |
+| Tiempo real multi-recepción (Durable Objects) | (por definir) | Quejas de citas duplicadas |
 
 ---
 
@@ -300,9 +316,9 @@ readme/
     d1-vs-cockroach.md       ← por qué no migrar la base
     expo-vs-pwa.md           ← por qué no hay app nativa todavía
   estados/
-    pendiente/               ← misiones listas para ejecutar (18, 19, 20)
-    en-progreso/             ← la misión que está corriendo (máximo 1)
-    hecho/                   ← 01–17 terminadas y verificadas
+    pendiente/               ← (vacío) definir siguientes misiones
+    en-progreso/             ← (vacío) sin misión en curso
+    hecho/                   ← 01–37 terminadas y verificadas
 ```
 
 **Flujo de estados:** una misión entra por `pendiente/`; al asignarla se mueve a
@@ -322,6 +338,8 @@ verificación en verde y el reporte escrito. Si se bloquea, se queda en
 | Un solo proveedor de modelo (Argon) | Dependencia y cuota | Misiones cortas; cualquier agente que lea `AGENTS.md` puede ejecutar |
 | Usuarios con baja alfabetización digital | Abandono y soporte | S1–S6 de §1, pruebas con personas reales |
 | Verificación manual del dueño | Cuellos de botella | Automatizar el arnés; el dueño solo aprueba artefactos |
+| Dependencia de un solo canal de recordatorios (email) | Las ausencias no bajan si el correo no se lee | Misión 35 mide; WhatsApp como siguiente paso si no mejora |
+| Falta de prueba social publicable | La landing no convierte sin casos reales | Misión 37 con casos de práctica si no hay reales |
 
 Decisiones ya tomadas y por qué: mejorar lo existente (no reescribir), seguir
 en PWA (no Expo), quedarse en Postgres/CockroachDB (no D1), un solo Worker (no
@@ -331,11 +349,15 @@ microservicios). El razonamiento está en `readme/analisis/`.
 
 ## 11. Próximos cinco pasos
 
-1. **Aprobar** las misiones 18, 19 y 20 (o ajustar su alcance).
-2. **Correr el baseline** en el entorno real: `pnpm test:usability` y
-   `pnpm test:perf` con `pnpm dev` y la cuenta E2E.
-3. **Ejecutar 18** (dominio público): es la única que desbloquea el negocio y
-   requiere 20 minutos del dueño en Cloudflare.
-4. **Ejecutar 19 y 20** en sesiones separadas, con `/clear` entre ellas.
-5. **Medir la primera venta** con 5 salones reales y decidir con datos si el
-   onboarding necesita otra misión.
+1. **Sincronizar y verificar**: mover 31 y 34 a `hecho/` (hecho), correr
+   `pnpm test:usability` y `pnpm test:perf` con `pnpm dev` y la cuenta E2E
+   para cerrar la verificación manual pendiente de 31 y 34.
+2. **Ejecutar 35** (ausencias y efecto de recordatorios) en una sesión
+   nueva, con `/clear` antes y después.
+3. **Ejecutar 36** (onboarding con datos de ejemplo) para bajar el tiempo
+   al primer cobro por debajo de 10 min.
+4. **Ejecutar 37** (landing y precios que convierten) antes de la primera
+   campaña o referido.
+5. **Medir con 5 salones reales** la activación (tiempo al primer cobro) y
+   la tasa de ausencias; con datos, decidir si se necesita WhatsApp o más
+   onboarding.
