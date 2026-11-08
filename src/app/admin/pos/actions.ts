@@ -662,6 +662,7 @@ export async function cobrarVenta(_previousState: CobroActionState, formData: Fo
   const db = getDatabase();
 
   let outcome: CobroActionState;
+  let ventaSucursalId: string | undefined;
   try {
     outcome = await withDbRetry(() =>
       db.transaction(async (tx): Promise<CobroActionState> => {
@@ -673,11 +674,19 @@ export async function cobrarVenta(_previousState: CobroActionState, formData: Fo
         accion: "venta.cobrar",
       });
       if (idem.repetida) {
-        const ventaId = typeof idem.resultado?.ventaId === "string" ? idem.resultado.ventaId : input.ventaId;
-        return actionSuccess("Venta cobrada correctamente.", { ventaId });
+        const ventaIdRepetida = typeof idem.resultado?.ventaId === "string" ? idem.resultado.ventaId : input.ventaId;
+        const [ventaRow] = await tx
+          .select({ sucursalId: ventas.sucursalId })
+          .from(ventas)
+          .where(eq(ventas.id, ventaIdRepetida))
+          .limit(1);
+        ventaSucursalId = ventaRow?.sucursalId;
+        return actionSuccess("Venta cobrada correctamente.", { ventaId: ventaIdRepetida });
       }
 
       const venta = await lockVentaEditable(tx, input.organizacionId, input.ventaId);
+      if (!venta) return actionError("Venta no encontrada o ya cerrada.");
+      ventaSucursalId = venta.sucursalId;
       if (!venta) return actionError("Venta no encontrada o ya cerrada.");
       if (!canAccessBranch(access, venta.sucursalId)) {
         return actionError("La venta pertenece a otra sucursal.");
@@ -889,11 +898,11 @@ export async function cobrarVenta(_previousState: CobroActionState, formData: Fo
     if (input.modo === "inline") {
       return outcome;
     }
-    // redirect() del lado servidor: el formulario se desmonta al cerrar la
-    // venta, así que un router.push en useEffect nunca llegaría a correr.
-    redirect(
-      safeAdminReturnTo(input.returnTo, `/admin/pos?organizationId=${input.organizacionId}`),
-    );
+    // Tras cobrar, ir a la página de confirmación (tipo Northud) en lugar de
+    // volver directamente al punto de venta. Desde ahí el usuario puede enviar
+    // el ticket por WhatsApp, imprimir, copiar el enlace, ver la venta o abrir
+    // una nueva venta.
+    redirect(`/admin/pos/cobrado/${input.ventaId}?organizationId=${input.organizacionId}&sucursalId=${ventaSucursalId}`);
   }
   return outcome;
 }
