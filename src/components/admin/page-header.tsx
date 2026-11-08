@@ -78,8 +78,8 @@ export function AdminPageHeader({
       {breadcrumbs && breadcrumbs.length > 0 ? (
         <AdminBreadcrumbs className="mb-0.5" items={breadcrumbs} />
       ) : null}
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-        <div className="flex min-w-0 shrink-0 items-center gap-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 max-w-full">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <h1
             className="min-w-0 text-lg font-semibold tracking-[-0.02em] text-foreground"
             title={description}
@@ -94,7 +94,7 @@ export function AdminPageHeader({
             <div className="flex flex-wrap items-center gap-2">{actions}</div>
           ) : null}
         </div>
-        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+        <div className="flex min-w-0 flex-nowrap items-center justify-end gap-2 overflow-x-auto no-scrollbar">
           {tabs}
         </div>
       </div>
