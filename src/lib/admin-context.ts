@@ -71,18 +71,22 @@ export type AdminContext = {
 // promesa cuando coinciden con el negocio/sucursal ya resueltos. Evita una
 // segunda ronda a la BD (resolveSessionContext) en la navegación client-side.
 const workerContextStore = new WeakMap<object, AdminContext>();
-const devContextStore = new Map<string, AdminContext>();
+// En dev no hay ExecutionContext: el store se memoiza por request con
+// React.cache (un objeto nuevo por request). Antes era un Map global que
+// reutilizaba el contexto del primer usuario autenticado en TODOS los
+// requests siguientes — las páginas servían datos sin sesión válida.
+const getDevContextStore = cache(() => ({ current: undefined as AdminContext | undefined }));
 
 function getStoredAdminContext(): AdminContext | undefined {
   const scope = getRequestScope();
   if (scope) return workerContextStore.get(scope);
-  return devContextStore.get("current");
+  return getDevContextStore().current;
 }
 
 function setStoredAdminContext(ctx: AdminContext): void {
   const scope = getRequestScope();
   if (scope) workerContextStore.set(scope, ctx);
-  else devContextStore.set("current", ctx);
+  else getDevContextStore().current = ctx;
 }
 
 const getAdminContextMemo = cache(

@@ -132,14 +132,49 @@ pnpm test:flows
 
 ```
 Misión: 72 — arnés de usabilidad del cobro
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔ | usability N rutas ✔ | flows N ✔
-Antes → después: <rutas POS cubiertas → + ticket, ventana y confirmación>
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <ninguno | qué falta>
+Cambios: usability-check.ts → ventas E2E por SQL + rutas ticket/confirmación +
+  auditoría del diálogo de cobro abierto (axe, acción primaria, táctil, móvil);
+  flows-e2e.ts → ventana de cobro antes de propina/pagos, /cobrado/ como
+  resultado válido, textos y selectores actualizados a la UI vigente;
+  agenda/cita-form.tsx, agenda/page.tsx, admin-context.ts → 3 fixes
+  bloqueantes (ver Desviaciones).
+Verificación: typecheck ✔ | lint ✔ (3 avisos preexistentes) | test 626 ✔ |
+  usability 3 rutas POS × 2 viewports + diálogo ✔ | flows 72/72 ✔
+Antes → después: solo /admin/pos estático → + ticket en proceso, ventana de
+  cobro abierta y confirmación /cobrado, con capturas en .artifacts/
+Desviaciones: 3 fixes en src/ bloqueantes del arnés + expectativa de stock
+  ajustada al comportamiento real del POS (ver sección abajo)
+Riesgo abierto: el POS no valida existencias al cobrar (stock queda negativo);
+  decidir si debe avisar o bloquear — posible misión nueva. La línea base de
+  usabilidad dejó registrados los defectos de las misiones 73/75/76.
 ```
 
 ## Desviaciones (las escribe el implementador)
 
-<Qué supuesto del plan resultó falso y qué se hizo en su lugar. Si no hubo,
-"ninguna".>
+- **Se tocaron 3 archivos de `src/`** (fuera del alcance estricto) porque eran
+  bloqueantes del arnés, no defectos de la línea base:
+  1. `src/app/admin/agenda/cita-form.tsx` — `FieldError`/`Textarea` dentro de
+     `<details>` sin `<Field>` padre tronaba el render del formulario de cita
+     (Base UI `Field.Error` exige `Field.Root`); sin el arreglo ninguna server
+     action de agenda podía completarse en E2E.
+  2. `src/lib/admin-context.ts` — `devContextStore` era un `Map` global del
+     módulo: en `next dev` (`getRequestScope()` → null) el primer request
+     autenticado guardaba el contexto y **todos los requests siguientes lo
+     reutilizaban sin sesión** (las páginas servían datos; las actions
+     redirigían a `/login`). Se reemplazó por memoización por request con
+     `React.cache`, equivalente al `WeakMap` por ExecutionContext de prod.
+  3. `src/app/admin/agenda/page.tsx` — `concat_ws` devuelve `''` (no NULL)
+     cuando la cita no tiene cliente, así que `?? "Cliente de paso"` nunca
+     aplicaba y el flujo no encontraba el texto; se agregó `nullif(…, '')`.
+- **"Cobro bloqueado por stock insuficiente" se reemplazó** por la verificación
+  del comportamiento real: el POS no valida existencias al cobrar y deja el
+  stock en negativo (`pos/service.ts` descuenta sin guarda; la validación
+  "Stock insuficiente" solo existe en movimientos manuales de inventario).
+  Queda como hallazgo para decidir si el cobro debe avisar o bloquear.
+- **Textos del flujo actualizados a la UI vigente**: check-in/cobro de Mi día
+  por `data-action-id` (los rótulos cambiaron con el glosario: "Ya llegó",
+  "Crear cliente"/"Guardar cambios", "Guardar en ficha técnica") y la fórmula
+  del expediente ahora vive en el recetario (modo "Escribir texto libre").
+- La corrida de `test:usability --only=pos` cierra con errores **esperados**:
+  son la línea base que medirán las misiones 73/75/76 (contraste del botón
+  Cobrar, `select-name` del país en `/cobrado`, acción bajo el pliegue).

@@ -20,7 +20,9 @@
  */
 import { AxePuppeteer } from "@axe-core/puppeteer";
 import { createHash } from "node:crypto";
+import { mkdirSync } from "node:fs";
 import type { Page } from "puppeteer";
+import type { Client } from "pg";
 
 import { loggedPage, pickViewports, withBrowser } from "./lib/browser";
 import { checkFlags } from "./lib/cli";
@@ -208,6 +210,137 @@ async function rutasDinamicas(): Promise<{ rutas: string[]; limpiar: () => Promi
 }
 
 const FOLIO_PRUEBA_COMPRA = "E2E-USABILITY";
+const NOTA_PRUEBA_VENTA = "E2E-USABILITY-POS";
+
+type VentasDePrueba = {
+  rutas: string[];
+  /** URL del ticket en proceso (para abrir la ventana de cobro). */
+  ticketEnProceso: string | null;
+  limpiar: () => Promise<void>;
+};
+
+/**
+ * Ventas temporales del arnés para el flujo de cobro: `/admin/pos?ventaId=`
+ * necesita una venta en proceso con líneas (para que exista el botón
+ * "Cobrar") y `/admin/pos/cobrado/<id>` una venta completada con pago (para
+ * la confirmación). Se crean por SQL en la org E2E, marcadas por
+ * `ventas.notas` y se borran al terminar la corrida (mismo patrón que
+ * `crearCompraDePrueba`).
+ */
+async function crearVentasDePrueba(): Promise<VentasDePrueba> {
+  const vacio: VentasDePrueba = { rutas: [], ticketEnProceso: null, limpiar: async () => {} };
+  const borrarVentas = async (client: Client) => {
+    await client.query(
+      `delete from detalle_ventas_medios_pagos d using ventas v
+        where d.venta_id = v.id and v.notas = $1`,
+      [NOTA_PRUEBA_VENTA],
+    );
+    await client.query(
+      `delete from detalle_ventas_servicios d using ventas v
+        where d.venta_id = v.id and v.notas = $1`,
+      [NOTA_PRUEBA_VENTA],
+    );
+    await client.query(`delete from ventas where notas = $1`, [NOTA_PRUEBA_VENTA]);
+  };
+  const limpiar = async () => {
+    try {
+      await withDb(async (client) => {
+        await borrarVentas(client);
+      });
+    } catch (error) {
+      console.warn(`Limpieza de ventas de prueba omitida: ${(error as Error).message}`);
+    }
+  };
+
+  try {
+    const datos = await withDb(async (client) => {
+      const org = (
+        await client.query(`select id from organizaciones where slug = $1`, [E2E_RESERVA_SLUG])
+      ).rows[0];
+      if (!org) return null;
+      const sucursal = (
+        await client.query(
+          `select id from sucursales where organizacion_id = $1 and activo order by nombre limit 1`,
+          [org.id],
+        )
+      ).rows[0];
+      if (!sucursal) return null;
+      const servicio = (
+        await client.query(
+          `select id, precio_base from servicios
+            where organizacion_id = $1 and activo order by created_at limit 1`,
+          [org.id],
+        )
+      ).rows[0];
+      if (!servicio) return null;
+      const medio = (
+        await client.query(
+          `select id from cat_medios_pago
+            where organizacion_id = $1 and activo and categoria = 'efectivo'
+            order by nombre limit 1`,
+          [org.id],
+        )
+      ).rows[0];
+      if (!medio) return null;
+
+      // Reutiliza/limpia restos de corridas anteriores antes de crear.
+      await borrarVentas(client);
+
+      const precio = Number(servicio.precio_base) || 100;
+      const precioTxt = precio.toFixed(2);
+
+      const enProceso = (
+        await client.query(
+          `insert into ventas (organizacion_id, sucursal_id, estado, subtotal, total, propina, notas)
+           values ($1, $2, 'en_proceso', $3, $3, 0, $4)
+           returning id`,
+          [org.id, sucursal.id, precioTxt, NOTA_PRUEBA_VENTA],
+        )
+      ).rows[0];
+      if (!enProceso) return null;
+      await client.query(
+        `insert into detalle_ventas_servicios (venta_id, servicio_id, nombre, precio, cantidad)
+         values ($1, $2, 'Servicio de prueba (arnés)', $3, 1)`,
+        [enProceso.id, servicio.id, precioTxt],
+      );
+
+      const completada = (
+        await client.query(
+          `insert into ventas (organizacion_id, sucursal_id, estado, cobrada_at, subtotal, total, propina, notas)
+           values ($1, $2, 'completada', now(), $3, $3, 0, $4)
+           returning id`,
+          [org.id, sucursal.id, precioTxt, NOTA_PRUEBA_VENTA],
+        )
+      ).rows[0];
+      if (!completada) return null;
+      await client.query(
+        `insert into detalle_ventas_servicios (venta_id, servicio_id, nombre, precio, cantidad)
+         values ($1, $2, 'Servicio de prueba (arnés)', $3, 1)`,
+        [completada.id, servicio.id, precioTxt],
+      );
+      // Efectivo con cambio: recibido = precio + $50 → cambio visible.
+      await client.query(
+        `insert into detalle_ventas_medios_pagos (venta_id, medio_pago_id, monto, recibido, cambio)
+         values ($1, $2, $3, $4, 50)`,
+        [completada.id, medio.id, precioTxt, (precio + 50).toFixed(2)],
+      );
+
+      return {
+        ticketEnProceso: `/admin/pos?organizationId=${org.id}&sucursalId=${sucursal.id}&ventaId=${enProceso.id}`,
+        cobrado: `/admin/pos/cobrado/${completada.id}?organizationId=${org.id}&sucursalId=${sucursal.id}`,
+      };
+    });
+    if (!datos) return vacio;
+    return {
+      rutas: [datos.ticketEnProceso, datos.cobrado],
+      ticketEnProceso: datos.ticketEnProceso,
+      limpiar,
+    };
+  } catch (error) {
+    console.warn(`Ventas de prueba omitidas: ${(error as Error).message}`);
+    return vacio;
+  }
+}
 
 /**
  * Compra temporal del arnés: `/admin/compras/[id]` necesita una compra real
@@ -464,9 +597,18 @@ async function layoutMovilCheck(page: Page, pagina: string, viewport: string): P
   return reporte.map((f) => ({ pagina, viewport, tipo: "layout-movil" as const, ...f }));
 }
 
-async function objetivoTactilCheck(page: Page, pagina: string, viewport: string): Promise<Finding[]> {
-  const pequenos = await page.evaluate(() => {
-    const selector = "main a[href], main button, main input, main select, main textarea, nav a, nav button";
+async function objetivoTactilCheck(
+  page: Page,
+  pagina: string,
+  viewport: string,
+  enDialogo = false,
+): Promise<Finding[]> {
+  const pequenos = await page.evaluate((dialogo) => {
+    // Con un diálogo abierto los controles viven en el portal de body, fuera
+    // de main/nav: se audita el diálogo en lugar de la página de fondo.
+    const selector = dialogo
+      ? '[role="dialog"] a[href], [role="dialog"] button, [role="dialog"] input, [role="dialog"] select, [role="dialog"] textarea'
+      : "main a[href], main button, main input, main select, main textarea, nav a, nav button";
     return [...document.querySelectorAll<HTMLElement>(selector)]
       .filter((el) => {
         // Controles dentro de <label>: el objetivo real es la etiqueta completa.
@@ -485,7 +627,7 @@ async function objetivoTactilCheck(page: Page, pagina: string, viewport: string)
         alto: Math.round(el.getBoundingClientRect().height),
       }))
       .filter((el) => el.alto < 24);
-  });
+  }, enDialogo);
   return pequenos.map((el) => ({
     pagina,
     viewport,
@@ -528,7 +670,8 @@ async function main() {
   const flags = checkFlags();
   const { rutas: dinamicas, limpiar } = await rutasDinamicas();
   const comprasDePrueba = await crearCompraDePrueba();
-  const todas = [...PAGES, ...dinamicas, ...comprasDePrueba];
+  const ventasPrueba = await crearVentasDePrueba();
+  const todas = [...PAGES, ...dinamicas, ...comprasDePrueba, ...ventasPrueba.rutas];
   const pages = flags.only.length
     ? todas.filter((p) => flags.only.some((o) => p.includes(o)))
     : todas;
@@ -541,6 +684,10 @@ async function main() {
   const rutas: Array<{ nombre: string; pasos: number; detalle: string }> = [];
   let tactil: { toque: boolean; feedback: boolean; destino: boolean } | null = null;
   let errores = 0;
+  // La ventana de cobro solo se audita si el ticket en proceso está en las
+  // rutas seleccionadas (--only).
+  const auditarCobro =
+    ventasPrueba.ticketEnProceso !== null && pages.includes(ventasPrueba.ticketEnProceso);
 
   try {
     await withBrowser(async (browser) => {
@@ -559,6 +706,61 @@ async function main() {
           findings.push(...hallazgos);
           const errores = hallazgos.filter((h) => h.severidad === "error").length;
           console.log(`${ruta.padEnd(18)} ${hallazgos.length === 0 ? "OK" : `${errores} error(es), ${hallazgos.length - errores} aviso(s)`}`);
+        }
+
+        // Ventana de cobro abierta: las rutas estáticas solo ven el ticket;
+        // el diálogo concentra propina, pagos y el CTA "Cobrar".
+        if (auditarCobro && ventasPrueba.ticketEnProceso) {
+          const paginaDialogo = "pos.cobro.dialogo";
+          await page.goto(`${BASE_URL}${ventasPrueba.ticketEnProceso}`, {
+            waitUntil: "networkidle0",
+            timeout: 60000,
+          });
+          // El ticket es pesado: el click puede llegar antes de que React
+          // hidrate el onClick. Se reintenta como en agregarAlTicket.
+          let dialogoListo = false;
+          for (let intento = 0; intento < 3 && !dialogoListo; intento++) {
+            await page.evaluate(() => {
+              document
+                .querySelector<HTMLElement>('[data-action-id="pos.cobro.abrir"]')
+                ?.click();
+            });
+            dialogoListo = await page
+              .waitForSelector('[role="dialog"] [data-action-id="pos.cobro.confirmar"]', {
+                visible: true,
+                timeout: 5000,
+              })
+              .then(() => true)
+              .catch(() => false);
+          }
+          if (dialogoListo) {
+            const hallazgos = [
+              ...(await axeScan(page, paginaDialogo, viewport.nombre)),
+              ...(await accionPrimariaCheck(page, paginaDialogo, viewport.nombre)),
+              ...(await objetivoTactilCheck(page, paginaDialogo, viewport.nombre, true)),
+              // En móvil el desborde del documento incluye el portal del
+              // diálogo (position:fixed dentro de body).
+              ...(viewport.isMobile ? await layoutMovilCheck(page, paginaDialogo, viewport.nombre) : []),
+            ];
+            findings.push(...hallazgos);
+            const erroresDialogo = hallazgos.filter((h) => h.severidad === "error").length;
+            console.log(
+              `${paginaDialogo.padEnd(18)} ${hallazgos.length === 0 ? "OK" : `${erroresDialogo} error(es), ${hallazgos.length - erroresDialogo} aviso(s)`}`,
+            );
+            mkdirSync(".artifacts", { recursive: true });
+            await page
+              .screenshot({ path: `.artifacts/usability-cobro-dialogo-${viewport.nombre}.png` })
+              .catch(() => {});
+          } else {
+            findings.push({
+              pagina: paginaDialogo,
+              viewport: viewport.nombre,
+              tipo: "accion-primaria",
+              severidad: "error",
+              detalle: "El botón Cobrar del ticket no abrió la ventana de cobro",
+            });
+            console.log(`${paginaDialogo.padEnd(18)} ERROR — el diálogo no abrió`);
+          }
         }
         await page.close();
       }
@@ -641,6 +843,7 @@ async function main() {
   } finally {
     await limpiar();
     await limpiarComprasDePrueba();
+    await ventasPrueba.limpiar();
   }
 
   errores = printFindings(findings);

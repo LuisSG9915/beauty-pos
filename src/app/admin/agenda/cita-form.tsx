@@ -659,14 +659,15 @@ export function CitaForm({
         <summary className="cursor-pointer list-none text-sm font-medium text-muted-foreground hover:text-primary">
           Agregar nota (opcional)
         </summary>
-        <Textarea
-          className="mt-3"
-          defaultValue={initial?.notas ?? ""}
-          invalid={Boolean(fe.notas)}
-          name="notas"
-          placeholder="Preferencias del cliente, alergias, recordatorios…"
-        />
-        <FieldError error={fe.notas} />
+        <Field className="mt-3">
+          <Textarea
+            defaultValue={initial?.notas ?? ""}
+            invalid={Boolean(fe.notas)}
+            name="notas"
+            placeholder="Preferencias del cliente, alergias, recordatorios…"
+          />
+          <FieldError error={fe.notas} />
+        </Field>
       </details>
 
       <div className="rounded-xl border border-border bg-muted/60 p-4">

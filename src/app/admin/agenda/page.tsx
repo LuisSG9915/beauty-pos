@@ -191,7 +191,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
               'estado', c.estado, 'notas', c.notas,
               'totalEstimado', c.total_estimado::text,
               'clienteId', c.cliente_id,
-              'clienteNombre', trim(concat_ws(' ', cl.nombre, cl.apellido_paterno, cl.apellido_materno)),
+              'clienteNombre', nullif(trim(concat_ws(' ', cl.nombre, cl.apellido_paterno, cl.apellido_materno)), ''),
               'clienteTelefono', cl.telefono,
               'clienteNotas', cl.notas_operativas,
               'sucursalId', c.sucursal_id,

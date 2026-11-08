@@ -313,7 +313,7 @@ WhatsApp con imagen y texto generados en el aparato (sin servidor).
 
 | # | Resultado | Misión | Estado |
 |---|---|---|---|
-| 72 | El arnés recorre ticket, ventana de cobro y confirmación | `pendiente/72` | Pendiente |
+| 72 | El arnés recorre ticket, ventana de cobro y confirmación | `hecho/72` | Hecha — flows 72/72, línea base en `.artifacts/` |
 | 73 | "Cobrar" visible y fijo en móvil; columnas correctas | `pendiente/73` | Pendiente |
 | 75 | Pantalla "Venta cobrada" con cambio real y acciones que funcionan | `pendiente/75` | Pendiente |
 | 74 | Imagen del ticket real + compartir por aparato + WhatsApp | `pendiente/74` | Pendiente |
