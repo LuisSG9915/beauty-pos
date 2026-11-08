@@ -66,7 +66,7 @@ export function RegistroForm() {
           <Input
             required
             autoComplete="organization"
-            className="border-0 bg-transparent px-0 focus-visible:ring-0"
+            className="h-11 border-0 bg-transparent px-0 focus-visible:ring-0"
             maxLength={160}
             name="negocio"
             placeholder="Estética Aurora"
@@ -84,7 +84,7 @@ export function RegistroForm() {
           <Input
             required
             autoComplete="name"
-            className="border-0 bg-transparent px-0 focus-visible:ring-0"
+            className="h-11 border-0 bg-transparent px-0 focus-visible:ring-0"
             maxLength={160}
             name="nombre"
             placeholder="María López"
@@ -102,7 +102,7 @@ export function RegistroForm() {
           <Input
             required
             autoComplete="email"
-            className="border-0 bg-transparent px-0 focus-visible:ring-0"
+            className="h-11 border-0 bg-transparent px-0 focus-visible:ring-0"
             maxLength={254}
             name="correo"
             placeholder="tu@salon.com"
@@ -120,7 +120,7 @@ export function RegistroForm() {
           <Input
             required
             autoComplete="new-password"
-            className="border-0 bg-transparent px-0 focus-visible:ring-0"
+            className="h-11 border-0 bg-transparent px-0 focus-visible:ring-0"
             minLength={12}
             name="password"
             placeholder="Mínimo 12 caracteres"
@@ -138,7 +138,7 @@ export function RegistroForm() {
       <TurnstileWidget className="my-2 flex justify-center" />
 
       <Button
-        className="w-full rounded-xl py-3 text-sm font-semibold"
+        className="w-full rounded-xl py-3 text-sm font-semibold bg-[var(--acento-conversion)] text-[var(--acento-conversion-foreground)] hover:bg-[color-mix(in_oklch,var(--acento-conversion),black_8%)]"
         data-action-clave="1"
         data-action-id="registro.cuenta.crear"
         disabled={isPending}

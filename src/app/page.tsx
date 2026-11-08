@@ -116,6 +116,13 @@ export default function Home() {
             Precios
           </Link>
           <Link
+            className="hidden h-8 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:inline-flex"
+            data-action-id="landing.registro.abrir"
+            href="/registro"
+          >
+            Crear cuenta
+          </Link>
+          <Link
             className="inline-flex h-8 items-center rounded-lg border border-border bg-card px-4 text-sm font-medium transition-colors hover:bg-muted"
             href="/login"
           >
@@ -124,7 +131,7 @@ export default function Home() {
         </nav>
       </header>
 
-      <section className="mx-auto grid w-full max-w-7xl flex-1 items-center gap-16 px-6 py-16 lg:grid-cols-[1.1fr_0.9fr] lg:px-10 lg:py-24">
+      <section className="mx-auto grid w-full max-w-7xl flex-1 items-center gap-16 px-6 py-24 lg:grid-cols-[1.1fr_0.9fr] lg:px-10 lg:py-32">
         {/* `min-w-0`: sin él, el grid item no encoge por debajo de su
             contenido (min-width: auto) y el hero desborda en móvil. */}
         <div className="min-w-0">
@@ -136,12 +143,12 @@ export default function Home() {
             <span className="block italic text-primary">bajo control.</span>
           </h1>
           <p className="mt-7 max-w-xl text-lg leading-8 text-muted-foreground">
-            De la cita al corte de caja: agenda, clientes, cobros, inventario y
-            comisiones conectados en un solo lugar. Menos libreta, más salón.
+            Agenda, clientes, cobros e inventario en un solo lugar. Menos
+            libreta, más salón.
           </p>
           <div className="mt-9 flex flex-wrap gap-3">
             <Button
-              className="h-11 rounded-xl px-6"
+              className="h-11 rounded-xl px-6 bg-[var(--acento-conversion)] text-[var(--acento-conversion-foreground)] hover:bg-[color-mix(in_oklch,var(--acento-conversion),black_8%)]"
               data-action-clave="1"
               data-action-id="landing.registro.abrir"
               nativeButton={false}
@@ -166,6 +173,8 @@ export default function Home() {
         </div>
 
         <div className="relative min-w-0">
+          {/* Foto de salón real (placeholder: reemplazar por foto del negocio cuando esté disponible). */}
+          <div className="absolute top-0 right-0 -mr-6 -mt-6 w-48 h-48 rounded-full bg-[url('/og.png')] bg-cover bg-center opacity-60 blur-md pointer-events-none" />
           <div className="pointer-events-none absolute -inset-5 rounded-[2.5rem] bg-accent/80 blur-3xl dark:bg-accent/40" />
           <div className="surface-elevated anim-entrada relative overflow-hidden rounded-[2rem] border border-border bg-card p-5">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-4">
@@ -273,6 +282,30 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      <section className="border-t border-border">
+        <div className="mx-auto w-full max-w-7xl px-6 py-14 lg:px-10">
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary">
+            Prueba social (próximamente)
+          </p>
+          <h2 className="mt-3 max-w-2xl font-serif text-3xl font-semibold tracking-[-0.02em] sm:text-4xl">
+            Tu pasaporte de belleza, compartible.
+          </h2>
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Cada servicio deja historial, fórmula y resultado. Compártelo con tu
+            clienta para que vuelva y te recomiende. Los casos reales se publican
+            con permiso del salón; mientras tanto, el modo práctica muestra el
+            flujo completo en 10 minutos.
+          </p>
+          <Link
+            className="mt-6 inline-flex min-h-10 items-center rounded-lg border border-border bg-card px-4 text-sm font-medium transition-colors hover:bg-muted"
+            data-action-id="landing.practica.abrir"
+            href="/registro"
+          >
+            Crear cuenta y practicar
+          </Link>
         </div>
       </section>
 

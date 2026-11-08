@@ -103,6 +103,8 @@
   --muted-foreground: #6f6069;
   --accent: #f8e2ee;
   --accent-foreground: #7b1749;
+  --acento-conversion: #f59e0b;
+  --acento-conversion-foreground: #ffffff;
   --destructive: #c22821;
   --destructive-foreground: #fff7f5;
   --destructive-soft: #fbe1de;
@@ -255,6 +257,8 @@
   --muted-foreground: #bdabb5;
   --accent: #492038;
   --accent-foreground: #ffc3df;
+  --acento-conversion: #fbbf24;
+  --acento-conversion-foreground: #1a1117;
   --destructive: #f0827a;
   --destructive-foreground: #35100d;
   --destructive-soft: #4a211e;

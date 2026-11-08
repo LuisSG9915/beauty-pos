@@ -10,11 +10,11 @@ export const metadata = { title: "Crear cuenta" };
 export default function RegistroPage() {
   return (
     <main className="grid min-h-screen bg-background lg:grid-cols-[0.95fr_1.05fr]">
-      <section className="relative flex items-center justify-center px-6 py-12 sm:px-10">
+      <section className="relative flex items-center justify-center px-6 py-16 sm:px-10">
         <div className="absolute left-6 top-6 sm:left-10">
           <ThemeModeSelector iconOnly />
         </div>
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-md space-y-6">
           <Link className="inline-flex rounded-lg outline-offset-4" href="/">
             <BrandWordmark markSize={36} />
           </Link>

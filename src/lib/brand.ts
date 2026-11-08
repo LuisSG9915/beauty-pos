@@ -31,6 +31,10 @@ export const BRAND_COLORS = {
   primaryForeground: "#fff7fb",
   /** Texto sobre accent (bugambilia oscuro, contraste AA). */
   accentForeground: "#7b1749",
+  /** Acento de conversión para CTAs principales de landing y registro (ámbar cálido). */
+  acentoConversion: "#f59e0b",
+  /** Texto sobre el acento de conversión. */
+  acentoConversionForeground: "#ffffff",
   /** Fin del degradado del tile del isotipo (= primary). */
   brandIconBgEnd: "#a91d5d",
 } as const;
