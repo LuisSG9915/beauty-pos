@@ -188,18 +188,18 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
         title="Gastos"
       />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm" method="get">
+      <form className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-2 rounded-2xl border border-border bg-card p-2.5 shadow-sm" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <input name="sucursalId" type="hidden" value={sucursalId} />
-        <Field className="w-40">
+        <Field className="w-full sm:w-40">
           <FieldLabel>Desde</FieldLabel>
           <Input defaultValue={desde} name="desde" type="date" />
         </Field>
-        <Field className="w-40">
+        <Field className="w-full sm:w-40">
           <FieldLabel>Hasta</FieldLabel>
           <Input defaultValue={hasta} name="hasta" type="date" />
         </Field>
-        <Field className="w-44">
+        <Field className="w-full sm:w-44">
           <FieldLabel>Categoría</FieldLabel>
           <Select defaultValue={categoriaId} name="categoria">
             <option value="">Todas</option>
@@ -208,7 +208,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
             ))}
           </Select>
         </Field>
-        <Field className="w-40">
+        <Field className="w-full sm:w-40">
           <FieldLabel>Estado</FieldLabel>
           <Select defaultValue={estadoValido} name="estado">
             <option value="">Todos</option>
@@ -216,7 +216,7 @@ export default async function GastosPage({ searchParams }: { searchParams: Searc
             <option value="revertido">Revertidos</option>
           </Select>
         </Field>
-        <Button className="rounded-xl" type="submit">Filtrar</Button>
+        <Button className="col-span-2 min-h-11 rounded-xl w-full sm:w-auto" type="submit">Filtrar</Button>
       </form>
 
       <section className="grid grid-cols-1 gap-3 sm:grid-cols-2">

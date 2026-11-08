@@ -321,7 +321,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
         title="Servicios"
       />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4" method="get">
+      <form className="flex flex-wrap items-end gap-2 rounded-2xl border border-border bg-card p-2.5" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <Field className="w-full sm:w-auto sm:min-w-56 sm:flex-1">
           <FieldLabel>Buscar</FieldLabel>
@@ -347,7 +347,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
         {serviceRows.length === 0 ? (
           <EmptyState description="Crea servicios para el salón: cortes, tratamientos, manicure, etc." title="No hay servicios" />
         ) : (
-          <div>
+          <VistaAdaptativa>
             <RegistroList>
               {serviceRows.map((service) => (
                 <RegistroCard
@@ -392,7 +392,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
               rowKey={(service) => service.id}
               rows={serviceRows}
             />
-          </div>
+          </VistaAdaptativa>
         )}
       </AdminCard>
       {editing || firstParam(params.nuevo) === "1" ? (

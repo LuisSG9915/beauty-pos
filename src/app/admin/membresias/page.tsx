@@ -166,13 +166,13 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
         title="Membresías"
       />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4" method="get">
+      <form className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-2 rounded-2xl border border-border bg-card p-2.5" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
-        <Field className="min-w-52 flex-1">
+        <Field className="col-span-2 min-w-52 flex-1">
           <FieldLabel>Buscar</FieldLabel>
           <Input defaultValue={query} key={query} name="q" placeholder="Nombre de la membresía" />
         </Field>
-        <Field className="w-40">
+        <Field className="w-full sm:w-40">
           <FieldLabel>Estado</FieldLabel>
           <Select defaultValue={estado} name="estado">
             <option value="">Todos</option>
@@ -180,9 +180,9 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
             <option value="oculto">Ocultos</option>
           </Select>
         </Field>
-        <Button className="rounded-xl" data-action-id="catalogo.membresias.filtro.aplicar" type="submit">Filtrar</Button>
+        <Button className="min-h-11 rounded-xl w-full sm:w-auto" data-action-id="catalogo.membresias.filtro.aplicar" type="submit">Filtrar</Button>
         {hasFilters ? (
-          <Button nativeButton={false} render={<Link href={buildAdminHref("/membresias", { organizationId })} />} variant="outline">
+          <Button className="col-span-2 min-h-11 rounded-xl w-full sm:w-auto" nativeButton={false} render={<Link href={buildAdminHref("/membresias", { organizationId })} />} variant="outline">
             Limpiar
           </Button>
         ) : null}

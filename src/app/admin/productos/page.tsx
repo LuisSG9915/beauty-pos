@@ -417,9 +417,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
         title="Productos e insumos"
       />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4" method="get">
+      <form className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-2 rounded-2xl border border-border bg-card p-2.5" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
-        <Field className="w-full sm:w-auto sm:min-w-56 sm:flex-1">
+        <Field className="col-span-2 w-full sm:w-auto sm:min-w-56 sm:flex-1">
           <FieldLabel>Buscar</FieldLabel>
           <Input defaultValue={query} key={query} name="q" placeholder="Nombre, clave o código de barras" />
         </Field>
@@ -443,7 +443,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
             ))}
           </Select>
         </Field>
-        <Field className="w-full sm:w-40">
+        <Field className="col-span-2 w-full sm:w-40">
           <FieldLabel>Estado</FieldLabel>
           <Select defaultValue={estado} name="estado">
             <option value="">Todos</option>
@@ -451,9 +451,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Sea
             <option value="oculto">Ocultos</option>
           </Select>
         </Field>
-        <Button className="rounded-xl" type="submit">Filtrar</Button>
+        <Button className="col-span-2 min-h-11 rounded-xl w-full sm:w-auto" type="submit">Filtrar</Button>
         {hasFilters ? (
-          <Button nativeButton={false} render={<Link href={buildAdminHref("/productos", { organizationId })} />} variant="outline">
+          <Button className="col-span-2 min-h-11 rounded-xl w-full sm:w-auto" nativeButton={false} render={<Link href={buildAdminHref("/productos", { organizationId })} />} variant="outline">
             Limpiar
           </Button>
         ) : null}

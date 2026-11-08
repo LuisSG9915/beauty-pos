@@ -303,7 +303,7 @@ export default async function ReportesPage({ searchParams }: Props) {
         />
       ) : null}
 
-      <form className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-end gap-3 rounded-2xl bg-muted/50 p-4 w-full min-w-0" method="get">
+      <form className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-end gap-2 rounded-2xl bg-muted/50 p-2.5 w-full min-w-0" method="get">
         <input name="organizationId" type="hidden" value={organization.id} />
         {context.branches.length > 1 ? (
           <Field className="w-full sm:w-56">
@@ -320,7 +320,7 @@ export default async function ReportesPage({ searchParams }: Props) {
         ) : (
           <input name="sucursalId" type="hidden" value={branch.id} />
         )}
-        <div className="grid grid-cols-2 gap-3 sm:contents">
+        <div className="grid grid-cols-2 gap-2 sm:contents">
           <Field className="w-full min-w-0 sm:w-40">
             <FieldLabel htmlFor="reportes-desde">Desde</FieldLabel>
             <Input className="min-h-11" defaultValue={desde} id="reportes-desde" name="desde" type="date" />

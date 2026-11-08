@@ -169,18 +169,18 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
         title="Comisiones"
       />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm" method="get">
+      <form className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-2 rounded-2xl border border-border bg-card p-2.5 shadow-sm" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <input name="sucursalId" type="hidden" value={sucursalId} />
-        <Field className="w-40">
+        <Field className="w-full sm:w-40">
           <FieldLabel>Desde</FieldLabel>
           <Input defaultValue={desde} name="desde" type="date" />
         </Field>
-        <Field className="w-40">
+        <Field className="w-full sm:w-40">
           <FieldLabel>Hasta</FieldLabel>
           <Input defaultValue={hasta} name="hasta" type="date" />
         </Field>
-        <Button className="rounded-xl" data-action-clave="1" data-action-id="comisiones.filtro.aplicar" size="lg" type="submit">Filtrar</Button>
+        <Button className="col-span-2 min-h-11 rounded-xl w-full sm:w-auto" data-action-clave="1" data-action-id="comisiones.filtro.aplicar" size="lg" type="submit">Filtrar</Button>
       </form>
 
       <AdminCard description="Comisiones devengadas y activas aún sin pagar en el periodo." title="Pendientes por profesional">

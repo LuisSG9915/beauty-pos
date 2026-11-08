@@ -60,9 +60,9 @@ export default async function PaymentMethodsPage({ searchParams }: { searchParam
     <div className="space-y-6">
       <AdminPageHeader description="Medios disponibles al cobrar en el POS." title="Medios de pago" />
 
-      <form className="flex flex-wrap items-end gap-3 rounded-2xl border border-border bg-card p-4" method="get">
+      <form className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-2 rounded-2xl border border-border bg-card p-2.5" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
-        <Field className="w-56">
+        <Field className="w-full sm:w-56">
           <FieldLabel>Categoría</FieldLabel>
           <Select defaultValue={categoriaFilter} name="categoria">
             <option value="">Todas</option>
@@ -73,9 +73,9 @@ export default async function PaymentMethodsPage({ searchParams }: { searchParam
             <option value="otro">Otro</option>
           </Select>
         </Field>
-        <Button className="rounded-xl" data-action-id="catalogo.medios_pago.filtro.aplicar" type="submit">Filtrar</Button>
+        <Button className="min-h-11 rounded-xl w-full sm:w-auto" data-action-id="catalogo.medios_pago.filtro.aplicar" type="submit">Filtrar</Button>
         {categoriaFilter ? (
-          <Button nativeButton={false} render={<Link href={buildAdminHref("/medios-pago", { organizationId })} />} variant="outline">
+          <Button className="col-span-2 min-h-11 rounded-xl w-full sm:w-auto" nativeButton={false} render={<Link href={buildAdminHref("/medios-pago", { organizationId })} />} variant="outline">
             Limpiar
           </Button>
         ) : null}
