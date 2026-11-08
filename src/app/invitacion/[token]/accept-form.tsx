@@ -15,14 +15,14 @@ export function AcceptInvitationForm({ token, email, name }: { token: string; em
       <div className="rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground">Invitación para <strong>{email}</strong></div>
       <Field>
         <FieldLabel required>Nombre</FieldLabel>
-        <Input defaultValue={name} name="nombre" required />
+        <Input autoComplete="name" defaultValue={name} name="nombre" required />
       </Field>
       <Field>
         <FieldLabel required>Contraseña</FieldLabel>
-        <Input minLength={12} name="password" required type="password" />
+        <Input autoComplete="new-password" minLength={12} name="password" required type="password" />
       </Field>
       {state.error ? <p className="anim-entrada rounded-xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm font-medium text-destructive-soft-foreground" role="alert">{state.error}</p> : null}
-      <Button className="h-11 w-full rounded-xl" disabled={isPending} type="submit">
+      <Button className="h-11 w-full rounded-xl" data-action-clave="1" data-action-id="invitacion.aceptar" disabled={isPending} type="submit">
         {isPending ? "Creando acceso…" : "Aceptar invitación"}
       </Button>
     </form>

@@ -4,9 +4,9 @@ import { useActionState, useState } from "react";
 
 import { registrarMovimientoCaja } from "@/app/admin/caja/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, Input } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
-import { initialActionState, type ActionState } from "@/lib/action-state";
+import { fieldError, initialActionState, type ActionState } from "@/lib/action-state";
 
 type MedioPago = { id: string; nombre: string };
 
@@ -32,6 +32,7 @@ export function MovimientoCajaForm({
     registrarMovimientoCaja,
     initialActionState,
   );
+  const fe = (name: string) => fieldError(state, name);
   const [tipo, setTipo] = useState("entrada");
   const notaRequerida = tipo !== "entrada";
 
@@ -81,12 +82,14 @@ export function MovimientoCajaForm({
           <FieldLabel className="text-op-xs">Monto</FieldLabel>
           <Input
             inputMode="decimal"
+            invalid={Boolean(fe("monto"))}
             min={tipo === "ajuste" ? undefined : "0.01"}
             name="monto"
             placeholder="0.00"
             step="0.01"
             type="number"
           />
+          <FieldError error={fe("monto")} />
         </Field>
       </div>
 
@@ -95,6 +98,7 @@ export function MovimientoCajaForm({
           Nota{notaRequerida ? " (obligatoria)" : ""}
         </FieldLabel>
         <Input
+          invalid={Boolean(fe("notas"))}
           maxLength={500}
           name="notas"
           placeholder={
@@ -109,6 +113,7 @@ export function MovimientoCajaForm({
                     : "Ej. préstamo para cambio"
           }
         />
+        <FieldError error={fe("notas")} />
       </Field>
 
       <ActionFeedback state={state} />

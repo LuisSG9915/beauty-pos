@@ -553,7 +553,7 @@ export function AgendaBoard({
         <Button
           className="rounded-xl max-lg:hidden"
           data-action-clave="1"
-          data-action-id="agenda.cita.abrir_formulario"
+          data-action-id="agenda.cita.abrir_formulario.desktop"
           onClick={abrirNuevaCita}
           size="lg"
           type="button"
@@ -621,7 +621,7 @@ export function AgendaBoard({
         aria-label="Nueva cita"
         className="fixed bottom-20 right-4 z-30 rounded-full shadow-lg lg:hidden"
         data-action-clave="1"
-        data-action-id="agenda.cita.abrir_formulario"
+        data-action-id="agenda.cita.abrir_formulario.fab"
         onClick={abrirNuevaCita}
         size="touch"
         type="button"

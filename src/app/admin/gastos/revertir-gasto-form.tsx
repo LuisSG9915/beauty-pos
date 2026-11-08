@@ -14,9 +14,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, Input } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
-import { initialActionState, type ActionState } from "@/lib/action-state";
+import { fieldError, initialActionState, type ActionState } from "@/lib/action-state";
 
 /**
  * Reversión con motivo obligatorio dentro del diálogo destructivo estándar:
@@ -38,6 +38,7 @@ export function RevertirGastoForm({
   const toast = useToast();
   const [abierto, setAbierto] = useState(false);
   const [state, action, pending] = useActionState(revertirGastoAction, initialActionState);
+  const fe = (name: string) => fieldError(state, name);
 
   const handled = useRef<ActionState | null>(null);
   useEffect(() => {
@@ -68,7 +69,8 @@ export function RevertirGastoForm({
           </AlertDialogHeader>
           <Field>
             <FieldLabel required>Motivo</FieldLabel>
-            <Input name="motivo" placeholder={`Por qué se revierte «${concepto}»`} required />
+            <Input invalid={Boolean(fe("motivo"))} name="motivo" placeholder={`Por qué se revierte «${concepto}»`} required />
+            <FieldError error={fe("motivo")} />
           </Field>
           <ActionFeedback state={state} />
           <AlertDialogFooter>

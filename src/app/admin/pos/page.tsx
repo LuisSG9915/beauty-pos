@@ -1,5 +1,5 @@
 import { and, desc, eq, gte, lt, sql } from "drizzle-orm";
-import { WifiOff } from "lucide-react";
+import { Receipt, WifiOff } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -253,6 +253,7 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
                 />
               }
               size="lg"
+              variant="outline"
             >
               Nueva venta rápida
             </Button>
@@ -304,7 +305,7 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
         >
           <div className="space-y-2">
             {ventasHoy.length === 0 ? (
-              <EmptyState description="Aún no se han registrado ventas hoy en esta sucursal." title="Sin ventas hoy" />
+              <EmptyState description="Aún no se han registrado ventas hoy en esta sucursal." icon={Receipt} title="Sin ventas hoy" />
             ) : null}
             {ventasHoy.map((venta, index) => (
               <Link

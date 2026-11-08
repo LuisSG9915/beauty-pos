@@ -347,7 +347,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
         {serviceRows.length === 0 ? (
           <EmptyState description="Crea servicios para el salón: cortes, tratamientos, manicure, etc." title="No hay servicios" />
         ) : (
-          <VistaAdaptativa>
+          <div>
             <RegistroList>
               {serviceRows.map((service) => (
                 <RegistroCard
@@ -392,7 +392,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Sea
               rowKey={(service) => service.id}
               rows={serviceRows}
             />
-          </VistaAdaptativa>
+          </div>
         )}
       </AdminCard>
       {editing || firstParam(params.nuevo) === "1" ? (

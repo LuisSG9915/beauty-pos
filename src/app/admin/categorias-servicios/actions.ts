@@ -18,11 +18,18 @@ const categorySchema = z.object({
   descripcion: z.string().trim().max(500).optional().or(z.literal("")),
 });
 
-export type CategoryActionState = { error?: string; success?: boolean };
+export type CategoryActionState = { error?: string; success?: boolean; fieldErrors?: Record<string, string> };
 
 export async function saveServiceCategory(_previousState: CategoryActionState, formData: FormData): Promise<CategoryActionState> {
   const result = categorySchema.safeParse(Object.fromEntries(formData.entries()));
-  if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa la categoría." };
+  if (!result.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of result.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
+    return { error: result.error.issues[0]?.message ?? "Revisa la categoría.", fieldErrors };
+  }
   const input = result.data;
   const access = await checkPermission(input.organizacionId, "catalogos.editar");
   if (!access) return { error: "No tienes permiso para editar catálogos." };

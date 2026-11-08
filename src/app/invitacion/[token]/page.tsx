@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import Link from "next/link";
 
 import { AcceptInvitationForm } from "@/app/invitacion/[token]/accept-form";
 import { BrandMark } from "@/components/brand-mark";
@@ -28,7 +29,9 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
         <ThemeModeSelector iconOnly />
       </div>
       <section className="surface-elevated anim-entrada w-full max-w-md rounded-2xl border border-border bg-card p-8">
-        <BrandMark size={40} />
+        <Link className="inline-flex rounded-lg outline-offset-4" href="/">
+          <BrandMark size={40} />
+        </Link>
         <p className="mt-8 text-sm font-semibold uppercase tracking-[0.2em] text-primary">{BRAND.name}</p>
         <h1 className="mt-3 font-serif text-3xl font-semibold tracking-[-0.03em]">Acepta tu invitación</h1>
         {valid ? (

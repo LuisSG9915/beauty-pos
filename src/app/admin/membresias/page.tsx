@@ -180,7 +180,7 @@ export default async function MembresiasPage({ searchParams }: { searchParams: S
             <option value="oculto">Ocultos</option>
           </Select>
         </Field>
-        <Button className="rounded-xl" type="submit">Filtrar</Button>
+        <Button className="rounded-xl" data-action-id="catalogo.membresias.filtro.aplicar" type="submit">Filtrar</Button>
         {hasFilters ? (
           <Button nativeButton={false} render={<Link href={buildAdminHref("/membresias", { organizationId })} />} variant="outline">
             Limpiar

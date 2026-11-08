@@ -272,7 +272,9 @@ export function OfflineVenta() {
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-4">
           <div className="flex items-center gap-3">
             <Link
-              className="inline-flex size-9 items-center justify-center rounded-xl border border-border text-muted-foreground hover:bg-muted transition-colors"
+              aria-label="Volver al punto de venta"
+               data-action-id="offline.venta.volver"
+               className="inline-flex size-9 items-center justify-center rounded-xl border border-border text-muted-foreground hover:bg-muted transition-colors"
               href="/admin/pos"
               title="Volver al punto de venta normal"
             >
@@ -451,7 +453,7 @@ export function OfflineVenta() {
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                   <input
                     aria-label="Buscar en el catálogo"
-                    className="w-full rounded-xl border border-input bg-background pl-9 pr-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    className="h-11 w-full rounded-xl border border-input bg-background pl-9 pr-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     onChange={(e) => setBusqueda(e.target.value)}
                     placeholder="Buscar servicio o producto por nombre…"
                     type="search"

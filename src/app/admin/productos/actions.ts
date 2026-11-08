@@ -43,6 +43,8 @@ export type ProductActionState = {
    * subir la foto como imagen principal una vez persistido el producto.
    */
   createdId?: string;
+  /** Errores por campo para validación en línea. */
+  fieldErrors?: Record<string, string>;
 };
 
 /** Error interno: revierte la transacción del alta cuando falla el stock inicial. */
@@ -50,7 +52,14 @@ class StockInicialError extends Error {}
 
 export async function saveProduct(_previousState: ProductActionState, formData: FormData): Promise<ProductActionState> {
   const result = productSchema.safeParse(Object.fromEntries(formData.entries()));
-  if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa los datos del producto." };
+  if (!result.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of result.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
+    return { error: result.error.issues[0]?.message ?? "Revisa los datos del producto.", fieldErrors };
+  }
   const input = result.data;
   const access = await checkPermission(input.organizacionId, "catalogos.editar");
   if (!access) return { error: "No tienes permiso para editar catálogos." };

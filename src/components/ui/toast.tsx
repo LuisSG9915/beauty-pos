@@ -58,7 +58,7 @@ function ToastList() {
           <ToastPrimitive.Description className="text-sm leading-5 text-muted-foreground" />
         </ToastPrimitive.Content>
         {toast.actionProps ? (
-          <ToastPrimitive.Action className="shrink-0 self-center rounded-lg px-2.5 py-1.5 text-op-xs font-semibold text-primary transition-colors hover:bg-muted" />
+          <ToastPrimitive.Action className="shrink-0 self-center rounded-lg px-2.5 py-1.5 text-op-xs font-semibold text-primary transition-colors hover:bg-muted min-h-9" />
         ) : null}
         <ToastPrimitive.Close
           aria-label="Cerrar aviso"
@@ -80,7 +80,7 @@ export function ToastProvider({ children }: { children?: ReactNode }) {
     <ToastPrimitive.Provider timeout={6000}>
       {children}
       <ToastPrimitive.Portal>
-        <ToastPrimitive.Viewport className="fixed right-4 bottom-4 z-[100] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2 outline-none">
+        <ToastPrimitive.Viewport className="fixed right-4 bottom-20 z-[100] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2 outline-none lg:bottom-4">
           <ToastList />
         </ToastPrimitive.Viewport>
       </ToastPrimitive.Portal>

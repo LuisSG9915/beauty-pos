@@ -1,7 +1,7 @@
 import { Children, type ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { leerViewportPreference } from "@/lib/viewport-preference";
+import { leerViewportPreference, type ViewportPreference } from "@/lib/viewport-preference";
 
 /**
  * Emite SOLO el layout que el usuario verá según la cookie `melena_viewport`
@@ -20,8 +20,16 @@ export async function VistaAdaptativa({
   children: ReactNode;
   className?: string;
 }) {
-  const preferida = await leerViewportPreference();
-  if (!preferida) return <div className={cn("w-full min-w-0", className)}>{children}</div>;
-  const [movil, escritorio] = Children.toArray(children);
+  let preferida: ViewportPreference | null = null;
+  try {
+    preferida = await leerViewportPreference();
+  } catch {
+    preferida = null;
+  }
+  const lista = Children.toArray(children);
+  if (!preferida || lista.length !== 2) {
+    return <div className={cn("w-full min-w-0", className)}>{children}</div>;
+  }
+  const [movil, escritorio] = lista;
   return <div className={cn("w-full min-w-0", className)}>{preferida === "movil" ? movil : escritorio}</div>;
 }

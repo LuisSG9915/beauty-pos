@@ -3,6 +3,8 @@ import Link from "next/link";
 
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
+import { Paginacion } from "@/components/admin/paginacion";
 import { StatusBadge, type StatusTone } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
@@ -136,85 +138,115 @@ export default async function IncidentesPage({
           title="Sin incidentes"
         />
       ) : (
-        <AdminCard className="overflow-x-auto p-0 sm:p-0">
-          <table className="w-full min-w-[720px] text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-op-xs text-muted-foreground">
-                <th className="px-5 py-3 font-medium">Prioridad</th>
-                <th className="px-5 py-3 font-medium">Error</th>
-                <th className="px-5 py-3 font-medium">Estado</th>
-                <th className="px-5 py-3 font-medium">Veces</th>
-                <th className="px-5 py-3 font-medium">Negocios</th>
-                <th className="px-5 py-3 font-medium">Última vez</th>
-                <th className="px-5 py-3 font-medium">Responsable</th>
-              </tr>
-            </thead>
-            <tbody>
-              {incidentes.map((incidente) => {
-                const prioridad = PRIORIDAD_LABELS[incidente.prioridad] ?? PRIORIDAD_LABELS.p3;
-                const estado = ESTADO_LABELS[incidente.estado] ?? ESTADO_LABELS.nuevo;
-                return (
-                  <tr
-                    className="border-b border-border last:border-0 hover:bg-muted/60"
-                    key={incidente.id}
-                  >
-                    <td className="px-5 py-3">
-                      <StatusBadge tone={prioridad.tone}>{prioridad.label}</StatusBadge>
-                    </td>
-                    <td className="max-w-md px-5 py-3">
-                      <Link
-                        className="font-medium text-primary hover:underline"
-                        href={`/admin/incidentes/${incidente.id}`}
-                      >
-                        {incidente.titulo}
-                      </Link>
-                      <p className="mt-0.5 truncate text-op-xs text-muted-foreground">
-                        {FUENTE_LABELS[incidente.fuente] ?? incidente.fuente}
-                        {incidente.modulo ? ` · ${incidente.modulo}` : ""}
-                        {incidente.ruta ? ` · ${incidente.ruta}` : ""}
-                      </p>
-                    </td>
-                    <td className="px-5 py-3">
-                      <StatusBadge tone={estado.tone}>{estado.label}</StatusBadge>
-                    </td>
-                    <td className="px-5 py-3 tabular-nums">{incidente.ocurrencias}</td>
-                    <td className="px-5 py-3 tabular-nums">
-                      {incidente.organizacionesAfectadas}
-                    </td>
-                    <td className="px-5 py-3 text-op-xs text-muted-foreground">
-                      {formatDateTime(incidente.ultimaVezAt)}
-                    </td>
-                    <td className="px-5 py-3 text-op-xs text-muted-foreground">
-                      {incidente.asignadoNombre ?? "—"}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </AdminCard>
+        <VistaAdaptativa>
+          <div className="space-y-3">
+            {incidentes.map((incidente) => {
+              const prioridad = PRIORIDAD_LABELS[incidente.prioridad] ?? PRIORIDAD_LABELS.p3;
+              const estado = ESTADO_LABELS[incidente.estado] ?? ESTADO_LABELS.nuevo;
+              return (
+                <article className="surface-card rounded-xl border border-border bg-card p-4" key={incidente.id}>
+                  <div className="flex items-start justify-between gap-2">
+                    <Link className="font-medium text-primary hover:underline" href={`/admin/incidentes/${incidente.id}`}>
+                      {incidente.titulo}
+                    </Link>
+                    <StatusBadge tone={prioridad.tone}>{prioridad.label}</StatusBadge>
+                  </div>
+                  <p className="mt-0.5 truncate text-op-xs text-muted-foreground">
+                    {FUENTE_LABELS[incidente.fuente] ?? incidente.fuente}
+                    {incidente.modulo ? ` · ${incidente.modulo}` : ""}
+                    {incidente.ruta ? ` · ${incidente.ruta}` : ""}
+                  </p>
+                  <dl className="mt-3 grid grid-cols-2 gap-2 text-op-xs">
+                    <div>
+                      <dt className="text-muted-foreground">Estado</dt>
+                      <dd className="font-medium text-foreground">{estado.label}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Veces</dt>
+                      <dd className="font-medium text-foreground">{incidente.ocurrencias}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Negocios</dt>
+                      <dd className="font-medium text-foreground">{incidente.organizacionesAfectadas}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-muted-foreground">Última vez</dt>
+                      <dd className="font-medium text-foreground">{formatDateTime(incidente.ultimaVezAt)}</dd>
+                    </div>
+                  </dl>
+                  <p className="mt-2 text-op-xs text-muted-foreground">
+                    Responsable: {incidente.asignadoNombre ?? "—"}
+                  </p>
+                </article>
+              );
+            })}
+          </div>
+          <AdminCard className="overflow-x-auto p-0 sm:p-0">
+            <table aria-label="Incidentes de error" className="w-full min-w-[720px] text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-op-xs text-muted-foreground">
+                  <th className="px-5 py-3 font-medium">Prioridad</th>
+                  <th className="px-5 py-3 font-medium">Error</th>
+                  <th className="px-5 py-3 font-medium">Estado</th>
+                  <th className="px-5 py-3 font-medium">Veces</th>
+                  <th className="px-5 py-3 font-medium">Negocios</th>
+                  <th className="px-5 py-3 font-medium">Última vez</th>
+                  <th className="px-5 py-3 font-medium">Responsable</th>
+                </tr>
+              </thead>
+              <tbody>
+                {incidentes.map((incidente) => {
+                  const prioridad = PRIORIDAD_LABELS[incidente.prioridad] ?? PRIORIDAD_LABELS.p3;
+                  const estado = ESTADO_LABELS[incidente.estado] ?? ESTADO_LABELS.nuevo;
+                  return (
+                    <tr
+                      className="border-b border-border last:border-0 hover:bg-muted/60"
+                      key={incidente.id}
+                    >
+                      <td className="px-5 py-3">
+                        <StatusBadge tone={prioridad.tone}>{prioridad.label}</StatusBadge>
+                      </td>
+                      <td className="max-w-md px-5 py-3">
+                        <Link
+                          className="font-medium text-primary hover:underline"
+                          href={`/admin/incidentes/${incidente.id}`}
+                        >
+                          {incidente.titulo}
+                        </Link>
+                        <p className="mt-0.5 truncate text-op-xs text-muted-foreground">
+                          {FUENTE_LABELS[incidente.fuente] ?? incidente.fuente}
+                          {incidente.modulo ? ` · ${incidente.modulo}` : ""}
+                          {incidente.ruta ? ` · ${incidente.ruta}` : ""}
+                        </p>
+                      </td>
+                      <td className="px-5 py-3">
+                        <StatusBadge tone={estado.tone}>{estado.label}</StatusBadge>
+                      </td>
+                      <td className="px-5 py-3 tabular-nums">{incidente.ocurrencias}</td>
+                      <td className="px-5 py-3 tabular-nums">
+                        {incidente.organizacionesAfectadas}
+                      </td>
+                      <td className="px-5 py-3 text-op-xs text-muted-foreground">
+                        {formatDateTime(incidente.ultimaVezAt)}
+                      </td>
+                      <td className="px-5 py-3 text-op-xs text-muted-foreground">
+                        {incidente.asignadoNombre ?? "—"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </AdminCard>
+        </VistaAdaptativa>
       )}
 
-      <div className="flex items-center justify-between">
-        {page > 1 ? (
-          <Link
-            className="inline-flex min-h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/60"
-            href={`/admin/incidentes?${queryBase}&page=${page - 1}`}
-          >
-            ← Anterior
-          </Link>
-        ) : (
-          <span />
-        )}
-        {hasMore ? (
-          <Link
-            className="inline-flex min-h-10 items-center rounded-xl border border-border bg-card px-4 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/60"
-            href={`/admin/incidentes?${queryBase}&page=${page + 1}`}
-          >
-            Siguiente →
-          </Link>
-        ) : null}
-      </div>
+      <Paginacion
+        hasMore={hasMore}
+        hrefAnterior={page > 1 ? `/admin/incidentes?${queryBase}&page=${page - 1}` : null}
+        hrefSiguiente={hasMore ? `/admin/incidentes?${queryBase}&page=${page + 1}` : null}
+        pagina={page}
+      />
     </div>
   );
 }

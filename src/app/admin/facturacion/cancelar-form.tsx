@@ -14,9 +14,9 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, Input, Select } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
-import type { ActionState } from "@/lib/action-state";
+import { fieldError, type ActionState } from "@/lib/action-state";
 import { MOTIVOS_CANCELACION } from "@/modules/facturacion/sat";
 
 /** Solicita la cancelación de un comprobante emitido (motivo SAT + UUID sustituto si es 01). */
@@ -33,6 +33,7 @@ export function CancelarFacturaForm({
   const toast = useToast();
   const [abierto, setAbierto] = useState(false);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(cancelarFactura, {});
+  const fe = (name: string) => fieldError(state, name);
   const [motivo, setMotivo] = useState("02");
 
   const handled = useRef<ActionState | null>(null);
@@ -74,7 +75,8 @@ export function CancelarFacturaForm({
           {motivo === "01" ? (
             <Field>
               <FieldLabel required>Folio fiscal que lo sustituye</FieldLabel>
-              <Input name="uuidSustitucion" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX" required />
+              <Input invalid={Boolean(fe("uuidSustitucion"))} name="uuidSustitucion" placeholder="XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX" required />
+              <FieldError error={fe("uuidSustitucion")} />
             </Field>
           ) : (
             <input name="uuidSustitucion" type="hidden" value="" />

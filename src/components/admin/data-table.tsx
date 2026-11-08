@@ -54,7 +54,7 @@ export function dataTableColumnClass(
     column.hideBelow ? HIDE_BELOW_CLASS[column.hideBelow] : null,
     // El fondo sólido evita que las celdas de atrás se vean bajo la columna
     // fija durante el scroll horizontal dentro de la tarjeta.
-    column.stickyEnd ? "sticky right-0 bg-card" : null,
+    column.stickyEnd ? "sticky right-0 bg-card group-hover:bg-muted/60" : null,
   );
 }
 
@@ -66,16 +66,22 @@ export function dataTableColumnClass(
  * escritas a mano.
  */
 export function DataTable<Row>({
+  ariaLabel,
   columns,
   emptyMessage = "Sin registros.",
+  loading = false,
   minWidth = "640px",
   rowKey,
   rows,
   className,
 }: {
+  /** Etiqueta accesible de la tabla. */
+  ariaLabel?: string;
   columns: Array<DataTableColumn<Row>>;
   /** Mensaje de la fila única cuando `rows` viene vacío. */
   emptyMessage?: string;
+  /** Marca la tabla como en carga (aria-busy). */
+  loading?: boolean;
   /** Ancho mínimo antes de activar scroll horizontal. */
   minWidth?: string;
   rowKey: (row: Row, index: number) => string;
@@ -84,7 +90,7 @@ export function DataTable<Row>({
 }) {
   return (
     <div className={cn("overflow-x-auto", className)}>
-      <table className="w-full text-left text-op-xs leading-5" style={{ minWidth }}>
+      <table aria-busy={loading} aria-label={ariaLabel ?? "Tabla de registros"} className="w-full text-left text-op-xs leading-5" style={{ minWidth }}>
         <thead className="border-b border-border uppercase tracking-wide text-muted-foreground">
           <tr>
             {columns.map((column) => (
@@ -105,7 +111,7 @@ export function DataTable<Row>({
         <tbody>
           {rows.map((row, index) => (
             <tr
-              className="anim-entrada border-b border-border transition-colors last:border-0 hover:bg-muted/60"
+              className="anim-entrada group border-b border-border transition-colors last:border-0 hover:bg-muted/60"
               key={rowKey(row, index)}
               style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
             >

@@ -53,6 +53,12 @@ export default function PrivacidadPage() {
         <nav className="flex items-center gap-2">
           <ThemeModeSelector iconOnly />
           <Link
+            className="hidden h-8 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted sm:inline-flex"
+            href="/precios"
+          >
+            Precios
+          </Link>
+          <Link
             className="inline-flex h-8 items-center rounded-lg border border-border bg-card px-4 text-sm font-medium transition-colors hover:bg-muted"
             href="/registro"
           >
@@ -64,7 +70,7 @@ export default function PrivacidadPage() {
       <article className="mx-auto w-full max-w-4xl px-6 pb-20 pt-10 lg:px-10">
         <p className="text-sm font-semibold uppercase tracking-[0.22em] text-primary">Legal</p>
         <h1 className="mt-4 text-4xl font-semibold tracking-[-0.04em]">Aviso de privacidad</h1>
-        <p className="mt-4 text-sm text-muted-foreground">Última actualización: enero 2026</p>
+        <p className="mt-4 text-sm text-muted-foreground">Última actualización: noviembre 2026</p>
 
         <div className="mt-10 space-y-8">
           {secciones.map((seccion) => (

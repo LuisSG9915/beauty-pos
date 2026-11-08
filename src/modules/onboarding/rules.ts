@@ -5,6 +5,13 @@ import type {
   ResumenGuia,
 } from "./types";
 
+/** Un salón está "vacío" si aún no tiene servicios ni citas: es el caso en
+ *  el que el onboarding debe ofrecer el modo práctica en lugar de pedir
+ *  datos reales. */
+export function salonVacio(estado: EstadoNegocio): boolean {
+  return estado.serviciosActivos === 0 && estado.citasRegistradas === 0 && estado.ventasCobradas === 0;
+}
+
 /**
  * Pasos de la guía «configuración inicial». El orden es el recorrido
  * recomendado; cada paso declara el permiso necesario para realizarlo, de

@@ -4,12 +4,13 @@ import { useActionState } from "react";
 
 import { crearCategoriaGastoAction } from "@/app/admin/gastos/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, Input } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
-import { initialActionState } from "@/lib/action-state";
+import { fieldError, initialActionState } from "@/lib/action-state";
 
 export function CategoriaGastoForm({ organizationId }: { organizationId: string }) {
   const [state, action, pending] = useActionState(crearCategoriaGastoAction, initialActionState);
+  const fe = (name: string) => fieldError(state, name);
 
   return (
     <form action={action} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -18,12 +19,13 @@ export function CategoriaGastoForm({ organizationId }: { organizationId: string 
       <p className="mt-1 text-sm text-muted-foreground">Renta, insumos, sueldos, mantenimiento…</p>
       <Field className="mt-4">
         <FieldLabel required>Nombre</FieldLabel>
-        <Input name="nombre" placeholder="Nombre de la categoría" required />
+        <Input invalid={Boolean(fe("nombre"))} name="nombre" placeholder="Nombre de la categoría" required />
+        <FieldError error={fe("nombre")} />
       </Field>
       <div className="mt-3">
         <ActionFeedback state={state} />
       </div>
-      <Button className="mt-4 rounded-xl" disabled={pending} type="submit" variant="outline">
+      <Button className="mt-4 rounded-xl" data-action-clave="1" data-action-id="gastos.categoria.crear" disabled={pending} type="submit" variant="outline">
         {pending ? "Creando…" : "Crear categoría"}
       </Button>
     </form>

@@ -52,7 +52,7 @@ export function RegistroCard({
     >
       <div className="flex items-start justify-between gap-3 min-w-0">
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold leading-5 text-foreground">{titulo}</h3>
+          <h3 className="line-clamp-2 text-sm font-semibold leading-5 text-foreground">{titulo}</h3>
           {subtitulo ? (
             <p className="mt-0.5 truncate text-op-xs leading-5 text-muted-foreground">{subtitulo}</p>
           ) : null}

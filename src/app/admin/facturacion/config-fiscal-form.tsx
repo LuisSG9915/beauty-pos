@@ -4,9 +4,9 @@ import { useActionState } from "react";
 
 import { saveConfigFiscal } from "@/app/admin/facturacion/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, Input, Select } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
-import type { ActionState } from "@/lib/action-state";
+import { fieldError, type ActionState } from "@/lib/action-state";
 import { REGIMENES_FISCALES } from "@/modules/facturacion/sat";
 
 export type ConfigFiscalData = {
@@ -27,6 +27,7 @@ export function ConfigFiscalForm({
   initial?: ConfigFiscalData;
 }) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(saveConfigFiscal, {});
+  const fe = (name: string) => fieldError(state, name);
 
   return (
     <form action={formAction} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -38,11 +39,13 @@ export function ConfigFiscalForm({
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel required>RFC</FieldLabel>
-          <Input defaultValue={initial?.rfc ?? ""} maxLength={13} name="rfc" placeholder="AAA010101AAA" required />
+          <Input defaultValue={initial?.rfc ?? ""} invalid={Boolean(fe("rfc"))} maxLength={13} name="rfc" placeholder="AAA010101AAA" required />
+          <FieldError error={fe("rfc")} />
         </Field>
         <Field>
           <FieldLabel required>Razón social</FieldLabel>
-          <Input defaultValue={initial?.razonSocial ?? ""} name="razonSocial" placeholder="Salón Bella SA de CV" required />
+          <Input defaultValue={initial?.razonSocial ?? ""} invalid={Boolean(fe("razonSocial"))} name="razonSocial" placeholder="Salón Bella SA de CV" required />
+          <FieldError error={fe("razonSocial")} />
         </Field>
         <Field>
           <FieldLabel required>Régimen fiscal</FieldLabel>
@@ -56,7 +59,8 @@ export function ConfigFiscalForm({
         </Field>
         <Field>
           <FieldLabel required>Código postal fiscal</FieldLabel>
-          <Input defaultValue={initial?.codigoPostal ?? ""} inputMode="numeric" maxLength={5} name="codigoPostal" placeholder="06000" required />
+          <Input defaultValue={initial?.codigoPostal ?? ""} inputMode="numeric" invalid={Boolean(fe("codigoPostal"))} maxLength={5} name="codigoPostal" placeholder="06000" required />
+          <FieldError error={fe("codigoPostal")} />
         </Field>
         <Field>
           <FieldLabel>Serie</FieldLabel>

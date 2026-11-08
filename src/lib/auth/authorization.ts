@@ -298,7 +298,7 @@ type SessionContextRow = {
  * `acceso` es `null` cuando no se pidió organización, el usuario es admin de
  * plataforma (acceso sintético) o no es miembro activo.
  */
-export const resolveSessionContext = cache(async function resolveSessionContext(
+const _resolveSessionContextImpl = cache(async function _resolveSessionContextImpl(
   authUsuarioId: string,
   requestedOrganizationId: string | null,
 ): Promise<{
@@ -462,6 +462,38 @@ export const resolveSessionContext = cache(async function resolveSessionContext(
     acceso: row?.acceso ?? null,
   };
 });
+
+// Caché en memoria del isolate (Workers reutiliza el mismo isolate para
+// múltiples requests): evita la consulta a la BD cuando el mismo usuario
+// vuelve a pedir su contexto dentro de la ventana de TTL. Complementa al
+// caché KV (cross-request, 300 s) y al React.cache (por request).
+const ISOLATE_CACHE_TTL_MS = 60_000;
+type IsolateCacheEntry = {
+  value: Awaited<ReturnType<typeof _resolveSessionContextImpl>>;
+  expiresAt: number;
+};
+const isolateCache = new Map<string, IsolateCacheEntry>();
+
+export async function resolveSessionContext(
+  authUsuarioId: string,
+  requestedOrganizationId: string | null,
+): Promise<Awaited<ReturnType<typeof _resolveSessionContextImpl>>> {
+  const key = `${authUsuarioId}:${requestedOrganizationId ?? "default"}`;
+  const entry = isolateCache.get(key);
+  if (entry && entry.expiresAt > Date.now()) {
+    return entry.value;
+  }
+  const value = await _resolveSessionContextImpl(authUsuarioId, requestedOrganizationId);
+  isolateCache.set(key, { value, expiresAt: Date.now() + ISOLATE_CACHE_TTL_MS });
+  // Evitar crecimiento ilimitado del Map en isolates longevos.
+  if (isolateCache.size > 200) {
+    const now = Date.now();
+    for (const [k, v] of isolateCache) {
+      if (v.expiresAt <= now) isolateCache.delete(k);
+    }
+  }
+  return value;
+}
 
 export async function resolveAccess(organizationId: string): Promise<ResolvedAccess> {
   const { user } = await requireAuthenticatedUser();

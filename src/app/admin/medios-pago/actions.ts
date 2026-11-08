@@ -18,11 +18,18 @@ const paymentMethodSchema = z.object({
   categoria: z.enum(["efectivo", "tarjeta", "transferencia", "wallet", "otro"]),
 });
 
-export type PaymentMethodActionState = { error?: string; success?: boolean };
+export type PaymentMethodActionState = { error?: string; success?: boolean; fieldErrors?: Record<string, string> };
 
 export async function savePaymentMethod(_previousState: PaymentMethodActionState, formData: FormData): Promise<PaymentMethodActionState> {
   const result = paymentMethodSchema.safeParse(Object.fromEntries(formData.entries()));
-  if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa el medio de pago." };
+  if (!result.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of result.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
+    return { error: result.error.issues[0]?.message ?? "Revisa el medio de pago.", fieldErrors };
+  }
   const input = result.data;
   const access = await checkPermission(input.organizacionId, "catalogos.editar");
   if (!access) return { error: "No tienes permiso para editar catálogos." };

@@ -5,8 +5,9 @@ import { useActionState } from "react";
 
 import { inviteMember } from "@/app/admin/usuarios/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, Input, Select } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
+import { fieldError } from "@/lib/action-state";
 
 export function MemberInviteForm({
   organizationId,
@@ -18,6 +19,7 @@ export function MemberInviteForm({
   branches: Array<{ id: string; nombre: string }>;
 }) {
   const [state, formAction, isPending] = useActionState(inviteMember, {});
+  const fe = (name: string) => fieldError(state, name);
   const invitationUrl = state.data?.invitationUrl;
 
   return (
@@ -26,11 +28,13 @@ export function MemberInviteForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel required>Nombre</FieldLabel>
-          <Input name="nombre" placeholder="Nombre del miembro" required />
+          <Input invalid={Boolean(fe("nombre"))} name="nombre" placeholder="Nombre del miembro" required />
+          <FieldError error={fe("nombre")} />
         </Field>
         <Field>
           <FieldLabel required>Correo</FieldLabel>
-          <Input name="correo" placeholder="persona@salon.com" required type="email" />
+          <Input invalid={Boolean(fe("correo"))} name="correo" placeholder="persona@salon.com" required type="email" />
+          <FieldError error={fe("correo")} />
         </Field>
       </div>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

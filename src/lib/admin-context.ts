@@ -2,7 +2,7 @@ import { and, asc, eq, inArray } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
-import { getDatabase } from "@/db/client";
+import { getDatabase, getRequestScope } from "@/db/client";
 import { sucursales } from "@/db/schema/core";
 import { getSessionOrRedirect } from "@/lib/auth/access";
 import {
@@ -66,6 +66,25 @@ export type AdminContext = {
  *
  * Deduplicado por request vía `React.cache()` y cacheado en KV con TTL de 60 s.
  */
+// Caché por request: el layout resuelve el contexto con params por defecto y la
+// página (que llega con organizationId/sucursalId en la URL) reutiliza la misma
+// promesa cuando coinciden con el negocio/sucursal ya resueltos. Evita una
+// segunda ronda a la BD (resolveSessionContext) en la navegación client-side.
+const workerContextStore = new WeakMap<object, AdminContext>();
+const devContextStore = new Map<string, AdminContext>();
+
+function getStoredAdminContext(): AdminContext | undefined {
+  const scope = getRequestScope();
+  if (scope) return workerContextStore.get(scope);
+  return devContextStore.get("current");
+}
+
+function setStoredAdminContext(ctx: AdminContext): void {
+  const scope = getRequestScope();
+  if (scope) workerContextStore.set(scope, ctx);
+  else devContextStore.set("current", ctx);
+}
+
 const getAdminContextMemo = cache(
   async (
     requestedOrganizationId: string | null,
@@ -73,12 +92,26 @@ const getAdminContextMemo = cache(
     loadBranches: boolean,
     includeInactiveBranches: boolean,
   ): Promise<AdminContext> => {
+    // Reutilizar el contexto ya resuelto en este request cuando la org/sucursal
+    // pedidas coinciden con las ya resueltas (caso común en navegación
+    // client-side, donde el layout resuelve con params por defecto).
+    const stored = getStoredAdminContext();
+    if (
+      stored &&
+      (requestedOrganizationId === null || requestedOrganizationId === stored.organization?.id) &&
+      (requestedSucursalId === null || requestedSucursalId === stored.branch?.id) &&
+      loadBranches === true &&
+      includeInactiveBranches === false
+    ) {
+      return stored;
+    }
+
     const session = await getSessionOrRedirect();
     const db = getDatabase();
 
     const contextRow = await kvReadThrough(
       `admin-ctx:${session.user.id}:${requestedOrganizationId ?? "default"}`,
-      60,
+      300,
       () => resolveSessionContext(session.user.id, requestedOrganizationId ?? null),
     );
 
@@ -93,7 +126,7 @@ const getAdminContextMemo = cache(
         : undefined) ?? organizations[0] ?? null;
 
     if (!organization) {
-      return {
+      const result = {
         user,
         organizations,
         organization: null,
@@ -103,7 +136,7 @@ const getAdminContextMemo = cache(
           user,
           organizationId: "",
           membershipId: null,
-          permissions: new Set(),
+          permissions: new Set<string>(),
           branchIds: null,
           sucursalesActivas: [],
           esPlataforma: user.esAdministradorPlataforma,
@@ -112,6 +145,8 @@ const getAdminContextMemo = cache(
         timeZone: DEFAULT_TIME_ZONE,
         currency: "MXN",
       };
+      setStoredAdminContext(result);
+      return result;
     }
 
     // El acceso ya viaja en la consulta de contexto cuando la org pedida (o la
@@ -183,7 +218,7 @@ const getAdminContextMemo = cache(
       }
     }
 
-    return {
+    const result = {
       user,
       organizations,
       organization,
@@ -195,6 +230,8 @@ const getAdminContextMemo = cache(
       timeZone: resolveTimeZone(branch?.zonaHoraria, organization.zonaHoraria),
       currency: organization.moneda || "MXN",
     };
+    setStoredAdminContext(result);
+    return result;
   },
 );
 

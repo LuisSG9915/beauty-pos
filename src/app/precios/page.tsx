@@ -130,7 +130,15 @@ export default async function PreciosPage() {
         <nav className="flex items-center gap-2">
           <ThemeModeSelector iconOnly />
           <Link
-            className="inline-flex h-8 items-center rounded-lg border border-border bg-card px-4 text-sm font-medium transition-colors hover:bg-muted"
+            className="hidden h-11 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:inline-flex"
+            data-action-clave="1"
+            data-action-id="precios.registro.abrir"
+            href="/registro"
+          >
+            Crear cuenta gratis
+          </Link>
+          <Link
+            className="inline-flex h-11 items-center rounded-lg border border-border bg-card px-4 text-sm font-medium transition-colors hover:bg-muted"
             href="/login"
           >
             Iniciar sesión
@@ -164,6 +172,30 @@ export default async function PreciosPage() {
           usuarios de cada plan, sin costo por colaborador ni comisión por
           cliente nuevo.
         </p>
+      </section>
+
+      <section className="mx-auto w-full max-w-6xl px-6 pb-12 lg:px-10">
+        <div className="grid gap-5 md:grid-cols-2">
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <h2 className="text-xl font-semibold tracking-tight">Pruébalo en tu teléfono en 10 minutos</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Crea tu cuenta gratis, abre el modo práctica y recorre agenda, cobro y ticket sin tocar datos reales. Lo que practiques se queda en tu navegador.
+            </p>
+            <Link
+              className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+              data-action-id="precios.demo.abrir"
+              href="/registro"
+            >
+              Crear cuenta y practicar
+            </Link>
+          </div>
+          <div className="rounded-2xl border border-border bg-card p-6">
+            <h2 className="text-xl font-semibold tracking-tight">Prueba social</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Salones que ya usan Melena comparten su pasaporte de belleza (antes y después) para atraer clientas. Los casos reales se publican con permiso del salón; mientras tanto, el modo práctica muestra el flujo completo.
+            </p>
+          </div>
+        </div>
       </section>
 
       <section className="border-t border-border bg-card/70">

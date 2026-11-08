@@ -19,6 +19,10 @@ export type RemoteComboboxProps = {
   /** Nombre del input oculto que se envía en formularios/server actions. */
   name?: string;
   label?: string;
+  /** Etiqueta del resumen de selección (por defecto "Cliente seleccionado"). */
+  selectedLabel?: string;
+  /** Mensaje de error; marca el input con aria-invalid. */
+  error?: string;
   /** Clases extra para el label (ej. `sr-only` cuando el contexto ya lo explica). */
   labelClassName?: string;
   placeholder?: string;
@@ -48,6 +52,8 @@ export function RemoteCombobox({
   selectedItem,
   name,
   label,
+  selectedLabel = "Cliente seleccionado",
+  error,
   labelClassName,
   placeholder = "Escribe para buscar",
   minQuery = 0,
@@ -60,6 +66,9 @@ export function RemoteCombobox({
   "aria-describedby": ariaDescribedBy,
 }: RemoteComboboxProps) {
   const inputId = useId();
+  const errorId = error ? `${inputId}-error` : undefined;
+  const describedBy =
+    [ariaDescribedBy, errorId].filter(Boolean).join(" ") || undefined;
   const initialItemsList = useMemo(() => {
     if (initialDefaultItems && initialDefaultItems.length > 0) return initialDefaultItems;
     return initialItem ? [initialItem] : [];
@@ -206,7 +215,8 @@ export function RemoteCombobox({
           )}
         >
           <ComboboxPrimitive.Input
-            aria-describedby={ariaDescribedBy}
+            aria-describedby={describedBy}
+            aria-invalid={error ? true : undefined}
             className={cn(
               "h-full w-full rounded-lg bg-transparent px-3 pr-16 text-sm text-foreground outline-none placeholder:text-muted-foreground",
               inputClassName?.includes("text-op-xs") && "text-op-xs",
@@ -270,10 +280,15 @@ export function RemoteCombobox({
           </ComboboxPrimitive.Positioner>
         </ComboboxPrimitive.Portal>
       </ComboboxPrimitive.Root>
+      {error ? (
+        <p className="text-op-xs font-medium text-destructive" id={errorId} role="alert">
+          {error}
+        </p>
+      ) : null}
       {seleccion ? (
         <p className="flex items-center gap-1.5 text-op-xs text-muted-foreground">
           <span className="inline-block size-1.5 rounded-full bg-success" />
-          <span>Cliente seleccionado:</span>
+          <span>{selectedLabel}:</span>
           <span className="font-medium text-foreground">{seleccion.label}</span>
           {seleccion.description ? <span>· {seleccion.description}</span> : null}
         </p>

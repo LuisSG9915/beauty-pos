@@ -197,7 +197,7 @@ export default async function PromotionsPage({ searchParams }: { searchParams: S
             <option value="oculto">Ocultas</option>
           </Select>
         </Field>
-        <Button className="rounded-xl" type="submit">Filtrar</Button>
+        <Button className="rounded-xl" data-action-id="catalogo.promociones.filtro.aplicar" type="submit">Filtrar</Button>
         {hasFilters ? (
           <Button nativeButton={false} render={<Link href={buildAdminHref("/promociones", { organizationId })} />} variant="outline">
             Limpiar

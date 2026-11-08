@@ -10,7 +10,7 @@ import { getDatabase } from "@/db/client";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { buildAdminHref } from "@/lib/url-context";
 import { cargarEstadoYProgresoGuia } from "@/modules/onboarding/queries";
-import { evaluarPasos, pasosParaPermisos, resumenGuia } from "@/modules/onboarding/rules";
+import { evaluarPasos, pasosParaPermisos, resumenGuia, salonVacio } from "@/modules/onboarding/rules";
 
 import { actualizarGuia } from "./actions";
 
@@ -84,6 +84,18 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
         title="Prepara tu negocio"
       />
 
+      {salonVacio(estado) ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-5 py-4">
+          <p className="text-sm text-foreground">
+            Tu negocio aún no tiene servicios ni citas. Puedes practicar el flujo completo con datos de ejemplo sin tocar tus datos reales.
+          </p>
+          <Button nativeButton={false} render={<Link href={buildAdminHref("/practica", { organizationId, sucursalId })} />} size="sm" variant="outline">
+            <FlaskConical aria-hidden="true" className="size-4" />
+            Practicar primero
+          </Button>
+        </div>
+      ) : null}
+
       {omitida && !resumen.terminada ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border bg-muted/60 px-5 py-4">
           <p className="text-sm text-muted-foreground">
@@ -91,7 +103,7 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
           </p>
           <form action={enviarAccionGuia}>
             {camposContexto("reanudar")}
-            <Button size="sm" type="submit">Reanudar guía</Button>
+            <Button data-action-id="guia.reanudar" size="sm" type="submit">Reanudar guía</Button>
           </form>
         </div>
       ) : null}
@@ -261,12 +273,12 @@ export default async function GuiaPage({ searchParams }: { searchParams: SearchP
         {resumen.terminada || omitida ? (
           <form action={enviarAccionGuia}>
             {camposContexto("reiniciar")}
-            <Button type="submit" variant="outline">Reiniciar guía</Button>
+            <Button data-action-id="guia.reiniciar" type="submit" variant="outline">Reiniciar guía</Button>
           </form>
         ) : (
           <form action={enviarAccionGuia}>
             {camposContexto("omitir")}
-            <Button type="submit" variant="ghost">Omitir por ahora</Button>
+            <Button data-action-id="guia.omitir" type="submit" variant="ghost">Omitir por ahora</Button>
           </form>
         )}
         <Link

@@ -122,6 +122,7 @@ export function Combobox({
           <ComboboxPrimitive.Input
             aria-describedby={describedBy}
             aria-invalid={error ? true : undefined}
+            aria-required={required}
             className={cn(
               "h-full w-full rounded-lg bg-transparent px-3 pr-16 text-sm text-foreground outline-none placeholder:text-muted-foreground",
               inputClassName,

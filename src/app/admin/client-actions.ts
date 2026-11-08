@@ -45,7 +45,7 @@ const clientSchema = z.object({
   confirmarDuplicado: z.literal("true").optional(),
 });
 
-export type ClientActionState = { error?: string; warning?: string; success?: boolean };
+export type ClientActionState = { error?: string; warning?: string; success?: boolean; fieldErrors?: Record<string, string> };
 export type ImportClientsState = { error?: string; success?: string };
 
 function normalize(value: string | undefined) {
@@ -55,7 +55,14 @@ function normalize(value: string | undefined) {
 export async function saveClient(_previousState: ClientActionState, formData: FormData): Promise<ClientActionState> {
   const raw = Object.fromEntries(formData.entries());
   const result = clientSchema.safeParse(raw);
-  if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa los datos del cliente." };
+  if (!result.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of result.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
+    return { error: result.error.issues[0]?.message ?? "Revisa los datos del cliente.", fieldErrors };
+  }
 
   const input = result.data;
   const access = await checkPermission(input.organizacionId, "clientes.editar");
@@ -123,7 +130,7 @@ const fichaSchema = z.object({
   privada: z.literal("true").optional(),
 });
 
-export type FichaActionState = { error?: string; success?: boolean; message?: string };
+export type FichaActionState = { error?: string; success?: boolean; message?: string; fieldErrors?: Record<string, string> };
 
 /** Registra una entrada de ficha técnica (fórmula, tratamiento, alergia, nota). */
 export async function saveFichaTecnica(
@@ -131,7 +138,14 @@ export async function saveFichaTecnica(
   formData: FormData,
 ): Promise<FichaActionState> {
   const result = fichaSchema.safeParse(Object.fromEntries(formData.entries()));
-  if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa la ficha." };
+  if (!result.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of result.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
+    return { error: result.error.issues[0]?.message ?? "Revisa la ficha.", fieldErrors };
+  }
   const input = result.data;
   const access = await checkPermission(input.organizacionId, "clientes.editar");
   if (!access) return { error: "No tienes permiso para editar expedientes." };
@@ -421,7 +435,7 @@ const consentimientoSchema = z.object({
   respuesta: z.enum(["aceptado", "rechazado"]),
 });
 
-export type ConsentimientoActionState = { error?: string; success?: boolean; message?: string };
+export type ConsentimientoActionState = { error?: string; success?: boolean; message?: string; fieldErrors?: Record<string, string> };
 
 /**
  * Registra el consentimiento informado del cliente (aceptado o rechazado) como
@@ -433,7 +447,14 @@ export async function saveConsentimiento(
   formData: FormData,
 ): Promise<ConsentimientoActionState> {
   const result = consentimientoSchema.safeParse(Object.fromEntries(formData.entries()));
-  if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa el consentimiento." };
+  if (!result.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of result.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
+    return { error: result.error.issues[0]?.message ?? "Revisa el consentimiento.", fieldErrors };
+  }
   const input = result.data;
   const access = await checkPermission(input.organizacionId, "clientes.editar");
   if (!access) return { error: "No tienes permiso para editar expedientes." };

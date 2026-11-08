@@ -6,7 +6,7 @@ import { saveFichaTecnica, type FichaActionState } from "@/app/admin/client-acti
 import { FichaFotosField } from "@/components/media-image-field";
 import { RecetarioEditor } from "@/components/recetario-editor";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Select, Textarea } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, Select, Textarea } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +52,7 @@ export function FichaForm({
 }) {
   const toast = useToast();
   const [state, formAction, pending] = useActionState(saveFichaTecnica, initialState);
+  const fe = state.fieldErrors ?? {};
   const formRef = useRef<HTMLFormElement>(null);
   const handled = useRef<FichaActionState | null>(null);
   const [tipo, setTipo] = useState(tipoDefault);
@@ -84,6 +85,7 @@ export function FichaForm({
         <Field>
           <FieldLabel required>Tipo de registro</FieldLabel>
           <Select
+            invalid={Boolean(fe.tipo)}
             name="tipo"
             onChange={(e) => setTipo(e.target.value)}
             value={tipo}
@@ -94,6 +96,7 @@ export function FichaForm({
               </option>
             ))}
           </Select>
+          <FieldError error={fe.tipo} />
         </Field>
       </div>
 
@@ -112,6 +115,7 @@ export function FichaForm({
           <Field>
             <FieldLabel>Detalle / observaciones</FieldLabel>
             <Textarea
+              invalid={Boolean(fe.notas)}
               name="notas"
               placeholder={
                 tipo === "alergia"
@@ -120,6 +124,7 @@ export function FichaForm({
               }
               rows={compact ? 2 : 3}
             />
+            <FieldError error={fe.notas} />
           </Field>
           <Field>
             <FieldLabel>Fotos de evidencia</FieldLabel>
@@ -136,7 +141,7 @@ export function FichaForm({
       ) : null}
 
       <ActionFeedback state={state} />
-      <Button className="w-full rounded-xl" disabled={pending} type="submit">
+      <Button className="w-full rounded-xl" data-action-clave="1" data-action-id="clientes.ficha.guardar" disabled={pending} type="submit">
         {pending ? "Guardando en ficha…" : "Guardar en ficha técnica"}
       </Button>
     </form>

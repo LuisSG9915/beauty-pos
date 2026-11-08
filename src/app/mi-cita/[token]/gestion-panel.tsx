@@ -186,6 +186,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
                     inputMode="tel"
                     onChange={(event) => setTelefono(event.target.value)}
                     placeholder="55 1234 5678"
+                    aria-label="Teléfono con el que reservaste"
                     type="tel"
                     value={telefono}
                   />
@@ -249,6 +250,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
                 inputMode="tel"
                 onChange={(event) => setTelefono(event.target.value)}
                 placeholder="55 1234 5678"
+                aria-label="Teléfono con el que reservaste"
                 type="tel"
                 value={telefono}
               />
@@ -289,6 +291,7 @@ export function GestionPanel({ token, reserva }: { token: string; reserva: Reser
                 inputMode="tel"
                 onChange={(event) => setTelefono(event.target.value)}
                 placeholder="55 1234 5678"
+                aria-label="Teléfono con el que reservaste"
                 type="tel"
                 value={telefono}
               />

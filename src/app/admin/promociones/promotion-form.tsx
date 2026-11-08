@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import { savePromotion, type PromotionActionState } from "@/app/admin/promociones/actions";
 import { FormTabs } from "@/components/form-tabs";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
 
 type PromotionData = {
@@ -24,6 +24,7 @@ type PromotionData = {
 export function PromotionForm({ organizationId, initial }: { organizationId: string; initial?: PromotionData }) {
   const [state, formAction, pending] = useActionState<PromotionActionState, FormData>(savePromotion, {});
   const value = (key: keyof PromotionData) => initial?.[key] ?? "";
+  const fe = state.fieldErrors ?? {};
   const tipo = (initial?.tipo ?? "porcentaje") as "porcentaje" | "monto" | "2x1" | "paquete";
   const aplica = (initial?.aplica ?? "ambos") as "producto" | "servicio" | "ambos";
 
@@ -31,7 +32,8 @@ export function PromotionForm({ organizationId, initial }: { organizationId: str
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field className="sm:col-span-2">
         <FieldLabel required>Nombre</FieldLabel>
-        <Input defaultValue={String(value("nombre"))} name="nombre" placeholder="Descuento del 10%" required />
+        <Input defaultValue={String(value("nombre"))} invalid={Boolean(fe.nombre)} name="nombre" placeholder="Descuento del 10%" required />
+        <FieldError error={fe.nombre} />
       </Field>
       <Field className="sm:col-span-2">
         <FieldLabel>Descripción</FieldLabel>
@@ -48,7 +50,8 @@ export function PromotionForm({ organizationId, initial }: { organizationId: str
       </Field>
       <Field>
         <FieldLabel required>Valor</FieldLabel>
-        <Input defaultValue={String(value("valor") || "0")} min="0" name="valor" placeholder="10" required step="0.001" type="number" />
+        <Input defaultValue={String(value("valor") || "0")} invalid={Boolean(fe.valor)} min="0" name="valor" placeholder="10" required step="0.001" type="number" />
+        <FieldError error={fe.valor} />
       </Field>
       <Field className="sm:col-span-2">
         <FieldLabel required>Aplica a</FieldLabel>
@@ -65,7 +68,8 @@ export function PromotionForm({ organizationId, initial }: { organizationId: str
           </summary>
           <Field className="mt-3">
             <FieldLabel>Clave</FieldLabel>
-            <Input name="clave" placeholder={initial.clave} />
+            <Input invalid={Boolean(fe.clave)} name="clave" placeholder={initial.clave} />
+            <FieldError error={fe.clave} />
             <FieldDescription>Déjala vacía para conservar la clave actual.</FieldDescription>
           </Field>
         </details>
@@ -77,7 +81,8 @@ export function PromotionForm({ organizationId, initial }: { organizationId: str
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <Field>
         <FieldLabel required>Vigencia desde</FieldLabel>
-        <Input defaultValue={String(value("vigenciaDesde"))} name="vigenciaDesde" required type="date" />
+        <Input defaultValue={String(value("vigenciaDesde"))} invalid={Boolean(fe.vigenciaDesde)} name="vigenciaDesde" required type="date" />
+        <FieldError error={fe.vigenciaDesde} />
       </Field>
       <Field>
         <FieldLabel>Vigencia hasta</FieldLabel>
@@ -113,7 +118,7 @@ export function PromotionForm({ organizationId, initial }: { organizationId: str
       <div className="mt-4">
         <ActionFeedback state={state} successMessage="Promoción guardada correctamente." />
       </div>
-      <Button className="mt-6 rounded-xl" disabled={pending} type="submit">{pending ? "Guardando…" : "Guardar promoción"}</Button>
+      <Button className="mt-6 rounded-xl" data-action-clave="1" data-action-id="catalogo.promociones.guardar" disabled={pending} type="submit">{pending ? "Guardando…" : "Guardar promoción"}</Button>
     </form>
   );
 }

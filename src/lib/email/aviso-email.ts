@@ -67,7 +67,7 @@ function plantillaPorTipo(tipo: string, input: AvisoCitaInput): Plantilla {
       return {
         subject: `Tu cita en ${negocio} cambió de horario`,
         titulo: "Tu cita cambió de horario",
-        mensaje: `Tu cita en <strong>${escapeHtml(negocio)}</strong> fue reagendada. Este es el nuevo horario:`,
+        mensaje: `Tu cita en <strong>${escapeHtml(negocio)}</strong> cambió de fecha. Este es el nuevo horario:`,
       };
     case "cancelacion":
       return {

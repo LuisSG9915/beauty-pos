@@ -21,8 +21,8 @@ export function RestablecerForm({ token }: { token: string }) {
     const password = String(formData.get("password") ?? "");
     const confirm = String(formData.get("confirm") ?? "");
 
-    if (password.length < 8) {
-      setErrorMessage("La contraseña necesita al menos 8 caracteres.");
+    if (password.length < 12) {
+      setErrorMessage("La contraseña necesita al menos 12 caracteres.");
       return;
     }
     if (password !== confirm) {
@@ -50,8 +50,8 @@ export function RestablecerForm({ token }: { token: string }) {
             required
             autoComplete="new-password"
             className="h-11 min-w-0 flex-1 border-0 bg-transparent px-0 focus:border-transparent focus:ring-0"
-            minLength={8}
-            placeholder="Mínimo 8 caracteres"
+            minLength={12}
+            placeholder="Mínimo 12 caracteres"
             type="password"
           />
         </div>
@@ -65,7 +65,7 @@ export function RestablecerForm({ token }: { token: string }) {
             required
             autoComplete="new-password"
             className="h-11 min-w-0 flex-1 border-0 bg-transparent px-0 focus:border-transparent focus:ring-0"
-            minLength={8}
+            minLength={12}
             placeholder="Escríbela igual"
             type="password"
           />
@@ -85,7 +85,7 @@ export function RestablecerForm({ token }: { token: string }) {
         </div>
       ) : null}
 
-      <Button className="h-11 w-full rounded-xl" data-action-id="auth.restablecer_guardar" disabled={isPending} type="submit">
+      <Button className="h-11 w-full rounded-xl" data-action-clave="1" data-action-id="auth.restablecer_guardar" disabled={isPending} type="submit">
         {isPending ? "Guardando..." : "Guardar contraseña"}
         {!isPending ? <ArrowRight className="size-4" /> : null}
       </Button>

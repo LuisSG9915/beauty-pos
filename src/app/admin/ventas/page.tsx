@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 
 import { AdminNavTabs, CAJA_VENTAS_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminPageHeader } from "@/components/admin/page-header";
+import { Paginacion } from "@/components/admin/paginacion";
 import { DataTable, type DataTableColumn } from "@/components/admin/data-table";
 import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { RegistroCard, RegistroList } from "@/components/admin/registro-lista";
@@ -292,7 +293,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
           <FieldLabel htmlFor="filtro-ventas-buscar">Buscar cliente</FieldLabel>
           <Input className="min-h-11" defaultValue={q} id="filtro-ventas-buscar" name="q" placeholder="Nombre del cliente" />
         </Field>
-        <Button className="min-h-11 rounded-xl w-full sm:w-auto" type="submit">Filtrar</Button>
+        <Button className="min-h-11 rounded-xl w-full sm:w-auto" data-action-id="ventas.filtro.aplicar" type="submit">Filtrar</Button>
       </form>
 
       {pageRows.length === 0 ? (
@@ -345,31 +346,12 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
         </VistaAdaptativa>
       )}
 
-      <div className="flex items-center justify-between gap-3 text-sm">
-        <span className="text-muted-foreground">Página {page}</span>
-        <div className="flex gap-2">
-          {page > 1 ? (
-            <Button
-              className="min-h-11"
-              nativeButton={false}
-              render={<Link href={pageHref(page - 1)} />}
-              variant="outline"
-            >
-              ← Anterior
-            </Button>
-          ) : null}
-          {hasMore ? (
-            <Button
-              className="min-h-11"
-              nativeButton={false}
-              render={<Link href={pageHref(page + 1)} />}
-              variant="outline"
-            >
-              Siguiente →
-            </Button>
-          ) : null}
-        </div>
-      </div>
+      <Paginacion
+        hasMore={hasMore}
+        hrefAnterior={page > 1 ? pageHref(page - 1) : null}
+        hrefSiguiente={hasMore ? pageHref(page + 1) : null}
+        pagina={page}
+      />
     </div>
   );
 }

@@ -1,17 +1,7 @@
 "use client";
 
-import Link from "next/link";
+import { Suspense, useCallback, useId, useMemo, useState, type ReactNode } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import {
-  Suspense,
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react";
 
 import { guardarSucursalPreferida } from "@/app/admin/actions";
 import { AdminSidebarNav, AdminTabBar, SignOutButton } from "@/components/admin-nav";
@@ -24,8 +14,7 @@ import { ThemeModeSelector } from "@/components/theme-mode-selector";
 import { ToastProvider } from "@/components/ui/toast";
 import { PoseTimerBar } from "@/components/pose-timer-bar";
 import { getClientSucursalCookie, setClientSucursalCookie } from "@/lib/sucursal-cookie-client";
-import { NAV_PENDING_EVENT, reportarNavegacionPendiente } from "@/lib/nav-pending";
-import { trackPerformance } from "@/lib/telemetry/cliente";
+import { reportarNavegacionPendiente } from "@/lib/nav-pending";
 import { buildAdminHref, buildHref, firstParam } from "@/lib/url-context";
 
 /** Sucursal visible para el selector global del shell. */
@@ -410,197 +399,15 @@ function initials(name: string) {
     .join("") || "·";
 }
 
-/**
- * Indicador de navegación del App Router. El shell no se desmonta entre
- * rutas, así que puede mostrar la barra de progreso mientras el destino
- * resuelve sus datos.
- *
- * La barra se limpia cuando cambian pathname/searchParams (el router confirma
- * el commit, a veces de forma optimista al mostrar el loading.tsx). No recarga
- * la página por su cuenta: una recarga a mitad de la navegación cancelaba la
- * respuesta en curso y duplicaba la espera (medido: la navegación a POS se
- * completó a los 5.9 s y aun así se recargó a los 6 s).
- */
-function NavigationActivity() {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  const searchKey = searchParams.toString();
-  const [pendingLabel, setPendingLabel] = useState<string | null>(null);
-  const startedAt = useRef<number | null>(null);
-  const targetPath = useRef<string | null>(null);
-  const targetKey = useRef<string | null>(null);
-  const targetHref = useRef<string | null>(null);
-  const tapTimes = useRef(new WeakMap<HTMLAnchorElement, number>());
-  const frameRef = useRef<number | null>(null);
-  const feedbackSent = useRef(false);
-
-  const reportar = useCallback((metrica: "nav_complete_ms") => {
-    if (startedAt.current === null) return;
-    trackPerformance(
-      metrica,
-      performance.now() - startedAt.current,
-      targetPath.current ?? undefined,
-    );
-  }, []);
-
-  const finish = useCallback(() => {
-    if (startedAt.current === null) return;
-    reportar("nav_complete_ms");
-    startedAt.current = null;
-    targetPath.current = null;
-    targetKey.current = null;
-    targetHref.current = null;
-    setPendingLabel(null);
-    if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
-    frameRef.current = null;
-  }, [reportar]);
-
-  const iniciarNav = useCallback(
-    (key: string, path: string, href: string, label: string) => {
-      if (startedAt.current !== null && targetKey.current === key) return;
-      if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
-      feedbackSent.current = false;
-      startedAt.current = performance.now();
-      targetPath.current = path;
-      targetKey.current = key;
-      targetHref.current = href;
-      setPendingLabel(label);
-
-      frameRef.current = window.requestAnimationFrame(() => {
-        if (startedAt.current === null || feedbackSent.current) return;
-        trackPerformance(
-          "nav_feedback_ms",
-          performance.now() - startedAt.current,
-          targetPath.current ?? undefined,
-        );
-        feedbackSent.current = true;
-      });
-    },
-    [],
-  );
-
-  useEffect(() => {
-    finish();
-  }, [finish, pathname, searchKey]);
-
-  useEffect(() => {
-    const onClick = (event: globalThis.MouseEvent) => {
-      if (
-        event.defaultPrevented ||
-        event.button !== 0 ||
-        event.metaKey ||
-        event.ctrlKey ||
-        event.shiftKey ||
-        event.altKey ||
-        !(event.target instanceof Element)
-      ) {
-        return;
-      }
-      const anchor = event.target.closest<HTMLAnchorElement>("a[href]");
-      if (!anchor || anchor.hasAttribute("download")) return;
-      if (anchor.target && anchor.target !== "_self") return;
-      const rawHref = anchor.getAttribute("href");
-      if (!rawHref || rawHref.startsWith("#")) return;
-
-      let url: URL;
-      try {
-        url = new URL(anchor.href);
-      } catch {
-        return;
-      }
-      if (url.origin !== window.location.origin) return;
-      if (url.pathname === window.location.pathname && url.search === window.location.search) {
-        return;
-      }
-
-      const key = `${url.pathname}${url.search}`;
-      const now = Date.now();
-      const lastGlobalTap = tapTimes.current.get(anchor) ?? 0;
-
-      // Doble toque accidental muy rápido (< 500 ms): ignorar rebote
-      if (now - lastGlobalTap < 500) {
-        event.preventDefault();
-        return;
-      }
-
-      if (startedAt.current !== null && targetKey.current === key) {
-        // En capture todavía no corre el onClick de Next Link; prevenir aquí
-        // evita que un segundo toque encole la misma navegación.
-        event.preventDefault();
-        return;
-      }
-      tapTimes.current.set(anchor, now);
-
-      const label = anchor.textContent?.replace(/\s+/g, " ").trim().slice(0, 40) || "sección";
-      iniciarNav(key, url.pathname, anchor.href, label);
-    };
-
-    // Navegaciones programáticas (router.push/replace, selects con redirect de
-    // server action): el destino llega por `melena:nav-pending`.
-    const onNavPending = (event: Event) => {
-      const href = (event as CustomEvent<{ href?: string }>).detail?.href;
-      if (typeof href !== "string" || !href) return;
-      let url: URL;
-      try {
-        url = new URL(href, window.location.origin);
-      } catch {
-        return;
-      }
-      if (url.origin !== window.location.origin) return;
-      const key = `${url.pathname}${url.search}`;
-      if (url.pathname === window.location.pathname && url.search === window.location.search) return;
-      iniciarNav(key, url.pathname, url.href, "sección");
-    };
-
-    // Atrás/adelante del navegador: la URL ya cambió; la barra se limpia
-    // cuando el router confirma la navegación.
-    const onPopState = () => {
-      iniciarNav(
-        `${window.location.pathname}${window.location.search}`,
-        window.location.pathname,
-        window.location.href,
-        "página anterior",
-      );
-    };
-
-    document.addEventListener("click", onClick, true);
-    window.addEventListener(NAV_PENDING_EVENT, onNavPending);
-    window.addEventListener("popstate", onPopState);
-    return () => {
-      document.removeEventListener("click", onClick, true);
-      window.removeEventListener(NAV_PENDING_EVENT, onNavPending);
-      window.removeEventListener("popstate", onPopState);
-      if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
-    };
-  }, [iniciarNav]);
-
-  return (
-    <>
-      {pendingLabel ? (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none fixed inset-x-0 top-0 z-[70] h-0.5 overflow-hidden bg-primary/15"
-        >
-          <span className="admin-nav-progress block h-full w-1/3 bg-primary" />
-        </div>
-      ) : null}
-      <span className="sr-only" data-navigation-activity="ready" role="status">
-        {pendingLabel ? `Abriendo ${pendingLabel}…` : ""}
-      </span>
-    </>
-  );
-}
-
 function HomeLink({ organizationId, sucursalId }: { organizationId?: string; sucursalId?: string }) {
   return (
-    <Link
+    <a
       aria-label="Ir al inicio del panel"
       className="inline-flex min-h-11 items-center rounded-lg outline-offset-4"
       href={buildAdminHref("", { organizationId, sucursalId })}
-      prefetch={false}
     >
       <BrandWordmark markSize={34} />
-    </Link>
+    </a>
   );
 }
 
@@ -672,9 +479,9 @@ export function AdminShell({
   return (
     <ToastProvider>
       <div className="flex min-h-dvh bg-background text-foreground">
-        <Suspense fallback={null}>
+        {/* <Suspense fallback={null}>
           <NavigationActivity />
-        </Suspense>
+        </Suspense> */}
         <a
           className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-foreground focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-background"
           href="#contenido-admin"
@@ -735,7 +542,7 @@ export function AdminShell({
         {/* Columna de contenido */}
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Header móvil: marca + organización */}
-          <header className="sticky top-0 z-40 max-w-full overflow-x-hidden border-b border-sidebar-border bg-card/95 backdrop-blur lg:hidden">
+          <header className="sticky top-0 z-30 max-w-full overflow-x-hidden border-b border-sidebar-border bg-card/95 backdrop-blur lg:hidden">
             <div className="flex items-center gap-3 px-4 py-3">
               <Suspense fallback={<BrandWordmark markSize={32} />}>
                 <SidebarHome

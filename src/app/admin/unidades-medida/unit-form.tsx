@@ -4,11 +4,12 @@ import { useActionState } from "react";
 
 import { saveUnit, type UnitActionState } from "@/app/admin/unidades-medida/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldLabel, Input } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel, Input } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
 
 export function UnitForm({ organizationId, initial }: { organizationId: string; initial?: { id: string; clave: string; nombre: string } }) {
   const [state, action, pending] = useActionState<UnitActionState, FormData>(saveUnit, {});
+  const fe = state.fieldErrors ?? {};
   return (
     <form action={action} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
       <input name="id" type="hidden" value={initial?.id ?? ""} />
@@ -18,7 +19,8 @@ export function UnitForm({ organizationId, initial }: { organizationId: string; 
       <div className="mt-5 space-y-4">
         <Field>
           <FieldLabel required>Nombre</FieldLabel>
-          <Input defaultValue={initial?.nombre} name="nombre" placeholder="Pieza" required />
+          <Input defaultValue={initial?.nombre} invalid={Boolean(fe.nombre)} name="nombre" placeholder="Pieza" required />
+          <FieldError error={fe.nombre} />
         </Field>
         {initial ? (
           <details className="rounded-xl border border-border bg-muted/60 px-4 py-3">
@@ -27,7 +29,8 @@ export function UnitForm({ organizationId, initial }: { organizationId: string; 
             </summary>
             <Field className="mt-3">
               <FieldLabel>Clave</FieldLabel>
-              <Input name="clave" placeholder={initial.clave} />
+              <Input invalid={Boolean(fe.clave)} name="clave" placeholder={initial.clave} />
+              <FieldError error={fe.clave} />
               <FieldDescription>Déjala vacía para conservar la clave actual.</FieldDescription>
             </Field>
           </details>

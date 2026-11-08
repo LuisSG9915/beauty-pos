@@ -4,7 +4,7 @@ import { useActionState } from "react";
 
 import { saveMembresia, type MembresiaActionState } from "@/app/admin/membresias/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
 
 export type MembresiaData = {
@@ -28,6 +28,7 @@ export function MembresiaForm({
 }) {
   const [state, formAction, pending] = useActionState<MembresiaActionState, FormData>(saveMembresia, {});
   const value = (key: keyof MembresiaData) => initial?.[key] ?? "";
+  const fe = state.fieldErrors ?? {};
 
   return (
     <form action={formAction} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -40,19 +41,23 @@ export function MembresiaForm({
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field className="sm:col-span-2">
           <FieldLabel required>Nombre</FieldLabel>
-          <Input defaultValue={String(value("nombre"))} name="nombre" placeholder="Membresía VIP" required />
+          <Input defaultValue={String(value("nombre"))} invalid={Boolean(fe.nombre)} name="nombre" placeholder="Membresía VIP" required />
+          <FieldError error={fe.nombre} />
         </Field>
         <Field>
           <FieldLabel required>Precio de venta</FieldLabel>
-          <Input defaultValue={String(value("precio"))} min="0" name="precio" placeholder="500.00" required step="0.01" type="number" />
+          <Input defaultValue={String(value("precio"))} invalid={Boolean(fe.precio)} min="0" name="precio" placeholder="500.00" required step="0.01" type="number" />
+          <FieldError error={fe.precio} />
         </Field>
         <Field>
           <FieldLabel required>Duración (días)</FieldLabel>
-          <Input defaultValue={String(value("duracionDias") || "30")} min="1" name="duracionDias" required step="1" type="number" />
+          <Input defaultValue={String(value("duracionDias") || "30")} invalid={Boolean(fe.duracionDias)} min="1" name="duracionDias" required step="1" type="number" />
+          <FieldError error={fe.duracionDias} />
         </Field>
         <Field>
           <FieldLabel required>Descuento %</FieldLabel>
-          <Input defaultValue={String(value("descuentoPorcentaje") || "10")} max="100" min="0" name="descuentoPorcentaje" required step="0.01" type="number" />
+          <Input defaultValue={String(value("descuentoPorcentaje") || "10")} invalid={Boolean(fe.descuentoPorcentaje)} max="100" min="0" name="descuentoPorcentaje" required step="0.01" type="number" />
+          <FieldError error={fe.descuentoPorcentaje} />
         </Field>
         <Field>
           <FieldLabel required>Aplica a</FieldLabel>
@@ -64,7 +69,8 @@ export function MembresiaForm({
         </Field>
         <Field className="sm:col-span-2">
           <FieldLabel>Descripción</FieldLabel>
-          <Textarea defaultValue={String(value("descripcion"))} name="descripcion" />
+          <Textarea defaultValue={String(value("descripcion"))} invalid={Boolean(fe.descripcion)} name="descripcion" />
+          <FieldError error={fe.descripcion} />
         </Field>
         {initial ? (
           <details className="rounded-xl border border-border bg-muted/60 px-4 py-3 sm:col-span-2">
@@ -73,7 +79,8 @@ export function MembresiaForm({
             </summary>
             <Field className="mt-3">
               <FieldLabel>Clave</FieldLabel>
-              <Input name="clave" placeholder={initial.clave} />
+              <Input invalid={Boolean(fe.clave)} name="clave" placeholder={initial.clave} />
+              <FieldError error={fe.clave} />
               <FieldDescription>Déjala vacía para conservar la clave actual.</FieldDescription>
             </Field>
           </details>
@@ -82,7 +89,7 @@ export function MembresiaForm({
       <div className="mt-4">
         <ActionFeedback state={state} successMessage="Membresía guardada correctamente." />
       </div>
-      <Button className="mt-6 rounded-xl" disabled={pending} type="submit">
+      <Button className="mt-6 rounded-xl" data-action-clave="1" data-action-id="catalogo.membresias.guardar" disabled={pending} type="submit">
         {pending ? "Guardando…" : "Guardar membresía"}
       </Button>
     </form>

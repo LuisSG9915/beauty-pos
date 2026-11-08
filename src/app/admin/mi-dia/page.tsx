@@ -215,6 +215,17 @@ export default async function MiDiaPage({ searchParams }: { searchParams: Search
         sucursalId={branch.id}
         timeZone={timeZone}
       />
+      <Button
+        aria-label="Ver agenda"
+        className="fixed bottom-20 right-4 z-30 rounded-full shadow-lg lg:hidden"
+        data-action-id="mi_dia.agenda.abrir.fab"
+        nativeButton={false}
+        render={<Link href={buildAdminHref("/agenda", { organizationId: organization.id, sucursalId: branch.id })} />}
+        size="touch"
+        variant="outline"
+      >
+        Ver agenda
+      </Button>
     </div>
   );
 }

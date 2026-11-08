@@ -4,9 +4,9 @@ import { useActionState } from "react";
 
 import { registrarGastoAction } from "@/app/admin/gastos/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, Input, Select } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
-import { initialActionState } from "@/lib/action-state";
+import { fieldError, initialActionState } from "@/lib/action-state";
 
 export type MedioPagoOpcion = { id: string; nombre: string; categoria: string };
 export type CategoriaGastoOpcion = { id: string; nombre: string };
@@ -33,6 +33,7 @@ export function GastoForm({
   fechaHoy: string;
 }) {
   const [state, action, pending] = useActionState(registrarGastoAction, initialActionState);
+  const fe = (name: string) => fieldError(state, name);
 
   return (
     <form action={action} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -46,24 +47,27 @@ export function GastoForm({
       <div className="mt-5 space-y-4">
         <Field>
           <FieldLabel required>Concepto</FieldLabel>
-          <Input name="concepto" placeholder="Renta del local, insumos, luz…" required />
+          <Input invalid={Boolean(fe("concepto"))} name="concepto" placeholder="Renta del local, insumos, luz…" required />
+          <FieldError error={fe("concepto")} />
         </Field>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel required>Fecha del gasto</FieldLabel>
-            <Input defaultValue={fechaHoy} name="fechaGasto" type="date" required />
+            <Input defaultValue={fechaHoy} invalid={Boolean(fe("fechaGasto"))} name="fechaGasto" type="date" required />
+            <FieldError error={fe("fechaGasto")} />
           </Field>
           <Field>
             <FieldLabel required>Importe</FieldLabel>
-            <Input min="0.01" name="importe" placeholder="0.00" required step="0.01" type="number" />
+            <Input invalid={Boolean(fe("importe"))} min="0.01" name="importe" placeholder="0.00" required step="0.01" type="number" />
+            <FieldError error={fe("importe")} />
           </Field>
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel required>Medio de pago</FieldLabel>
-            <Select name="medioPagoId" required>
+            <Select invalid={Boolean(fe("medioPagoId"))} name="medioPagoId" required>
               <option value="">Selecciona…</option>
               {medios.map((medio) => (
                 <option key={medio.id} value={medio.id}>
@@ -71,6 +75,7 @@ export function GastoForm({
                 </option>
               ))}
             </Select>
+            <FieldError error={fe("medioPagoId")} />
           </Field>
           <Field>
             <FieldLabel>Categoría</FieldLabel>

@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import { saveService, type ServiceActionState } from "@/app/admin/servicios/actions";
 import { ProductImageField } from "@/components/media-image-field";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
 
 type ServiceData = { id?: string; organizacionId: string; categoriaId?: string | null; clave: string; nombre: string; descripcion?: string | null; duracionMinutos: number; precioBase: string; visibleAgenda: boolean; requiereCabina: boolean; /** Llave R2 de la foto principal (null si aún no tiene). */ imagenClaveR2?: string | null };
@@ -13,6 +13,7 @@ type ServiceData = { id?: string; organizacionId: string; categoriaId?: string |
 export function ServiceForm({ organizationId, categories, initial }: { organizationId: string; categories: Array<{ id: string; nombre: string }>; initial?: ServiceData }) {
   const [state, formAction, pending] = useActionState<ServiceActionState, FormData>(saveService, {});
   const value = (key: keyof ServiceData) => initial?.[key] ?? "";
+  const fe = state.fieldErrors ?? {};
 
   // "Más opciones" arranca abierto solo cuando la edición ya trae datos no
   // básicos, para que el usuario vea lo que había llenado antes.
@@ -34,24 +35,28 @@ export function ServiceForm({ organizationId, categories, initial }: { organizat
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel required>Nombre</FieldLabel>
-          <Input defaultValue={String(value("nombre"))} name="nombre" placeholder="Corte de dama" required />
+          <Input defaultValue={String(value("nombre"))} invalid={Boolean(fe.nombre)} name="nombre" placeholder="Corte de dama" required />
+          <FieldError error={fe.nombre} />
         </Field>
         <Field>
           <FieldLabel required>Duración en minutos</FieldLabel>
-          <Input defaultValue={String(value("duracionMinutos") || 60)} min={5} name="duracionMinutos" required type="number" />
+          <Input defaultValue={String(value("duracionMinutos") || 60)} invalid={Boolean(fe.duracionMinutos)} min={5} name="duracionMinutos" required type="number" />
+          <FieldError error={fe.duracionMinutos} />
         </Field>
         <Field>
           <FieldLabel required>Precio base (MXN)</FieldLabel>
-          <Input defaultValue={String(value("precioBase"))} min="0" name="precioBase" placeholder="350.00" required step="0.01" type="number" />
+          <Input defaultValue={String(value("precioBase"))} invalid={Boolean(fe.precioBase)} min="0" name="precioBase" placeholder="350.00" required step="0.01" type="number" />
+          <FieldError error={fe.precioBase} />
         </Field>
         <Field>
           <FieldLabel>Categoría</FieldLabel>
-          <Select defaultValue={String(value("categoriaId"))} name="categoriaId">
+          <Select defaultValue={String(value("categoriaId"))} invalid={Boolean(fe.categoriaId)} name="categoriaId">
             <option value="">Sin categoría</option>
             {categories.map((category) => (
               <option key={category.id} value={category.id}>{category.nombre}</option>
             ))}
           </Select>
+          <FieldError error={fe.categoriaId} />
         </Field>
         <Field className="sm:col-span-2">
           <FieldLabel>Foto</FieldLabel>
@@ -80,7 +85,8 @@ export function ServiceForm({ organizationId, categories, initial }: { organizat
         <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field className="sm:col-span-2">
             <FieldLabel>Descripción</FieldLabel>
-            <Textarea defaultValue={String(value("descripcion"))} name="descripcion" />
+            <Textarea defaultValue={String(value("descripcion"))} invalid={Boolean(fe.descripcion)} name="descripcion" />
+              <FieldError error={fe.descripcion} />
           </Field>
           <label className="flex min-h-11 items-center gap-3 rounded-xl border border-border bg-card p-3 text-sm">
             <input defaultChecked={initial ? initial.visibleAgenda : true} name="visibleAgenda" type="checkbox" value="true" /> Visible en agenda
@@ -91,7 +97,8 @@ export function ServiceForm({ organizationId, categories, initial }: { organizat
           {initial ? (
             <Field className="sm:col-span-2">
               <FieldLabel>Clave</FieldLabel>
-              <Input name="clave" placeholder={initial.clave} />
+              <Input invalid={Boolean(fe.clave)} name="clave" placeholder={initial.clave} />
+              <FieldError error={fe.clave} />
               <FieldDescription>Déjala vacía para conservar la clave actual.</FieldDescription>
             </Field>
           ) : null}

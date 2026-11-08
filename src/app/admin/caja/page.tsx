@@ -390,7 +390,7 @@ export default async function CajaPage({ searchParams }: { searchParams: SearchP
                       })}
                     </ul>
                     <div className="mt-3 hidden overflow-x-auto sm:block">
-                      <table className="w-full text-left text-sm">
+                      <table aria-label="Historial de caja" className="w-full text-left text-sm">
                         <thead className="text-op-xs uppercase tracking-wider text-muted-foreground border-b border-border">
                           <tr>
                             <th className="py-1.5 pr-3 font-semibold">Medio de pago</th>

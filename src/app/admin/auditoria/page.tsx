@@ -1,8 +1,8 @@
 import { sql } from "drizzle-orm";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AdminPageHeader } from "@/components/admin/page-header";
+import { Paginacion } from "@/components/admin/paginacion";
 import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
@@ -231,21 +231,20 @@ export default async function AuditoriaPage({ searchParams }: { searchParams: Se
         </VistaAdaptativa>
       )}
 
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-muted-foreground">Página {page}</span>
-        <div className="flex gap-2">
-          {page > 1 ? (
-            <Button nativeButton={false} render={<Link href={buildAdminHref("/auditoria", { ...baseParams, extra: { ...baseParams.extra, page: String(page - 1) } })} />} variant="outline">
-              ← Anterior
-            </Button>
-          ) : null}
-          {hasMore ? (
-            <Button nativeButton={false} render={<Link href={buildAdminHref("/auditoria", { ...baseParams, extra: { ...baseParams.extra, page: String(page + 1) } })} />} variant="outline">
-              Siguiente →
-            </Button>
-          ) : null}
-        </div>
-      </div>
+      <Paginacion
+        hasMore={hasMore}
+        hrefAnterior={
+          page > 1
+            ? buildAdminHref("/auditoria", { ...baseParams, extra: { ...baseParams.extra, page: String(page - 1) } })
+            : null
+        }
+        hrefSiguiente={
+          hasMore
+            ? buildAdminHref("/auditoria", { ...baseParams, extra: { ...baseParams.extra, page: String(page + 1) } })
+            : null
+        }
+        pagina={page}
+      />
     </div>
   );
 }

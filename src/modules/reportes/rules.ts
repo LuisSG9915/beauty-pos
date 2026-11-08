@@ -120,6 +120,23 @@ export function derivarCitas(rows: readonly CitaEstadoRow[]) {
   return { totalCitas, completadas, finalizadas, asistencia };
 }
 
+// Ausencias: citas marcadas "no_asistio" sobre las citas cerradas
+// (completadas + no_asistio). Se excluyen canceladas del denominador para
+// que la tasa refleje "de los que se atendieron o no vinieron".
+export type AusenciasReporte = {
+  noAsistio: number;
+  totalCerradas: number;
+  tasa: number | null;
+};
+
+export function derivarAusencias(rows: readonly CitaEstadoRow[]): AusenciasReporte {
+  const noAsistio = Number(rows.find((row) => row.estado === "no_asistio")?.total ?? 0);
+  const completadas = Number(rows.find((row) => row.estado === "completada")?.total ?? 0);
+  const totalCerradas = noAsistio + completadas;
+  const tasa = totalCerradas > 0 ? Math.round((noAsistio / totalCerradas) * 100) : null;
+  return { noAsistio, totalCerradas, tasa };
+}
+
 export function derivarVentas(rows: readonly VentaDiaRow[]) {
   const vendido = rows.reduce((acc, row) => acc + Number(row.total ?? 0), 0);
   const propinasTotal = rows.reduce((acc, row) => acc + Number(row.propinas ?? 0), 0);

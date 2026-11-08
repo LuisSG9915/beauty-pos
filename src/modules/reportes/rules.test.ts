@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   deltaKpi,
   derivarAvisos,
+  derivarAusencias,
   derivarCitas,
   derivarReservasWeb,
   derivarVentas,
@@ -133,6 +134,26 @@ describe("derivarCitas", () => {
   it("asistencia null sin finalizadas", () => {
     expect(derivarCitas([{ estado: "pendiente", total: 3 }]).asistencia).toBeNull();
     expect(derivarCitas([]).asistencia).toBeNull();
+  });
+});
+
+describe("derivarAusencias", () => {
+  it("calcula no asistidas y tasa sobre cerradas", () => {
+    const rows = [
+      { estado: "completada", total: 8 },
+      { estado: "no_asistio", total: 2 },
+      { estado: "cancelada", total: 3 },
+    ];
+    const r = derivarAusencias(rows);
+    expect(r.noAsistio).toBe(2);
+    expect(r.totalCerradas).toBe(10);
+    expect(r.tasa).toBe(20);
+  });
+
+  it("tasa null sin citas cerradas", () => {
+    expect(derivarAusencias([{ estado: "pendiente", total: 3 }]).tasa).toBeNull();
+    expect(derivarAusencias([]).tasa).toBeNull();
+    expect(derivarAusencias([{ estado: "cancelada", total: 2 }]).tasa).toBeNull();
   });
 });
 

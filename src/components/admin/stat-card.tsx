@@ -19,6 +19,7 @@ type StatCardProps = {
 export function StatCard({ label, value, hint, icon: Icon, className }: StatCardProps) {
   return (
     <div
+      aria-label={typeof value === "string" ? `${label}: ${value}` : label}
       className={cn(
         "surface-card min-w-0 overflow-hidden rounded-2xl border border-border bg-card px-4 py-3.5 transition-colors duration-150",
         className,
@@ -28,7 +29,7 @@ export function StatCard({ label, value, hint, icon: Icon, className }: StatCard
         <p className="truncate text-op-xs font-medium text-muted-foreground">{label}</p>
         {Icon ? <Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.8} /> : null}
       </div>
-      <p className="mt-1.5 truncate text-2xl font-semibold tracking-tight text-foreground">{value}</p>
+      <p className="mt-1.5 break-words text-2xl font-semibold tracking-tight text-foreground">{value}</p>
       {hint ? <p className="mt-0.5 line-clamp-2 text-op-xs leading-4 text-muted-foreground">{hint}</p> : null}
     </div>
   );

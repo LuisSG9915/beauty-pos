@@ -16,7 +16,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
-import Link from "next/link";
+// import Link from "next/link"; // removed: using <a> for full page loads
 import { usePathname, useSearchParams } from "next/navigation";
 
 import { buildAdminHref, firstParam } from "@/lib/url-context";
@@ -50,7 +50,7 @@ export function AdminNavTabs({
     <nav
       aria-label="Sub-navegación de módulo"
       className={cn(
-        "inline-flex max-w-full items-center gap-1 overflow-x-auto no-scrollbar rounded-2xl border border-border/80 bg-muted/40 p-1 shadow-2xs backdrop-blur-xs",
+        "inline-flex max-w-full items-center gap-1 overflow-x-auto no-scrollbar rounded-2xl border border-border/80 bg-muted/40 p-0.5 shadow-2xs backdrop-blur-xs",
         className,
       )}
     >
@@ -61,10 +61,10 @@ export function AdminNavTabs({
         const Icon = tab.icon;
 
         return (
-          <Link
+          <a
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "inline-flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 py-1.5 text-op-xs sm:text-sm font-medium transition-all duration-200 select-none active:scale-[0.97]",
+              "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1 text-op-xs font-medium transition-all duration-200 select-none active:scale-[0.97]",
               isActive
                 ? "bg-card font-semibold text-foreground shadow-xs border border-border/80"
                 : "text-muted-foreground hover:bg-card/40 hover:text-foreground",
@@ -79,7 +79,7 @@ export function AdminNavTabs({
               <Icon
                 aria-hidden="true"
                 className={cn(
-                  "size-4 shrink-0 transition-colors",
+                  "size-3.5 shrink-0 transition-colors",
                   isActive ? "text-primary" : "text-muted-foreground",
                 )}
               />
@@ -99,7 +99,7 @@ export function AdminNavTabs({
                 {tab.badge}
               </span>
             ) : null}
-          </Link>
+          </a>
         );
       })}
     </nav>

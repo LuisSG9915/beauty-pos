@@ -95,7 +95,7 @@ export function LoginForm() {
       </p>
 
       <p className="text-center text-op-xs leading-5 text-muted-foreground">
-        El acceso se habilita mediante una invitación administrativa.
+        Si eres la dueña del negocio, crea tu cuenta en la página de registro; el equipo entra con una invitación.
       </p>
     </form>
   );

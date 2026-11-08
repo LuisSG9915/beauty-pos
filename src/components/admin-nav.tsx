@@ -37,7 +37,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
-import Link, { useLinkStatus } from "next/link";
+// import Link, { useLinkStatus } from "next/link"; // removed: using <a> for full page loads
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState, type MouseEvent } from "react";
 
@@ -91,6 +91,7 @@ const OPERACION: AdminNavItem[] = [
     description: "Citas, estados y venta en proceso",
     icon: Calendar,
     permiso: "agenda.ver",
+    prefetch: undefined,
   },
   {
     path: "/admin/mi-dia",
@@ -98,6 +99,7 @@ const OPERACION: AdminNavItem[] = [
     description: "Tus citas, propinas y comisiones de hoy",
     icon: CalendarCheck,
     permiso: "agenda.ver",
+    prefetch: undefined,
   },
   {
     path: "/admin/pos",
@@ -105,6 +107,7 @@ const OPERACION: AdminNavItem[] = [
     description: "Terminal POS, historial y caja",
     icon: ShoppingCart,
     permiso: ["ventas.ver", "caja.ver"],
+    prefetch: undefined,
     matchPaths: ["/admin/pos", "/admin/ventas", "/admin/caja"],
     children: [
       {
@@ -146,6 +149,7 @@ const CATALOGO_STOCK: AdminNavItem[] = [
     description: "Servicios, productos, paquetes y promociones",
     icon: Scissors,
     permiso: "catalogos.ver",
+    prefetch: undefined,
     matchPaths: [
       "/admin/servicios",
       "/admin/productos",
@@ -529,30 +533,7 @@ function guardNavTap(event: MouseEvent<HTMLAnchorElement>) {
 }
 
 /** Punto fijo + anuncio accesible mientras el `Link` está pendiente. */
-function LinkPendingIndicator({
-  compact = false,
-  label,
-}: {
-  compact?: boolean;
-  label: string;
-}) {
-  const { pending } = useLinkStatus();
-  return (
-    <>
-      <span
-        aria-hidden="true"
-        className={cn(
-          "pointer-events-none absolute rounded-full bg-primary opacity-0 transition-opacity data-[pending=true]:opacity-100",
-          compact ? "right-1.5 top-1.5 size-1.5" : "right-2 top-2 size-2",
-        )}
-        data-pending={pending}
-      />
-      <span className="sr-only" role="status">
-        {pending ? `Abriendo ${label}…` : ""}
-      </span>
-    </>
-  );
-}
+// LinkPendingIndicator removed: no longer using next/link
 
 function NavItemRow({
   item,
@@ -576,15 +557,10 @@ function NavItemRow({
   return (
     <div className="space-y-0.5">
       <div className="flex items-center gap-0.5">
-        <Link
-          aria-current={estaActivoDirecto ? "page" : undefined}
+        <a
+          aria-current={estaActivoDirecto ? "page" : estaEnSeccion && tieneHijos ? "true" : undefined}
           className={cn(navItemClasses(estaActivoDirecto || (estaEnSeccion && !tieneHijos)), "flex-1")}
           href={buildAdminHref(toAdminPath(item.path), { organizationId, sucursalId })}
-          onClick={(event) => {
-            guardNavTap(event);
-            if (!event.defaultPrevented) onNavigate?.();
-          }}
-          prefetch={item.prefetch ?? false}
           title={item.description}
         >
           <item.icon
@@ -593,13 +569,13 @@ function NavItemRow({
             strokeWidth={estaActivoDirecto || estaEnSeccion ? 2 : 1.8}
           />
           <span className="flex-1 truncate">{item.label}</span>
-          <LinkPendingIndicator label={item.label} />
-        </Link>
+          {/* <LinkPendingIndicator label={item.label} /> */}
+        </a>
         {tieneHijos ? (
           <button
             aria-expanded={abierto}
             aria-label={`Sub-opciones de ${item.label}`}
-            className="flex size-9 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+            className="flex size-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:size-9"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -621,20 +597,15 @@ function NavItemRow({
             const isChildActive = isItemActive(pathname, child.path, child.matchPaths);
             return (
               <li key={child.path}>
-                <Link
+                <a
                   aria-current={isChildActive ? "page" : undefined}
                   className={cn(
-                    "flex min-h-8 items-center gap-2 rounded-xl px-2.5 text-op-xs transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                    "flex min-h-11 items-center gap-2 rounded-xl px-2.5 text-op-xs transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] md:min-h-8",
                     isChildActive
                       ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
                       : "text-muted-foreground hover:bg-muted/70 hover:text-foreground",
                   )}
                   href={buildAdminHref(toAdminPath(child.path), { organizationId, sucursalId })}
-                  onClick={(event) => {
-                    guardNavTap(event);
-                    if (!event.defaultPrevented) onNavigate?.();
-                  }}
-                  prefetch={child.prefetch ?? false}
                   title={child.description}
                 >
                   <child.icon
@@ -643,8 +614,8 @@ function NavItemRow({
                     strokeWidth={isChildActive ? 2 : 1.8}
                   />
                   <span className="truncate">{child.label}</span>
-                  <LinkPendingIndicator compact label={child.label} />
-                </Link>
+                  {/* <LinkPendingIndicator compact label={child.label} /> */}
+                </a>
               </li>
             );
           })}
@@ -706,7 +677,7 @@ function SidebarSection({
     <section aria-label={section.title}>
       <button
         aria-expanded={abierta}
-        className="flex min-h-8 w-full items-center justify-between rounded-lg px-3 text-op-xs font-medium text-muted-foreground transition-colors duration-150 hover:text-primary"
+        className="flex min-h-11 w-full items-center justify-between rounded-lg px-3 text-op-xs font-medium text-muted-foreground transition-colors duration-150 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
         onClick={() => setManual(!abierta)}
         type="button"
       >
@@ -812,7 +783,7 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
           {items.map((item) => {
             const isActive = isItemActive(context.pathname, item.path);
             return (
-              <Link
+              <a
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
                   "relative flex min-h-14 flex-col items-center justify-center gap-0.5 text-op-xs font-medium transition-all duration-150 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-95",
@@ -826,12 +797,18 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
                   sucursalId: context.sucursalId,
                 })}
                 key={item.path}
-                onClick={guardNavTap}
+                onClick={(event) => {
+                  event.preventDefault();
+                  window.location.assign(buildAdminHref(toAdminPath(item.path), {
+                    organizationId: context.organizationId,
+                    sucursalId: context.sucursalId,
+                  }));
+                }}
               >
                 <item.icon aria-hidden="true" className="size-5 transition-transform duration-150" strokeWidth={isActive ? 2.2 : 1.8} />
                 {item.label}
-                <LinkPendingIndicator compact label={item.label} />
-              </Link>
+                {/* <LinkPendingIndicator compact label={item.label} /> */}
+              </a>
             );
           })}
           <button

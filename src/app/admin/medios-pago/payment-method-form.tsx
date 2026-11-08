@@ -4,7 +4,7 @@ import { useActionState } from "react";
 
 import { savePaymentMethod, type PaymentMethodActionState } from "@/app/admin/medios-pago/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldLabel, Input, Select } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel, Input, Select } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
 
 type PaymentMethodData = { id: string; clave: string; nombre: string; categoria: string };
@@ -19,6 +19,7 @@ const CATEGORIA_DESC: Record<string, string> = {
 
 export function PaymentMethodForm({ organizationId, initial }: { organizationId: string; initial?: PaymentMethodData }) {
   const [state, action, pending] = useActionState<PaymentMethodActionState, FormData>(savePaymentMethod, {});
+  const fe = state.fieldErrors ?? {};
   const categoria = (initial?.categoria ?? "efectivo") as "efectivo" | "tarjeta" | "transferencia" | "wallet" | "otro";
   return (
     <form action={action} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -30,18 +31,20 @@ export function PaymentMethodForm({ organizationId, initial }: { organizationId:
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel required>Nombre</FieldLabel>
-            <Input defaultValue={initial?.nombre} name="nombre" placeholder="Efectivo" required />
+            <Input defaultValue={initial?.nombre} invalid={Boolean(fe.nombre)} name="nombre" placeholder="Efectivo" required />
+            <FieldError error={fe.nombre} />
           </Field>
         </div>
         <Field>
           <FieldLabel required>Categoría</FieldLabel>
-          <Select defaultValue={categoria} name="categoria">
+          <Select defaultValue={categoria} invalid={Boolean(fe.categoria)} name="categoria">
             <option value="efectivo">Efectivo</option>
             <option value="tarjeta">Tarjeta</option>
             <option value="transferencia">Transferencia</option>
             <option value="wallet">Wallet digital</option>
             <option value="otro">Otro</option>
           </Select>
+          <FieldError error={fe.categoria} />
         </Field>
         <p className="rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">{CATEGORIA_DESC[categoria]}</p>
         {initial ? (
@@ -51,7 +54,8 @@ export function PaymentMethodForm({ organizationId, initial }: { organizationId:
             </summary>
             <Field className="mt-3">
               <FieldLabel>Clave</FieldLabel>
-              <Input name="clave" placeholder={initial.clave} />
+              <Input invalid={Boolean(fe.clave)} name="clave" placeholder={initial.clave} />
+              <FieldError error={fe.clave} />
               <FieldDescription>Déjala vacía para conservar la clave actual.</FieldDescription>
             </Field>
           </details>
@@ -60,7 +64,7 @@ export function PaymentMethodForm({ organizationId, initial }: { organizationId:
       <div className="mt-4">
         <ActionFeedback state={state} successMessage="Medio de pago guardado." />
       </div>
-      <Button className="mt-6 rounded-xl" disabled={pending} type="submit">{pending ? "Guardando…" : "Guardar medio de pago"}</Button>
+      <Button className="mt-6 rounded-xl" data-action-clave="1" data-action-id="catalogo.medios_pago.guardar" disabled={pending} type="submit">{pending ? "Guardando…" : "Guardar medio de pago"}</Button>
     </form>
   );
 }

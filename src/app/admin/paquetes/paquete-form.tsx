@@ -5,7 +5,7 @@ import { useActionState } from "react";
 import { savePaquete, type PaqueteActionState } from "@/app/admin/paquetes/actions";
 import { Button } from "@/components/ui/button";
 import { Combobox } from "@/components/ui/combobox";
-import { Field, FieldDescription, FieldLabel, Input, Textarea } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel, Input, Textarea } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
 
 export type PaqueteData = {
@@ -30,6 +30,7 @@ export function PaqueteForm({
 }) {
   const [state, formAction, pending] = useActionState<PaqueteActionState, FormData>(savePaquete, {});
   const value = (key: keyof PaqueteData) => initial?.[key] ?? "";
+  const fe = state.fieldErrors ?? {};
 
   return (
     <form action={formAction} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -42,7 +43,8 @@ export function PaqueteForm({
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field className="sm:col-span-2">
           <FieldLabel required>Nombre</FieldLabel>
-          <Input defaultValue={String(value("nombre"))} name="nombre" placeholder="Paquete 5 depilaciones" required />
+          <Input defaultValue={String(value("nombre"))} invalid={Boolean(fe.nombre)} name="nombre" placeholder="Paquete 5 depilaciones" required />
+          <FieldError error={fe.nombre} />
         </Field>
         <Field className="sm:col-span-2">
           <Combobox
@@ -60,15 +62,18 @@ export function PaqueteForm({
         </Field>
         <Field>
           <FieldLabel required>Sesiones incluidas</FieldLabel>
-          <Input defaultValue={String(value("sesiones") || "5")} min="1" name="sesiones" required step="1" type="number" />
+          <Input defaultValue={String(value("sesiones") || "5")} invalid={Boolean(fe.sesiones)} min="1" name="sesiones" required step="1" type="number" />
+          <FieldError error={fe.sesiones} />
         </Field>
         <Field>
           <FieldLabel required>Precio del paquete</FieldLabel>
-          <Input defaultValue={String(value("precio"))} min="0" name="precio" placeholder="800.00" required step="0.01" type="number" />
+          <Input defaultValue={String(value("precio"))} invalid={Boolean(fe.precio)} min="0" name="precio" placeholder="800.00" required step="0.01" type="number" />
+          <FieldError error={fe.precio} />
         </Field>
         <Field className="sm:col-span-2">
           <FieldLabel>Descripción</FieldLabel>
-          <Textarea defaultValue={String(value("descripcion"))} name="descripcion" />
+          <Textarea defaultValue={String(value("descripcion"))} invalid={Boolean(fe.descripcion)} name="descripcion" />
+          <FieldError error={fe.descripcion} />
         </Field>
         {initial ? (
           <details className="rounded-xl border border-border bg-muted/60 px-4 py-3 sm:col-span-2">
@@ -77,7 +82,8 @@ export function PaqueteForm({
             </summary>
             <Field className="mt-3">
               <FieldLabel>Clave</FieldLabel>
-              <Input name="clave" placeholder={initial.clave} />
+              <Input invalid={Boolean(fe.clave)} name="clave" placeholder={initial.clave} />
+              <FieldError error={fe.clave} />
               <FieldDescription>Déjala vacía para conservar la clave actual.</FieldDescription>
             </Field>
           </details>

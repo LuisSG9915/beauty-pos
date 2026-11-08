@@ -39,6 +39,7 @@ const organizationSchema = z.object({
 export type OrganizationActionState = {
   error?: string;
   success?: boolean;
+  fieldErrors?: Record<string, string>;
 };
 
 export async function createOrganization(
@@ -54,8 +55,14 @@ export async function createOrganization(
   });
 
   if (!result.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of result.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
     return {
       error: result.error.issues[0]?.message ?? "Revisa los datos del formulario.",
+      fieldErrors,
     };
   }
 
@@ -148,6 +155,7 @@ export type InvitationActionState = {
   error?: string;
   success?: boolean;
   invitationUrl?: string;
+  fieldErrors?: Record<string, string>;
 };
 
 export async function createInvitation(
@@ -164,7 +172,12 @@ export async function createInvitation(
   });
 
   if (!result.success) {
-    return { error: result.error.issues[0]?.message ?? "Revisa los datos de la invitación." };
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of result.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
+    return { error: result.error.issues[0]?.message ?? "Revisa los datos de la invitación.", fieldErrors };
   }
 
   try {

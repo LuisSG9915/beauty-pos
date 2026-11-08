@@ -21,7 +21,7 @@ const pagoManualSchema = z.object({
   referencia: z.string().trim().max(160).optional(),
 });
 
-export type PagoManualState = { error?: string; ok?: boolean };
+export type PagoManualState = { error?: string; ok?: boolean; fieldErrors?: Record<string, string> };
 
 /**
  * Activación manual de una suscripción (cobro por transferencia). Aplica el
@@ -44,7 +44,12 @@ export async function registrarPagoSuscripcion(
     referencia: formData.get("referencia") || undefined,
   });
   if (!input.success) {
-    return { error: "Revisa los datos del pago." };
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of input.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
+    return { error: "Revisa los datos del pago.", fieldErrors };
   }
 
   const db = getDatabase();

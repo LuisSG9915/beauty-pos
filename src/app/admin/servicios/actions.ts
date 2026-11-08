@@ -30,11 +30,23 @@ export type ServiceActionState = {
   warning?: string;
   /** La baja requiere confirmación porque el servicio tiene citas o ventas. */
   needsConfirm?: boolean;
+  /** Errores por campo para validación en línea (clave = name del input). */
+  fieldErrors?: Record<string, string>;
 };
 
 export async function saveService(_previousState: ServiceActionState, formData: FormData): Promise<ServiceActionState> {
   const result = serviceSchema.safeParse(Object.fromEntries(formData.entries()));
-  if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa los datos del servicio." };
+  if (!result.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of result.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
+    return {
+      error: result.error.issues[0]?.message ?? "Revisa los datos del servicio.",
+      fieldErrors,
+    };
+  }
   const input = result.data;
   const access = await checkPermission(input.organizacionId, "catalogos.editar");
   if (!access) return { error: "No tienes permiso para editar catálogos." };

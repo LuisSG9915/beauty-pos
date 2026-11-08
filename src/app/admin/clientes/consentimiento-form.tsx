@@ -4,7 +4,7 @@ import { useActionState, useEffect, useRef } from "react";
 
 import { saveConsentimiento, type ConsentimientoActionState } from "@/app/admin/client-actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +34,7 @@ export function ConsentimientoForm({
 }) {
   const toast = useToast();
   const [state, formAction, pending] = useActionState(saveConsentimiento, initialState);
+  const fe = state.fieldErrors ?? {};
   const formRef = useRef<HTMLFormElement>(null);
   const handled = useRef<ConsentimientoActionState | null>(null);
 
@@ -55,22 +56,26 @@ export function ConsentimientoForm({
       <div className={cn("grid gap-3", compact ? "grid-cols-1" : "sm:grid-cols-2")}>
         <Field>
           <FieldLabel required>Título</FieldLabel>
-          <Input name="titulo" placeholder="Consentimiento de depilación láser" required />
+          <Input invalid={Boolean(fe.titulo)} name="titulo" placeholder="Consentimiento de depilación láser" required />
+          <FieldError error={fe.titulo} />
         </Field>
         <Field>
           <FieldLabel required>Firmado por</FieldLabel>
-          <Input defaultValue={nombreCliente ?? ""} name="firmadoPor" placeholder="Nombre de quien firma" required />
+          <Input defaultValue={nombreCliente ?? ""} invalid={Boolean(fe.firmadoPor)} name="firmadoPor" placeholder="Nombre de quien firma" required />
+          <FieldError error={fe.firmadoPor} />
         </Field>
       </div>
 
       <Field>
         <FieldLabel required>Texto del consentimiento</FieldLabel>
         <Textarea
+          invalid={Boolean(fe.contenido)}
           name="contenido"
           placeholder="Declaro que se me informaron los riesgos y cuidados del procedimiento…"
           required
           rows={compact ? 3 : 4}
         />
+        <FieldError error={fe.contenido} />
       </Field>
 
       <Field className="sm:max-w-52">
@@ -82,7 +87,7 @@ export function ConsentimientoForm({
       </Field>
 
       <ActionFeedback state={state} />
-      <Button className="rounded-xl" disabled={pending} type="submit">
+      <Button className="rounded-xl" data-action-clave="1" data-action-id="clientes.consentimiento.registrar" disabled={pending} type="submit">
         {pending ? "Guardando…" : "Registrar consentimiento"}
       </Button>
     </form>

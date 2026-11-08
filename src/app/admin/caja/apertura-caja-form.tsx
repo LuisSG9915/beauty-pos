@@ -4,8 +4,9 @@ import { useActionState } from "react";
 
 import { abrirCaja, type CajaActionState } from "@/app/admin/caja/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input, Textarea } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, Input, Textarea } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
+import { fieldError } from "@/lib/action-state";
 
 const initialState: CajaActionState = {};
 
@@ -17,6 +18,7 @@ export function AperturaCajaForm({
   sucursalId: string;
 }) {
   const [state, formAction, pending] = useActionState(abrirCaja, initialState);
+  const fe = (name: string) => fieldError(state, name);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -25,11 +27,13 @@ export function AperturaCajaForm({
 
       <Field>
         <FieldLabel required>Fondo inicial (efectivo en caja)</FieldLabel>
-        <Input inputMode="decimal" min="0" name="fondoInicial" placeholder="0.00" required step="0.01" type="number" />
+        <Input inputMode="decimal" invalid={Boolean(fe("fondoInicial"))} min="0" name="fondoInicial" placeholder="0.00" required step="0.01" type="number" />
+        <FieldError error={fe("fondoInicial")} />
       </Field>
       <Field>
         <FieldLabel>Notas</FieldLabel>
-        <Textarea name="notas" placeholder="Observaciones de apertura" rows={2} />
+        <Textarea invalid={Boolean(fe("notas"))} name="notas" placeholder="Observaciones de apertura" rows={2} />
+        <FieldError error={fe("notas")} />
       </Field>
 
       <ActionFeedback state={state} />

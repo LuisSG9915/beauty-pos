@@ -18,11 +18,18 @@ const taxSchema = z.object({
   tipo: z.enum(["agregado", "incluido", "exento"]),
 });
 
-export type TaxActionState = { error?: string; success?: boolean };
+export type TaxActionState = { error?: string; success?: boolean; fieldErrors?: Record<string, string> };
 
 export async function saveTax(_previousState: TaxActionState, formData: FormData): Promise<TaxActionState> {
   const result = taxSchema.safeParse(Object.fromEntries(formData.entries()));
-  if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa el impuesto." };
+  if (!result.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of result.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
+    return { error: result.error.issues[0]?.message ?? "Revisa el impuesto.", fieldErrors };
+  }
   const input = result.data;
   const access = await checkPermission(input.organizacionId, "catalogos.editar");
   if (!access) return { error: "No tienes permiso para editar catálogos." };

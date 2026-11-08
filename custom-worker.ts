@@ -38,6 +38,21 @@ const worker = {
   },
 
   async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+    // Warm-up de Hyperdrive: mantiene el pool de conexiones caliente para
+    // reducir el cold-start de los requests normales (cada request paga
+    // ~80-100 ms de handshake si el pool está frío). Se ejecuta antes de
+    // los recordatorios para que el pool esté listo.
+    try {
+      await handler.fetch(
+        new Request("https://cron.interno/api/cron/warmup", {
+          headers: env.CRON_SECRET ? { authorization: `Bearer ${env.CRON_SECRET}` } : {},
+        }),
+        env,
+        ctx,
+      );
+    } catch (error) {
+      console.error("[cron] error en warmup:", error);
+    }
     try {
       const respuesta = await handler.fetch(
         new Request("https://cron.interno/api/cron/recordatorios", {

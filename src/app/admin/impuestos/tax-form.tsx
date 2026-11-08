@@ -4,7 +4,7 @@ import { useActionState } from "react";
 
 import { saveTax, type TaxActionState } from "@/app/admin/impuestos/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldLabel, Input, Select } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel, Input, Select } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
 
 type TaxData = { id: string; clave: string; nombre: string; tasa: string; tipo: string };
@@ -13,6 +13,7 @@ const TIPO_LABEL: Record<string, string> = { agregado: "Agregado al precio", inc
 
 export function TaxForm({ organizationId, initial }: { organizationId: string; initial?: TaxData }) {
   const [state, action, pending] = useActionState<TaxActionState, FormData>(saveTax, {});
+  const fe = state.fieldErrors ?? {};
   const tipo = (initial?.tipo ?? "agregado") as "agregado" | "incluido" | "exento";
   return (
     <form action={action} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
@@ -24,21 +25,24 @@ export function TaxForm({ organizationId, initial }: { organizationId: string; i
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel required>Nombre</FieldLabel>
-            <Input defaultValue={initial?.nombre} name="nombre" placeholder="IVA (16%)" required />
+            <Input defaultValue={initial?.nombre} invalid={Boolean(fe.nombre)} name="nombre" placeholder="IVA (16%)" required />
+            <FieldError error={fe.nombre} />
           </Field>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel required>Tasa (%)</FieldLabel>
-            <Input defaultValue={String(initial?.tasa ?? "16")} min="0" name="tasa" placeholder="16" required step="0.0001" type="number" />
+            <Input defaultValue={String(initial?.tasa ?? "16")} invalid={Boolean(fe.tasa)} min="0" name="tasa" placeholder="16" required step="0.0001" type="number" />
+            <FieldError error={fe.tasa} />
           </Field>
           <Field>
             <FieldLabel required>Tipo</FieldLabel>
-            <Select defaultValue={tipo} name="tipo">
+            <Select defaultValue={tipo} invalid={Boolean(fe.tipo)} name="tipo">
               <option value="agregado">Agregado al precio</option>
               <option value="incluido">Incluido en el precio</option>
               <option value="exento">Exento (0%)</option>
             </Select>
+            <FieldError error={fe.tipo} />
           </Field>
         </div>
         <p className="rounded-xl bg-muted/60 p-4 text-sm text-muted-foreground">
@@ -51,7 +55,8 @@ export function TaxForm({ organizationId, initial }: { organizationId: string; i
             </summary>
             <Field className="mt-3">
               <FieldLabel>Clave</FieldLabel>
-              <Input name="clave" placeholder={initial.clave} />
+              <Input invalid={Boolean(fe.clave)} name="clave" placeholder={initial.clave} />
+              <FieldError error={fe.clave} />
               <FieldDescription>Déjala vacía para conservar la clave actual.</FieldDescription>
             </Field>
           </details>

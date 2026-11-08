@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldLabel,
   Input,
   Textarea,
@@ -62,6 +63,7 @@ export function ClientForm({
 }) {
   const toast = useToast();
   const [state, formAction, isPending] = useActionState(saveClient, {});
+  const fe = state.fieldErrors ?? {};
   const value = (key: keyof ClientData) => initial?.[key] ?? "";
 
   const nombreCompleto = [initial?.nombre, initial?.apellidoPaterno, initial?.apellidoMaterno]
@@ -155,10 +157,12 @@ export function ClientForm({
             <Input
               autoFocus={!initial?.id}
               defaultValue={String(value("nombre"))}
+              invalid={Boolean(fe.nombre)}
               name="nombre"
               placeholder="Ej. Mariana"
               required
             />
+            <FieldError error={fe.nombre} />
           </Field>
 
           <Field>
@@ -209,10 +213,12 @@ export function ClientForm({
             <FieldLabel>Teléfono móvil</FieldLabel>
             <Input
               defaultValue={String(value("telefono"))}
+              invalid={Boolean(fe.telefono)}
               name="telefono"
               placeholder="55 1234 5678"
               type="tel"
             />
+            <FieldError error={fe.telefono} />
             <FieldDescription>Para avisos de cita y confirmaciones por WhatsApp.</FieldDescription>
           </Field>
 
@@ -220,10 +226,12 @@ export function ClientForm({
             <FieldLabel>Correo electrónico</FieldLabel>
             <Input
               defaultValue={String(value("correo"))}
+              invalid={Boolean(fe.correo)}
               name="correo"
               placeholder="cliente@correo.com"
               type="email"
             />
+            <FieldError error={fe.correo} />
           </Field>
         </div>
       </div>

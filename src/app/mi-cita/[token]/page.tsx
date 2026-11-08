@@ -12,12 +12,12 @@ import { GestionPanel } from "./gestion-panel";
 export const dynamic = "force-dynamic";
 
 const ETIQUETA_ESTADO: Record<string, string> = {
-  pendiente: "Pendiente de confirmación",
+  pendiente: "Agendada",
   confirmada: "Confirmada",
   en_proceso: "En atención",
-  completada: "Completada",
+  completada: "Terminada",
   cancelada: "Cancelada",
-  no_asistio: "No asistió",
+  no_asistio: "No vino",
 };
 
 const ESTILO_ESTADO: Record<string, string> = {
@@ -236,7 +236,7 @@ export default async function MiCitaPage({ params }: { params: Promise<{ token: 
             ¿No fuiste tú? Alguien con tu enlace puede ver esta cita. Comunícate con{" "}
             {reserva.organizacionNombre} si necesitas ayuda.{" "}
             <Link
-              className="inline-flex min-h-6 items-center underline"
+              className="inline-flex min-h-11 items-center underline"
               data-action-id="mi_cita.reservar_otra"
               href={`/reservar/${reserva.organizacionSlug}`}
             >

@@ -62,6 +62,26 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
             Ocurrió un error inesperado. Intenta de nuevo; si el problema persiste, contacta a soporte.
           </p>
           {error.digest ? <p style={{ color: "var(--muted-foreground)", fontSize: 12, marginTop: 8 }}>Referencia: {error.digest}</p> : null}
+          {error.digest ? (
+            <button
+              onClick={() => {
+                if (error.digest) void navigator.clipboard?.writeText(error.digest);
+              }}
+              style={{
+                backgroundColor: "transparent",
+                border: "1px solid var(--ring)",
+                borderRadius: 12,
+                color: "var(--foreground)",
+                cursor: "pointer",
+                fontSize: 13,
+                marginTop: 12,
+                padding: "8px 16px",
+              }}
+              type="button"
+            >
+              Copiar referencia
+            </button>
+          ) : null}
           <button
             onClick={() => reset()}
             style={{

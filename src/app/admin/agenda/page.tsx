@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { Suspense } from "react";
 
 import { AgendaBoard, type AgendaBloqueo, type AgendaCita, type AgendaHorario } from "@/app/admin/agenda/agenda-board";
 import { AgendaToolbar } from "@/app/admin/agenda/agenda-toolbar";
@@ -112,7 +113,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
   if (!inicioBounds || !finBounds) {
     return (
       <div className="space-y-6">
-        <AdminPageHeader description="La fecha seleccionada no es válida." title="Agenda de citas" />
+        <AdminPageHeader description="Administra citas, profesionales y ventas por sucursal." title="Agenda de citas" />
         <EmptyState description="Elige una fecha válida para consultar la agenda." title="Fecha inválida" />
       </div>
     );
@@ -339,7 +340,8 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
       <div className="hidden md:block">
         <AdminPageHeader description={branch.nombre} title="Agenda" />
       </div>
-      <AgendaToolbar
+      <Suspense fallback={null}>
+        <AgendaToolbar
         action={
           puedeEditar ? (
             <DisponibilidadPanel
@@ -371,6 +373,8 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
         q={q}
         vista={vista}
       />
+      </Suspense>
+      <Suspense fallback={null}>
       <AgendaBoard
         bloqueos={bloqueos}
         citas={citasSerializadas}
@@ -388,6 +392,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Searc
         vista={vista}
         weekDays={weekDays}
       />
+      </Suspense>
     </div>
   );
 }

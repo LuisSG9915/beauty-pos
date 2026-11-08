@@ -23,11 +23,18 @@ const membresiaSchema = z.object({
   precio: z.string().trim().regex(/^\d+(\.\d{1,2})?$/, "Usa un precio válido."),
 });
 
-export type MembresiaActionState = { error?: string; success?: boolean };
+export type MembresiaActionState = { error?: string; success?: boolean; fieldErrors?: Record<string, string> };
 
 export async function saveMembresia(_previousState: MembresiaActionState, formData: FormData): Promise<MembresiaActionState> {
   const result = membresiaSchema.safeParse(Object.fromEntries(formData.entries()));
-  if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa la membresía." };
+  if (!result.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of result.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
+    return { error: result.error.issues[0]?.message ?? "Revisa la membresía.", fieldErrors };
+  }
   const input = result.data;
   const access = await checkPermission(input.organizacionId, "catalogos.editar");
   if (!access) return { error: "No tienes permiso para editar catálogos." };

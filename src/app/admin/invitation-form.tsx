@@ -5,7 +5,7 @@ import { useActionState, useState } from "react";
 
 import { createInvitation } from "@/app/admin/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, Input, Select } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
 
 type InvitationFormProps = {
@@ -16,6 +16,7 @@ type InvitationFormProps = {
 
 export function InvitationForm({ organizations, roles, branches }: InvitationFormProps) {
   const [state, formAction, isPending] = useActionState(createInvitation, {});
+  const fe = state.fieldErrors ?? {};
   const [organizationId, setOrganizationId] = useState("");
   const availableRoles = roles.filter((role) => role.organizacionId === organizationId);
   const availableBranches = branches.filter((branch) => branch.organizacionId === organizationId);
@@ -77,11 +78,13 @@ export function InvitationForm({ organizations, roles, branches }: InvitationFor
         </div>
         <Field>
           <FieldLabel required>Nombre</FieldLabel>
-          <Input name="nombre" placeholder="Nombre del miembro" required />
+          <Input invalid={Boolean(fe.nombre)} name="nombre" placeholder="Nombre del miembro" required />
+          <FieldError error={fe.nombre} />
         </Field>
         <Field>
           <FieldLabel required>Correo</FieldLabel>
-          <Input name="correo" placeholder="persona@salon.com" required type="email" />
+          <Input invalid={Boolean(fe.correo)} name="correo" placeholder="persona@salon.com" required type="email" />
+          <FieldError error={fe.correo} />
         </Field>
       </div>
 
@@ -100,7 +103,7 @@ export function InvitationForm({ organizations, roles, branches }: InvitationFor
         </div>
       ) : null}
 
-      <Button className="mt-6 rounded-xl" disabled={isPending} type="submit">
+      <Button className="mt-6 rounded-xl" data-action-clave="1" data-action-id="plataforma.invitacion.enviar" disabled={isPending} type="submit">
         <MailPlus aria-hidden="true" className="size-4" />
         {isPending ? "Enviando…" : "Enviar invitación"}
       </Button>

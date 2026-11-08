@@ -7,7 +7,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { saveProduct, type ProductActionState } from "@/app/admin/productos/actions";
 import { ProductImageField } from "@/components/media-image-field";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel, Input, Select, Textarea } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
 import {
   CAMPO_FORM_POR_CAMPO_IA,
@@ -154,6 +154,7 @@ export function ProductForm({
 }) {
   const [state, formAction, pending] = useActionState<ProductActionState, FormData>(saveProduct, {});
   const value = (key: keyof ProductData) => initial?.[key] ?? "";
+  const fe = state.fieldErrors ?? {};
   const tipo = (initial?.tipo ?? "producto") as "producto" | "insumo" | "ambos";
   const toast = useToast();
   // Nombre del último submit: `ActionState` no lo trae y `onCreated` lo
@@ -418,13 +419,15 @@ export function ProductForm({
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel required>Nombre</FieldLabel>
-          <Input className={marcaDudoso("nombre")} defaultValue={String(value("nombre"))} name="nombre" placeholder="Shampoo reparador 300ml" ref={nombreRef} required />
+          <Input className={marcaDudoso("nombre")} defaultValue={String(value("nombre"))} invalid={Boolean(fe.nombre)} name="nombre" placeholder="Shampoo reparador 300ml" ref={nombreRef} required />
           {avisoDudoso("nombre")}
+          <FieldError error={fe.nombre} />
         </Field>
         <Field>
           <FieldLabel required>Precio de venta (MXN)</FieldLabel>
-          <Input className={marcaDudoso("precioVenta")} defaultValue={String(value("precioVenta"))} min="0" name="precioVenta" placeholder="0.00" ref={precioRef} required step="0.01" type="number" />
+          <Input className={marcaDudoso("precioVenta")} defaultValue={String(value("precioVenta"))} invalid={Boolean(fe.precioVenta)} min="0" name="precioVenta" placeholder="0.00" ref={precioRef} required step="0.01" type="number" />
           {avisoDudoso("precioVenta")}
+          <FieldError error={fe.precioVenta} />
           {precioEtiqueta !== null ? (
             <FieldDescription>
               En la etiqueta dice {formatCurrency(precioEtiqueta)}.{" "}

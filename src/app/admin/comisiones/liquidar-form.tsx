@@ -4,9 +4,9 @@ import { useActionState } from "react";
 
 import { liquidarComisionesAction } from "@/app/admin/comisiones/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, Input, Select } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
-import { initialActionState } from "@/lib/action-state";
+import { fieldError, initialActionState } from "@/lib/action-state";
 
 export type MedioPagoOpcion = { id: string; nombre: string; categoria: string };
 
@@ -39,6 +39,7 @@ export function LiquidarForm({
   medios: MedioPagoOpcion[];
 }) {
   const [state, action, pending] = useActionState(liquidarComisionesAction, initialActionState);
+  const fe = (name: string) => fieldError(state, name);
 
   return (
     <details className="group">
@@ -53,7 +54,7 @@ export function LiquidarForm({
         <input name="periodoHasta" type="hidden" value={periodoHasta} />
         <Field>
           <FieldLabel required>Medio de pago</FieldLabel>
-          <Select name="medioPagoId" required>
+          <Select invalid={Boolean(fe("medioPagoId"))} name="medioPagoId" required>
             <option value="">Selecciona…</option>
             {medios.map((medio) => (
               <option key={medio.id} value={medio.id}>
@@ -61,10 +62,12 @@ export function LiquidarForm({
               </option>
             ))}
           </Select>
+          <FieldError error={fe("medioPagoId")} />
         </Field>
         <Field>
           <FieldLabel>Notas</FieldLabel>
-          <Input name="notas" placeholder="Opcional" />
+          <Input invalid={Boolean(fe("notas"))} name="notas" placeholder="Opcional" />
+          <FieldError error={fe("notas")} />
         </Field>
         <ActionFeedback state={state} />
         <Button data-action-clave="1" data-action-id="comisiones.liquidacion.confirmar" disabled={pending} size="lg" type="submit">

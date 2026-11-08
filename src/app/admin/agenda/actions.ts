@@ -66,6 +66,7 @@ export type CitaActionState = {
   error?: string;
   success?: boolean;
   message?: string;
+  fieldErrors?: Record<string, string>;
   citaId?: string;
   /** ISO 8601: próximos horarios libres cuando hubo conflicto de disponibilidad. */
   sugerencias?: string[];
@@ -218,7 +219,14 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
     return { error: "Uno o más recursos son inválidos." };
   }
   const result = citaSchema.safeParse(Object.fromEntries(formData.entries()));
-  if (!result.success) return { error: result.error.issues[0]?.message ?? "Revisa los datos de la cita." };
+  if (!result.success) {
+    const fieldErrors: Record<string, string> = {};
+    for (const issue of result.error.issues) {
+      const key = String(issue.path[0] ?? "");
+      if (key && !fieldErrors[key]) fieldErrors[key] = issue.message;
+    }
+    return { error: result.error.issues[0]?.message ?? "Revisa los datos de la cita.", fieldErrors };
+  }
   const input = result.data;
   const access = await checkPermission(input.organizacionId, "agenda.editar");
   if (!access) return { error: "No tienes permiso para editar la agenda." };
@@ -282,7 +290,7 @@ export async function saveCita(_previousState: CitaActionState, formData: FormDa
           return { error: "No tienes acceso a esta sucursal." };
         }
         if (!isCitaEditable(previa.estado)) {
-          return { error: "Una cita cancelada, completada o no asistida solo puede reagendarse." };
+          return { error: "Una cita cancelada, completada o no asistida solo puede cambiar de fecha." };
         }
         if (!versionCoincide(previa, input.version)) {
           return { error: CITA_STALE_MESSAGE };
@@ -765,7 +773,7 @@ async function moverCitaEnTx(
 
   if (opts.reactivarAPendiente) {
     if (!canRescheduleEstado(cita.estado)) {
-      return { success: false, error: `Una cita en estado "${cita.estado}" no puede reagendarse.` };
+      return { success: false, error: `Una cita en estado "${cita.estado}" no puede cambiar de fecha.` };
     }
   } else if (!isCitaEditable(cita.estado)) {
     return { success: false, error: "Una cita cancelada, completada o no asistida solo puede reagendarse." };
@@ -868,7 +876,7 @@ async function moverCitaEnTx(
   }
   return {
     success: true,
-    message: opts.reactivarAPendiente ? "Cita reagendada a pendiente." : "Cita movida.",
+    message: opts.reactivarAPendiente ? "Cita cambió de fecha y quedó pendiente." : "Cita movida.",
     avisoDiferido,
   };
 }
@@ -910,7 +918,7 @@ export async function moveCita(formData: FormData): Promise<CitaMutationResult> 
  */
 export async function rescheduleCita(formData: FormData): Promise<CitaMutationResult> {
   const result = moveSchema.safeParse(Object.fromEntries(formData.entries()));
-  if (!result.success) return { success: false, error: "Datos inválidos para reagendar la cita." };
+  if (!result.success) return { success: false, error: "Datos inválidos para cambiar la fecha de la cita." };
   const input = result.data;
   const access = await checkPermission(input.organizacionId, "agenda.editar");
   if (!access) return { success: false, error: "No tienes permiso para editar la agenda." };
@@ -933,7 +941,7 @@ export async function rescheduleCita(formData: FormData): Promise<CitaMutationRe
     return outcome;
   } catch (error) {
     console.error("rescheduleCita", error);
-    return { success: false, error: "No se pudo reagendar la cita." };
+    return { success: false, error: "No se pudo cambiar la fecha de la cita." };
   }
 }
 

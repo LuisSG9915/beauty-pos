@@ -5,12 +5,15 @@ import { cn } from "@/lib/utils";
 
 export function EmptyState({
   icon: Icon,
+  id,
   title,
   description,
   action,
   className,
 }: {
   icon?: LucideIcon;
+  /** id opcional para el encabezado (accesibilidad). */
+  id?: string;
   title: string;
   description: string;
   /** Acción opcional de recuperación (link o botón). */
@@ -25,9 +28,9 @@ export function EmptyState({
       )}
     >
       {Icon ? (
-        <Icon aria-hidden="true" className="size-8 text-primary/70" strokeWidth={1.7} />
+        <Icon aria-hidden="true" className="size-8 text-primary" strokeWidth={1.7} />
       ) : null}
-      <h3 className="mt-4 font-semibold text-foreground">{title}</h3>
+      <h3 className="mt-4 font-semibold text-foreground" id={id}>{title}</h3>
       <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">{description}</p>
       {action ? <div className="mt-5">{action}</div> : null}
     </div>

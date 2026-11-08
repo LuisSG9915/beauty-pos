@@ -6,6 +6,7 @@ import { RevertirLiquidacionForm } from "@/app/admin/comisiones/revertir-liquida
 import { AdminNavTabs, EQUIPO_TABS } from "@/components/admin/admin-nav-tabs";
 import { AdminCard, AdminPageHeader } from "@/components/admin/page-header";
 import { EmptyState } from "@/components/empty-state";
+import { VistaAdaptativa } from "@/components/admin/vista-adaptativa";
 import { PlanUpgradeNotice } from "@/components/plan-gate";
 import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
@@ -214,38 +215,67 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
         {pendientes.length === 0 ? (
           <EmptyState description="Cada servicio cobrado con regla de comisión aparece aquí hasta que se liquida." title="Sin líneas" />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="border-b border-border text-op-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="py-2 pr-4 font-medium">Cobro</th>
-                  <th className="py-2 pr-4 font-medium">Profesional</th>
-                  <th className="py-2 pr-4 font-medium">Servicio</th>
-                  <th className="py-2 pr-4 text-right font-medium">Base</th>
-                  <th className="py-2 text-right font-medium">Comisión</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pendientes.map((row) => (
-                  <tr className="border-b border-border align-top" key={row.id}>
-                    <td className="whitespace-nowrap py-3 pr-4 text-muted-foreground">{formatDateTime(row.fecha, { timeZone })}</td>
-                    <td className="py-3 pr-4 font-medium text-foreground">{row.profesional}</td>
-                    <td className="py-3 pr-4 text-muted-foreground">
-                      {row.servicio ?? "Servicio"}
-                      <a
-                        className="ml-2 inline-flex min-h-6 items-center text-op-xs text-primary hover:underline"
-                        href={buildAdminHref("/pos", { organizationId, sucursalId, extra: { ventaId: row.ventaId } })}
-                      >
-                        ticket
-                      </a>
-                    </td>
-                    <td className="py-3 pr-4 text-right tabular-nums text-muted-foreground">{fmt(row.base)}</td>
-                    <td className="py-3 text-right font-semibold tabular-nums">{fmt(row.monto)}</td>
+          <VistaAdaptativa>
+            <div className="space-y-3">
+              {pendientes.map((row) => (
+                <article className="surface-card rounded-xl border border-border bg-card p-4" key={row.id}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium text-foreground">{row.profesional}</p>
+                    <span className="text-sm font-semibold tabular-nums">{fmt(row.monto)}</span>
+                  </div>
+                  <p className="mt-0.5 text-op-xs text-muted-foreground">{row.servicio ?? "Servicio"}</p>
+                  <dl className="mt-3 space-y-1 text-op-xs">
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground">Cobro</dt>
+                      <dd className="text-foreground">{formatDateTime(row.fecha, { timeZone })}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground">Base</dt>
+                      <dd className="tabular-nums text-foreground">{fmt(row.base)}</dd>
+                    </div>
+                  </dl>
+                  <a
+                    className="mt-3 inline-flex min-h-9 items-center text-op-xs text-primary hover:underline"
+                    href={buildAdminHref("/pos", { organizationId, sucursalId, extra: { ventaId: row.ventaId } })}
+                  >
+                    Ver ticket
+                  </a>
+                </article>
+              ))}
+            </div>
+            <div className="overflow-x-auto">
+              <table aria-label="Pendientes de comisión" className="w-full min-w-[640px] text-left text-sm">
+                <thead className="border-b border-border text-op-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="py-2 pr-4 font-medium">Cobro</th>
+                    <th className="py-2 pr-4 font-medium">Profesional</th>
+                    <th className="py-2 pr-4 font-medium">Servicio</th>
+                    <th className="py-2 pr-4 text-right font-medium">Base</th>
+                    <th className="py-2 text-right font-medium">Comisión</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {pendientes.map((row) => (
+                    <tr className="border-b border-border align-top" key={row.id}>
+                      <td className="whitespace-nowrap py-3 pr-4 text-muted-foreground">{formatDateTime(row.fecha, { timeZone })}</td>
+                      <td className="py-3 pr-4 font-medium text-foreground">{row.profesional}</td>
+                      <td className="py-3 pr-4 text-muted-foreground">
+                        {row.servicio ?? "Servicio"}
+                        <a
+                          className="ml-2 inline-flex min-h-6 items-center text-op-xs text-primary hover:underline"
+                          href={buildAdminHref("/pos", { organizationId, sucursalId, extra: { ventaId: row.ventaId } })}
+                        >
+                          ticket
+                        </a>
+                      </td>
+                      <td className="py-3 pr-4 text-right tabular-nums text-muted-foreground">{fmt(row.base)}</td>
+                      <td className="py-3 text-right font-semibold tabular-nums">{fmt(row.monto)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </VistaAdaptativa>
         )}
       </AdminCard>
 
@@ -253,47 +283,84 @@ export default async function ComisionesPage({ searchParams }: { searchParams: S
         {liquidaciones.length === 0 ? (
           <EmptyState description="Aún no se ha pagado ninguna liquidación." title="Sin liquidaciones" />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px] text-left text-sm">
-              <thead className="border-b border-border text-op-xs uppercase tracking-wide text-muted-foreground">
-                <tr>
-                  <th className="py-2 pr-4 font-medium">Registro</th>
-                  <th className="py-2 pr-4 font-medium">Profesional</th>
-                  <th className="py-2 pr-4 font-medium">Periodo</th>
-                  <th className="py-2 pr-4 font-medium">Medio</th>
-                  <th className="py-2 pr-4 text-right font-medium">Total</th>
-                  <th className="py-2 pr-4 font-medium">Estado</th>
-                  {puedeEditar ? <th className="py-2 font-medium">Acción</th> : null}
-                </tr>
-              </thead>
-              <tbody>
-                {liquidaciones.map((liq) => (
-                  <tr className="border-b border-border align-top" key={liq.id}>
-                    <td className="whitespace-nowrap py-3 pr-4 text-muted-foreground">{formatDateTime(liq.createdAt, { timeZone })}</td>
-                    <td className="py-3 pr-4 font-medium text-foreground">{liq.profesional}</td>
-                    <td className="whitespace-nowrap py-3 pr-4 text-muted-foreground">{liq.periodoDesde} → {liq.periodoHasta}</td>
-                    <td className="py-3 pr-4 text-muted-foreground">{liq.medio}</td>
-                    <td className="py-3 pr-4 text-right font-semibold tabular-nums">{fmt(liq.total)}</td>
-                    <td className="py-3 pr-4">
-                      <StatusBadge tone={liq.estado === "confirmada" ? "success" : "neutral"}>
-                        {ESTADO_LABEL[liq.estado] ?? liq.estado}
-                      </StatusBadge>
-                      {liq.motivoReversion ? (
-                        <p className="mt-1 text-op-xs text-destructive">{liq.motivoReversion}</p>
-                      ) : null}
-                    </td>
-                    {puedeEditar ? (
-                      <td className="py-3">
-                        {liq.estado === "confirmada" ? (
-                          <RevertirLiquidacionForm liquidacionId={liq.id} organizationId={organizationId} />
+          <VistaAdaptativa>
+            <div className="space-y-3">
+              {liquidaciones.map((liq) => (
+                <article className="surface-card rounded-xl border border-border bg-card p-4" key={liq.id}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-medium text-foreground">{liq.profesional}</p>
+                    <span className="text-sm font-semibold tabular-nums">{fmt(liq.total)}</span>
+                  </div>
+                  <p className="mt-0.5 text-op-xs text-muted-foreground">
+                    {liq.periodoDesde} → {liq.periodoHasta} · {liq.medio}
+                  </p>
+                  <dl className="mt-3 space-y-1 text-op-xs">
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground">Registro</dt>
+                      <dd className="text-foreground">{formatDateTime(liq.createdAt, { timeZone })}</dd>
+                    </div>
+                    <div className="flex justify-between gap-3">
+                      <dt className="text-muted-foreground">Estado</dt>
+                      <dd className="text-foreground">
+                        <StatusBadge tone={liq.estado === "confirmada" ? "success" : "neutral"}>
+                          {ESTADO_LABEL[liq.estado] ?? liq.estado}
+                        </StatusBadge>
+                      </dd>
+                    </div>
+                  </dl>
+                  {liq.motivoReversion ? (
+                    <p className="mt-2 text-op-xs text-destructive">{liq.motivoReversion}</p>
+                  ) : null}
+                  {puedeEditar && liq.estado === "confirmada" ? (
+                    <div className="mt-3 border-t border-border pt-3">
+                      <RevertirLiquidacionForm liquidacionId={liq.id} organizationId={organizationId} />
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+            <div className="overflow-x-auto">
+              <table aria-label="Historial de liquidaciones" className="w-full min-w-[640px] text-left text-sm">
+                <thead className="border-b border-border text-op-xs uppercase tracking-wide text-muted-foreground">
+                  <tr>
+                    <th className="py-2 pr-4 font-medium">Registro</th>
+                    <th className="py-2 pr-4 font-medium">Profesional</th>
+                    <th className="py-2 pr-4 font-medium">Periodo</th>
+                    <th className="py-2 pr-4 font-medium">Medio</th>
+                    <th className="py-2 pr-4 text-right font-medium">Total</th>
+                    <th className="py-2 pr-4 font-medium">Estado</th>
+                    {puedeEditar ? <th className="py-2 font-medium">Acción</th> : null}
+                  </tr>
+                </thead>
+                <tbody>
+                  {liquidaciones.map((liq) => (
+                    <tr className="border-b border-border align-top" key={liq.id}>
+                      <td className="whitespace-nowrap py-3 pr-4 text-muted-foreground">{formatDateTime(liq.createdAt, { timeZone })}</td>
+                      <td className="py-3 pr-4 font-medium text-foreground">{liq.profesional}</td>
+                      <td className="whitespace-nowrap py-3 pr-4 text-muted-foreground">{liq.periodoDesde} → {liq.periodoHasta}</td>
+                      <td className="py-3 pr-4 text-muted-foreground">{liq.medio}</td>
+                      <td className="py-3 pr-4 text-right font-semibold tabular-nums">{fmt(liq.total)}</td>
+                      <td className="py-3 pr-4">
+                        <StatusBadge tone={liq.estado === "confirmada" ? "success" : "neutral"}>
+                          {ESTADO_LABEL[liq.estado] ?? liq.estado}
+                        </StatusBadge>
+                        {liq.motivoReversion ? (
+                          <p className="mt-1 text-op-xs text-destructive">{liq.motivoReversion}</p>
                         ) : null}
                       </td>
-                    ) : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      {puedeEditar ? (
+                        <td className="py-3">
+                          {liq.estado === "confirmada" ? (
+                            <RevertirLiquidacionForm liquidacionId={liq.id} organizationId={organizationId} />
+                          ) : null}
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </VistaAdaptativa>
         )}
       </AdminCard>
     </div>

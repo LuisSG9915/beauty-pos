@@ -189,7 +189,7 @@ function Tabla({
     return <p className="text-sm text-muted-foreground">Sin datos en el rango.</p>;
   }
   return (
-    <div className="overflow-x-auto">
+    <div aria-label="Tabla de telemetría" className="overflow-x-auto" tabIndex={0}>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-border text-left text-op-xs text-muted-foreground">

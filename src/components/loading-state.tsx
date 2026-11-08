@@ -22,7 +22,7 @@ export function LoadingState({
       {Array.from({ length: rows }).map((_, index) => (
         <div
           aria-hidden="true"
-          className="surface-card h-16 animate-pulse rounded-xl border border-border bg-card"
+          className="surface-card h-16 animate-pulse rounded-xl border border-border bg-muted/60"
           key={index}
           style={{ animationDelay: `${index * 75}ms` }}
         />

@@ -4,9 +4,9 @@ import { useActionState } from "react";
 
 import { actualizarSucursalAction, crearSucursalAction } from "@/app/admin/sucursales/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldLabel, Input, Select } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldLabel, Input, Select } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
-import { initialActionState } from "@/lib/action-state";
+import { fieldError, initialActionState } from "@/lib/action-state";
 
 export const ZONAS_HORARIAS_MX = [
   "America/Mexico_City",
@@ -92,6 +92,7 @@ export function SucursalNuevaForm({
   deshabilitado?: boolean;
 }) {
   const [state, action, pending] = useActionState(crearSucursalAction, initialActionState);
+  const fe = (name: string) => fieldError(state, name);
 
   return (
     <form action={action} className="space-y-4">
@@ -99,7 +100,8 @@ export function SucursalNuevaForm({
       <div className="grid grid-cols-1 gap-4">
         <Field>
           <FieldLabel required>Nombre</FieldLabel>
-          <Input name="nombre" placeholder="Salón Roma Norte" required />
+          <Input invalid={Boolean(fe("nombre"))} name="nombre" placeholder="Salón Roma Norte" required />
+          <FieldError error={fe("nombre")} />
         </Field>
         <Field>
           <FieldLabel>Dirección</FieldLabel>
@@ -141,6 +143,7 @@ export function SucursalNuevaForm({
  */
 export function SucursalEditarForm({ organizationId, sucursal }: { organizationId: string; sucursal: SucursalEditable }) {
   const [state, action, pending] = useActionState(actualizarSucursalAction, initialActionState);
+  const fe = (name: string) => fieldError(state, name);
 
   return (
     <form action={action} className="space-y-4">
@@ -149,7 +152,8 @@ export function SucursalEditarForm({ organizationId, sucursal }: { organizationI
       <div className="grid grid-cols-1 gap-4">
         <Field>
           <FieldLabel required>Nombre</FieldLabel>
-          <Input defaultValue={sucursal.nombre} name="nombre" required />
+          <Input defaultValue={sucursal.nombre} invalid={Boolean(fe("nombre"))} name="nombre" required />
+          <FieldError error={fe("nombre")} />
         </Field>
         <Field>
           <FieldLabel>Dirección</FieldLabel>

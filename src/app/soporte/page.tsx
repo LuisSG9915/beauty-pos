@@ -16,6 +16,18 @@ export default function SoportePage() {
         <nav className="flex items-center gap-2">
           <ThemeModeSelector iconOnly />
           <Link
+            className="hidden h-8 items-center rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted sm:inline-flex"
+            href="/precios"
+          >
+            Precios
+          </Link>
+          <Link
+            className="hidden h-8 items-center rounded-lg bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 sm:inline-flex"
+            href="/registro"
+          >
+            Crear cuenta
+          </Link>
+          <Link
             className="inline-flex h-8 items-center rounded-lg border border-border bg-card px-4 text-sm font-medium transition-colors hover:bg-muted"
             href="/login"
           >

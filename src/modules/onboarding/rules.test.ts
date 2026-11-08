@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { evaluarPasos, pasosParaPermisos, resumenGuia, PASOS_GUIA } from "./rules";
+import { evaluarPasos, pasosParaPermisos, resumenGuia, salonVacio, PASOS_GUIA } from "./rules";
 import type { EstadoNegocio } from "./types";
 
 const negocioVacio: EstadoNegocio = {
@@ -45,6 +45,18 @@ describe("pasosParaPermisos", () => {
 
   it("sin permisos relevantes la guía queda vacía", () => {
     expect(pasosParaPermisos(new Set(["clientes.ver"]))).toHaveLength(0);
+  });
+});
+
+describe("salonVacio", () => {
+  it("vacío sin servicios ni citas ni ventas", () => {
+    expect(salonVacio(negocioVacio)).toBe(true);
+  });
+  it("no vacío si ya hay servicios", () => {
+    expect(salonVacio({ ...negocioVacio, serviciosActivos: 1 })).toBe(false);
+  });
+  it("no vacío si ya hay ventas aunque no haya servicios", () => {
+    expect(salonVacio({ ...negocioVacio, ventasCobradas: 1 })).toBe(false);
   });
 });
 

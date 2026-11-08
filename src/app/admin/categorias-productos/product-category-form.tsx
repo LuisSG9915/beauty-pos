@@ -36,7 +36,7 @@ export function ProductCategoryForm({ organizationId, initial }: { organizationI
       <div className="mt-4">
         <ActionFeedback state={state} successMessage="Categoría guardada." />
       </div>
-      <Button className="mt-6 rounded-xl" disabled={pending} type="submit">{pending ? "Guardando…" : "Guardar categoría"}</Button>
+      <Button className="mt-6 rounded-xl" data-action-clave="1" data-action-id="catalogo.categorias_productos.guardar" disabled={pending} type="submit">{pending ? "Guardando…" : "Guardar categoría"}</Button>
     </form>
   );
 }

@@ -72,7 +72,7 @@ export function RecuperarForm() {
         </p>
       ) : null}
 
-      <Button className="h-11 w-full rounded-xl" data-action-id="auth.recuperar_enviar" disabled={isPending} type="submit">
+      <Button className="h-11 w-full rounded-xl" data-action-clave="1" data-action-id="auth.recuperar_enviar" disabled={isPending} type="submit">
         {isPending ? "Enviando correo..." : "Enviar enlace a mi correo"}
       </Button>
 

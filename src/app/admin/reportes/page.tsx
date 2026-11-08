@@ -26,6 +26,7 @@ import {
 import {
   deltaKpi,
   derivarAvisos,
+  derivarAusencias,
   derivarCitas,
   derivarReservasWeb,
   derivarVentas,
@@ -235,6 +236,7 @@ export default async function ReportesPage({ searchParams }: Props) {
 
   // KPIs operativos
   const { totalCitas, asistencia } = derivarCitas(citasPorEstado);
+  const ausencias = derivarAusencias(citasPorEstado);
 
   // KPIs financieros
   const { vendido, propinasTotal, operaciones } = derivarVentas(ventasPorDia);
@@ -264,6 +266,7 @@ export default async function ReportesPage({ searchParams }: Props) {
   const operacionesAnt = num(ventasAnt[0]?.operaciones);
   const { totalCitas: totalCitasAnt, asistencia: asistenciaAntRaw } = derivarCitas(citasAnt);
   const asistenciaAnt = asistenciaAntRaw == null ? null : asistenciaAntRaw;
+  const ausenciasAnt = derivarAusencias(citasAnt);
 
   // Métricas de reservas públicas y avisos.
   const reservasWeb = derivarReservasWeb(citasPorOrigen);
@@ -415,6 +418,17 @@ export default async function ReportesPage({ searchParams }: Props) {
               value={String(reservasWeb)}
             />
             <Kpi label="Profesionales con agenda" value={String(profesionales.length)} />
+            <Kpi
+              hint={
+                ausencias.tasa == null
+                  ? "sin citas cerradas en el rango"
+                  : `${ausencias.tasa}% de las citas cerradas${
+                      ausenciasAnt.tasa == null ? "" : ` · ${etiquetaDelta(deltaKpi(ausencias.tasa, ausenciasAnt.tasa))}`
+                    }`
+              }
+              label="Citas que no se presentaron"
+              value={String(ausencias.noAsistio)}
+            />
           </section>
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

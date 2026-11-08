@@ -73,7 +73,7 @@ export default async function PaymentMethodsPage({ searchParams }: { searchParam
             <option value="otro">Otro</option>
           </Select>
         </Field>
-        <Button className="rounded-xl" type="submit">Filtrar</Button>
+        <Button className="rounded-xl" data-action-id="catalogo.medios_pago.filtro.aplicar" type="submit">Filtrar</Button>
         {categoriaFilter ? (
           <Button nativeButton={false} render={<Link href={buildAdminHref("/medios-pago", { organizationId })} />} variant="outline">
             Limpiar

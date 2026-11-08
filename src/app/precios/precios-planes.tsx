@@ -45,7 +45,7 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
   const [sucursales, setSucursales] = useState(1);
 
   return (
-    <div>
+    <div className="pb-20 sm:pb-0">
       <div className="mb-8 flex flex-col items-center justify-center gap-4 sm:flex-row sm:gap-8">
         <div className="surface-card inline-flex rounded-full border border-border bg-card p-1">
           {(["mensual", "anual"] as const).map((modo) => (
@@ -182,7 +182,6 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
               </ul>
               <Button
                 className="mt-7 w-full rounded-xl"
-                data-action-clave={plan.destacado ? "1" : undefined}
                 data-action-id="precios.plan.prueba"
                 nativeButton={false}
                 render={<Link href="/registro" />}
@@ -195,6 +194,18 @@ export function PreciosPlanes({ planes }: { planes: PlanPrecioCard[] }) {
           );
         })}
       </div>
+
+      <Link
+        className="fixed bottom-0 inset-x-0 z-40 flex items-center justify-between gap-3 border-t border-border bg-card/95 px-4 py-3 backdrop-blur sm:hidden"
+        data-action-clave="1"
+        data-action-id="precios.cta.sticky"
+        href="/registro"
+      >
+        <span className="text-sm font-medium">Prueba Melena gratis 14 días</span>
+        <span className="rounded-full bg-primary px-3 py-1 text-sm font-semibold text-primary-foreground">
+          Empezar
+        </span>
+      </Link>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 
 import { registrarPagoSuscripcion } from "@/app/admin/billing-actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, Input } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
 import { cotizarSuscripcion, planPreciosDesdeFila, type Periodicidad } from "@/modules/billing/precios";
 
@@ -70,6 +70,7 @@ export function SuscripcionAdminRow({
   sugerida?: SolicitudSugerida;
 }) {
   const [state, formAction, isPending] = useActionState(registrarPagoSuscripcion, {});
+  const fe = state.fieldErrors ?? {};
   const badge = estadoLabel(estado);
 
   const [planClave, setPlanClave] = useState(sugerida?.planClave ?? planes[0]?.clave ?? "");
@@ -145,6 +146,7 @@ export function SuscripcionAdminRow({
               type="number"
               value={facturadas}
             />
+            <FieldError error={fe.sucursalesFacturadas} />
           </Field>
           <Field>
             <FieldLabel required>Meses cubiertos</FieldLabel>
@@ -157,6 +159,7 @@ export function SuscripcionAdminRow({
               type="number"
               value={meses}
             />
+            <FieldError error={fe.meses} />
           </Field>
           <Field>
             <FieldLabel>Total a cobrar</FieldLabel>
@@ -169,7 +172,8 @@ export function SuscripcionAdminRow({
           </Field>
           <Field>
             <FieldLabel>Referencia</FieldLabel>
-            <Input maxLength={160} name="referencia" placeholder="Transferencia, folio…" />
+            <Input invalid={Boolean(fe.referencia)} maxLength={160} name="referencia" placeholder="Transferencia, folio…" />
+            <FieldError error={fe.referencia} />
           </Field>
           <div className="sm:col-span-2 lg:col-span-3 flex items-center gap-3">
             <Button className="rounded-xl" data-action-clave="1" data-action-id="suscripcion.pago.confirmar" disabled={isPending} size="lg" type="submit">

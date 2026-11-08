@@ -35,7 +35,7 @@ function DialogContent({
         {hideCloseButton ? null : (
           <DialogPrimitive.Close
             aria-label="Cerrar"
-            className="absolute right-4 top-4 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="absolute right-4 top-4 inline-flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <X className="size-4" aria-hidden="true" />
           </DialogPrimitive.Close>

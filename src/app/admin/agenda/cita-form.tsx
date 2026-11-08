@@ -13,6 +13,7 @@ import { RemoteCombobox } from "@/components/ui/remote-combobox";
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldLabel,
   Input,
   Select,
@@ -101,6 +102,7 @@ export function CitaForm({
     [clientes],
   );
   const [state, formAction, pending] = useActionState<CitaActionState, FormData>(saveCita, {});
+  const fe = state.fieldErrors ?? {};
   const [clienteId, setClienteId] = useState(initial?.clienteId ?? "");
   const [seleccionados, setSeleccionados] = useState<Set<string>>(() => new Set(initial?.servicioIds ?? []));
   const [recursosSel, setRecursosSel] = useState<Set<string>>(() => new Set(initial?.recursoIds ?? []));
@@ -501,12 +503,14 @@ export function CitaForm({
         <Field>
           <FieldLabel required>Fecha y hora</FieldLabel>
           <Input
+            invalid={Boolean(fe.fechaHora)}
             name="fechaHora"
             onChange={(event) => setInicio(event.target.value)}
             required
             type="datetime-local"
             value={inicio}
           />
+          <FieldError error={fe.fechaHora} />
           <FieldDescription>Hora local de la sucursal.</FieldDescription>
         </Field>
         {seleccionados.size === 0 ? (
@@ -658,9 +662,11 @@ export function CitaForm({
         <Textarea
           className="mt-3"
           defaultValue={initial?.notas ?? ""}
+          invalid={Boolean(fe.notas)}
           name="notas"
           placeholder="Preferencias del cliente, alergias, recordatorios…"
         />
+        <FieldError error={fe.notas} />
       </details>
 
       <div className="rounded-xl border border-border bg-muted/60 p-4">

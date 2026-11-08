@@ -47,7 +47,7 @@ export function SubscriptionBanner({
   if (!puedeAdministrarPlan) {
     if (badge.estado === "vencida") {
       return (
-        <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-destructive-soft-foreground">
+        <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-destructive-soft-foreground" aria-live="polite" role="status">
           <LockKeyhole aria-hidden="true" className="size-4 shrink-0" />
           <p>
             La suscripción del salón está en pausa (solo lectura) — avísale a
@@ -59,7 +59,7 @@ export function SubscriptionBanner({
     const dias = badge.diasRestantes;
     if (dias === null || dias > 3) return null;
     return (
-      <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning-soft-foreground">
+      <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning-soft-foreground" aria-live="polite" role="status">
         <Clock3 aria-hidden="true" className="size-4 shrink-0" />
         <p>
           El periodo de prueba del salón vence en {dias}{" "}
@@ -72,7 +72,7 @@ export function SubscriptionBanner({
 
   if (badge.estado === "vencida") {
     return (
-      <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-destructive-soft-foreground">
+      <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-destructive-soft-foreground" aria-live="polite" role="status">
         <LockKeyhole aria-hidden="true" className="size-4 shrink-0" />
         <p>
           Tu suscripción está en pausa: puedes consultar tu información, pero no
@@ -90,7 +90,7 @@ export function SubscriptionBanner({
   }
 
   return (
-    <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning-soft-foreground">
+    <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning-soft-foreground" aria-live="polite" role="status">
       <Clock3 aria-hidden="true" className="size-4 shrink-0" />
       <p>
         Estás en tu periodo de prueba
