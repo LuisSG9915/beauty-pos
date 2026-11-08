@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 import { firstParam } from "@/lib/url-context";
+import { SUSCRIPCION_COPY } from "@/lib/glosario";
+import { puedeAdministrarPlan } from "@/lib/auth/permissions";
 
 export type BillingBadge = {
   /** `vigente` con trial activo muestra cuenta regresiva; `vencida` aviso de solo lectura. */
@@ -32,27 +34,19 @@ export function SubscriptionBanner({
   const badge = organizationId ? billingByOrg[organizationId] : undefined;
   if (!badge) return null;
 
-  // El personal operativo no administra el plan: en trial solo ve aviso
-  // cuando falta poco para el vencimiento, y en pausa un aviso para escalar
-  // a la dueña — nunca el CTA comercial "Ver planes".
   const permisos =
     organizationId && permissionsByOrg
       ? (permissionsByOrg[organizationId] ?? null)
       : null;
-  const puedeAdministrarPlan =
-    permisos === null ||
-    permisos.includes("organizaciones.editar") ||
-    permisos.includes("sucursales.editar");
+  const esAdminPlan = puedeAdministrarPlan(permisos);
 
-  if (!puedeAdministrarPlan) {
+  // Staff operativo: solo aviso suave (sin CTA comercial)
+  if (!esAdminPlan) {
     if (badge.estado === "vencida") {
       return (
         <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-destructive-soft-foreground" aria-live="polite" role="status">
           <LockKeyhole aria-hidden="true" className="size-4 shrink-0" />
-          <p>
-            La suscripción del salón está en pausa (solo lectura) — avísale a
-            la dueña o encargada para reactivarla.
-          </p>
+          <p>{SUSCRIPCION_COPY.vencidaStaff}</p>
         </div>
       );
     }
@@ -61,24 +55,17 @@ export function SubscriptionBanner({
     return (
       <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning-soft-foreground" aria-live="polite" role="status">
         <Clock3 aria-hidden="true" className="size-4 shrink-0" />
-        <p>
-          El periodo de prueba del salón vence en {dias}{" "}
-          {dias === 1 ? "día" : "días"} — recuérdale a la dueña o encargada
-          para evitar pausas.
-        </p>
+        <p>{SUSCRIPCION_COPY.trialStaff(dias)}</p>
       </div>
     );
   }
 
+  // Admin del plan: aviso con CTA a planes
   if (badge.estado === "vencida") {
     return (
       <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-destructive/30 bg-destructive-soft px-4 py-3 text-sm text-destructive-soft-foreground" aria-live="polite" role="status">
         <LockKeyhole aria-hidden="true" className="size-4 shrink-0" />
-        <p>
-          Tu suscripción está en pausa: puedes consultar tu información, pero no
-          registrar cambios. Reactiva tu plan para volver a operar — tus datos
-          están a salvo.
-        </p>
+        <p>{SUSCRIPCION_COPY.vencidaAdmin}</p>
         <Link
           className="ml-auto inline-flex min-h-11 shrink-0 items-center rounded-full border border-destructive-soft-foreground/40 bg-card/60 px-3.5 text-op-xs font-semibold transition-colors hover:bg-card"
           href="/precios"
@@ -92,13 +79,7 @@ export function SubscriptionBanner({
   return (
     <div className="anim-entrada mb-4 flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-warning-soft-foreground" aria-live="polite" role="status">
       <Clock3 aria-hidden="true" className="size-4 shrink-0" />
-      <p>
-        Estás en tu periodo de prueba
-        {badge.diasRestantes !== null
-          ? ` — te ${badge.diasRestantes === 1 ? "queda 1 día" : `quedan ${badge.diasRestantes} días`}`
-          : ""}
-        . Todo lo que registres se conserva al contratar.
-      </p>
+      <p>{SUSCRIPCION_COPY.trialAdmin(badge.diasRestantes)}</p>
       <Link
         className="ml-auto inline-flex min-h-11 shrink-0 items-center rounded-full border border-warning-soft-foreground/40 bg-card/60 px-3.5 text-op-xs font-semibold transition-colors hover:bg-card"
         href="/precios"

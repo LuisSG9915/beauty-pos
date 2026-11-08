@@ -18,7 +18,6 @@ import { ventas } from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { canAccessBranch, hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { obtenerCatalogoPosCacheado } from "@/lib/catalogo-cache";
-import { existeConfiguracionPos } from "@/modules/pos/queries";
 import { formatCurrency, formatTime } from "@/lib/format";
 import { GLOSARIO } from "@/lib/glosario";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
@@ -199,10 +198,6 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
   const sucursalId = context.sucursalId;
   const day = dayKey(new Date(), context.timeZone);
   const bounds = dayBoundsUtc(day, context.timeZone);
-  const yaConfigurado = await existeConfiguracionPos(organizationId);
-  if (!yaConfigurado) {
-    redirect(buildAdminHref("/pos/inicio", { organizationId }));
-  }
   const [ventasHoy, catalogos] = await Promise.all([
     obtenerEstadoOperativoPos(db, organizationId, sucursalId, bounds),
     sucursalId ? obtenerCatalogoPosCacheado(organizationId, sucursalId) : Promise.resolve(null),
@@ -257,15 +252,16 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
                   })}
                 />
               }
-              size="lg"
+              size="sm"
               variant="outline"
             >
-              Nueva venta rápida
+              Nueva venta <span className="hidden sm:inline">rápida</span>
             </Button>
             <Button
               data-action-id="pos.ventas.historial"
               nativeButton={false}
               render={<Link href={buildAdminHref("/ventas", { organizationId, sucursalId })} />}
+              size="sm"
               variant="outline"
             >
               Ver historial

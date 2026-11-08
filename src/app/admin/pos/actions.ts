@@ -901,8 +901,11 @@ export async function cobrarVenta(_previousState: CobroActionState, formData: Fo
     // Tras cobrar, ir a la página de confirmación (tipo Northud) en lugar de
     // volver directamente al punto de venta. Desde ahí el usuario puede enviar
     // el ticket por WhatsApp, imprimir, copiar el enlace, ver la venta o abrir
-    // una nueva venta.
-    redirect(`/admin/pos/cobrado/${input.ventaId}?organizationId=${input.organizacionId}&sucursalId=${ventaSucursalId}`);
+    // una nueva venta. Si no se pudo resolver la sucursal, ir al POS general.
+    if (ventaSucursalId) {
+      redirect(`/admin/pos/cobrado/${input.ventaId}?organizationId=${input.organizacionId}&sucursalId=${ventaSucursalId}`);
+    }
+    redirect(`/admin/pos?organizationId=${input.organizacionId}`);
   }
   return outcome;
 }
@@ -1473,6 +1476,239 @@ export async function cancelarVentaCobrada(_previousState: ActionState, formData
     if (error instanceof PosOperationError) return actionError(error.message);
     console.error("cancelarVentaCobrada", error);
     return actionError("No se pudo cancelar la venta. Intenta de nuevo.");
+  }
+
+  if (outcome.success) {
+    revalidatePath("/admin/pos");
+    revalidatePath("/admin/agenda");
+    revalidatePath("/admin/inventario");
+    revalidatePath("/admin/caja");
+  }
+  return outcome;
+}
+
+const reactivarVentaSchema = z.object({
+  organizacionId: z.string().uuid(),
+  ventaId: z.string().uuid(),
+});
+
+/**
+ * Revierte una cancelación de venta cobrada: la venta vuelve a "completada",
+ * se re-consumen inventario y caja, se reactivan comisiones/propinas y
+ * sesiones de paquete, y los anticipos vuelven a aplicados. Falla si el corte
+ * de la venta ya está cerrado (no se puede reabrir la caja).
+ */
+export async function reactivarVenta(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = parseWithSchema(reactivarVentaSchema, Object.fromEntries(formData.entries()), "Revisa la venta.");
+  if (!parsed.success) return parsed.state;
+  const input = parsed.data;
+
+  const access = await checkPermission(input.organizacionId, "ventas.cancelar");
+  if (!access) return actionError("No tienes permiso para reactivar ventas.");
+  const { user } = access;
+  const db = getDatabase();
+
+  let outcome: ActionState;
+  try {
+    outcome = await withDbRetry(() =>
+      db.transaction(async (tx): Promise<ActionState> => {
+        const [venta] = await tx
+          .select()
+          .from(ventas)
+          .where(and(eq(ventas.id, input.ventaId), eq(ventas.organizacionId, input.organizacionId), eq(ventas.activo, true)))
+          .limit(1)
+          .for("update");
+        if (!venta) return actionError("La venta no existe.");
+        if (venta.estado !== "cancelada") {
+          return actionError(venta.estado === "completada" ? "La venta ya está activa." : "Solo se reactivan ventas canceladas.");
+        }
+        if (!canAccessBranch(access, venta.sucursalId)) {
+          return actionError("La venta pertenece a otra sucursal.");
+        }
+        if (venta.corteId) {
+          const [corte] = await tx
+            .select({ estado: cortesCaja.estado })
+            .from(cortesCaja)
+            .where(eq(cortesCaja.id, venta.corteId))
+            .limit(1);
+          if (corte?.estado === "cerrado") {
+            return actionError("La venta pertenece a un corte ya cerrado. No se puede deshacer la cancelación.");
+          }
+        }
+
+        // Stock: re-consumir productos (cancel los devolvió al inventario).
+        const lineasProductos = await tx
+          .select({ productoId: detalleVentasProductos.productoId, cantidad: detalleVentasProductos.cantidad })
+          .from(detalleVentasProductos)
+          .where(and(eq(detalleVentasProductos.ventaId, venta.id), eq(detalleVentasProductos.activo, true)));
+        for (const linea of lineasProductos) {
+          const outcomeStock = await applyInventoryMovement(tx, {
+            organizacionId: input.organizacionId,
+            sucursalId: venta.sucursalId,
+            productoId: linea.productoId,
+            ventaId: venta.id,
+            tipo: "venta",
+            cantidad: linea.cantidad,
+            notas: "Reactivación de venta cancelada",
+            userId: user.id,
+          });
+          if (!outcomeStock.success) throw new PosOperationError(outcomeStock.error ?? "No se pudo re-consumir el stock.");
+        }
+
+        // Caja: si hay corte abierto, registrar un ingreso compensatorio.
+        const pagosVenta = await tx
+          .select({ monto: detalleVentasMediosPagos.monto })
+          .from(detalleVentasMediosPagos)
+          .where(and(eq(detalleVentasMediosPagos.ventaId, venta.id), eq(detalleVentasMediosPagos.activo, true)));
+        const montoRetiro = Math.round(pagosVenta.reduce((s, p) => s + Number(p.monto), 0) * 100) / 100;
+        const [corteAbierto] = await tx
+          .select({ id: cortesCaja.id })
+          .from(cortesCaja)
+          .where(
+            and(
+              eq(cortesCaja.sucursalId, venta.sucursalId),
+              eq(cortesCaja.organizacionId, input.organizacionId),
+              eq(cortesCaja.estado, "abierto"),
+              eq(cortesCaja.activo, true),
+            ),
+          )
+          .limit(1);
+        if (corteAbierto && montoRetiro > 0) {
+          // medio: usar el primer medio en efectivo de la venta o el primero activo
+          const [medioDeVenta] = await tx
+            .select({ medioPagoId: detalleVentasMediosPagos.medioPagoId })
+            .from(detalleVentasMediosPagos)
+            .innerJoin(catMediosPago, eq(detalleVentasMediosPagos.medioPagoId, catMediosPago.id))
+            .where(
+              and(
+                eq(detalleVentasMediosPagos.ventaId, venta.id),
+                eq(detalleVentasMediosPagos.activo, true),
+                eq(catMediosPago.categoria, "efectivo"),
+              ),
+            )
+            .limit(1);
+          const medioId =
+            medioDeVenta?.medioPagoId ??
+            (
+              await tx
+                .select({ id: catMediosPago.id })
+                .from(catMediosPago)
+                .where(
+                  and(
+                    eq(catMediosPago.organizacionId, input.organizacionId),
+                    eq(catMediosPago.activo, true),
+                  ),
+                )
+                .limit(1)
+            )[0]?.id;
+          if (medioId) {
+            await tx.insert(movimientosCaja).values({
+              organizacionId: input.organizacionId,
+              sucursalId: venta.sucursalId,
+              corteId: corteAbierto.id,
+              medioPagoId: medioId,
+              tipo: "ingreso",
+              monto: montoRetiro.toFixed(2),
+              notas: "Reactivación de venta cancelada",
+              usuarioId: user.id,
+              createdBy: user.id,
+            });
+          }
+        }
+
+        // Comisiones y propinas: reactivar.
+        await tx
+          .update(detalleVentasComisiones)
+          .set({ activo: true, updatedBy: user.id })
+          .where(eq(detalleVentasComisiones.ventaId, venta.id));
+        await tx
+          .update(detalleVentasPropinas)
+          .set({ activo: true, updatedBy: user.id })
+          .where(eq(detalleVentasPropinas.ventaId, venta.id));
+
+        // Paquetes comprados: reactivar primero (restaurar sesiones totales).
+        const paquetesComprados = await tx
+          .select({ id: clientePaquetes.id })
+          .from(clientePaquetes)
+          .where(and(eq(clientePaquetes.ventaId, venta.id), eq(clientePaquetes.organizacionId, input.organizacionId), eq(clientePaquetes.estado, "cancelado"), eq(clientePaquetes.activo, true)));
+        if (paquetesComprados.length > 0) {
+          await tx
+            .update(clientePaquetes)
+            .set({ estado: "vigente", sesionesRestantes: sql`${clientePaquetes.sesionesTotal}`, updatedBy: user.id })
+            .where(inArray(clientePaquetes.id, paquetesComprados.map((p) => p.id)));
+        }
+
+        // Sesiones consumidas: re-consumir.
+        const usosVenta = await tx
+          .select({ id: paqueteUsos.id, clientePaqueteId: paqueteUsos.clientePaqueteId, cantidad: paqueteUsos.cantidad })
+          .from(paqueteUsos)
+          .where(and(eq(paqueteUsos.ventaId, venta.id), eq(paqueteUsos.activo, false)));
+        for (const uso of usosVenta) {
+          await tx.update(paqueteUsos).set({ activo: true, updatedBy: user.id }).where(eq(paqueteUsos.id, uso.id));
+          const [saldo] = await tx
+            .select({ sesionesRestantes: clientePaquetes.sesionesRestantes, sesionesTotal: clientePaquetes.sesionesTotal })
+            .from(clientePaquetes)
+            .where(eq(clientePaquetes.id, uso.clientePaqueteId))
+            .limit(1)
+            .for("update");
+          if (saldo) {
+            const nuevo = Math.max(saldo.sesionesRestantes - uso.cantidad, 0);
+            await tx
+              .update(clientePaquetes)
+              .set({ sesionesRestantes: nuevo, estado: nuevo > 0 ? "vigente" : "agotado", updatedBy: user.id })
+              .where(eq(clientePaquetes.id, uso.clientePaqueteId));
+          }
+        }
+
+        // Membresías compradas: reactivar.
+        const membresiasCompradas = await tx
+          .select({ id: clienteMembresias.id })
+          .from(clienteMembresias)
+          .where(and(eq(clienteMembresias.ventaId, venta.id), eq(clienteMembresias.organizacionId, input.organizacionId), eq(clienteMembresias.estado, "cancelado"), eq(clienteMembresias.activo, true)));
+        if (membresiasCompradas.length > 0) {
+          await tx
+            .update(clienteMembresias)
+            .set({ estado: "vigente", updatedBy: user.id })
+            .where(inArray(clienteMembresias.id, membresiasCompradas.map((m) => m.id)));
+        }
+
+        // Anticipos: volver a aplicados (se identifican por la cita de la venta).
+        if (venta.citaId) {
+          await tx
+            .update(anticipos)
+            .set({ estado: "aplicado", ventaId: venta.id, updatedBy: user.id })
+            .where(and(eq(anticipos.citaId, venta.citaId), eq(anticipos.estado, "vigente"), eq(anticipos.activo, true)));
+        }
+
+        // Venta: completada.
+        await tx
+          .update(ventas)
+          .set({ estado: "completada", updatedBy: user.id })
+          .where(eq(ventas.id, venta.id));
+
+        // Cita: completada.
+        if (venta.citaId) {
+          await tx
+            .update(citas)
+            .set({ estado: "completada", updatedBy: user.id })
+            .where(and(eq(citas.id, venta.citaId), eq(citas.estado, "en_proceso")));
+        }
+
+        await auditEvent(tx, {
+          organizacionId: input.organizacionId,
+          sucursalId: venta.sucursalId,
+          usuarioId: user.id,
+          accion: "venta.reactivada",
+          entidad: "venta",
+          entidadId: venta.id,
+        });
+        return actionSuccess("Venta reactivada.", { ventaId: venta.id });
+      }),
+    );
+  } catch (error) {
+    if (error instanceof PosOperationError) return actionError(error.message);
+    console.error("reactivarVenta", error);
+    return actionError("No se pudo reactivar la venta. Intenta de nuevo.");
   }
 
   if (outcome.success) {

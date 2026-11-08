@@ -188,3 +188,6 @@ export function validarAccesoRuta(pathname: string, hasAssertion = false): boole
   return hasAssertion;
 }
 
+// Re-exportar helpers de permisos desde archivo puro (sin deps Next.js runtime)
+export { PERMISOS_ADMIN_PLAN, puedeAdministrarPlan } from "./permissions";
+

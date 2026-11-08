@@ -467,7 +467,7 @@ const _resolveSessionContextImpl = cache(async function _resolveSessionContextIm
 // múltiples requests): evita la consulta a la BD cuando el mismo usuario
 // vuelve a pedir su contexto dentro de la ventana de TTL. Complementa al
 // caché KV (cross-request, 300 s) y al React.cache (por request).
-const ISOLATE_CACHE_TTL_MS = 60_000;
+const ISOLATE_CACHE_TTL_MS = 600_000;
 type IsolateCacheEntry = {
   value: Awaited<ReturnType<typeof _resolveSessionContextImpl>>;
   expiresAt: number;

@@ -7,9 +7,9 @@ import {
   renombrarSucursalAction,
 } from "@/app/admin/sucursales/actions";
 import { Button } from "@/components/ui/button";
-import { Field, FieldLabel, Input } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel, Input } from "@/components/ui/field";
 import { ActionFeedback } from "@/components/ui/toast";
-import { initialActionState } from "@/lib/action-state";
+import { fieldError, initialActionState } from "@/lib/action-state";
 
 /**
  * Tarjeta del inicio "¿Cómo se llama tu salón?": aparece cuando la
@@ -29,6 +29,7 @@ export function RenombrarSucursalCard({
   nombreSugerido: string;
 }) {
   const [state, action, pending] = useActionState(renombrarSucursalAction, initialActionState);
+  const fe = (name: string) => fieldError(state, name);
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
@@ -58,7 +59,8 @@ export function RenombrarSucursalCard({
         <input name="sucursalId" type="hidden" value={sucursalId} />
         <Field className="w-full sm:w-auto sm:min-w-56 sm:flex-1">
           <FieldLabel required>Nombre de la sucursal</FieldLabel>
-          <Input defaultValue={nombreSugerido} name="nombre" required />
+          <Input defaultValue={nombreSugerido} invalid={Boolean(fe("nombre"))} name="nombre" required />
+          <FieldError error={fe("nombre")} />
         </Field>
         <Button
           className="rounded-xl"

@@ -75,7 +75,7 @@
     }
   ],
   "triggers": {
-    "crons": ["*/15 * * * *"]
+    "crons": ["* * * * *"]
   },
   // AI Gateway `melena-ia` se crea a mano en el dashboard (ver "Pasos
   // manuales" del plan 08). Descomentar la var SOLO cuando el gateway exista:

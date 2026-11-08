@@ -73,6 +73,23 @@ export const MENSAJES_ERROR_ACCESO: Record<string, string> = {
 };
 
 /**
+ * Copy centralizado de estados de suscripción para UI (evita duplicación y
+ * divergencia entre banner, emails, etc.).
+ */
+export const SUSCRIPCION_COPY = {
+  /** Trial: aviso para admins con CTA a planes. */
+  trialAdmin: (dias: number | null) =>
+    `Estás en tu periodo de prueba${dias !== null ? ` — te ${dias === 1 ? "queda 1 día" : `quedan ${dias} días`}` : ""}. Todo lo que registres se conserva al contratar.`,
+  /** Trial: aviso para staff (sin CTA, solo recordatorio a dueña). */
+  trialStaff: (dias: number | null) =>
+    `El periodo de prueba del salón vence en ${dias}${dias === 1 ? " día" : " días"} — recuérdale a la dueña o encargada para evitar pausas.`,
+  /** Vencida: aviso para admins con CTA a planes. */
+  vencidaAdmin: "Tu suscripción está en pausa: puedes consultar tu información, pero no registrar cambios. Reactiva tu plan para volver a operar — tus datos están a salvo.",
+  /** Vencida: aviso para staff (escalación a dueña). */
+  vencidaStaff: "La suscripción del salón está en pausa (solo lectura) — avísale a la dueña o encargada para reactivarla.",
+} as const;
+
+/**
  * Heurística de presentación/copy para la UI: traduce el texto de un error
  * operativo a un mensaje llano que indica quién puede resolverlo en el salón.
  * Solo sirve para mostrar texto amable; NUNCA para lógica de negocio ni para

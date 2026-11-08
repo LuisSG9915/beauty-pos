@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Plus, Trash2 } from "lucide-react";
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 
 import { cobrarVenta, type CobroActionState } from "@/app/admin/pos/actions";
@@ -46,6 +46,8 @@ export function CobroForm({
   returnTo,
   modo,
   onCobrada,
+  enDialog = false,
+  onClose,
 }: {
   organizationId: string;
   ventaId: string;
@@ -56,6 +58,10 @@ export function CobroForm({
   returnTo: string;
   modo?: "inline";
   onCobrada?: () => void;
+  /** Si se renderiza dentro de un <Dialog>, se oculte el CTA pegado y se expone `onClose`. */
+  enDialog?: boolean;
+  /** Cerrar el diálogo contenedor (p. ej. al pulsar Esc o "Volver"). */
+  onClose?: () => void;
 }) {
   const [state, formAction, pending] = useActionState<CobroActionState, FormData>(
     cobrarVenta,
@@ -67,6 +73,7 @@ export function CobroForm({
   ]);
   const [propinaOpcion, setPropinaOpcion] = useState("0");
   const [propinaOtro, setPropinaOtro] = useState("");
+  const [pagoActivo, setPagoActivo] = useState(0);
   // Rastrea si la fila ya empezó a sumar billetes por toque: mientras el
   // monto es el prellenado automático (exacto o resto), el primer billete
   // reemplaza; a partir de ahí cada toque suma.
@@ -119,6 +126,16 @@ export function CobroForm({
     handledState.current = state;
     onCobrada?.();
   }, [modo, onCobrada, state]);
+
+  // En modal, Esc cierra sin cobrar.
+  useEffect(() => {
+    if (!enDialog || !onClose) return;
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [enDialog, onClose]);
 
   const updatePago = (index: number, patch: Partial<PagoRow>) =>
     setPagos((current) =>
@@ -206,13 +223,42 @@ export function CobroForm({
     updatePago(index, { monto: "0" });
   };
 
+  // Numpad numérico (móvil): opera sobre el pago activo.
+  const agregarDigito = (index: number, digito: string) => {
+    const montoActual = pagos[index].monto;
+    const nuevoMonto = montoActual === "0" || montoActual === "" ? digito : montoActual + digito;
+    acumuloBilletesPorPago.current[index] = true;
+    updatePago(index, { monto: nuevoMonto });
+  };
+
+  const agregarDecimal = (index: number) => {
+    const montoActual = pagos[index].monto;
+    if (!montoActual.includes(".")) {
+      acumuloBilletesPorPago.current[index] = true;
+      updatePago(index, { monto: montoActual === "" || montoActual === "0" ? "0." : montoActual + "." });
+    }
+  };
+
+  const borrarDigito = (index: number) => {
+    const montoActual = pagos[index].monto;
+    const nuevoMonto = montoActual.length > 1 ? montoActual.slice(0, -1) : "0";
+    acumuloBilletesPorPago.current[index] = true;
+    updatePago(index, { monto: nuevoMonto });
+  };
+
+  const botonNumpadClass =
+    "min-h-12 rounded-xl border border-border bg-card flex items-center justify-center text-sm font-semibold tabular-nums text-muted-foreground transition-all duration-150 active:scale-[0.95] cursor-pointer select-none hover:border-primary/50 hover:text-primary";
+
+  const botonBorrarClass =
+    "min-h-12 rounded-xl border border-border bg-card flex items-center justify-center text-sm font-semibold text-destructive transition-all duration-150 active:scale-[0.95] cursor-pointer select-none hover:bg-destructive-soft";
+
   const botonBilleteClass =
     "inline-flex min-h-11 items-center rounded-lg border border-border bg-card px-2.5 text-op-xs font-semibold tabular-nums text-muted-foreground transition-all duration-150 active:scale-[0.98] cursor-pointer select-none hover:border-primary/50 hover:text-foreground";
 
   return (
     <form
       action={formAction}
-      className="rounded-2xl border border-border bg-card p-5 shadow-sm sm:p-6"
+      className="rounded-2xl border border-border bg-card p-5 md:p-7 shadow-sm"
     >
       <input name="organizacionId" type="hidden" value={organizationId} />
       <input name="ventaId" type="hidden" value={ventaId} />
@@ -333,7 +379,10 @@ export function CobroForm({
                     className={chipPagoClass(pago.medioPagoId === item.id)}
                     data-action-id="pos.cobro.medio_pago"
                     key={item.id}
-                    onClick={() => updatePago(index, { medioPagoId: item.id })}
+                    onClick={() => {
+                      setPagoActivo(index);
+                      updatePago(index, { medioPagoId: item.id });
+                    }}
                     type="button"
                   >
                     {item.nombre}
@@ -353,7 +402,10 @@ export function CobroForm({
                       className={botonBilleteClass}
                       data-action-id="pos.cobro.billete_rapido"
                       key={denom}
-                      onClick={() => tocarBillete(index, denom)}
+                      onClick={() => {
+                        setPagoActivo(index);
+                        tocarBillete(index, denom);
+                      }}
                       type="button"
                     >
                       +${denom.toLocaleString("es-MX")}
@@ -362,7 +414,10 @@ export function CobroForm({
                   <button
                     className={botonBilleteClass}
                     data-action-id="pos.cobro.billete_exacto"
-                    onClick={() => fijarMontoExacto(index)}
+                    onClick={() => {
+                      setPagoActivo(index);
+                      fijarMontoExacto(index);
+                    }}
                     type="button"
                   >
                     Exacto ({formatCurrency(aCubrir)})
@@ -371,7 +426,10 @@ export function CobroForm({
                     aria-label={`Borrar monto del pago ${index + 1}`}
                     className={botonBilleteClass}
                     data-action-id="pos.cobro.billete_borrar"
-                    onClick={() => borrarMonto(index)}
+                    onClick={() => {
+                      setPagoActivo(index);
+                      borrarMonto(index);
+                    }}
                     type="button"
                   >
                     Borrar
@@ -386,6 +444,7 @@ export function CobroForm({
                   inputMode="decimal"
                   min="0"
                   onChange={(event) => {
+                    setPagoActivo(index);
                     // Edición manual: el siguiente billete suma sobre lo escrito.
                     acumuloBilletesPorPago.current[index] = true;
                     updatePago(index, { monto: event.target.value });
@@ -400,6 +459,7 @@ export function CobroForm({
                   className="min-h-11 h-11 rounded-xl border border-border bg-card px-3 text-op-xs font-medium text-primary transition-all hover:bg-accent/70 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   disabled={resto <= 0}
                   onClick={() => {
+                    setPagoActivo(index);
                     // Monto autocompletado: el primer billete reemplaza.
                     acumuloBilletesPorPago.current[index] = false;
                     updatePago(index, { monto: resto.toFixed(2) });
@@ -434,6 +494,70 @@ export function CobroForm({
             </div>
           );
         })}
+
+        {/* Numpad numérico móvil: afecta al pago activo (último medio seleccionado o el primero). */}
+        <div className="md:hidden mt-4 rounded-xl border border-border bg-card p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-op-xs font-medium text-muted-foreground">
+              Numpad · pago {pagoActivo + 1} de {pagos.length}
+            </span>
+            <button
+              aria-label="Seleccionar pago anterior"
+              className="min-h-8 h-8 rounded-lg border border-border bg-background px-1.5 text-op-xs transition-colors hover:bg-muted"
+              disabled={pagoActivo === 0 || pagos.length <= 1}
+              onClick={() => setPagoActivo((p) => Math.max(p - 1, 0))}
+              type="button"
+            >
+              <ChevronLeft className="size-3.5" />
+            </button>
+            <button
+              aria-label="Seleccionar pago siguiente"
+              className="min-h-8 h-8 rounded-lg border border-border bg-background px-1.5 text-op-xs transition-colors hover:bg-muted"
+              disabled={pagoActivo === pagos.length - 1 || pagos.length <= 1}
+              onClick={() => setPagoActivo((p) => Math.min(p + 1, pagos.length - 1))}
+              type="button"
+            >
+              <ChevronRight className="size-3.5" />
+            </button>
+          </div>
+          <div className="grid grid-cols-3 gap-1.5">
+            {[...Array(9).keys()].map((i) => (
+              <button
+                key={i + 1}
+                aria-label={`Dígito ${i + 1}`}
+                className={botonNumpadClass}
+                onClick={() => agregarDigito(pagoActivo, String(i + 1))}
+                type="button"
+              >
+                {i + 1}
+              </button>
+            ))}
+            <button
+              aria-label="Punto decimal"
+              className={botonNumpadClass}
+              onClick={() => agregarDecimal(pagoActivo)}
+              type="button"
+            >
+              .
+            </button>
+            <button
+              aria-label="Dígito 0"
+              className={botonNumpadClass}
+              onClick={() => agregarDigito(pagoActivo, "0")}
+              type="button"
+            >
+              0
+            </button>
+            <button
+              aria-label="Borrar último dígito"
+              className={botonBorrarClass}
+              onClick={() => borrarDigito(pagoActivo)}
+              type="button"
+            >
+              <ArrowLeft className="size-4" />
+            </button>
+          </div>
+        </div>
       </div>
 
       <div className="mt-4">
@@ -470,14 +594,21 @@ export function CobroForm({
         ) : null}
       </div>
 
-      {/* CTA pegado al fondo del formulario: al llegar a esta sección en
-          móvil, "Cobrar" queda siempre a un toque sin llegar al final. */}
-      <div className="sticky bottom-0 z-30 -mx-5 -mb-5 mt-4 border-t border-border/60 bg-card/95 px-5 pb-4 pt-3 backdrop-blur-sm sm:-mx-6 sm:-mb-6 sm:px-6 sm:pb-6">
+      <div className="mt-4 flex flex-wrap justify-end gap-2">
+        {enDialog ? (
+          <Button
+            type="button"
+            onClick={onClose}
+            disabled={pending}
+            variant="outline"
+          >
+            Volver (Esc)
+          </Button>
+        ) : null}
         <ActionFeedback className="mb-3" state={state} />
-
         <Button
           className={cn(
-            "w-full rounded-2xl font-bold shadow-sm transition-all duration-200 active:scale-[0.98]",
+            "rounded-2xl font-bold shadow-sm transition-all duration-200 active:scale-[0.98]",
             puedeCobrar && "bg-primary text-primary-foreground hover:brightness-105 hover:shadow-md",
           )}
           data-action-clave="1"

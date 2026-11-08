@@ -15,6 +15,7 @@ import {
   cambiarCantidadLinea,
   cancelarVentaCobrada,
   devolverLineasVenta,
+  reactivarVenta,
   quitarMembresiaAplicada,
   quitarMembresiaVenta,
   quitarPaqueteDeLinea,
@@ -40,6 +41,13 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Combobox } from "@/components/ui/combobox";
 import { RemoteCombobox } from "@/components/ui/remote-combobox";
 import { Field, FieldLabel, Input } from "@/components/ui/field";
@@ -199,79 +207,76 @@ function TicketLine({
   return (
     <div
       className={cn(
-        "group rounded-2xl border border-border/80 bg-card p-3 sm:px-4 text-sm shadow-xs transition-all duration-200 hover:border-border hover:shadow-sm anim-entrada",
+        "group rounded-2xl border border-border bg-card p-4 sm:p-5 shadow-sm transition-all duration-200 hover:border-border hover:shadow-sm anim-entrada",
         pending && "opacity-60",
       )}
     >
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 min-w-0">
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium text-foreground">{line.nombre}</p>
-          <p className="mt-0.5 text-op-xs tabular-nums text-muted-foreground">
-            {formatCurrency(line.precio, { currency })} c/u
-            {paquete?.usado ? " · cubierto por paquete" : ""}
-            {!editable && profesionalNombre ? ` · ${profesionalNombre}` : ""}
-          </p>
+          <div className="flex items-baseline gap-2">
+            <p className="truncate font-semibold text-base text-foreground">{line.nombre}</p>
+            <span className="text-op-xs font-medium tabular-nums text-muted-foreground">
+              {formatCurrency(line.precio, { currency })} c/u
+            </span>
+          </div>
+          {(paquete?.usado || profesionalNombre) && (
+            <p className="mt-1 text-op-xs text-muted-foreground">
+              {paquete?.usado ? "Cubierto por paquete" : profesionalNombre ?? ""}
+            </p>
+          )}
         </div>
-        {editable ? (
-          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-            <div
-              aria-label={`Cantidad de ${line.nombre}`}
-              className="flex items-center overflow-hidden rounded-xl border border-border bg-muted/30 shadow-xs"
-              role="group"
-            >
-              <button
-                aria-label="Disminuir cantidad"
-                className="flex size-11 min-h-11 min-w-11 items-center justify-center text-muted-foreground transition-all duration-100 hover:bg-muted hover:text-foreground active:scale-[0.98] disabled:opacity-40"
+        <div className="flex items-end gap-3 min-w-0">
+          <span className="text-sm font-bold tabular-nums text-foreground">
+            {paquete?.usado ? "Paquete" : formatCurrency(importe, { currency })}
+          </span>
+          {editable ? (
+            <>
+              <Button
+                aria-label={`Quitar ${line.nombre}`}
+                onClick={() => run(removeAction, {})}
                 disabled={pending}
-                onClick={() => run(cambiarCantidadLinea, { tipo, delta: "-1" })}
-                type="button"
+                size="icon"
+                variant="ghost"
+                className="size-10 p-1 text-muted-foreground transition-colors hover:bg-destructive-soft hover:text-destructive active:scale-[0.95]"
               >
-                <Minus aria-hidden="true" className="size-4" />
-              </button>
-              <span
-                aria-live="polite"
-                className="w-8 text-center text-op-xs font-bold tabular-nums text-foreground"
+                <Trash2 aria-hidden="true" className="size-4" />
+              </Button>
+              <div
+                aria-label={`Cantidad de ${line.nombre}`}
+                className="flex items-center gap-1 rounded-xl border border-border bg-muted/30 px-2 py-1"
+                role="group"
               >
-                {line.cantidad}
-              </span>
-              <button
-                aria-label="Aumentar cantidad"
-                className="flex size-11 min-h-11 min-w-11 items-center justify-center text-muted-foreground transition-all duration-100 hover:bg-muted hover:text-foreground active:scale-[0.98] disabled:opacity-40"
-                disabled={pending}
-                onClick={() => run(cambiarCantidadLinea, { tipo, delta: "1" })}
-                type="button"
-              >
-                <Plus aria-hidden="true" className="size-4" />
-              </button>
-            </div>
-            <span className="w-24 text-right font-bold tabular-nums text-foreground">
-              {paquete?.usado ? "Paquete" : formatCurrency(importe, { currency })}
-            </span>
-            <Button
-              aria-label={`Quitar ${line.nombre}`}
-              className="min-h-11 min-w-11 text-muted-foreground transition-all duration-150 hover:bg-destructive-soft hover:text-destructive active:scale-[0.98]"
-              disabled={pending}
-              onClick={() => run(removeAction, {})}
-              size="icon"
-              type="button"
-              variant="ghost"
-            >
-              <Trash2 aria-hidden="true" className="size-4" />
-            </Button>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            <span className="text-op-xs tabular-nums text-muted-foreground">
-              {line.cantidad} × {formatCurrency(line.precio, { currency })}
-            </span>
-            <span className="w-24 text-right font-bold tabular-nums text-foreground">
-              {paquete?.usado ? "Paquete" : formatCurrency(importe, { currency })}
-            </span>
-          </div>
-        )}
+                <button
+                  aria-label="Disminuir cantidad"
+                  disabled={pending}
+                  onClick={() => run(cambiarCantidadLinea, { tipo, delta: "-1" })}
+                  type="button"
+                  className="size-9 sm:size-10 p-0 text-muted-foreground transition-colors hover:bg-muted active:scale-[0.95] disabled:opacity-40"
+                >
+                  <Minus aria-hidden="true" className="size-3.5" />
+                </button>
+                <span
+                  aria-live="polite"
+                  className="min-w-[1.2rem] text-center text-xs font-bold tabular-nums text-foreground"
+                >
+                  {line.cantidad}
+                </span>
+                <button
+                  aria-label="Aumentar cantidad"
+                  disabled={pending}
+                  onClick={() => run(cambiarCantidadLinea, { tipo, delta: "1" })}
+                  type="button"
+                  className="size-9 sm:size-10 p-0 text-muted-foreground transition-colors hover:bg-muted active:scale-[0.95] disabled:opacity-40"
+                >
+                  <Plus aria-hidden="true" className="size-3.5" />
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
       </div>
       {esServicio && editable ? (
-        <div className="mt-1.5 flex items-center gap-2">
+        <div className="mt-2 flex items-center gap-2">
           <label
             className="shrink-0 text-op-xs text-muted-foreground"
             htmlFor={`profesional-${line.id}`}
@@ -280,7 +285,7 @@ function TicketLine({
           </label>
           <select
             aria-label={`Profesional para ${line.nombre}`}
-            className="h-11 min-h-11 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-op-xs outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 disabled:opacity-60 sm:max-w-52"
+            className="h-10 min-h-10 min-w-0 flex-1 rounded-lg border border-input bg-background px-2 text-op-xs outline-none transition-colors focus:border-ring focus:ring-2 focus:ring-ring/30 disabled:opacity-60 sm:max-w-52"
             defaultValue={usuarioId ?? ""}
             disabled={pending}
             id={`profesional-${line.id}`}
@@ -304,7 +309,7 @@ function TicketLine({
         </div>
       ) : null}
       {esServicio && editable && paquete ? (
-        <div className="mt-1.5 flex items-center gap-2">
+        <div className="mt-2 flex items-center gap-2">
           {paquete.usado ? (
             <>
               <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-1 text-op-xs font-medium text-success-soft-foreground">
@@ -312,7 +317,7 @@ function TicketLine({
                 Paquete{paquete.nombre ? ` · ${paquete.nombre}` : ""}
               </span>
               <button
-                className="inline-flex min-h-11 items-center rounded-lg px-2 text-op-xs font-medium text-primary underline underline-offset-2 transition-colors hover:bg-accent/70 hover:text-primary disabled:opacity-50"
+                className="inline-flex min-h-10 items-center rounded-lg px-2 text-op-xs font-medium text-primary underline underline-offset-2 transition-colors hover:bg-accent/70 hover:text-primary disabled:opacity-50"
                 disabled={pending}
                 onClick={() => run(quitarPaqueteDeLinea, {})}
                 type="button"
@@ -322,7 +327,7 @@ function TicketLine({
             </>
           ) : paquete.disponible > 0 ? (
             <button
-              className="inline-flex min-h-11 items-center gap-1 rounded-lg px-2.5 text-op-xs font-medium bg-success-soft text-success-soft-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
+              className="inline-flex min-h-10 items-center gap-1 rounded-lg px-2.5 text-op-xs font-medium bg-success-soft text-success-soft-foreground transition-opacity hover:opacity-90 disabled:opacity-50"
               disabled={pending}
               onClick={() => run(usarPaqueteEnLinea, {})}
               type="button"
@@ -570,7 +575,13 @@ export function VentaTicket({
     initialActionState,
   );
   const [, startQuickTransition] = useTransition();
+  const [cobroAbierto, setCobroAbierto] = useState(false);
   const propinaNum = Number(venta.propina) || 0;
+  const tieneLineas =
+    lineasServicios.length > 0 ||
+    lineasProductos.length > 0 ||
+    lineasPaquetes.length > 0 ||
+    lineasMembresias.length > 0;
   const totalDevuelto = devoluciones.reduce((s, d) => s + Number(d.monto), 0);
   // Importe de servicios cubiertos por paquete (informativo; no cobrado).
   const cubiertoPorPaquete = lineasServicios
@@ -622,8 +633,8 @@ export function VentaTicket({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)] min-w-0 max-w-full">
-      <section className="rounded-2xl border border-border bg-card p-4 sm:p-6 shadow-sm min-w-0 max-w-full">
+    <div className="grid grid-cols-1 gap-4 md:gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)] min-w-0 max-w-full">
+      <section className="order-1 md:order-2 rounded-2xl border border-border bg-card p-4 md:p-6 shadow-sm min-w-0 max-w-full md:max-h-[45vh] md:overflow-y-auto">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
@@ -817,8 +828,8 @@ export function VentaTicket({
         </div>
       </section>
 
-      <aside className="space-y-4">
-        <section className="rounded-2xl border border-border/80 bg-card p-5 shadow-sm transition-all duration-200 hover:shadow-md">
+      <aside className="order-2 md:order-1 space-y-4 min-h-0 md:max-h-[60vh] md:overflow-y-auto md:max-h-none md:overflow-visible">
+        <section className="rounded-2xl border border-border/80 bg-card p-4 md:p-6 shadow-sm transition-all duration-200 hover:shadow-md">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-wide text-foreground">Resumen de cobro</h2>
             <span className="rounded-full bg-accent px-2.5 py-0.5 text-op-xs font-medium text-muted-foreground">
@@ -971,16 +982,43 @@ export function VentaTicket({
         ) : null}
 
         {editable ? (
-          <CobroForm
-            anticipo={anticipoPorAplicar}
-            mediosPago={mediosPago}
-            modo={modo === "inline" ? "inline" : undefined}
-            onCobrada={onCobrada}
-            organizationId={organizationId}
-            returnTo={returnTo}
-            total={Number(venta.total)}
-            ventaId={venta.id}
-          />
+          tieneLineas ? (
+            <>
+              <Button
+                data-action-clave="1"
+                data-action-id="pos.cobro.abrir"
+                onClick={() => setCobroAbierto(true)}
+                className="w-full rounded-2xl font-bold bg-primary text-primary-foreground shadow-sm hover:brightness-105 transition-colors sticky bottom-0 z-10 border-t border-border/60 bg-card/95 px-4 py-3 backdrop-blur-sm"
+                size="lg"
+                type="button"
+              >
+                Cobrar {formatCurrency(venta.total, { currency })}
+              </Button>
+
+              <Dialog open={cobroAbierto} onOpenChange={setCobroAbierto}>
+                <DialogContent className="p-0 sm:p-6 max-w-md md:max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Cobrar</DialogTitle>
+                    <DialogDescription className="text-op-sm">
+                      {formatCurrency(venta.total, { currency })}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <CobroForm
+                    anticipo={anticipoPorAplicar}
+                    mediosPago={mediosPago}
+                    modo={modo === "inline" ? "inline" : undefined}
+                    onCobrada={onCobrada}
+                    organizationId={organizationId}
+                    returnTo={returnTo}
+                    total={Number(venta.total)}
+                    ventaId={venta.id}
+                    enDialog
+                    onClose={() => setCobroAbierto(false)}
+                  />
+                </DialogContent>
+              </Dialog>
+            </>
+          ) : null
         ) : cancelada ? (
           <section className="rounded-2xl border border-destructive/30 bg-destructive-soft p-6 shadow-sm">
             <h2 className="font-semibold text-destructive-soft-foreground">Venta cancelada</h2>
@@ -1371,6 +1409,7 @@ function CancelarVentaButton({
   const router = useRouter();
   const toast = useToast();
   const [abierto, setAbierto] = useState(false);
+  const [, startTransition] = useTransition();
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
     cancelarVentaCobrada,
     initialActionState,
@@ -1380,11 +1419,36 @@ function CancelarVentaButton({
   useEffect(() => {
     if (!state.success || handled.current === state) return;
     handled.current = state;
-    toast.success(state.message ?? "Venta cancelada.");
     setAbierto(false);
     onChanged?.();
     router.refresh();
-  }, [state, toast, onChanged, router]);
+    let toastId = "";
+    toastId = toast.show({
+      title: state.message ?? "Venta cancelada.",
+      description: "Puedes deshacer en los próximos segundos.",
+      type: "success",
+      timeout: 5000,
+      actionProps: {
+        children: "Deshacer",
+        onClick: () => {
+          toast.close(toastId);
+          const data = new FormData();
+          data.set("organizacionId", organizationId);
+          data.set("ventaId", ventaId);
+          startTransition(async () => {
+            const result = await reactivarVenta(initialActionState, data);
+            if (result.success) {
+              toast.success(result.message ?? "Venta reactivada.");
+              router.refresh();
+              onChanged?.();
+            } else {
+              toast.error(result.error ?? "No se pudo deshacer la cancelación.");
+            }
+          });
+        },
+      },
+    });
+  }, [state, toast, onChanged, router, organizationId, ventaId]);
 
   return (
     <AlertDialog onOpenChange={setAbierto} open={abierto}>

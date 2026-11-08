@@ -78,6 +78,7 @@ const demoAppointments: ReadonlyArray<{
   service: string;
   estado: EstadoVista;
 }> = [
+  // Demo ilustrativo — no conectado a BD
   {
     time: "09:30",
     initials: "ML",

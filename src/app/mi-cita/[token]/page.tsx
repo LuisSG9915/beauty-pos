@@ -8,26 +8,14 @@ import { Button } from "@/components/ui/button";
 import { clientIp } from "@/lib/client-ip";
 import { obtenerReservaPorToken } from "@/modules/reservas/gestion";
 import { GestionPanel } from "./gestion-panel";
+import {
+  estadoVistaDeCita,
+  ESTADO_VISTA_LABEL,
+  ESTADO_VISTA_CARD,
+  ESTADO_VISTA_DOT,
+} from "@/modules/agenda/estados";
 
 export const dynamic = "force-dynamic";
-
-const ETIQUETA_ESTADO: Record<string, string> = {
-  pendiente: "Agendada",
-  confirmada: "Confirmada",
-  en_proceso: "En atención",
-  completada: "Terminada",
-  cancelada: "Cancelada",
-  no_asistio: "No vino",
-};
-
-const ESTILO_ESTADO: Record<string, string> = {
-  pendiente: "bg-warning-soft text-warning-soft-foreground border-warning/30",
-  confirmada: "bg-success-soft text-success-soft-foreground border-success/30",
-  en_proceso: "bg-info-soft text-info-soft-foreground border-info/30",
-  completada: "bg-muted text-muted-foreground border-border",
-  cancelada: "bg-destructive-soft text-destructive-soft-foreground border-destructive/30",
-  no_asistio: "bg-muted text-muted-foreground border-border",
-};
 
 function formatoFechaHora(iso: string, zonaHoraria: string) {
   return new Intl.DateTimeFormat("es-MX", {
@@ -63,8 +51,11 @@ export default async function MiCitaPage({ params }: { params: Promise<{ token: 
     );
   }
 
-  const estado = ETIQUETA_ESTADO[reserva.estado] ?? reserva.estado;
-  const estilo = ESTILO_ESTADO[reserva.estado] ?? ESTILO_ESTADO.completada;
+  // Mapear estado de BD a EstadoVista de presentación (usa la misma lógica que la agenda)
+  const estadoVista = estadoVistaDeCita({ estado: reserva.estado, ventaId: null });
+  const etiquetaEstado = ESTADO_VISTA_LABEL[estadoVista];
+  const estiloEstado = ESTADO_VISTA_CARD[estadoVista];
+  const puntoEstado = ESTADO_VISTA_DOT[estadoVista];
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -83,8 +74,9 @@ export default async function MiCitaPage({ params }: { params: Promise<{ token: 
         <div className="rounded-2xl border border-border bg-card p-8 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h1 className="text-2xl font-semibold tracking-tight">Tu cita</h1>
-            <span className={`rounded-full border px-3 py-1 text-op-xs font-semibold ${estilo}`}>
-              {estado}
+            <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-op-xs font-semibold ${estiloEstado}`}>
+              <span aria-hidden="true" className={`size-1.5 rounded-full ${puntoEstado}`} />
+              {etiquetaEstado}
             </span>
           </div>
 

@@ -797,13 +797,7 @@ export function AdminTabBar({ organizationId, sucursalId, activePath, permission
                   sucursalId: context.sucursalId,
                 })}
                 key={item.path}
-                onClick={(event) => {
-                  event.preventDefault();
-                  window.location.assign(buildAdminHref(toAdminPath(item.path), {
-                    organizationId: context.organizationId,
-                    sucursalId: context.sucursalId,
-                  }));
-                }}
+
               >
                 <item.icon aria-hidden="true" className="size-5 transition-transform duration-150" strokeWidth={isActive ? 2.2 : 1.8} />
                 {item.label}

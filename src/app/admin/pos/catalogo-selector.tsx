@@ -164,7 +164,7 @@ export function CatalogoSelector({
               <button
                 aria-pressed={activo}
                 className={cn(
-                  "inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-op-xs font-medium whitespace-nowrap transition-all duration-150 sm:px-4 active:scale-[0.98] cursor-pointer",
+                  "inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg px-3 text-op-xs font-medium whitespace-nowrap transition-all duration-150 md:px-5 active:scale-[0.98] cursor-pointer",
                   activo
                     ? "bg-card text-primary shadow-xs font-semibold"
                     : "text-muted-foreground hover:text-foreground",
@@ -182,7 +182,7 @@ export function CatalogoSelector({
             );
           })}
         </div>
-        <div className="relative min-w-0 w-full sm:w-auto sm:max-w-64 flex-1">
+        <div className="relative min-w-0 w-full sm:w-auto md:max-w-72 flex-1">
           <Search
             aria-hidden="true"
             className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
@@ -242,7 +242,7 @@ export function CatalogoSelector({
                 : "No hay productos que coincidan."}
         </p>
       ) : (
-        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4 min-w-0 max-w-full">
+        <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-4 min-w-0 max-w-full">
           {filtrados.map((item, index) => {
             const tone = categoryTone("categoriaId" in item ? item.categoriaId : null);
             const imagenClave = "imagenClaveR2" in item ? item.imagenClaveR2 : null;

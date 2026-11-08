@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 
-import { cancelarFactura } from "@/app/admin/facturacion/actions";
+import { cancelarFactura, reemitirComprobante } from "@/app/admin/facturacion/actions";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel, Input, Select } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
-import { fieldError, type ActionState } from "@/lib/action-state";
+import { fieldError, initialActionState, type ActionState } from "@/lib/action-state";
 import { MOTIVOS_CANCELACION } from "@/modules/facturacion/sat";
 
 /** Solicita la cancelación de un comprobante emitido (motivo SAT + UUID sustituto si es 01). */
@@ -35,14 +35,38 @@ export function CancelarFacturaForm({
   const [state, formAction, pending] = useActionState<ActionState, FormData>(cancelarFactura, {});
   const fe = (name: string) => fieldError(state, name);
   const [motivo, setMotivo] = useState("02");
+  const [, startTransition] = useTransition();
 
   const handled = useRef<ActionState | null>(null);
   useEffect(() => {
     if (!state.success || handled.current === state) return;
     handled.current = state;
-    toast.success(state.message ?? "Comprobante cancelado.");
     setAbierto(false);
-  }, [state, toast]);
+    let toastId = "";
+    toastId = toast.show({
+      title: state.message ?? "Comprobante cancelado.",
+      description: "Puedes deshacer en los próximos segundos.",
+      type: "success",
+      timeout: 5000,
+      actionProps: {
+        children: "Deshacer",
+        onClick: () => {
+          toast.close(toastId);
+          const data = new FormData();
+          data.set("organizacionId", organizationId);
+          data.set("comprobanteId", comprobanteId);
+          startTransition(async () => {
+            const result = await reemitirComprobante(initialActionState, data);
+            if (result.success) {
+              toast.success(result.message ?? "Comprobante reemitido.");
+            } else {
+              toast.error(result.error ?? "No se pudo deshacer la cancelación.");
+            }
+          });
+        },
+      },
+    });
+  }, [state, toast, organizationId, comprobanteId]);
 
   return (
     <AlertDialog onOpenChange={setAbierto} open={abierto}>

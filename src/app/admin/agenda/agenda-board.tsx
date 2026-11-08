@@ -516,9 +516,25 @@ export function AgendaBoard({
         void runMutation(toggleCitaActiva(data));
       }}
       onToggleServicio={() => router.refresh()}
-      onTransition={(cita, estado) =>
-        void runMutation(updateCitaEstado(estadoFormData(cita, estado)), { keepSelected: true })
-      }
+      onTransition={(cita, estado) => {
+        const estadoAnterior = cita.estado;
+        void runMutation(updateCitaEstado(estadoFormData(cita, estado)), { keepSelected: true }).then((result) => {
+          if (result.success && estado === "cancelada" && estadoAnterior !== "cancelada") {
+            toast.show({
+              title: "Cita cancelada",
+              description: "Puedes deshacer en los próximos segundos.",
+              type: "success",
+              timeout: 5000,
+              actionProps: {
+                children: "Deshacer",
+                onClick: () => {
+                  void runMutation(updateCitaEstado(estadoFormData(cita, estadoAnterior)), { keepSelected: true });
+                },
+              },
+            });
+          }
+        });
+      }}
       organizationId={organizationId}
       pending={pending}
       recursos={recursos}

@@ -346,3 +346,118 @@ export async function cancelarFactura(_prev: ActionState, formData: FormData): P
   revalidatePath("/admin/facturacion");
   return actionSuccess("Comprobante cancelado.");
 }
+
+const reemitirSchema = z.object({
+  organizacionId: z.string().uuid(),
+  comprobanteId: z.string().uuid(),
+});
+
+/** Re-emite un comprobante cancelado (undo de cancelación). */
+export async function reemitirComprobante(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = parseWithSchema(reemitirSchema, Object.fromEntries(formData), "Revisa el comprobante.");
+  if (!parsed.success) return parsed.state;
+  const input = parsed.data;
+
+  let access = await checkPermission(input.organizacionId, "facturacion.cancelar");
+  if (!access) access = await checkPermission(input.organizacionId, "facturacion.emitir");
+  if (!access) return actionError("No tienes permiso para reemitir comprobantes.");
+  const db = getDatabase();
+
+  const [comprobante] = await db
+    .select()
+    .from(comprobantes)
+    .where(and(eq(comprobantes.id, input.comprobanteId), eq(comprobantes.organizacionId, input.organizacionId), eq(comprobantes.activo, true)))
+    .limit(1);
+  if (!comprobante) return actionError("El comprobante no existe.");
+  if (!canAccessBranch(access, comprobante.sucursalId)) return actionError("El comprobante pertenece a otra sucursal.");
+  if (comprobante.estado !== "cancelada") return actionError("Solo se reemiten comprobantes cancelados.");
+
+  const [venta] = await db
+    .select({ id: ventas.id, sucursalId: ventas.sucursalId, estado: ventas.estado })
+    .from(ventas)
+    .where(and(eq(ventas.id, comprobante.ventaId), eq(ventas.organizacionId, input.organizacionId), eq(ventas.activo, true)))
+    .limit(1);
+  if (!venta) return actionError("La venta no existe.");
+  if (venta.estado !== "completada") return actionError("La venta ya no está cobrada; no se puede reemitir.");
+
+  const [config] = await db
+    .select()
+    .from(facturacionConfig)
+    .where(and(eq(facturacionConfig.organizacionId, input.organizacionId), eq(facturacionConfig.activo, true)))
+    .limit(1);
+  if (!config?.rfc || !config.regimenFiscal || !config.codigoPostal) {
+    return actionError("Configura primero los datos del emisor en Comprobantes.");
+  }
+
+  const pac = pacActivo(comprobante.pacProveedor ?? config.pacProveedor);
+  const total = Number(comprobante.total);
+  const subtotal = Number(comprobante.subtotal);
+  const impuestos = Number(comprobante.impuestos);
+  const folio = Number(comprobante.folio ?? 0);
+
+  let timbrado: { uuid: string; respuesta?: Record<string, unknown> } | null = null;
+  let errorTimbrado: string | null = null;
+  try {
+    timbrado = await pac.timbrar({
+      serie: comprobante.serie ?? "A",
+      folio,
+      subtotal,
+      impuestos,
+      total,
+      moneda: "MXN",
+      metodoPago: comprobante.metodoPago ?? "PUE",
+      formaPago: comprobante.formaPago ?? "01",
+      usoCfdi: comprobante.usoCfdi ?? "G03",
+      emisor: {
+        rfc: config.rfc!,
+        razonSocial: config.razonSocial ?? "",
+        regimenFiscal: config.regimenFiscal!,
+        codigoPostal: config.codigoPostal!,
+      },
+      receptor: {
+        rfc: comprobante.receptorRfc,
+        nombre: comprobante.receptorNombre,
+        regimenFiscal: comprobante.receptorRegimen,
+        codigoPostal: comprobante.receptorCp || config.codigoPostal!,
+      },
+    });
+  } catch (error) {
+    errorTimbrado = error instanceof Error ? error.message : "Error desconocido del PAC.";
+  }
+
+  if (!timbrado) {
+    return actionError(errorTimbrado ? `No se pudo reemitir: ${errorTimbrado}` : "El PAC rechazó la reemisión.");
+  }
+
+  await withDbRetry(() =>
+    db.transaction(async (tx) => {
+      await tx
+        .update(comprobantes)
+        .set({
+          estado: "timbrada",
+          uuid: timbrado!.uuid,
+          pacProveedor: pac.clave,
+          pacRespuesta: timbrado!.respuesta ?? null,
+          timbradoAt: new Date(),
+          motivoCancelacion: null,
+          uuidSustitucion: null,
+          canceladoAt: null,
+          updatedBy: access.user.id,
+        })
+        .where(eq(comprobantes.id, comprobante.id));
+      await auditEvent(tx, {
+        organizacionId: input.organizacionId,
+        sucursalId: comprobante.sucursalId,
+        usuarioId: access.user.id,
+        accion: "factura.reemitida",
+        entidad: "comprobante",
+        entidadId: comprobante.id,
+        detalle: { uuid: timbrado!.uuid },
+      });
+    }),
+  );
+
+  revalidatePath("/admin/pos");
+  revalidatePath("/admin/facturacion");
+  return actionSuccess("Comprobante reemitido.");
+}

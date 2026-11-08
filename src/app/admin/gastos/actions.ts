@@ -7,6 +7,7 @@ import { z } from "zod";
 import { getDatabase } from "@/db/client";
 import { catMediosPago } from "@/db/schema/catalogs";
 import { catCategoriasGastos, gastos } from "@/db/schema/finance";
+import { cortesCaja, movimientosCaja } from "@/db/schema/operations";
 import { actionError, actionSuccess, parseWithSchema, type ActionState } from "@/lib/action-state";
 import { auditEvent } from "@/lib/audit";
 import { canAccessBranch, checkPermission } from "@/lib/auth/authorization";
@@ -188,6 +189,113 @@ export async function revertirGastoAction(_previousState: ActionState, formData:
   } catch (error) {
     console.error("revertirGastoAction", error);
     return actionError("No se pudo revertir el gasto. Intenta de nuevo.");
+  }
+
+  if (outcome.success) {
+    revalidatePath("/admin/gastos");
+    revalidatePath("/admin/caja");
+    revalidatePath("/admin/reportes");
+  }
+  return outcome;
+}
+
+const deshacerReversionSchema = z.object({
+  organizacionId: z.string().uuid(),
+  gastoId: z.string().uuid(),
+});
+
+/** Deshace la reversión de un gasto: vuelve a confirmado y re-descuenta de caja. */
+export async function deshacerReversionGasto(_previousState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = parseWithSchema(deshacerReversionSchema, Object.fromEntries(formData.entries()), "Revisa la reversión.");
+  if (!parsed.success) return parsed.state;
+  const input = parsed.data;
+
+  const access = await checkPermission(input.organizacionId, "gastos.editar");
+  if (!access) return actionError("No tienes permiso para gestionar gastos.");
+  const negado = await requiereCapacidad(input.organizacionId, "gastos");
+  if (negado) return actionError(negado);
+  const { user } = access;
+  const db = getDatabase();
+
+  let outcome: ActionState;
+  try {
+    outcome = await withDbRetry(() =>
+      db.transaction(async (tx): Promise<ActionState> => {
+        const [gasto] = await tx
+          .select({
+            id: gastos.id,
+            organizacionId: gastos.organizacionId,
+            sucursalId: gastos.sucursalId,
+            concepto: gastos.concepto,
+            importe: gastos.importe,
+            medioPagoId: gastos.medioPagoId,
+            movimientoCajaId: gastos.movimientoCajaId,
+            estado: gastos.estado,
+          })
+          .from(gastos)
+          .where(and(eq(gastos.id, input.gastoId), eq(gastos.organizacionId, input.organizacionId)))
+          .limit(1)
+          .for("update");
+        if (!gasto) return actionError("El gasto no existe.");
+        if (!canAccessBranch(access, gasto.sucursalId)) return actionError("El gasto pertenece a otra sucursal.");
+        if (gasto.estado !== "revertido") return actionError("Este gasto no está revertido.");
+
+        // Volver a confirmado.
+        await tx
+          .update(gastos)
+          .set({
+            estado: "confirmado",
+            revertidoAt: null,
+            revertidoPor: null,
+            motivoReversion: null,
+            updatedBy: user.id,
+          })
+          .where(eq(gastos.id, gasto.id));
+
+        // Re-descontar de caja si el gasto original salía del cajón.
+        if (gasto.movimientoCajaId) {
+          const [corte] = await tx
+            .select({ id: cortesCaja.id })
+            .from(cortesCaja)
+            .where(
+              and(
+                eq(cortesCaja.organizacionId, gasto.organizacionId),
+                eq(cortesCaja.sucursalId, gasto.sucursalId),
+                eq(cortesCaja.estado, "abierto"),
+                eq(cortesCaja.activo, true),
+              ),
+            )
+            .limit(1);
+          if (corte) {
+            await tx.insert(movimientosCaja).values({
+              organizacionId: gasto.organizacionId,
+              sucursalId: gasto.sucursalId,
+              corteId: corte.id,
+              medioPagoId: gasto.medioPagoId,
+              tipo: "gasto",
+              monto: gasto.importe,
+              notas: `Deshacer reversión de gasto: ${gasto.concepto}`,
+              usuarioId: user.id,
+              createdBy: user.id,
+            });
+          }
+        }
+
+        await auditEvent(tx, {
+          organizacionId: input.organizacionId,
+          sucursalId: gasto.sucursalId,
+          usuarioId: user.id,
+          accion: "gasto.reversion_deshacha",
+          entidad: "gasto",
+          entidadId: gasto.id,
+          detalle: { importe: gasto.importe },
+        });
+        return actionSuccess("Reversión deshecha; el gasto vuelve a estar activo.");
+      }),
+    );
+  } catch (error) {
+    console.error("deshacerReversionGasto", error);
+    return actionError("No se pudo deshacer la reversión. Intenta de nuevo.");
   }
 
   if (outcome.success) {

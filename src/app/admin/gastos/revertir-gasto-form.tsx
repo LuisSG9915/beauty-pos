@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState, useTransition } from "react";
 
-import { revertirGastoAction } from "@/app/admin/gastos/actions";
+import { deshacerReversionGasto, revertirGastoAction } from "@/app/admin/gastos/actions";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -39,14 +39,38 @@ export function RevertirGastoForm({
   const [abierto, setAbierto] = useState(false);
   const [state, action, pending] = useActionState(revertirGastoAction, initialActionState);
   const fe = (name: string) => fieldError(state, name);
+  const [, startTransition] = useTransition();
 
   const handled = useRef<ActionState | null>(null);
   useEffect(() => {
     if (!state.success || handled.current === state) return;
     handled.current = state;
-    toast.success(state.message ?? "Gasto revertido.");
     setAbierto(false);
-  }, [state, toast]);
+    let toastId = "";
+    toastId = toast.show({
+      title: state.message ?? "Gasto revertido.",
+      description: "Puedes deshacer en los próximos segundos.",
+      type: "success",
+      timeout: 5000,
+      actionProps: {
+        children: "Deshacer",
+        onClick: () => {
+          toast.close(toastId);
+          const data = new FormData();
+          data.set("organizacionId", organizationId);
+          data.set("gastoId", gastoId);
+          startTransition(async () => {
+            const result = await deshacerReversionGasto(initialActionState, data);
+            if (result.success) {
+              toast.success(result.message ?? "Reversión deshecha.");
+            } else {
+              toast.error(result.error ?? "No se pudo deshacer la reversión.");
+            }
+          });
+        },
+      },
+    });
+  }, [state, toast, organizationId, gastoId]);
 
   return (
     <AlertDialog onOpenChange={setAbierto} open={abierto}>

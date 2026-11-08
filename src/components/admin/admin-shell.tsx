@@ -148,7 +148,7 @@ function OrganizationSelector({
         className={
           variant === "sidebar"
             ? "h-11 min-h-11 w-full min-w-0 rounded-xl border border-input bg-card px-2.5 text-op-xs font-medium text-foreground"
-            : "h-11 min-h-11 min-w-0 max-w-44 rounded-xl border border-input bg-card px-2.5 text-op-xs font-medium text-foreground sm:max-w-56"
+            : "h-11 min-h-11 min-w-0 max-w-36 rounded-xl border border-input bg-card px-2.5 text-op-xs font-medium text-foreground sm:max-w-52"
         }
         id={selectId}
         onChange={(event) => {
@@ -524,7 +524,7 @@ export function AdminShell({
         <div className="flex min-w-0 flex-1 flex-col">
           {/* Header móvil: marca + organización + sucursal activa (una sola fila) */}
           <header className="sticky top-0 z-30 max-w-full overflow-x-hidden border-b border-sidebar-border bg-card/95 backdrop-blur lg:hidden">
-            <div className="flex items-center gap-2 px-4 py-2">
+            <div className="flex items-center gap-1.5 px-3 py-2">
               <Suspense fallback={<BrandWordmark markSize={32} />}>
                 <SidebarHome
                   organizations={organizations}
@@ -533,15 +533,15 @@ export function AdminShell({
               </Suspense>
               {activeBranch ? (
                 <span
-                  className="flex-shrink-0 border border-border bg-muted px-2.5 py-1 rounded-full text-op-xs font-medium text-foreground whitespace-nowrap"
+                  className="hidden flex-shrink-0 border border-border bg-muted px-2.5 py-1 rounded-full text-op-xs font-medium text-foreground whitespace-nowrap sm:inline-flex"
                 >
                   {activeBranch.nombre}
                 </span>
               ) : null}
-              <div className="ml-auto flex min-w-0 items-center gap-3">
+              <div className="ml-auto flex min-w-0 items-center gap-2">
                 <Suspense
                   fallback={
-                    <span className="h-11 min-h-11 w-36 animate-pulse rounded-xl bg-muted" />
+                    <span className="h-11 min-h-11 w-32 animate-pulse rounded-xl bg-muted" />
                   }
                 >
                   <OrganizationSelector organizations={organizations} />
@@ -553,7 +553,7 @@ export function AdminShell({
           {/* Red de seguridad — ningún contenido del main puede empujar la página
               más allá del ancho del teléfono (390 px). */}
           <main
-            className="mx-auto w-full max-w-[1400px] min-w-0 max-w-full flex-1 overflow-x-hidden px-2.5 pb-24 pt-2 sm:px-6 sm:pt-6 lg:px-8 lg:pb-8"
+            className="mx-auto w-full max-w-[1400px] min-w-0 max-w-full flex-1 overflow-x-hidden px-3 pb-24 pt-2 sm:px-6 sm:pt-6 lg:px-8 lg:pb-8"
             id="contenido-admin"
           >
             {billingByOrg ? (
