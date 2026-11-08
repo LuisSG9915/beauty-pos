@@ -289,32 +289,6 @@ function BranchSelector({
   );
 }
 
-/**
- * Segunda fila del header móvil con la sucursal activa; no se pinta cuando la
- * organización no tiene sucursales visibles.
- */
-function MobileBranchRow({
-  organizations,
-  sucursalPreferidaPorOrg,
-  onSucursalChange,
-}: {
-  organizations: AdminShellOrganization[];
-  sucursalPreferidaPorOrg: Record<string, string>;
-  onSucursalChange?: (orgId: string, sucursalId: string) => void;
-}) {
-  const organization = useEffectiveOrganization(organizations);
-  if (!organization || (organization.sucursales ?? []).length === 0) return null;
-  return (
-    <div className="border-t border-sidebar-border px-4 py-2">
-      <BranchSelector
-        onSucursalChange={onSucursalChange}
-        organizations={organizations}
-        sucursalPreferidaPorOrg={sucursalPreferidaPorOrg}
-      />
-    </div>
-  );
-}
-
 type NavWiring = {
   organizations: AdminShellOrganization[];
   platformAdmin: boolean;
@@ -476,6 +450,13 @@ export function AdminShell({
     capacidadesFaltantesByOrg,
     sucursalPreferidaPorOrg: preferenciasSucursal,
   };
+
+  // Resuelve la sucursal activa para mostrarla como pill compacto en la barra
+  // principal del header móvil (ahorra una fila entera de apilado).
+  const { organizationId, sucursalId } = useNavWiring(wiring);
+  const organization = useEffectiveOrganization(organizations);
+  const activeBranch =
+    sucursalId ? (organization?.sucursales ?? []).find((b) => b.id === sucursalId) : undefined;
   return (
     <ToastProvider>
       <div className="flex min-h-dvh bg-background text-foreground">
@@ -541,15 +522,22 @@ export function AdminShell({
 
         {/* Columna de contenido */}
         <div className="flex min-w-0 flex-1 flex-col">
-          {/* Header móvil: marca + organización */}
+          {/* Header móvil: marca + organización + sucursal activa (una sola fila) */}
           <header className="sticky top-0 z-30 max-w-full overflow-x-hidden border-b border-sidebar-border bg-card/95 backdrop-blur lg:hidden">
-            <div className="flex items-center gap-3 px-4 py-3">
+            <div className="flex items-center gap-2 px-4 py-2">
               <Suspense fallback={<BrandWordmark markSize={32} />}>
                 <SidebarHome
                   organizations={organizations}
                   sucursalPreferidaPorOrg={preferenciasSucursal}
                 />
               </Suspense>
+              {activeBranch ? (
+                <span
+                  className="flex-shrink-0 border border-border bg-muted px-2.5 py-1 rounded-full text-op-xs font-medium text-foreground whitespace-nowrap"
+                >
+                  {activeBranch.nombre}
+                </span>
+              ) : null}
               <div className="ml-auto flex min-w-0 items-center gap-3">
                 <Suspense
                   fallback={
@@ -560,13 +548,6 @@ export function AdminShell({
                 </Suspense>
               </div>
             </div>
-            <Suspense fallback={null}>
-              <MobileBranchRow
-                onSucursalChange={handleSucursalChange}
-                organizations={organizations}
-                sucursalPreferidaPorOrg={preferenciasSucursal}
-              />
-            </Suspense>
           </header>
 
           {/* Red de seguridad — ningún contenido del main puede empujar la página

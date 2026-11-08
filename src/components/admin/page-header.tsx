@@ -62,6 +62,7 @@ type AdminPageHeaderProps = ComponentProps<"header"> & {
 /**
  * Encabezado de página del panel: migas de pan, título, descripción y
  * acciones, sin duplicar el header global del shell.
+ * Estrategia única "banda de módulo": título a la izq, tabs + acciones a la der.
  */
 export function AdminPageHeader({
   title,
@@ -73,57 +74,30 @@ export function AdminPageHeader({
   ...props
 }: AdminPageHeaderProps) {
   return (
-    <header className={cn("flex flex-col gap-2 sm:gap-3", className)} {...props}>
+    <header className={cn("flex flex-col gap-1 sm:gap-2", className)} {...props}>
       {breadcrumbs && breadcrumbs.length > 0 ? (
         <AdminBreadcrumbs className="mb-0.5" items={breadcrumbs} />
       ) : null}
-      {tabs ? (
-        // Banda de módulo (estrategia A): título + submenú en una sola fila.
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
-          <div className="flex min-w-0 shrink-0 items-center gap-2">
-            <h1
-              className="min-w-0 text-xl font-semibold tracking-[-0.02em] text-foreground"
-              title={description}
-            >
-              {title}
-            </h1>
-            <Suspense fallback={null}>
-              <AyudaContextualBoton />
-            </Suspense>
-            {description ? <span className="sr-only">{description}</span> : null}
-          </div>
-          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2">
-            {tabs}
-            {actions ? (
-              <div className="flex flex-wrap items-center gap-2">{actions}</div>
-            ) : null}
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between min-w-0">
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <h1
-                className="min-w-0 text-xl font-semibold tracking-[-0.02em] text-foreground"
-                title={description}
-              >
-                {title}
-              </h1>
-              <Suspense fallback={null}>
-                <AyudaContextualBoton />
-              </Suspense>
-            </div>
-            {description ? (
-              <p className="mt-0.5 max-w-2xl text-op-xs leading-5 text-muted-foreground sm:text-sm sm:leading-6">
-                {description}
-              </p>
-            ) : null}
-          </div>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
+        <div className="flex min-w-0 shrink-0 items-center gap-2">
+          <h1
+            className="min-w-0 text-lg font-semibold tracking-[-0.02em] text-foreground"
+            title={description}
+          >
+            {title}
+          </h1>
+          <Suspense fallback={null}>
+            <AyudaContextualBoton />
+          </Suspense>
+          {description ? <span className="sr-only">{description}</span> : null}
           {actions ? (
-            <div className="flex flex-wrap items-center gap-2 sm:w-auto">{actions}</div>
+            <div className="flex flex-wrap items-center gap-2">{actions}</div>
           ) : null}
         </div>
-      )}
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+          {tabs}
+        </div>
+      </div>
     </header>
   );
 }

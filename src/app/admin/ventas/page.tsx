@@ -271,7 +271,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
         title="Historial de ventas"
       />
 
-      <form className="grid grid-cols-1 sm:flex sm:flex-wrap sm:items-end gap-3 rounded-2xl border border-border bg-card p-4 shadow-sm w-full min-w-0" method="get">
+      <form className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-end gap-2 rounded-2xl border border-border bg-card p-2.5 shadow-sm w-full min-w-0" method="get">
         <input name="organizationId" type="hidden" value={organizationId} />
         <input name="sucursalId" type="hidden" value={sucursalId} />
         <Field className="w-full sm:w-40">
@@ -293,7 +293,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
           <FieldLabel htmlFor="filtro-ventas-buscar">Buscar cliente</FieldLabel>
           <Input className="min-h-11" defaultValue={q} id="filtro-ventas-buscar" name="q" placeholder="Nombre del cliente" />
         </Field>
-        <Button className="min-h-11 rounded-xl w-full sm:w-auto" data-action-id="ventas.filtro.aplicar" type="submit">Filtrar</Button>
+        <Button className="col-span-2 min-h-11 rounded-xl w-full sm:w-auto" data-action-id="ventas.filtro.aplicar" type="submit">Filtrar</Button>
       </form>
 
       {pageRows.length === 0 ? (
