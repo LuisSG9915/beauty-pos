@@ -320,7 +320,7 @@ WhatsApp con imagen y texto generados en el aparato (sin servidor).
 | 76 | Ventana de cobro en orden norhud con pie fijo | `hecho/76` | Hecha — flows 77/77, teclado solo en md+, Esc vetado durante cobro |
 | 77a | Folio consecutivo por sucursal (esquema + migración) | `hecho/77a` | Hecha — migración aplicada con autorización, backfill 369 ventas, flows 77/77 |
 | 77b | Folio visible en ticket, comprobante, confirmación y listados | `hecho/77b` | Hecha — flows 77/77, folio en ticket/impresión/imagen/WhatsApp/confirmación/listados |
-| 78 | Cobrar desde la agenda termina con la misma confirmación | `pendiente/78` | Pendiente |
+| 78 | Cobrar desde la agenda termina con la misma confirmación | `hecho/78` | Hecha — confirmación inline con cambio, ticket y "Listo"; flows 77/77 |
 | 79 | Inicio de Cobrar sin acciones repetidas; sencillo sin jerga | `pendiente/79` | Pendiente |
 
 Orden de ejecución: 72 → 73 → 75 → 74 → 76 → 77a → 77b → 78 → 79. Las
@@ -377,8 +377,8 @@ microservicios). El razonamiento está en `readme/analisis/`.
 
 ## 11. Próximos cinco pasos
 
-1. **Ejecutar la 78** (cobrar desde la agenda termina en "Venta cobrada") y
-   la 79 (inicio de Cobrar sin acciones repetidas; sencillo sin jerga).
+1. **Ejecutar la 79** (inicio de Cobrar sin acciones repetidas; sencillo sin
+   jerga).
 3. **Verificación manual de impresión** en un salón real: la 75 dejó la
    vista previa mostrando solo el comprobante; falta probarla en la
    impresora térmica física y en iPhone (compartir imagen).

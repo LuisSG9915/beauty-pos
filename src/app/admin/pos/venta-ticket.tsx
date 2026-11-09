@@ -136,8 +136,10 @@ type VentaTicketProps = {
   facturacionConfigurada?: boolean;
   /** "inline" = dentro del sheet de agenda (sin redirect al cobrar). */
   modo?: "page" | "inline";
-  /** modo inline: cerrar el sheet al cobrar. */
+  /** modo inline: cobro exitoso (el sheet recarga el ticket a "completada"). */
   onCobrada?: () => void;
+  /** modo inline: "Listo" de la confirmación — cerrar el sheet. */
+  onFinalizar?: () => void;
   /** modo inline: refetch del ticket tras cada mutación. */
   onChanged?: () => void;
 };
@@ -545,6 +547,7 @@ export function VentaTicket({
   facturacionConfigurada = false,
   modo = "page",
   onCobrada,
+  onFinalizar,
   onChanged,
 }: VentaTicketProps) {
   const editable = venta.estado === "en_proceso";
@@ -592,6 +595,8 @@ export function VentaTicket({
     lineasPaquetes.length > 0 ||
     lineasMembresias.length > 0;
   const totalDevuelto = devoluciones.reduce((s, d) => s + Number(d.monto), 0);
+  // Cambio a entregar: suma del cambio registrado en cada pago.
+  const cambioTotal = pagos.reduce((s, p) => s + Number(p.cambio || 0), 0);
   // Importe de servicios cubiertos por paquete (informativo; no cobrado).
   const cubiertoPorPaquete = lineasServicios
     .filter((l) => l.paqueteUsado)
@@ -1103,6 +1108,17 @@ export function VentaTicket({
               Venta cerrada — ya fue cobrada y no puede modificarse.
             </p>
 
+            {modo === "inline" && cambioTotal > 0 ? (
+              <p className="rounded-xl border border-warning/40 bg-warning-soft px-4 py-3 text-center">
+                <span className="block text-op-xs font-medium text-warning-soft-foreground">
+                  Cambio a entregar
+                </span>
+                <span className="block text-2xl font-bold tabular-nums text-warning-soft-foreground">
+                  {formatCurrency(cambioTotal, { currency })}
+                </span>
+              </p>
+            ) : null}
+
             <TicketActionsBar
               clienteNombre={venta.clienteNombre}
               clienteTelefono={venta.clienteTelefono}
@@ -1125,14 +1141,25 @@ export function VentaTicket({
             />
 
             <div className="flex flex-wrap items-center gap-3 pt-1 border-t border-success/20">
-              {modo !== "inline" ? (
+              {modo === "inline" ? (
+                <Button
+                  className="rounded-xl font-semibold"
+                  data-action-clave="1"
+                  data-action-id="agenda.cobro.listo"
+                  onClick={onFinalizar}
+                  size="touch"
+                  type="button"
+                >
+                  Listo
+                </Button>
+              ) : (
                 <Link
                   className="inline-flex min-h-10 items-center rounded-xl border border-success/30 bg-card px-4 text-sm font-medium text-success hover:bg-success/5 transition-colors"
                   href={returnTo}
                 >
                   ← Volver a Cobrar
                 </Link>
-              ) : null}
+              )}
               {puedeCancelar ? (
                 <CancelarVentaButton
                   currency={currency}

@@ -663,14 +663,9 @@ export function AgendaBoard({
 
       <CheckoutSheet
         currency={currency}
-        onCobrada={() => {
-          setCheckoutVentaId(null);
-          toast.success("Venta cobrada correctamente.");
-          router.refresh();
-        }}
         onClose={() => {
           setCheckoutVentaId(null);
-          // El ticket pudo mutar la cita/venta (líneas, descuento, estado).
+          // El ticket pudo mutar la cita/venta (líneas, descuento, cobro).
           router.refresh();
         }}
         organizationId={organizationId}

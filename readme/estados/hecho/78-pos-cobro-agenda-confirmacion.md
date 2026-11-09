@@ -119,11 +119,50 @@ pnpm test:usability --only=agenda --json
 
 ```
 Misión: 78 — cobro desde agenda con confirmación
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔ | flows ✔ | smoke ✔ | usability 0 errores
-Antes → después: <sheet que se cierra sin feedback → confirmación con cambio y ticket>
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <ninguno | qué falta>
+Cambios:
+- src/app/admin/pos/venta-ticket.tsx — nuevo prop onFinalizar (modo inline);
+  bloque "Venta cobrada con éxito" muestra "Cambio a entregar $X" (suma de
+  pagos[].cambio, solo si > 0) y botón primario "Listo"
+  (data-action-id=agenda.cobro.listo, data-action-clave=1) en lugar del
+  "Volver a Cobrar" de página. TicketActionsBar (WhatsApp/imagen/descargar)
+  ya estaba y se conserva.
+- src/app/admin/agenda/checkout-sheet.tsx — onCobrada del padre ya no cierra
+  el sheet: VentaTicket.onCobrada=refetch (recarga el ticket a completada) y
+  onFinalizar=onClose. CheckoutSheet pierde la prop onCobrada.
+- src/app/admin/agenda/agenda-board.tsx — CheckoutSheet solo recibe onClose
+  (cierra + router.refresh); se elimina el toast "Venta cobrada
+  correctamente." porque la confirmación visible es el feedback.
+- scripts/flows-e2e.ts — esperarResultadoCobro(true) ahora espera el botón
+  "Listo" de la confirmación inline, lo pulsa y verifica que el sheet se
+  cierre (antes esperaba el cierre directo).
+Verificación: typecheck ✔ | lint ✔ (0 errores, 4 avisos preexistentes) |
+  test 653 ✔ | flows 77/77 ✔ (los dos cobros inline ejercitan la
+  confirmación: "Listo" aparece, se pulsa y el sheet se cierra) |
+  smoke ✔ | usability --only=agenda: /admin/agenda OK ambos viewports;
+  único hallazgo = Agenda→Mi día táctil, preexistente (ver desviaciones).
+Antes → después: el sheet se cerraba en silencio tras cobrar → queda abierta
+  la confirmación "Venta cobrada con éxito" con cambio a entregar, acciones
+  de ticket (WhatsApp/imagen/descargar) y "Listo" que cierra y refresca.
+Desviaciones:
+- No hizo falta extraer un componente compartido nuevo: la confirmación
+  inline reutiliza el bloque "Venta cobrada con éxito" de VentaTicket y
+  TicketActionsBar (la lógica de WhatsApp/imagen ya es compartida desde la
+  74). Solo se agregó el cambio a entregar y el botón "Listo" en modo inline.
+- El toast "Venta cobrada correctamente." se eliminó del cierre (la misión
+  pedía conservarlo solo sin confirmación visible); onClose ya hacía
+  router.refresh(), así que "Listo" = cierre + refresh sin código extra.
+- Hallazgo preexistente investigado (no corregido, fuera de alcance): el
+  check táctil Agenda→Mi día falla desde antes de la 78. Causa: el shell usó
+  NavigationActivity con barra .admin-nav-progress hasta el commit 94d2b6b,
+  que borró el componente y dejó el uso comentado; la tab bar usa <a> de
+  carga completa sin indicador propio (guardNavTap y onNavigate quedaron
+  sin uso — avisos de lint preexistentes). El check quedó desactualizado
+  respecto al patrón actual (punto useLinkStatus por enlace). Decisión de
+  producto pendiente: restaurar indicador global, cablear guardNavTap +
+  pending por enlace, o ajustar el check.
+Riesgo abierto: el cambio a entregar inline solo se pinta cuando
+  cambioTotal > 0 (los cobros E2E son exactos); el cálculo es el mismo
+  reduce de pagos[].cambio ya probado en la pantalla /cobrado de la 75.
 ```
 
 ## Desviaciones (las escribe el implementador)

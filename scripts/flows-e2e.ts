@@ -672,7 +672,10 @@ async function main() {
       }
       throw new Error(`La línea ${nombre} no apareció en el ticket tras 3 intentos`);
     };
-    /** Espera resultado del cobro: sheet cerrado (inline), redirect (página) o error visible. */
+    /** Espera resultado del cobro: en el sheet queda la confirmación "Venta
+     * cobrada" con "Listo" (se pulsa y se espera el cierre); en página, el
+     * redirect a /cobrado o regreso al POS/agenda. Un error visible también
+     * resuelve la espera para que el paso falle con contexto. */
     const esperarResultadoCobro = async (enSheet: boolean) => {
       await page.waitForFunction(
         (sheet) => {
@@ -683,7 +686,12 @@ async function main() {
             texto.includes("invalid input") ||
             texto.includes("no cubren")
           ) return true;
-          if (sheet) return !document.querySelector('[role="dialog"]');
+          if (sheet) {
+            // La confirmación inline conserva el sheet abierto con "Listo".
+            return Boolean(
+              document.querySelector('[data-action-id="agenda.cobro.listo"]'),
+            );
+          }
           return (
             location.pathname.startsWith("/admin/pos/cobrado/") ||
             (location.pathname === "/admin/pos" && !location.search.includes("ventaId")) ||
@@ -693,6 +701,18 @@ async function main() {
         { timeout: 25000 },
         enSheet,
       );
+      if (enSheet) {
+        const listo = await clickByText(
+          page,
+          '[data-action-id="agenda.cobro.listo"]',
+          "Listo",
+        );
+        if (!listo) throw new Error("Confirmación de cobro sin botón 'Listo'");
+        await page.waitForFunction(
+          () => !document.querySelector('[role="dialog"]'),
+          { timeout: 15000 },
+        );
+      }
     };
     const clickCobrar = async () => {
       // El submit vive en la ventana de cobro: se abre si aún no está.

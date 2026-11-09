@@ -20,13 +20,14 @@ function CheckoutContent({
   ventaId,
   currency,
   returnTo,
-  onCobrada,
+  onCerrar,
 }: {
   organizationId: string;
   ventaId: string;
   currency: string;
   returnTo: string;
-  onCobrada: () => void;
+  /** "Listo" de la confirmación o cierre del sheet: el padre refresca. */
+  onCerrar: () => void;
 }) {
   const [ticket, setTicket] = useState<TicketData | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -88,7 +89,11 @@ function CheckoutContent({
       currency={currency}
       modo="inline"
       onChanged={refetch}
-      onCobrada={onCobrada}
+      // Cobro exitoso: recargar el ticket para pintar la confirmación
+      // "Venta cobrada" (cambio a entregar + acciones + Listo). El sheet
+      // no se cierra solo; "Listo" llama a onFinalizar → onCerrar.
+      onCobrada={refetch}
+      onFinalizar={onCerrar}
       organizationId={organizationId}
       returnTo={returnTo}
     />
@@ -98,7 +103,8 @@ function CheckoutContent({
 /**
  * Sheet de cobro inline: carga el ticket de la venta con `cargarTicket` y
  * renderiza `VentaTicket` en modo inline. `onChanged` re-carga el ticket tras
- * cada mutación de líneas/descuento; `onCobrada` lo delega al padre.
+ * cada mutación de líneas/descuento; tras cobrar, la confirmación queda
+ * abierta y "Listo"/el cierre llaman a `onClose` (el padre refresca).
  */
 export function CheckoutSheet({
   organizationId,
@@ -106,14 +112,12 @@ export function CheckoutSheet({
   currency,
   returnTo,
   onClose,
-  onCobrada,
 }: {
   organizationId: string;
   ventaId: string | null;
   currency: string;
   returnTo: string;
   onClose: () => void;
-  onCobrada: () => void;
 }) {
   return (
     <Sheet onOpenChange={(open) => !open && onClose()} open={Boolean(ventaId)}>
@@ -132,7 +136,7 @@ export function CheckoutSheet({
           <CheckoutContent
             currency={currency}
             key={ventaId}
-            onCobrada={onCobrada}
+            onCerrar={onClose}
             organizationId={organizationId}
             returnTo={returnTo}
             ventaId={ventaId}
