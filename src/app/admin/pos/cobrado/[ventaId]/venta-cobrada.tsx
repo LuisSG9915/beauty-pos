@@ -11,7 +11,7 @@ import {
 } from "@/app/admin/pos/printable-ticket";
 import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
-import { formatCurrency, formatDate, formatTime } from "@/lib/format";
+import { formatCurrency, formatDate, formatFolioVenta, formatTime } from "@/lib/format";
 import { buildAdminHref } from "@/lib/url-context";
 import { enlaceWhatsApp, textoTicketWhatsApp } from "@/lib/whatsapp";
 
@@ -40,6 +40,7 @@ export function VentaCobrada(props: VentaCobradaProps) {
   const {
     negocioNombre = "Salón",
     ventaId,
+    folio,
     clienteNombre,
     clienteTelefono,
     fecha,
@@ -70,6 +71,7 @@ export function VentaCobrada(props: VentaCobradaProps) {
       textoTicketWhatsApp({
         negocio: negocioNombre,
         fecha,
+        folio,
         cliente: clienteNombre,
         lineas: [
           ...lineasServicios,
@@ -81,7 +83,7 @@ export function VentaCobrada(props: VentaCobradaProps) {
         pagos,
         moneda: currency,
       }),
-    [negocioNombre, fecha, clienteNombre, lineasServicios, lineasProductos, lineasPaquetes, lineasMembresias, total, pagos, currency],
+    [negocioNombre, fecha, folio, clienteNombre, lineasServicios, lineasProductos, lineasPaquetes, lineasMembresias, total, pagos, currency],
   );
 
   const digitos = telefono.replace(/\D/g, "");
@@ -106,6 +108,7 @@ export function VentaCobrada(props: VentaCobradaProps) {
   const propsTicket = {
     negocioNombre,
     ventaId,
+    folio,
     clienteNombre,
     clienteTelefono,
     fecha,
@@ -139,6 +142,7 @@ export function VentaCobrada(props: VentaCobradaProps) {
             <p className="mt-0.5 text-op-xs text-muted-foreground">
               {[
                 fecha ? `${formatDate(fecha)} · ${formatTime(fecha)}` : null,
+                folio != null ? `Folio ${formatFolioVenta(folio)}` : null,
                 clienteNombre ?? "Cliente de paso",
               ]
                 .filter(Boolean)

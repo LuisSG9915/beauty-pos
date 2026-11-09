@@ -319,7 +319,7 @@ WhatsApp con imagen y texto generados en el aparato (sin servidor).
 | 74 | Imagen del ticket real + compartir por aparato + WhatsApp | `hecho/74` | Hecha — PNG 2x real, share/portapapeles/descarga por aparato, wa.me normalizado |
 | 76 | Ventana de cobro en orden norhud con pie fijo | `hecho/76` | Hecha — flows 77/77, teclado solo en md+, Esc vetado durante cobro |
 | 77a | Folio consecutivo por sucursal (esquema + migración) | `hecho/77a` | Hecha — migración aplicada con autorización, backfill 369 ventas, flows 77/77 |
-| 77b | Folio visible en ticket, comprobante, confirmación y listados | `pendiente/77b` | Pendiente |
+| 77b | Folio visible en ticket, comprobante, confirmación y listados | `hecho/77b` | Hecha — flows 77/77, folio en ticket/impresión/imagen/WhatsApp/confirmación/listados |
 | 78 | Cobrar desde la agenda termina con la misma confirmación | `pendiente/78` | Pendiente |
 | 79 | Inicio de Cobrar sin acciones repetidas; sencillo sin jerga | `pendiente/79` | Pendiente |
 
@@ -377,10 +377,7 @@ microservicios). El razonamiento está en `readme/analisis/`.
 
 ## 11. Próximos cinco pasos
 
-1. **Ejecutar la 77b** (folio visible) — el folio consecutivo ya se asigna en
-   el cobro (77a aplicada); falta mostrarlo en ticket impreso/imagen/texto,
-   confirmación "Venta cobrada", ticket del POS y listados de ventas.
-2. **Ejecutar la 78** (cobrar desde la agenda termina en "Venta cobrada") y
+1. **Ejecutar la 78** (cobrar desde la agenda termina en "Venta cobrada") y
    la 79 (inicio de Cobrar sin acciones repetidas; sencillo sin jerga).
 3. **Verificación manual de impresión** en un salón real: la 75 dejó la
    vista previa mostrando solo el comprobante; falta probarla en la

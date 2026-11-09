@@ -35,6 +35,8 @@
  *                     el campo técnico es "mobiliario", nunca "recursos"
  *                     (los recursos son los agendables de la agenda)
  *   sin ubicar        stock de la sucursal sin ubicación asignada en el plano
+ *   folio             número consecutivo del ticket por sucursal (nunca el
+ *                     identificador interno ni un fragmento de él)
  */
 
 export const GLOSARIO = {
@@ -51,6 +53,7 @@ export const GLOSARIO = {
   ubicacion: "ubicación",
   mobiliario: "mobiliario",
   sinUbicar: "Sin ubicar",
+  folio: "folio",
   aquiCobras: "Aquí cobras los servicios y productos del salón.",
   conteoCajaTitulo: "Cuenta el dinero de la caja",
   conteoCajaDescripcion:

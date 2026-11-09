@@ -53,7 +53,7 @@ import { RemoteCombobox } from "@/components/ui/remote-combobox";
 import { Field, FieldLabel, Input } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
 import { initialActionState, type ActionState } from "@/lib/action-state";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatFolioVenta } from "@/lib/format";
 import { GLOSARIO } from "@/lib/glosario";
 import { cn } from "@/lib/utils";
 import { formaPagoDesdeCategoria } from "@/modules/facturacion/sat";
@@ -87,6 +87,8 @@ type VentaTicketProps = {
     total: string;
     propina: string;
     cobradaAt?: string | null;
+    /** Folio consecutivo por sucursal; null mientras la venta está en proceso. */
+    folio?: number | null;
     promocionId?: string | null;
     promocionNombre?: string | null;
     descuentoPromocion?: string;
@@ -853,8 +855,15 @@ export function VentaTicket({
         <section className="rounded-2xl border border-border/80 bg-card p-4 md:p-6 shadow-sm transition-all duration-200 hover:shadow-md">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-wide text-foreground">Resumen de cobro</h2>
-            <span className="rounded-full bg-accent px-2.5 py-0.5 text-op-xs font-medium text-muted-foreground">
-              {venta.estado === "en_proceso" ? "Pendiente" : venta.estado === "completada" ? "Cobrado" : "Cancelado"}
+            <span className="flex items-center gap-2">
+              {venta.folio != null ? (
+                <span className="text-op-xs font-medium tabular-nums text-muted-foreground">
+                  Folio {formatFolioVenta(venta.folio)}
+                </span>
+              ) : null}
+              <span className="rounded-full bg-accent px-2.5 py-0.5 text-op-xs font-medium text-muted-foreground">
+                {venta.estado === "en_proceso" ? "Pendiente" : venta.estado === "completada" ? "Cobrado" : "Cancelado"}
+              </span>
             </span>
           </div>
 
@@ -1099,6 +1108,7 @@ export function VentaTicket({
               clienteTelefono={venta.clienteTelefono}
               currency={currency}
               fecha={venta.cobradaAt ?? undefined}
+              folio={venta.folio}
               descuento={venta.descuento}
               descuentoMembresia={venta.descuentoMembresia}
               descuentoPromocion={venta.descuentoPromocion}

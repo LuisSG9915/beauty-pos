@@ -161,6 +161,20 @@ export function formatDateTime(
 }
 
 /**
+ * Folio consecutivo de venta por sucursal (misión 77a): se muestra con
+ * relleno a 4 dígitos ("0042") sin truncar si pasa de 4 ("12345").
+ * Devuelve "—" para ventas sin folio (en proceso o históricas sin migrar).
+ */
+export function formatFolioVenta(
+  folio: number | string | null | undefined,
+): string {
+  if (folio === null || folio === undefined || folio === "") return EMPTY_VALUE;
+  const numero = typeof folio === "string" ? Number(folio) : folio;
+  if (!Number.isFinite(numero)) return EMPTY_VALUE;
+  return String(Math.trunc(numero)).padStart(4, "0");
+}
+
+/**
  * Fecha de hoy en formato `YYYY-MM-DD` para inputs type="date".
  */
 export function todayDateInput(timeZone: string = DEFAULT_TIME_ZONE): string {

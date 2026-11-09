@@ -18,7 +18,7 @@ import { ventas } from "@/db/schema/operations";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { canAccessBranch, hasPermission, requireAccessPermission } from "@/lib/auth/authorization";
 import { obtenerCatalogoPosCacheado } from "@/lib/catalogo-cache";
-import { formatCurrency, formatTime } from "@/lib/format";
+import { formatCurrency, formatFolioVenta, formatTime } from "@/lib/format";
 import { GLOSARIO } from "@/lib/glosario";
 import { buildAdminHref, firstParam } from "@/lib/url-context";
 import { dayBoundsUtc, dayKey } from "@/modules/agenda/timezone";
@@ -173,6 +173,7 @@ async function obtenerEstadoOperativoPos(
       id: ventas.id,
       estado: ventas.estado,
       total: ventas.total,
+      folio: ventas.folio,
       fecha: fechaVenta,
       clienteNombre: clientes.nombre,
     })
@@ -321,6 +322,7 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
                 style={{ animationDelay: `${Math.min(index, 8) * 30}ms` }}
               >
                 <span className="min-w-0 truncate">
+                  {venta.folio != null ? `Folio ${formatFolioVenta(venta.folio)} · ` : ""}
                   {venta.clienteNombre ?? GLOSARIO.clienteDePaso} · {formatTime(venta.fecha, { timeZone: context.timeZone })}
                 </span>
                 <span className="flex items-center gap-2">

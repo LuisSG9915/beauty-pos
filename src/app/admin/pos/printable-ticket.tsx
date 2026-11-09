@@ -3,7 +3,7 @@
 import { Copy, Download, Loader2, MessageCircle, Printer, Share2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
-import { formatCurrency, formatDate, formatTime } from "@/lib/format";
+import { formatCurrency, formatDate, formatFolioVenta, formatTime } from "@/lib/format";
 import { renderTicketToPng } from "@/lib/ticket-imagen";
 import { enlaceWhatsApp, textoTicketWhatsApp } from "@/lib/whatsapp";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,8 @@ import { useToast } from "@/components/ui/toast";
 export type PrintableTicketProps = {
   negocioNombre?: string;
   ventaId: string;
+  /** Folio consecutivo por sucursal; null/undefined → "—". */
+  folio?: number | null;
   clienteNombre?: string | null;
   clienteTelefono?: string | null;
   fecha?: Date | string;
@@ -72,7 +74,7 @@ const estiloLineaCaptura: CSSProperties = {
  */
 export function ComprobanteImprimible({
   negocioNombre = "Salón",
-  ventaId,
+  folio,
   clienteNombre,
   fecha = new Date(),
   lineasServicios,
@@ -98,7 +100,7 @@ export function ComprobanteImprimible({
         ) : (
           <p className="text-[10px]">COMPROBANTE DE VENTA</p>
         )}
-        <p className="text-[10px]">Folio: #{ventaId.slice(0, 8).toUpperCase()}</p>
+        <p className="text-[10px]">Folio {formatFolioVenta(folio)}</p>
         <p className="text-[10px]" suppressHydrationWarning>
           {formatDate(fecha)} · {formatTime(fecha)}
         </p>
@@ -192,6 +194,7 @@ export function TicketCapturaImagen({
   capturaRef,
   negocioNombre = "Salón",
   ventaId,
+  folio,
   clienteNombre,
   fecha = new Date(),
   lineasServicios,
@@ -256,7 +259,7 @@ export function TicketCapturaImagen({
         ) : (
           <p style={{ fontSize: 12, margin: "4px 0 0" }}>COMPROBANTE DE VENTA</p>
         )}
-        <p style={{ fontSize: 12, margin: "4px 0 0" }}>Folio: #{ventaId.slice(0, 8).toUpperCase()}</p>
+        <p style={{ fontSize: 12, margin: "4px 0 0" }}>Folio {formatFolioVenta(folio)}</p>
         <p style={{ fontSize: 12, margin: "4px 0 0" }} suppressHydrationWarning>
           {formatDate(fecha)} · {formatTime(fecha)}
         </p>
@@ -387,6 +390,13 @@ function soportaCompartirArchivos(file: File): boolean {
   }
 }
 
+/** Nombre del PNG descargable/compartido: folio legible + sufijo del id
+ *  para que dos sucursales con el mismo folio no choquen al guardar. */
+function nombreArchivoTicket(folio: number | null | undefined, ventaId: string): string {
+  const base = folio != null ? `ticket-${String(folio).padStart(4, "0")}` : `ticket-${ventaId.slice(0, 8)}`;
+  return `${base}-${ventaId.slice(0, 4)}.png`;
+}
+
 /** Portapapeles de imágenes disponible (Chrome/Edge de escritorio). */
 function soportaPortapapelesImagen(): boolean {
   return (
@@ -400,6 +410,7 @@ export function TicketActionsBar(props: PrintableTicketProps) {
   const {
     negocioNombre = "Salón",
     ventaId,
+    folio,
     clienteNombre,
     clienteTelefono,
     fecha,
@@ -427,6 +438,7 @@ export function TicketActionsBar(props: PrintableTicketProps) {
   const claveImagen = [
     negocioNombre,
     ventaId,
+    String(folio ?? ""),
     clienteNombre ?? "",
     String(fecha ?? ""),
     currency,
@@ -451,7 +463,7 @@ export function TicketActionsBar(props: PrintableTicketProps) {
         if (!vivo) return;
         setImagen({
           blob,
-          file: new File([blob], `ticket-${ventaId.slice(0, 8)}.png`, {
+          file: new File([blob], nombreArchivoTicket(folio, ventaId), {
             type: "image/png",
           }),
         });
@@ -466,12 +478,13 @@ export function TicketActionsBar(props: PrintableTicketProps) {
       vivo = false;
     };
     // claveImagen resume todas las props que cambian el PNG.
-  }, [claveImagen, ventaId]);
+  }, [claveImagen, ventaId, folio]);
 
   const lineasMensaje = lineasTicketTodas(props);
   const mensajeWhatsApp = textoTicketWhatsApp({
     negocio: negocioNombre,
     fecha,
+    folio,
     cliente: clienteNombre,
     lineas: lineasMensaje,
     total,
@@ -525,7 +538,7 @@ export function TicketActionsBar(props: PrintableTicketProps) {
     const url = URL.createObjectURL(imagen.blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `ticket-${ventaId.slice(0, 8)}.png`;
+    a.download = nombreArchivoTicket(folio, ventaId);
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

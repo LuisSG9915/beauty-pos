@@ -1,4 +1,4 @@
-import { formatCurrency, formatDate, formatTime } from "@/lib/format";
+import { formatCurrency, formatDate, formatFolioVenta, formatTime } from "@/lib/format";
 
 /**
  * Utilidades de WhatsApp (`wa.me`): normalización de teléfonos y armado del
@@ -58,13 +58,15 @@ export type LineaTicketWhatsApp = {
 };
 
 /**
- * Mensaje llano del ticket para WhatsApp: negocio, fecha del cobro, cliente
- * opcional, conceptos, total y formas de pago. Sin rutas internas ni
- * identificadores visibles (el folio consecutivo llega con la misión 77b).
+ * Mensaje llano del ticket para WhatsApp: negocio, folio, fecha del cobro,
+ * cliente opcional, conceptos, total y formas de pago. Sin rutas internas
+ * ni identificadores visibles.
  */
 export function textoTicketWhatsApp(opciones: {
   negocio: string;
   fecha?: Date | string | null;
+  /** Folio consecutivo de la venta; se omite la línea si es null. */
+  folio?: number | null;
   cliente?: string | null;
   lineas: LineaTicketWhatsApp[];
   total: string;
@@ -81,6 +83,7 @@ export function textoTicketWhatsApp(opciones: {
   return [
     `*${opciones.negocio}* · Ticket de venta${opciones.preliminar ? " (preliminar)" : ""}`,
     opciones.fecha ? `${formatDate(opciones.fecha)} · ${formatTime(opciones.fecha)}` : null,
+    opciones.folio != null ? `Folio ${formatFolioVenta(opciones.folio)}` : null,
     opciones.cliente ? `Cliente: ${opciones.cliente}` : null,
     conceptos.length > 0 ? `Conceptos: ${conceptos.join(", ")}` : null,
     `Total: ${formatCurrency(opciones.total, { currency: opciones.moneda })}`,

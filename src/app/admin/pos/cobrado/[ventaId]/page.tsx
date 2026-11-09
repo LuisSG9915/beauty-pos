@@ -57,6 +57,7 @@ export default async function CobradoPage({
         clienteTelefono={ticket.venta.clienteTelefono}
         currency={context.currency}
         fecha={ticket.venta.cobradaAt ?? undefined}
+        folio={ticket.venta.folio}
         lineasMembresias={ticket.lineasMembresias}
         lineasPaquetes={ticket.lineasPaquetes}
         lineasProductos={ticket.lineasProductos}

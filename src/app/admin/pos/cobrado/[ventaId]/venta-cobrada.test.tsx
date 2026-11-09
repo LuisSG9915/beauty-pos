@@ -76,6 +76,22 @@ describe("VentaCobrada", () => {
     expect(sinCambio).not.toContain("Cambio a entregar");
   });
 
+  it("muestra el folio consecutivo en el encabezado y en el mensaje de WhatsApp", () => {
+    const html = renderToStaticMarkup(<VentaCobrada {...propsBase({ folio: 42 })} />);
+    expect(html).toContain("Folio 0042");
+    const href = hrefDe(html, "pos.cobrado.whatsapp");
+    const decodificado = decodeURIComponent(href!);
+    expect(decodificado).toContain("Folio 0042");
+    expect(decodificado).not.toContain("f47ac10b");
+  });
+
+  it("sin folio el encabezado no muestra 'Folio —' (el comprobante sí)", () => {
+    const html = renderToStaticMarkup(<VentaCobrada {...propsBase({ folio: null })} />);
+    const inicio = html.indexOf("Venta cobrada");
+    const fin = html.indexOf("</section>", inicio);
+    expect(html.slice(inicio, fin)).not.toContain("Folio");
+  });
+
   it("el enlace de WhatsApp no lleva rutas internas ni identificadores", () => {
     const html = renderToStaticMarkup(<VentaCobrada {...propsBase()} />);
     const href = hrefDe(html, "pos.cobrado.whatsapp");

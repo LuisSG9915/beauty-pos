@@ -103,11 +103,45 @@ pnpm test:flows
 
 ```
 Misión: 77b — folio visible en el flujo
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔ | usability 0 errores | flows ✔
-Antes → después: <UUIDs visibles → folio consecutivo en todo el flujo>
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <ninguno | qué falta>
+Cambios:
+- src/lib/format.ts — formatFolioVenta(): 42→"0042", 12345→"12345",
+  null→"—".
+- src/lib/glosario.ts — término `folio` ("número consecutivo del ticket
+  por sucursal").
+- src/modules/pos/ticket.ts — TicketData.venta.folio + TicketDetallesRow +
+  v.folio en el CTE (misma ronda SQL, sin consulta extra).
+- src/lib/whatsapp.ts — textoTicketWhatsApp acepta folio y agrega la
+  línea "Folio 0042" junto a la fecha.
+- src/app/admin/pos/printable-ticket.tsx — prop folio; ComprobanteImprimible
+  y TicketCapturaImagen muestran "Folio 0042" (antes "Folio: #A1B2C3D4");
+  TicketActionsBar lo pasa al mensaje de WhatsApp y a la clave del PNG;
+  nombreArchivoTicket() → ticket-0042-ab12.png (folio + sufijo del id).
+- src/app/admin/pos/cobrado/[ventaId]/ — folio en subtítulo "Venta cobrada"
+  y en propsTicket/mensaje (page.tsx lo pasa desde ticket.venta).
+- src/app/admin/pos/venta-ticket.tsx — "Folio 0042" junto al estado en
+  Resumen de cobro (solo si existe) y folio a TicketActionsBar.
+- src/app/admin/pos/page.tsx — "Ventas de hoy": "Folio 0042 · cliente ·
+  hora" (en_proceso sin folio, badge "En proceso" ya lo dice).
+- src/app/admin/ventas/page.tsx — columna Folio en tabla + campo en
+  tarjeta móvil (solo cuando existe).
+- src/app/admin/pos/sencillo/cobro-sencillo.tsx — "Venta #A1B2" →
+  "Folio 0042" o "Venta en proceso".
+- Pruebas: format.test.ts (formatFolioVenta), printable-ticket.test.tsx
+  (comprobante con folio, sin fragmento de UUID), venta-cobrada.test.tsx
+  (+2: folio en encabezado y mensaje, encabezado sin folio cuando null).
+Verificación: typecheck ✔ | lint ✔ (0 errores, 0 avisos nuevos) | test
+  653 ✔ | usability --only=pos: rutas OK ambos viewports, 0 avisos (el
+  error Agenda→Mi día móvil es preexistente) | flows 77/77 ✔
+Antes → después: "Folio: #F47AC10B" y "Venta #C3D4" → "Folio 0042"
+  consecutivo por sucursal en ticket, impresión, imagen, WhatsApp,
+  confirmación, Ventas de hoy e historial.
+Desviaciones:
+- 11 archivos (el plan estimaba ≤7 pero su propio contexto listaba 9;
+  whatsapp.ts y cobrado/page.tsx eran necesarios para que el folio
+  llegara al mensaje y a la pantalla).
+- Los nombres de archivo PNG llevan folio + sufijo del id (ticket-0042-
+  ab12.png) para no colisionar entre sucursales con el mismo folio.
+Riesgo abierto: ninguno; ventas en_proceso muestran "—"/"En proceso".
 ```
 
 ## Desviaciones (las escribe el implementador)

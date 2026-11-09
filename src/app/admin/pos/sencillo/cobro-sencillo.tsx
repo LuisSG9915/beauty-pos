@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Wallet } from "lucide-react";
-import { formatCurrency } from "@/lib/format";
+import { formatCurrency, formatFolioVenta } from "@/lib/format";
 import { cobrarVentaSencilla } from "./actions";
 import { CatalogoSelector } from "@/app/admin/pos/catalogo-selector";
 import type { TicketData } from "@/modules/pos/ticket";
@@ -84,7 +84,9 @@ export function CobroSencillo({
       <div className="rounded-2xl border border-background bg-card p-5 shadow-sm">
         <div className="flex items-baseline justify-between gap-3 mb-4">
           <div>
-            <h2 className="font-semibold">Venta #{venta.id.slice(-4)}</h2>
+            <h2 className="font-semibold">
+              {venta.folio != null ? `Folio ${formatFolioVenta(venta.folio)}` : "Venta en proceso"}
+            </h2>
             <p className="text-op-xs text-muted-foreground">
               Punto de venta sencillo · {venta.estado}
             </p>

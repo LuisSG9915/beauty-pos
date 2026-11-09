@@ -15,7 +15,7 @@ import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { getDatabase } from "@/db/client";
 import { getAdminContext, type AdminSearchParams } from "@/lib/admin-context";
 import { requireAccessPermission } from "@/lib/auth/authorization";
-import { formatCurrency, formatDate, formatTime, todayDateInput } from "@/lib/format";
+import { formatCurrency, formatDate, formatFolioVenta, formatTime, todayDateInput } from "@/lib/format";
 import { buildAdminHref, firstParam, normalizeDateInput } from "@/lib/url-context";
 import { GLOSARIO } from "@/lib/glosario";
 import { dayBoundsUtc, shiftDateKey } from "@/modules/agenda";
@@ -73,6 +73,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
   type VentaJson = {
     id: string;
     estado: string;
+    folio: number | null;
     total: string;
     propina: string;
     fecha: string;
@@ -93,6 +94,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
       select
         v.id,
         v.estado,
+        v.folio,
         v.total,
         v.propina,
         coalesce(v.cobrada_at, v.created_at) as fecha_venta,
@@ -132,6 +134,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
     select
       vp.id,
       vp.estado,
+      vp.folio,
       vp.total::text as total,
       vp.propina::text as propina,
       to_char(vp.fecha_venta at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as fecha,
@@ -174,6 +177,13 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
     });
 
   const columns: Array<DataTableColumn<VentaRow>> = [
+    {
+      id: "folio",
+      header: "Folio",
+      cell: (venta) => (
+        <span className="tabular-nums text-muted-foreground">{formatFolioVenta(venta.folio)}</span>
+      ),
+    },
     {
       id: "fecha",
       header: "Fecha de cobro",
@@ -317,6 +327,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Searc
                   }
                   badge={<StatusBadge tone={ESTADO_TONE[estadoVenta]}>{ESTADO_LABEL[estadoVenta]}</StatusBadge>}
                   campos={[
+                    ...(venta.folio != null ? [{ label: "Folio", value: formatFolioVenta(venta.folio) }] : []),
                     { label: "Cobro", value: `${formatDate(venta.fecha, { timeZone })} · ${formatTime(venta.fecha, { timeZone })}` },
                     ...(venta.vendedorNombre ? [{ label: "Vendedor", value: venta.vendedorNombre }] : []),
                     { label: "Artículos", value: String(venta.articulos) },
