@@ -49,6 +49,14 @@ export function CobroSencillo({
 
   const medioEfectivo = mediosPago.find((m) => m.categoria === "efectivo");
 
+  // Estado visible sin jerga interna (nunca el valor crudo de la BD).
+  const estadoLabel =
+    venta.estado === "completada"
+      ? "Cobrada"
+      : venta.estado === "cancelada"
+        ? "Cancelada"
+        : "En proceso";
+
   const subtotalServicios = lineasServicios.reduce(
     (s, l) => s + Number(l.precio) * l.cantidad,
     0,
@@ -88,14 +96,14 @@ export function CobroSencillo({
               {venta.folio != null ? `Folio ${formatFolioVenta(venta.folio)}` : "Venta en proceso"}
             </h2>
             <p className="text-op-xs text-muted-foreground">
-              Punto de venta sencillo · {venta.estado}
+              Punto de venta sencillo · {estadoLabel}
             </p>
           </div>
           <div className="text-right">
             <p className="text-op-xs font-medium text-muted-foreground">
               Total a cobrar
             </p>
-            <p className="text-3xl font-bold tabular-nums text-warning">
+            <p className="text-3xl font-bold tabular-nums text-primary">
               {formatCurrency(total, { currency })}
             </p>
           </div>
@@ -166,7 +174,7 @@ export function CobroSencillo({
         <div className="mt-5 flex flex-col sm:flex-row gap-3">
           {cobroCajaActivo ? (
             <Button
-              className="w-full sm:w-auto rounded-xl font-bold bg-warning text-warning-foreground shadow-sm"
+              className="w-full sm:w-auto rounded-xl font-bold shadow-sm"
               data-action-clave="1"
               data-action-id="pos.cobro.cobrar"
               disabled={!tieneLineas}
@@ -174,7 +182,7 @@ export function CobroSencillo({
               size="lg"
               type="button"
             >
-              <Wallet className="size-4 mr-2 text-warning" />
+              <Wallet className="size-4 mr-2" />
               {tieneLineas ? "Cobrar venta" : "Agrega líneas primero"}
             </Button>
           ) : (
@@ -233,7 +241,7 @@ function CobroDirectoForm({
       <input name="idempotencyKey" type="hidden" value={idempotencia} />
       <Button
         aria-busy={pending}
-        className="w-full min-h-11 rounded-xl font-bold bg-warning text-warning-foreground shadow-sm"
+        className="w-full min-h-11 rounded-xl font-bold shadow-sm"
         data-action-clave="1"
         data-action-id="pos.cobro.cobrar"
         disabled={!puedeCobrar}

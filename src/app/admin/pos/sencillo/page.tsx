@@ -51,12 +51,12 @@ export default async function PosSencilloPage({
         </div>
         {params.error === "no-acceso" && (
           <div className="rounded-md border border-destructive bg-destructive/10 p-4 text-op-xs text-destructive">
-            No tienes acceso a esta organización.
+            No tienes acceso a este negocio.
           </div>
         )}
         {params.error === "sin-sucursal" && (
           <div className="rounded-md border border-destructive bg-destructive/10 p-4 text-op-xs text-destructive">
-            No hay una sucursal activa para esta organización.
+            No hay una sucursal activa para este negocio.
           </div>
         )}
       </div>

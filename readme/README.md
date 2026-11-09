@@ -321,7 +321,7 @@ WhatsApp con imagen y texto generados en el aparato (sin servidor).
 | 77a | Folio consecutivo por sucursal (esquema + migración) | `hecho/77a` | Hecha — migración aplicada con autorización, backfill 369 ventas, flows 77/77 |
 | 77b | Folio visible en ticket, comprobante, confirmación y listados | `hecho/77b` | Hecha — flows 77/77, folio en ticket/impresión/imagen/WhatsApp/confirmación/listados |
 | 78 | Cobrar desde la agenda termina con la misma confirmación | `hecho/78` | Hecha — confirmación inline con cambio, ticket y "Listo"; flows 77/77 |
-| 79 | Inicio de Cobrar sin acciones repetidas; sencillo sin jerga | `pendiente/79` | Pendiente |
+| 79 | Inicio de Cobrar sin acciones repetidas; sencillo sin jerga | `hecho/79` | Hecha — "Abrir venta directa" es la única entrada, "Ventas de hoy" con folio/hora/cliente/estado/total, cobro sencillo en bugambilia sin UUID ni "organización" |
 
 Orden de ejecución: 72 → 73 → 75 → 74 → 76 → 77a → 77b → 78 → 79. Las
 misiones 58 (imagen), 59 (acciones al cobrar) y 61 (layout norhud) se
@@ -344,9 +344,9 @@ readme/
     d1-vs-cockroach.md       ← por qué no migrar la base
     expo-vs-pwa.md           ← por qué no hay app nativa todavía
   estados/
-    pendiente/               ← 72–79 (cobro POS y ticket)
+    pendiente/               ← (vacío) sin misiones pendientes
     en-progreso/             ← (vacío) sin misión en curso
-    hecho/                   ← 01–71 terminadas y verificadas
+    hecho/                   ← 01–79 terminadas y verificadas
 ```
 
 **Flujo de estados:** una misión entra por `pendiente/`; al asignarla se mueve a
@@ -377,13 +377,17 @@ microservicios). El razonamiento está en `readme/analisis/`.
 
 ## 11. Próximos cinco pasos
 
-1. **Ejecutar la 79** (inicio de Cobrar sin acciones repetidas; sencillo sin
-   jerga).
-3. **Verificación manual de impresión** en un salón real: la 75 dejó la
+1. **Verificación manual de impresión** en un salón real: la 75 dejó la
    vista previa mostrando solo el comprobante; falta probarla en la
    impresora térmica física y en iPhone (compartir imagen).
-4. **Evaluar la 80** (imagen del ticket en servidor con Browser Run + R2)
+2. **Evaluar la 80** (imagen del ticket en servidor con Browser Run + R2)
    solo si la generación en iPhone falla en la prueba manual.
-5. **Revisar el aviso de hidratación** en `/admin/clientes/[id]` (preexistente,
-   aparece en consola durante los flujos) y el error de feedback
-   Agenda → Mi día en usabilidad móvil si se reproduce.
+3. **Revisar el aviso de hidratación** en `/admin/clientes/[id]`
+   (preexistente, aparece en consola durante los flujos).
+4. **Atender la inestabilidad de `test:flows`**: en las últimas corridas la
+   suite murió en pasos distintos por timeouts y "Failed query" contra la
+   base remota; conviene revisar si es saturación del dev server o de
+   CockroachDB antes de confiar en corridas aisladas.
+5. **Decidir el destino de `/admin/pos/sencillo`**: quedó como ruta directa
+   sin enlace en el menú (fuera de alcance de la 79); si se quiere exponer,
+   hace falta una misión de producto aparte.

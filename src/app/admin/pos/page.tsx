@@ -188,7 +188,11 @@ async function obtenerEstadoOperativoPos(
         lt(fechaVenta, bounds.terminaAt),
       ),
     )
-    .orderBy(desc(fechaVenta));
+    // En proceso primero (hay que cerrarlas), luego las más recientes.
+    .orderBy(
+      sql`case when ${ventas.estado} = 'en_proceso' then 0 else 1 end`,
+      desc(fechaVenta),
+    );
 }
 
 async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdminContext>> }) {
@@ -240,23 +244,6 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
             >
               <WifiOff className="size-4 mr-1 text-muted-foreground" />
               Venta sin conexión
-            </Button>
-            <Button
-              data-action-id="pos.venta.nueva"
-              nativeButton={false}
-              render={
-                <Link
-                  href={buildAdminHref("/pos", {
-                    organizationId,
-                    sucursalId,
-                    extra: { nueva: "1" },
-                  })}
-                />
-              }
-              size="sm"
-              variant="outline"
-            >
-              Nueva venta <span className="hidden sm:inline">rápida</span>
             </Button>
             <Button
               data-action-id="pos.ventas.historial"
@@ -323,7 +310,7 @@ async function PosIndex({ context }: { context: Awaited<ReturnType<typeof getAdm
               >
                 <span className="min-w-0 truncate">
                   {venta.folio != null ? `Folio ${formatFolioVenta(venta.folio)} · ` : ""}
-                  {venta.clienteNombre ?? GLOSARIO.clienteDePaso} · {formatTime(venta.fecha, { timeZone: context.timeZone })}
+                  {formatTime(venta.fecha, { timeZone: context.timeZone })} · {venta.clienteNombre ?? GLOSARIO.clienteDePaso}
                 </span>
                 <span className="flex items-center gap-2">
                   <StatusBadge

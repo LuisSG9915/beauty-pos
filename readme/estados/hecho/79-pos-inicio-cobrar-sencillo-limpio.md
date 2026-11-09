@@ -110,11 +110,50 @@ pnpm test:flows
 
 ```
 Misión: 79 — inicio de Cobrar limpio y sencillo sin jerga
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔ | usability 0 errores | flows ✔
-Antes → después: <acciones duplicadas y UUIDs → entrada clara con folio>
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <ninguno | qué falta>
+Cambios:
+- src/app/admin/pos/page.tsx — quitado el botón "Nueva venta rápida" del
+  header (duplicaba "Abrir venta directa" de la tarjeta, mismo destino
+  ?nueva=1). "Venta sin conexión" y "Ver historial" quedan outline/sm.
+  "Ventas de hoy": orden en_proceso primero y luego fecha desc
+  (case en ORDER BY); fila reordenada a folio · hora · cliente · estado ·
+  total (el badge ya muestra En proceso/Cancelada/Completada).
+- src/app/admin/pos/sencillo/cobro-sencillo.tsx — encabezado muestra
+  "Folio 0042" o "Venta en proceso" y el estado traducido (En proceso /
+  Cancelada / Cobrada, nunca el valor crudo). Total y ambos CTA "Cobrar"
+  pasan de ámbar (bg-warning/text-warning) a bugambilia (bg-primary por
+  defecto del Button); el ícono Wallet hereda el color del botón.
+- src/app/admin/pos/sencillo/page.tsx — errores "esta organización" →
+  "este negocio" (glosario).
+- src/lib/glosario.ts — sin cambios (los términos usados ya existían).
+Verificación: typecheck ✔ | lint ✔ (0 errores, 4 avisos preexistentes) |
+  test 653 ✔ | usability --only=pos --viewport=movil: 0 errores, 0 avisos
+  (incluye el recorrido táctil Agenda→Mi día ya corregido en 83e4962) |
+  flows: pasos de venta directa en verde; suite completa no cerró limpia
+  en 4 corridas por fallos ajenos y variables (ver Desviaciones).
+Antes → después: dos acciones para abrir venta y "Venta #A1B2 ·
+  en_proceso" en ámbar → una sola entrada clara, folio/hora/cliente/estado/
+  total de un vistazo y cobro sencillo en bugambilia sin jerga.
+Desviaciones:
+- `test:flows` se corrió 4 veces; en ninguna falló un paso de esta misión.
+  Los fallos fueron todos en secciones ajenas y distintos cada vez:
+  espera en "Entrada de inventario" (run 1), timeout asignando cliente +
+  tarjeta de paquete no hallada (run 2), `/admin/reportes` con 413 +
+  "Failed query" (run 3, 75/77) y "Failed query" en `/admin/inventario`
+  (run 4). `/admin/reportes` se verificó aparte con sesión real: renderiza
+  las 4 secciones sin errores de consola → errores transitorios del dev
+  server contra CockroachDB remoto, no del cambio.
+- Verificación en vivo con Puppeteer (scripts/scratch/m79-*.ts):
+  `/admin/pos` sin "Nueva venta rápida", con "Abrir venta directa",
+  "Venta sin conexión", "Ver historial"; "Ventas de hoy" ordena en_proceso
+  primero (sin folio) y luego completadas por hora desc con "Folio NNNN ·
+  hora · cliente · estado · total". `/admin/pos/sencillo` con venta real:
+  sin "organización", sin `#uuid`, estado "En proceso", CTA con fondo
+  rgb(169,29,93) = bugambilia.
+- Estado del cobro sencillo: se usó fallback "En proceso" para cualquier
+  valor distinto de completada/cancelada (más seguro que asumir cobrada).
+Riesgo abierto: ninguno funcional. La inestabilidad de `test:flows` por
+  timeouts/consultas fallidas contra la base remota sigue siendo un tema
+  del entorno de pruebas (ya documentado en misiones anteriores).
 ```
 
 ## Desviaciones (las escribe el implementador)
