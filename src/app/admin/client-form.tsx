@@ -22,6 +22,7 @@ import {
   Textarea,
 } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
+import { enlaceWhatsApp } from "@/lib/whatsapp";
 import { cn } from "@/lib/utils";
 
 type ClientData = {
@@ -127,7 +128,7 @@ export function ClientForm({
               <span className="text-muted-foreground/30">·</span>
               <a
                 className="inline-flex items-center gap-1 text-op-xs font-medium text-success hover:underline"
-                href={`https://wa.me/52${initial.telefono.replace(/\D/g, "")}`}
+                href={enlaceWhatsApp({ telefono: initial.telefono })}
                 rel="noopener noreferrer"
                 target="_blank"
               >

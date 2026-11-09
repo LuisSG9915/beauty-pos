@@ -1067,6 +1067,72 @@ async function main() {
     record("'Nueva venta' abre un ticket nuevo", nuevaVentaOk);
     await shot(page, "16c-nueva-venta");
 
+    // Imagen del ticket (misión 74): en el ticket completado, "Compartir
+    // imagen" entrega un File PNG 2x con texto real (no blanco ni
+    // contaminado). Se mockean share/canShare/clipboard antes de cargar.
+    // OJO: el mock va como string — tsx/esbuild envuelve funciones con el
+    // helper __name (keepNames) que no existe en el navegador.
+    await page.evaluateOnNewDocument(`(() => {
+      window.__ticketCompartido = null;
+      const definir = (nombre, valor) => {
+        try {
+          Object.defineProperty(navigator, nombre, { configurable: true, value: valor });
+        } catch (e) { /* solo lectura: la verificación fallará con claridad */ }
+      };
+      definir("share", async (data) => { window.__ticketCompartido = data; });
+      definir("canShare", () => true);
+      definir("clipboard", { write: async () => {}, writeText: async () => {} });
+    })()`);
+    await page.goto(
+      `${BASE_URL}/admin/pos?organizationId=${ctx.orgId}&sucursalId=${ctx.branchId}&ventaId=${ventaCobradaId}`,
+      { waitUntil: "networkidle0" },
+    );
+    const botonImagen = await page
+      .waitForSelector('[data-action-id="pos.ticket.compartir_imagen"]', {
+        visible: true,
+        timeout: 30000,
+      })
+      .then(() => true)
+      .catch(() => false);
+    record("Ticket completado muestra 'Compartir imagen'", botonImagen);
+    if (botonImagen) {
+      await page.click('[data-action-id="pos.ticket.compartir_imagen"]');
+      const png = await page
+        .waitForFunction(
+          () => Boolean((window as { __ticketCompartido?: { files?: unknown[] } }).__ticketCompartido?.files?.length),
+          { timeout: 15000 },
+        )
+        .then(() => true)
+        .catch(() => false);
+      record("navigator.share recibió el archivo del ticket", png);
+      if (png) {
+        const pixeles = await page.evaluate(async () => {
+          const data = (window as { __ticketCompartido?: { files?: File[] } }).__ticketCompartido;
+          const file = data?.files?.[0];
+          if (!file) return { ok: false as const, motivo: "sin files" };
+          if (file.type !== "image/png") return { ok: false as const, motivo: `tipo ${file.type}` };
+          const bitmap = await createImageBitmap(file);
+          const canvas = document.createElement("canvas");
+          canvas.width = bitmap.width;
+          canvas.height = bitmap.height;
+          const c2d = canvas.getContext("2d");
+          if (!c2d) return { ok: false as const, motivo: "sin canvas" };
+          c2d.drawImage(bitmap, 0, 0);
+          const { data: px } = c2d.getImageData(0, 0, canvas.width, canvas.height);
+          let noBlancos = 0;
+          for (let i = 0; i < px.length; i += 4) {
+            if (!(px[i]! > 245 && px[i + 1]! > 245 && px[i + 2]! > 245)) noBlancos++;
+          }
+          return { ok: true as const, ancho: bitmap.width, noBlancos };
+        });
+        record(
+          "PNG del ticket es 2x y tiene texto (no blanco)",
+          pixeles.ok === true && pixeles.ancho >= 600 && pixeles.noBlancos > 1000,
+        );
+      }
+    }
+    await shot(page, "16d-ticket-compartir");
+
     // ── Catálogos: alta en cada módulo ────────────────────────────────────
     const runId = Date.now().toString(36).toUpperCase();
     const fill = (name: string, value: string) =>

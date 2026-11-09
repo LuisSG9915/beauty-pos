@@ -1,10 +1,11 @@
 "use client";
 
-import { Printer, MessageCircle, Share2 } from "lucide-react";
-import { useRef } from "react";
+import { Copy, Download, Loader2, MessageCircle, Printer, Share2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, RefObject } from "react";
 import { formatCurrency, formatDate, formatTime } from "@/lib/format";
 import { renderTicketToPng } from "@/lib/ticket-imagen";
+import { enlaceWhatsApp, textoTicketWhatsApp } from "@/lib/whatsapp";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
 
@@ -61,7 +62,7 @@ const estiloLineaCaptura: CSSProperties = {
   display: "flex",
   justifyContent: "space-between",
   gap: 4,
-  fontSize: 11,
+  fontSize: 13,
   lineHeight: 1.3,
 };
 
@@ -239,27 +240,27 @@ export function TicketCapturaImagen({
         background: "#ffffff",
         color: "#000000",
         fontFamily: "monospace",
-        fontSize: 11,
-        padding: 8,
+        fontSize: 14,
+        padding: 10,
         boxSizing: "border-box",
       }}
     >
-      <div style={{ textAlign: "center", paddingBottom: 8, borderBottom: "1px solid #000" }}>
-        <p style={{ fontWeight: "bold", fontSize: 13, textTransform: "uppercase", letterSpacing: 1, margin: 0 }}>
+      <div style={{ textAlign: "center", paddingBottom: 10, borderBottom: "1px solid #000" }}>
+        <p style={{ fontWeight: "bold", fontSize: 16, textTransform: "uppercase", letterSpacing: 1, margin: 0 }}>
           {negocioNombre}
         </p>
         {preliminar ? (
-          <p style={{ fontSize: 10, fontWeight: "bold", margin: "4px 0 0" }}>
+          <p style={{ fontSize: 12, fontWeight: "bold", margin: "4px 0 0" }}>
             PRELIMINAR — NO VÁLIDO COMO COMPROBANTE
           </p>
         ) : (
-          <p style={{ fontSize: 10, margin: "4px 0 0" }}>COMPROBANTE DE VENTA</p>
+          <p style={{ fontSize: 12, margin: "4px 0 0" }}>COMPROBANTE DE VENTA</p>
         )}
-        <p style={{ fontSize: 10, margin: "4px 0 0" }}>Folio: #{ventaId.slice(0, 8).toUpperCase()}</p>
-        <p style={{ fontSize: 10, margin: "4px 0 0" }} suppressHydrationWarning>
+        <p style={{ fontSize: 12, margin: "4px 0 0" }}>Folio: #{ventaId.slice(0, 8).toUpperCase()}</p>
+        <p style={{ fontSize: 12, margin: "4px 0 0" }} suppressHydrationWarning>
           {formatDate(fecha)} · {formatTime(fecha)}
         </p>
-        <p style={{ fontSize: 10, margin: "4px 0 0" }}>Cliente: {clienteNombre ?? "Cliente de paso"}</p>
+        <p style={{ fontSize: 12, margin: "4px 0 0" }}>Cliente: {clienteNombre ?? "Cliente de paso"}</p>
       </div>
 
       <div style={{ padding: "8px 0", borderBottom: "1px solid #000" }}>
@@ -275,7 +276,7 @@ export function TicketCapturaImagen({
               </span>
             </div>
             {l.cantidad > 1 ? (
-              <div style={{ fontSize: 9, color: "#555", textAlign: "right" }}>
+              <div style={{ fontSize: 10, color: "#555", textAlign: "right" }}>
                 {l.cantidad} × {formatCurrency(l.precio, { currency })}
               </div>
             ) : null}
@@ -283,7 +284,7 @@ export function TicketCapturaImagen({
         ))}
       </div>
 
-      <div style={{ padding: "8px 0", borderBottom: "1px solid #000", fontSize: 11 }}>
+      <div style={{ padding: "10px 0", borderBottom: "1px solid #000", fontSize: 13 }}>
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span>Subtotal:</span>
           <span>{formatCurrency(subtotal, { currency })}</span>
@@ -328,7 +329,7 @@ export function TicketCapturaImagen({
       </div>
 
       {pagos.length > 0 ? (
-        <div style={{ padding: "8px 0", borderBottom: "1px solid #000", fontSize: 10 }}>
+        <div style={{ padding: "10px 0", borderBottom: "1px solid #000", fontSize: 12 }}>
           <p style={{ fontWeight: "bold", margin: "0 0 2px" }}>FORMA DE PAGO:</p>
           {pagos.map((p) => (
             <div key={p.id}>
@@ -340,13 +341,13 @@ export function TicketCapturaImagen({
                 <span>{formatCurrency(p.monto, { currency })}</span>
               </div>
               {Number(p.recibido) > 0 && Number(p.recibido) !== Number(p.monto) ? (
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#555" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#555" }}>
                   <span>Recibido</span>
                   <span>{formatCurrency(p.recibido, { currency })}</span>
                 </div>
               ) : null}
               {Number(p.cambio) > 0 ? (
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#555" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "#555" }}>
                   <span>Cambio</span>
                   <span>{formatCurrency(p.cambio, { currency })}</span>
                 </div>
@@ -356,7 +357,7 @@ export function TicketCapturaImagen({
         </div>
       ) : null}
 
-      <div style={{ textAlign: "center", paddingTop: 12, fontSize: 10 }}>
+      <div style={{ textAlign: "center", paddingTop: 14, fontSize: 12 }}>
         <p style={{ fontWeight: "bold", margin: 0 }}>¡Gracias por tu preferencia!</p>
         <p style={{ margin: "2px 0 0" }}>Conserva este comprobante para cualquier duda o aclaración.</p>
       </div>
@@ -373,108 +374,163 @@ export function TicketCapturaImagen({
  * 3. `TicketCapturaImagen`: contenedor de captura (renderizado, fuera de
  *    pantalla) con estilos inline para generar la imagen PNG.
  */
+/** `navigator.share({ files })` disponible para este archivo concreto. */
+function soportaCompartirArchivos(file: File): boolean {
+  try {
+    return (
+      typeof navigator !== "undefined" &&
+      typeof navigator.canShare === "function" &&
+      navigator.canShare({ files: [file] })
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** Portapapeles de imágenes disponible (Chrome/Edge de escritorio). */
+function soportaPortapapelesImagen(): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    typeof navigator.clipboard?.write === "function" &&
+    typeof ClipboardItem !== "undefined"
+  );
+}
+
 export function TicketActionsBar(props: PrintableTicketProps) {
   const {
     negocioNombre = "Salón",
     ventaId,
     clienteNombre,
     clienteTelefono,
+    fecha,
     lineasServicios,
     lineasProductos,
     lineasPaquetes = [],
     lineasMembresias = [],
     total,
+    pagos,
     currency,
     preliminar = false,
   } = props;
   const toast = useToast();
   const capturaRef = useRef<HTMLDivElement>(null);
 
-  const todasLasLineas = [
-    ...lineasServicios.map((l) => `${l.cantidad > 1 ? `${l.cantidad}x ` : ""}${l.nombre}`),
-    ...lineasProductos.map((l) => `${l.cantidad > 1 ? `${l.cantidad}x ` : ""}${l.nombre}`),
-    ...lineasPaquetes.map((l) => `${l.cantidad > 1 ? `${l.cantidad}x ` : ""}${l.nombre}`),
-    ...lineasMembresias.map((l) => `${l.cantidad > 1 ? `${l.cantidad}x ` : ""}${l.nombre}`),
-  ];
+  // El PNG se genera por adelantado al montar/actualizar el ticket:
+  // navigator.share exige activación de usuario en Safari y no se puede
+  // generar dentro del clic.
+  const [imagen, setImagen] = useState<{ blob: Blob; file: File } | null>(null);
+  const [preparandoImagen, setPreparandoImagen] = useState(true);
+  const [falloImagen, setFalloImagen] = useState(false);
 
-  const mensajeWhatsApp = [
-    `*${negocioNombre}* · Comprobante de pago${preliminar ? " (preliminar)" : ""}`,
-    `Folio: #${ventaId.slice(0, 8).toUpperCase()}`,
-    clienteNombre ? `Cliente: ${clienteNombre}` : null,
-    todasLasLineas.length > 0 ? `Conceptos: ${todasLasLineas.join(", ")}` : null,
-    `Total: ${formatCurrency(total, { currency })}`,
-    `¡Muchas gracias por tu visita! Te esperamos pronto.`,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const firmaLineas = (lineas: Array<{ nombre: string; precio: string; cantidad: number }>) =>
+    lineas.map((l) => `${l.nombre}:${l.precio}:${l.cantidad}`).join("|");
+  const claveImagen = [
+    negocioNombre,
+    ventaId,
+    clienteNombre ?? "",
+    String(fecha ?? ""),
+    currency,
+    String(preliminar),
+    total,
+    firmaLineas(lineasServicios),
+    firmaLineas(lineasProductos),
+    firmaLineas(lineasPaquetes),
+    firmaLineas(lineasMembresias),
+    pagos.map((p) => `${p.monto}:${p.recibido}:${p.cambio}`).join("|"),
+  ].join("~");
 
-  const telefonoLimpio = clienteTelefono ? clienteTelefono.replace(/\D/g, "") : "";
-  const whatsappHref = telefonoLimpio
-    ? `https://wa.me/52${telefonoLimpio}?text=${encodeURIComponent(mensajeWhatsApp)}`
-    : `https://wa.me/?text=${encodeURIComponent(mensajeWhatsApp)}`;
+  useEffect(() => {
+    const nodo = capturaRef.current;
+    if (!nodo) return;
+    let vivo = true;
+    setPreparandoImagen(true);
+    setFalloImagen(false);
+    setImagen(null);
+    renderTicketToPng(nodo)
+      .then((blob) => {
+        if (!vivo) return;
+        setImagen({
+          blob,
+          file: new File([blob], `ticket-${ventaId.slice(0, 8)}.png`, {
+            type: "image/png",
+          }),
+        });
+        setPreparandoImagen(false);
+      })
+      .catch(() => {
+        if (!vivo) return;
+        setPreparandoImagen(false);
+        setFalloImagen(true);
+      });
+    return () => {
+      vivo = false;
+    };
+    // claveImagen resume todas las props que cambian el PNG.
+  }, [claveImagen, ventaId]);
+
+  const lineasMensaje = lineasTicketTodas(props);
+  const mensajeWhatsApp = textoTicketWhatsApp({
+    negocio: negocioNombre,
+    fecha,
+    cliente: clienteNombre,
+    lineas: lineasMensaje,
+    total,
+    pagos,
+    moneda: currency,
+    preliminar,
+  });
+  const whatsappHref = enlaceWhatsApp({ telefono: clienteTelefono, texto: mensajeWhatsApp });
 
   const handlePrint = () => {
     window.print();
   };
 
-  const handleWhatsApp = async () => {
-    // Intentar compartir la imagen del ticket vía el menú nativo del sistema
-    // (permite adjuntar el PNG a WhatsApp). Si el navegador no soporta compartir
-    // archivos, caer al enlace wa.me con el texto del comprobante.
-    if (capturaRef.current) {
-      try {
-        const blob = await renderTicketToPng(capturaRef.current);
-        const file = new File([blob], `ticket-${ventaId.slice(0, 8)}.png`, { type: "image/png" });
-        if (
-          typeof navigator !== "undefined" &&
-          typeof navigator.share === "function" &&
-          typeof navigator.canShare === "function" &&
-          navigator.canShare({ files: [file] })
-        ) {
-          await navigator.share({ files: [file], title: "Ticket", text: mensajeWhatsApp });
-          toast.success("Ticket compartido.");
-          return;
-        }
-      } catch (error) {
-        if ((error as Error)?.name === "AbortError") return;
-      }
-    }
-    // Fallback: enlace wa.me con texto (sin imagen).
-    window.open(whatsappHref, "_blank", "noopener,noreferrer");
-  };
-
   const handleCompartirImagen = async () => {
-    if (!capturaRef.current) {
-      toast.error("No se pudo generar la imagen.");
+    if (!imagen) {
+      toast.error("La imagen aún se está generando.");
       return;
     }
     try {
-      const blob = await renderTicketToPng(capturaRef.current);
-      const file = new File([blob], `ticket-${ventaId.slice(0, 8)}.png`, { type: "image/png" });
-      if (
-        typeof navigator !== "undefined" &&
-        typeof navigator.share === "function" &&
-        typeof navigator.canShare === "function" &&
-        navigator.canShare({ files: [file] })
-      ) {
-        await navigator.share({ files: [file], title: "Ticket", text: mensajeWhatsApp });
-        toast.success("Ticket compartido.");
-      } else {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `ticket-${ventaId.slice(0, 8)}.png`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        toast.success("Imagen descargada.");
-      }
+      // Solo el archivo: en iOS, title/text junto a files puede hacer que
+      // WhatsApp descarte la imagen.
+      await navigator.share({ files: [imagen.file] });
+      toast.success("Ticket compartido.");
     } catch (error) {
       if ((error as Error)?.name !== "AbortError") {
-        toast.error("No se pudo generar la imagen.");
+        toast.error("No se pudo compartir la imagen.");
       }
     }
+  };
+
+  const handleCopiarImagen = async () => {
+    if (!imagen) {
+      toast.error("La imagen aún se está generando.");
+      return;
+    }
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({ "image/png": imagen.blob }),
+      ]);
+      toast.success("Imagen copiada. Pégala en el chat de WhatsApp.");
+    } catch {
+      toast.error("No se pudo copiar la imagen.");
+    }
+  };
+
+  const handleDescargarImagen = () => {
+    if (!imagen) {
+      toast.error("La imagen aún se está generando.");
+      return;
+    }
+    const url = URL.createObjectURL(imagen.blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `ticket-${ventaId.slice(0, 8)}.png`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success("Imagen descargada.");
   };
 
   return (
@@ -492,28 +548,65 @@ export function TicketActionsBar(props: PrintableTicketProps) {
           {preliminar ? "Imprimir preliminar" : "Imprimir ticket"}
         </Button>
 
+        {preparandoImagen ? (
+          <Button disabled size="sm" variant="outline">
+            <Loader2 aria-hidden="true" className="size-4 mr-1.5 animate-spin" />
+            Preparando imagen…
+          </Button>
+        ) : falloImagen ? (
+          <Button disabled size="sm" variant="outline">
+            Imagen no disponible
+          </Button>
+        ) : imagen && soportaCompartirArchivos(imagen.file) ? (
+          <Button
+            className="rounded-xl shadow-xs font-semibold"
+            data-action-id="pos.ticket.compartir_imagen"
+            onClick={handleCompartirImagen}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <Share2 aria-hidden="true" className="size-4 mr-1.5 text-primary" />
+            Compartir imagen
+          </Button>
+        ) : imagen && soportaPortapapelesImagen() ? (
+          <Button
+            className="rounded-xl shadow-xs font-semibold"
+            data-action-id="pos.ticket.copiar_imagen"
+            onClick={handleCopiarImagen}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <Copy aria-hidden="true" className="size-4 mr-1.5 text-primary" />
+            Copiar imagen
+          </Button>
+        ) : (
+          <Button
+            className="rounded-xl shadow-xs font-semibold"
+            data-action-id="pos.ticket.descargar_imagen"
+            onClick={handleDescargarImagen}
+            size="sm"
+            type="button"
+            variant="outline"
+          >
+            <Download aria-hidden="true" className="size-4 mr-1.5 text-primary" />
+            Descargar imagen
+          </Button>
+        )}
+
         <Button
           className="rounded-xl shadow-xs font-semibold border-success/30 bg-success-soft text-success-soft-foreground hover:bg-success-soft/80"
-          data-action-id="pos.ticket.whatsapp"
-          onClick={handleWhatsApp}
+          data-action-id="pos.ticket.abrir_whatsapp"
+          nativeButton={false}
+          render={
+            <a href={whatsappHref} rel="noopener noreferrer" target="_blank" />
+          }
           size="sm"
-          type="button"
           variant="outline"
         >
           <MessageCircle aria-hidden="true" className="size-4 mr-1.5 text-success-soft-foreground" />
-          Enviar por WhatsApp
-        </Button>
-
-        <Button
-          className="rounded-xl shadow-xs font-semibold"
-          data-action-id="pos.ticket.imagen"
-          onClick={handleCompartirImagen}
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          <Share2 aria-hidden="true" className="size-4 mr-1.5 text-primary" />
-          Compartir imagen
+          Abrir WhatsApp
         </Button>
       </div>
 

@@ -1,3 +1,5 @@
+import { enlaceWhatsApp, normalizarTelefonoWhatsApp } from "@/lib/whatsapp";
+
 export type CategoriaRetencion =
   | "color_decoloracion"
   | "color_global"
@@ -187,13 +189,10 @@ export function calcularRetencionSugerida(params: {
     linkReserva ? `Puedes elegir tu día y horario aquí: ${linkReserva}` : "Escríbenos por aquí para coordinar tu horario ideal. ¡Será un gusto atenderte!",
   ].join("\n\n");
 
-  let whatsappUrl: string | undefined;
-  if (params.telefonoCliente) {
-    const digitos = params.telefonoCliente.replace(/\D/g, "");
-    if (digitos.length >= 8) {
-      whatsappUrl = `https://wa.me/${digitos}?text=${encodeURIComponent(mensajeWhatsApp)}`;
-    }
-  }
+  const numeroWhatsApp = normalizarTelefonoWhatsApp(params.telefonoCliente);
+  const whatsappUrl = numeroWhatsApp
+    ? enlaceWhatsApp({ telefono: numeroWhatsApp, texto: mensajeWhatsApp })
+    : undefined;
 
   return {
     categoria: regla.categoria,

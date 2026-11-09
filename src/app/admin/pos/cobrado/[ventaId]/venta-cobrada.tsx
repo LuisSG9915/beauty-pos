@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldLabel, Input, Select } from "@/components/ui/field";
 import { formatCurrency, formatDate, formatTime } from "@/lib/format";
 import { buildAdminHref } from "@/lib/url-context";
+import { enlaceWhatsApp, textoTicketWhatsApp } from "@/lib/whatsapp";
 
 type VentaCobradaProps = PrintableTicketProps & {
   organizationId: string;
@@ -29,41 +30,6 @@ const PAISES_WHATSAPP: Array<{ etiqueta: string; codigo: string }> = [
   { etiqueta: "Chile", codigo: "56" },
   { etiqueta: "Perú", codigo: "51" },
 ];
-
-/**
- * Mensaje del ticket para WhatsApp: negocio, fecha del cobro, cliente y
- * total. Sin rutas internas ni identificadores visibles (el folio
- * consecutivo llega con la misión 77b).
- */
-function mensajeTicketWhatsApp(props: {
-  negocioNombre: string;
-  fecha?: Date | string;
-  clienteNombre?: string | null;
-  lineasServicios: PrintableTicketProps["lineasServicios"];
-  lineasProductos: PrintableTicketProps["lineasProductos"];
-  lineasPaquetes?: PrintableTicketProps["lineasPaquetes"];
-  lineasMembresias?: PrintableTicketProps["lineasMembresias"];
-  total: string;
-  currency: string;
-  preliminar?: boolean;
-}): string {
-  const conceptos = [
-    ...props.lineasServicios,
-    ...props.lineasProductos,
-    ...(props.lineasPaquetes ?? []),
-    ...(props.lineasMembresias ?? []),
-  ].map((l) => `${l.cantidad > 1 ? `${l.cantidad}x ` : ""}${l.nombre}`);
-  return [
-    `*${props.negocioNombre}* · Ticket de venta${props.preliminar ? " (preliminar)" : ""}`,
-    props.fecha ? `${formatDate(props.fecha)} · ${formatTime(props.fecha)}` : null,
-    props.clienteNombre ? `Cliente: ${props.clienteNombre}` : null,
-    conceptos.length > 0 ? `Conceptos: ${conceptos.join(", ")}` : null,
-    `Total: ${formatCurrency(props.total, { currency: props.currency })}`,
-    "¡Gracias por tu preferencia! Te esperamos pronto.",
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
 
 /**
  * Pantalla "Venta cobrada" (página propia, no modal): total, formas de pago,
@@ -101,24 +67,28 @@ export function VentaCobrada(props: VentaCobradaProps) {
 
   const mensaje = useMemo(
     () =>
-      mensajeTicketWhatsApp({
-        negocioNombre,
+      textoTicketWhatsApp({
+        negocio: negocioNombre,
         fecha,
-        clienteNombre,
-        lineasServicios,
-        lineasProductos,
-        lineasPaquetes,
-        lineasMembresias,
+        cliente: clienteNombre,
+        lineas: [
+          ...lineasServicios,
+          ...lineasProductos,
+          ...lineasPaquetes,
+          ...lineasMembresias,
+        ],
         total,
-        currency,
+        pagos,
+        moneda: currency,
       }),
-    [negocioNombre, fecha, clienteNombre, lineasServicios, lineasProductos, lineasPaquetes, lineasMembresias, total, currency],
+    [negocioNombre, fecha, clienteNombre, lineasServicios, lineasProductos, lineasPaquetes, lineasMembresias, total, pagos, currency],
   );
 
   const digitos = telefono.replace(/\D/g, "");
-  const whatsappHref = digitos
-    ? `https://wa.me/${paisCodigo}${digitos}?text=${encodeURIComponent(mensaje)}`
-    : `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+  const whatsappHref = enlaceWhatsApp({
+    telefono: digitos ? `${paisCodigo}${digitos}` : null,
+    texto: mensaje,
+  });
 
   const urlVenta = buildAdminHref("/pos", {
     organizationId,

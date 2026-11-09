@@ -146,14 +146,69 @@ pnpm test:flows
 
 ```
 Misión: 74 — imagen del ticket y WhatsApp por aparato
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔ | flows ✔ | manual <aparatos>
-Antes → después: <PNG en blanco/tainted → imagen real compartible>
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <iOS/WhatsApp Web pendiente de prueba manual | ninguno>
+Cambios:
+- src/lib/ticket-imagen.ts → renderTicketToPng reescrito: URL data: (no
+  blob:, que contaminaba el canvas), clon del nodo sin position/left/top
+  (el original queda en -9999px), viewBox en px CSS + width/height en px
+  de dispositivo (escala 2x real), sonda getImageData de 1 px y errores
+  tipados TicketImagenError.
+- src/lib/ticket-imagen.test.ts → cubre data: URL, clon sin posición,
+  viewBox, escala 2x/3x y error sin canvas.
+- src/lib/whatsapp.ts (nuevo) → normalizarTelefonoWhatsApp (MX: 044/045,
+  521…, 10 dígitos → 52; 8–15 dígitos), enlaceWhatsApp y
+  textoTicketWhatsApp (negocio, fecha, cliente, conceptos, total, pago).
+- src/lib/whatsapp.test.ts (nuevo) → 8 pruebas de normalización/enlace/texto.
+- src/app/admin/pos/printable-ticket.tsx → PNG generado por adelantado al
+  montar (navigator.share exige gesto en Safari); botones por aparato:
+  Compartir imagen (canShare files, share solo con el archivo), Copiar
+  imagen (ClipboardItem) o Descargar imagen; "Abrir WhatsApp" con
+  enlaceWhatsApp; letra base de la captura ~14 px; action-ids nuevos.
+- src/app/admin/client-form.tsx → wa.me ciego reemplazado por
+  enlaceWhatsApp (corrige números extranjeros o ya con código de país).
+- src/modules/expedientes/retencion.ts → wa.me manual reemplazado por
+  enlaceWhatsApp + normalizar (corrige el número de 10 dígitos que antes
+  salía inválido); test ajustado al formato vigente sin "1".
+- src/app/admin/pos/cobrado/[ventaId]/venta-cobrada.tsx → mensaje y enlace
+  de WhatsApp ahora salen de whatsapp.ts (una sola fuente).
+- scripts/flows-e2e.ts → mock de navigator.share/canShare/clipboard (como
+  string: tsx/esbuild inyecta __name que no existe en el navegador) y 3
+  pasos: botón visible, share recibe File y PNG 2x con texto.
+Verificación: typecheck ✔ | lint ✔ | test 641 ✔ | usability --only=pos ✔
+  (rutas OK en ambos viewports; avisos preexistentes: confirmar bajo el
+  pliegue → M76, toque Agenda→Mi día) | smoke ✔ | PNG real verificado en
+  Chrome headless: image/png 640px (2x), 41k píxeles no blancos ✔ |
+  flows: pasos de la misión en verde en 2 corridas; la suite completa no
+  cerró limpia por flakes de infraestructura ajenos (detalles abajo)
+Antes → después: PNG en blanco/tainted que nunca se generaba → imagen real
+  2x compartible por menú nativo (teléfono), portapapeles (escritorio) o
+  descarga; teléfonos normalizados para wa.me.
+Desviaciones:
+- El mensaje de WhatsApp del ticket ahora incluye la línea "Pago:
+  <medio> <monto>" (la pide el diseño de textoTicketWhatsApp).
+- En venta-cobrada la imagen PNG queda montada (TicketCapturaImagen) pero
+  sin botón de compartir propio: las acciones de imagen viven en
+  TicketActionsBar (ticket). Si se quiere compartir imagen directo desde
+  la confirmación, es una iteración chica sobre whatsapp.ts.
+Riesgo abierto: iOS/WhatsApp Web pendientes de prueba manual del dueño
+  (el share solo con files evita el bug de iOS que descartaba la imagen);
+  ClipboardItem requiere contexto seguro (localhost y https OK).
 ```
 
 ## Desviaciones (las escribe el implementador)
 
-<Qué supuesto del plan resultó falso y qué se hizo en su lugar. Si no hubo,
-"ninguna".>
+- `scripts/flows-e2e.ts`: los mocks de `navigator.*` van como **string** en
+  `evaluateOnNewDocument`, no como función — tsx/esbuild envuelve las
+  funciones con el helper `__name` (keepNames) que no existe en el
+  navegador y el mock nunca se instalaba (verificado con
+  `ReferenceError: __name is not defined`).
+- `retencion.test.ts`: la expectativa `wa.me/52155…` se actualizó a
+  `wa.me/5255…` — el "1" tras +52 está obsoleto y la misión lo elimina.
+- El texto del ticket por WhatsApp suma la línea "Pago:" con medio y
+  monto (antes solo llevaba total).
+- La pantalla "Venta cobrada" no ofrece compartir imagen propia; la imagen
+  se comparte desde el ticket (`TicketActionsBar`). `TicketCapturaImagen`
+  queda montada ahí como punto de integración futuro.
+- `flows-e2e` arrojó dos fallos intermitentes ajenos al cambio en corridas
+  separadas (wait de 10 s en "Nuevo cliente" — reproducido funcionando;
+  500 transitorio en consulta de suscripciones de /admin/pos — servidor
+  sano al reintentar). Se documentan por transparencia.

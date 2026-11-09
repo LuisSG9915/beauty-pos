@@ -73,7 +73,8 @@ describe("calcularRetencionSugerida", () => {
     expect(resultado.diasRestantes).toBe(24);
     expect(resultado.estadoCiclo).toBe("a_tiempo");
     expect(resultado.whatsappUrl).toBeDefined();
-    expect(resultado.whatsappUrl).toContain("wa.me/5215512345678");
+    // "+52 1 55…" se normaliza a wa.me sin el "1" (formato vigente de WhatsApp).
+    expect(resultado.whatsappUrl).toContain("wa.me/525512345678");
     expect(resultado.mensajeWhatsApp).toContain("Sofía");
     expect(resultado.mensajeWhatsApp).toContain("Studio Melena");
     expect(resultado.linkReserva).toBe("https://melena.app/reservar/studio-melena");

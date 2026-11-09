@@ -316,7 +316,7 @@ WhatsApp con imagen y texto generados en el aparato (sin servidor).
 | 72 | El arnés recorre ticket, ventana de cobro y confirmación | `hecho/72` | Hecha — flows 72/72, línea base en `.artifacts/` |
 | 73 | "Cobrar" visible y fijo en móvil; columnas correctas | `hecho/73` | Hecha — contraste y pliegue resueltos en línea base |
 | 75 | Pantalla "Venta cobrada" con cambio real y acciones que funcionan | `hecho/75` | Hecha — flows 74/74, impresión solo comprobante, guardas en /cobrado y /sencillo |
-| 74 | Imagen del ticket real + compartir por aparato + WhatsApp | `pendiente/74` | Pendiente |
+| 74 | Imagen del ticket real + compartir por aparato + WhatsApp | `hecho/74` | Hecha — PNG 2x real, share/portapapeles/descarga por aparato, wa.me normalizado |
 | 76 | Ventana de cobro en orden norhud con pie fijo | `pendiente/76` | Pendiente |
 | 77a | Folio consecutivo por sucursal (esquema + migración) | `pendiente/77a` | Pendiente — migrate requiere autorización |
 | 77b | Folio visible en ticket, comprobante, confirmación y listados | `pendiente/77b` | Pendiente |
