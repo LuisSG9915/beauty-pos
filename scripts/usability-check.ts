@@ -27,7 +27,7 @@ import type { Client } from "pg";
 import { loggedPage, pickViewports, withBrowser } from "./lib/browser";
 import { checkFlags } from "./lib/cli";
 import { withDb } from "./lib/db";
-import { clickByHref, clickByText, waitForPath } from "./lib/dom";
+import { clickByHref, clickByText, sleep, waitForPath } from "./lib/dom";
 import { BASE_URL } from "./lib/e2e";
 import { printFindings, writeArtifact, type Finding } from "./lib/report";
 
@@ -798,20 +798,33 @@ async function main() {
         const mobilePage = await loggedPage(browser, movil);
         console.log("\n=== Recorrido táctil (móvil) ===");
         await mobilePage.goto(`${BASE_URL}/admin/agenda`, { waitUntil: "networkidle0", timeout: 60000 });
+        // La barra de progreso vive en el documento que se está yendo: con
+        // navegación de página completa, waitForFunction no alcanza a instalar
+        // su sondeo antes de que el contexto muera (el poller de Puppeteer se
+        // crea por CDP y la instalación corre la misma suerte que la página).
+        // El sondeo va dentro de la página, instalado antes del toque, y
+        // resuelve desde el contexto viejo en cuanto ve el indicador.
+        const feedbackPromise = mobilePage
+          .evaluate(
+            `new Promise((resolve) => {
+              const inicio = Date.now();
+              const iv = setInterval(() => {
+                const visto = Boolean(
+                  document.querySelector(".admin-nav-progress") ||
+                    document.querySelector('[data-pending="true"]'),
+                );
+                if (visto || Date.now() - inicio > 1500) {
+                  clearInterval(iv);
+                  resolve(visto);
+                }
+              }, 16);
+            })`,
+          )
+          .then((visto) => visto === true)
+          .catch(() => false);
+        await sleep(30); // el sondeo ya está instalado antes del toque
         const tapOk = await clickByHref(mobilePage, "/admin/mi-dia");
-        const feedbackOk = tapOk
-          ? await mobilePage
-              .waitForFunction(
-                () =>
-                  Boolean(
-                    document.querySelector(".admin-nav-progress") ||
-                      document.querySelector('[data-pending="true"]'),
-                  ),
-                { timeout: 1500, polling: 16 },
-              )
-              .then(() => true)
-              .catch(() => false)
-          : false;
+        const feedbackOk = tapOk ? await feedbackPromise : false;
         const completedOk = tapOk
           ? await mobilePage
               .waitForFunction(
