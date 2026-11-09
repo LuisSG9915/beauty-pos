@@ -182,6 +182,8 @@ export const ventas = pgTable(
     corteId: uuid("corte_id").references(() => cortesCaja.id),
     /** Momento confirmado del cobro; null en ventas históricas aún no migradas. */
     cobradaAt: timestamp("cobrada_at", { withTimezone: true }),
+    /** Folio consecutivo por sucursal asignado al confirmar el cobro; null mientras la venta está en proceso. */
+    folio: integer("folio"),
     estado: varchar("estado", { length: 30 }).default("en_proceso").notNull(),
     subtotal: numeric("subtotal", { precision: 12, scale: 2 }).default("0").notNull(),
     descuento: numeric("descuento", { precision: 12, scale: 2 }).default("0").notNull(),
@@ -207,6 +209,7 @@ export const ventas = pgTable(
     index("ventas_cita_idx").on(table.citaId),
     index("ventas_corte_idx").on(table.corteId),
     index("ventas_sucursal_cobrada_idx").on(table.sucursalId, table.cobradaAt),
+    uniqueIndex("ventas_sucursal_folio_uq").on(table.sucursalId, table.folio),
     index("ventas_estado_idx").on(table.estado),
     index("ventas_org_cliente_idx").on(table.organizacionId, table.clienteId),
     index("ventas_org_usuario_idx").on(table.organizacionId, table.usuarioId),
@@ -214,6 +217,16 @@ export const ventas = pgTable(
     index("ventas_membresia_idx").on(table.membresiaId),
   ],
 );
+
+// Contador del folio de venta por sucursal: una fila por sucursal. El
+// incremento atómico (INSERT … ON CONFLICT DO UPDATE … RETURNING) ocurre
+// dentro de la transacción del cobro, así dos cobros simultáneos nunca
+// repiten número ni dejan huecos por reintentos idempotentes.
+export const foliosVenta = pgTable("folios_venta", {
+  sucursalId: uuid("sucursal_id").primaryKey().references(() => sucursales.id),
+  ultimo: integer("ultimo").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull().$onUpdate(() => new Date()),
+});
 
 export const detalleVentasServicios = pgTable(
   "detalle_ventas_servicios",

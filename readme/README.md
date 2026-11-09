@@ -318,7 +318,7 @@ WhatsApp con imagen y texto generados en el aparato (sin servidor).
 | 75 | Pantalla "Venta cobrada" con cambio real y acciones que funcionan | `hecho/75` | Hecha — flows 74/74, impresión solo comprobante, guardas en /cobrado y /sencillo |
 | 74 | Imagen del ticket real + compartir por aparato + WhatsApp | `hecho/74` | Hecha — PNG 2x real, share/portapapeles/descarga por aparato, wa.me normalizado |
 | 76 | Ventana de cobro en orden norhud con pie fijo | `hecho/76` | Hecha — flows 77/77, teclado solo en md+, Esc vetado durante cobro |
-| 77a | Folio consecutivo por sucursal (esquema + migración) | `pendiente/77a` | Pendiente — migrate requiere autorización |
+| 77a | Folio consecutivo por sucursal (esquema + migración) | `hecho/77a` | Hecha — migración aplicada con autorización, backfill 369 ventas, flows 77/77 |
 | 77b | Folio visible en ticket, comprobante, confirmación y listados | `pendiente/77b` | Pendiente |
 | 78 | Cobrar desde la agenda termina con la misma confirmación | `pendiente/78` | Pendiente |
 | 79 | Inicio de Cobrar sin acciones repetidas; sencillo sin jerga | `pendiente/79` | Pendiente |
@@ -377,16 +377,16 @@ microservicios). El razonamiento está en `readme/analisis/`.
 
 ## 11. Próximos cinco pasos
 
-1. **Ejecutar la 74** (imagen del ticket + WhatsApp por aparato) — el PNG hoy
-   nunca se genera; es la pieza que el usuario pidió para WhatsApp. La 75 ya
-   dejó montado `TicketCapturaImagen` en la pantalla "Venta cobrada".
-2. **Ejecutar la 76** (ventana de cobro norhud) — orden visual, pie fijo y
-   textos del glosario en el diálogo de cobro.
-3. **Ejecutar la 77a** (folio consecutivo por sucursal) — requiere
-   autorización aparte para la migración de esquema; después la 77b lo
-   muestra en ticket, comprobante, confirmación y listados.
-4. **Ejecutar la 78** (cobrar desde la agenda termina en "Venta cobrada") y
+1. **Ejecutar la 77b** (folio visible) — el folio consecutivo ya se asigna en
+   el cobro (77a aplicada); falta mostrarlo en ticket impreso/imagen/texto,
+   confirmación "Venta cobrada", ticket del POS y listados de ventas.
+2. **Ejecutar la 78** (cobrar desde la agenda termina en "Venta cobrada") y
    la 79 (inicio de Cobrar sin acciones repetidas; sencillo sin jerga).
-5. **Verificación manual de impresión** en un salón real: la 75 dejó la
+3. **Verificación manual de impresión** en un salón real: la 75 dejó la
    vista previa mostrando solo el comprobante; falta probarla en la
    impresora térmica física y en iPhone (compartir imagen).
+4. **Evaluar la 80** (imagen del ticket en servidor con Browser Run + R2)
+   solo si la generación en iPhone falla en la prueba manual.
+5. **Revisar el aviso de hidratación** en `/admin/clientes/[id]` (preexistente,
+   aparece en consola durante los flujos) y el error de feedback
+   Agenda → Mi día en usabilidad móvil si se reproduce.

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { withRetry } from "@/db/retry";
 import { comisiones, membresias, paquetes, relServiciosInsumos } from "@/db/schema/catalogs";
@@ -13,6 +13,7 @@ import {
   detalleVentasProductos,
   detalleVentasPropinas,
   detalleVentasServicios,
+  foliosVenta,
   inventarioStock,
   movimientosInventario,
   ventas,
@@ -94,6 +95,25 @@ export type ResultadoVentaTransaccional = {
   yaProcesada: boolean;
 };
 
+// Incremento atómico del folio por sucursal dentro de la transacción del
+// cobro: la fila de folios_venta serializa los cobros simultáneos, así dos
+// ventas seguidas reciben números consecutivos sin duplicar. Las rutas
+// idempotentes salen antes por las guardas de existencia y no consumen folio.
+async function asignarFolioVenta(tx: any, sucursalId: string): Promise<number> {
+  const [fila] = await tx
+    .insert(foliosVenta)
+    .values({ sucursalId, ultimo: 1 })
+    .onConflictDoUpdate({
+      target: foliosVenta.sucursalId,
+      set: { ultimo: sql`${foliosVenta.ultimo} + 1`, updatedAt: new Date() },
+    })
+    .returning({ ultimo: foliosVenta.ultimo });
+  if (fila?.ultimo == null) {
+    throw new Error("No se pudo asignar el folio de la venta.");
+  }
+  return Number(fila.ultimo);
+}
+
 export async function ejecutarVentaTransaccional(
   db: any,
   input: EjecutarVentaInput,
@@ -102,7 +122,7 @@ export async function ejecutarVentaTransaccional(
     // Paso 1 (Idempotencia): Si input.idempotencyKey viene definido, consultar si ya existe la venta.
     if (input.idempotencyKey) {
       const [existente] = await tx
-        .select({ id: ventas.id, estado: ventas.estado })
+        .select({ id: ventas.id, estado: ventas.estado, folio: ventas.folio })
         .from(ventas)
         .where(
           and(
@@ -115,17 +135,23 @@ export async function ejecutarVentaTransaccional(
       if (existente) {
         return {
           ventaId: existente.id,
-          folio: existente.id.slice(0, 8),
+          folio: existente.folio != null ? String(existente.folio) : existente.id.slice(0, 8),
           yaProcesada: true,
         };
       }
     }
 
     let ventaId = input.ventaId;
+    let folioFinal: number | null = null;
 
     if (ventaId) {
       const [ventaExistente] = await tx
-        .select({ id: ventas.id, estado: ventas.estado })
+        .select({
+          id: ventas.id,
+          estado: ventas.estado,
+          folio: ventas.folio,
+          sucursalId: ventas.sucursalId,
+        })
         .from(ventas)
         .where(
           and(
@@ -143,16 +169,22 @@ export async function ejecutarVentaTransaccional(
       if (ventaExistente.estado === "completada") {
         return {
           ventaId: ventaExistente.id,
-          folio: ventaExistente.id.slice(0, 8),
+          folio: ventaExistente.folio != null ? String(ventaExistente.folio) : ventaExistente.id.slice(0, 8),
           yaProcesada: true,
         };
       }
+
+      // Folio consecutivo por sucursal: solo si la venta aún no tiene uno
+      // (una cancelada conserva el folio con el que se cobró).
+      folioFinal =
+        ventaExistente.folio ?? (await asignarFolioVenta(tx, ventaExistente.sucursalId));
 
       await tx
         .update(ventas)
         .set({
           estado: "completada",
           cobradaAt: new Date(),
+          folio: folioFinal,
           corteId: input.corteId ?? null,
           subtotal: (input.subtotal ?? 0).toFixed(2),
           total: (input.total ?? 0).toFixed(2),
@@ -162,11 +194,13 @@ export async function ejecutarVentaTransaccional(
         })
         .where(eq(ventas.id, ventaId));
     } else {
+      folioFinal = await asignarFolioVenta(tx, input.sucursalId);
       const [nuevaVenta] = await tx
         .insert(ventas)
         .values({
           organizacionId: input.organizacionId,
           sucursalId: input.sucursalId,
+          folio: folioFinal,
           usuarioId: input.usuarioId ?? input.userId ?? null,
           clienteId: input.clienteId ?? null,
           citaId: input.citaId ?? null,
@@ -571,7 +605,7 @@ export async function ejecutarVentaTransaccional(
 
     return {
       ventaId: finalVentaId,
-      folio: finalVentaId.slice(0, 8),
+      folio: folioFinal != null ? String(folioFinal) : finalVentaId.slice(0, 8),
       yaProcesada: false,
     };
   };

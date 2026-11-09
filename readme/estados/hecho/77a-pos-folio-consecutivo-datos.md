@@ -131,11 +131,41 @@ pnpm db:check
 
 ```
 Misión: 77a — folio consecutivo por sucursal (datos)
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔ | db:check ✔ | migrate <aplicada/pendiente>
-Antes → después: <sin folio → consecutivo por sucursal en la transacción>
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <migración pendiente de autorización | ninguno>
+Cambios:
+- src/db/schema/operations.ts — ventas.folio integer NULL, índice único
+  ventas_sucursal_folio_uq(sucursal_id, folio) (NULL no colisiona) y tabla
+  folios_venta(sucursal_id PK → sucursales, ultimo, updated_at).
+- drizzle/0057_abnormal_shard.sql — DDL generado + backfill a mano:
+  row_number() por sucursal sobre ventas completada/cancelada en orden
+  coalesce(cobrada_at, created_at), id; folios_venta.ultimo = max(folio).
+  La misma migración crea configuracion_pos (ver desviaciones).
+- src/modules/pos/service.ts — asignarFolioVenta(): INSERT … ON CONFLICT
+  (sucursal_id) DO UPDATE ultimo+1 RETURNING dentro de ejecutarTx, en las
+  dos ramas que confirman cobro (update con ventaId usa el sucursalId de la
+  venta bloqueada; insert usa input.sucursalId). Retornos idempotentes
+  devuelven el folio guardado (fallback al slice del UUID si es NULL).
+  ResultadoVentaTransaccional.folio ahora es el número real ("42").
+- src/modules/pos/service.test.ts — 5 pruebas nuevas del folio.
+Verificación: typecheck ✔ | lint ✔ | test 646 ✔ | db:check ✔ |
+  db:migrate APLICADA (autorización expresa del dueño) | backfill
+  verificado en BD: 369 completadas folio 1..N por sucursal, 154 en_proceso
+  NULL, contadores folios_venta = max(folio), 0 duplicados | smoke ✔ |
+  flows 77/77 ✔ (los cobros E2E siguieron la secuencia: folios 154-165 en
+  la sucursal E2E, contador en 165)
+Antes → después: folio = fragmento del UUID → consecutivo por sucursal
+  asignado atómicamente en la transacción del cobro.
+Desviaciones:
+- La migración incluye CREATE TABLE configuracion_pos: la tabla está en el
+  esquema y el código la consulta (pos/queries.ts) pero nunca existió en la
+  base — su archivo 0057_configuracion_pos.sql quedó huérfano (fuera del
+  journal de drizzle). db:generate la detectó como pendiente y la incluye;
+  aplicar la migración repara ese hueco. El archivo huérfano se conserva.
+- Dos archivos quedaron numerados 0057 (el huérfano y el generado); drizzle
+  solo corre los del journal, no hay conflicto.
+- asignarFolioVenta usa el query builder de drizzle (onConflictDoUpdate)
+  en vez del SQL crudo del diseño: mismo INSERT…ON CONFLICT…RETURNING y
+  permite afirmar el sucursalId en las pruebas con mocks.
+Riesgo abierto: ninguno funcional; 77b decide el formato visible ("0042").
 ```
 
 ## Desviaciones (las escribe el implementador)

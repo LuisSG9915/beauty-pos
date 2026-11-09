@@ -400,6 +400,13 @@
       "when": 1792190000000,
       "tag": "0056_idempotencia_ventas_indices",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1794191997443,
+      "tag": "0057_abnormal_shard",
+      "breakpoints": true
     }
   ]
 }
