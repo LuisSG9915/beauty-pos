@@ -151,15 +151,16 @@ Desviaciones:
 - El toast "Venta cobrada correctamente." se eliminó del cierre (la misión
   pedía conservarlo solo sin confirmación visible); onClose ya hacía
   router.refresh(), así que "Listo" = cierre + refresh sin código extra.
-- Hallazgo preexistente investigado (no corregido, fuera de alcance): el
-  check táctil Agenda→Mi día falla desde antes de la 78. Causa: el shell usó
-  NavigationActivity con barra .admin-nav-progress hasta el commit 94d2b6b,
-  que borró el componente y dejó el uso comentado; la tab bar usa <a> de
-  carga completa sin indicador propio (guardNavTap y onNavigate quedaron
-  sin uso — avisos de lint preexistentes). El check quedó desactualizado
-  respecto al patrón actual (punto useLinkStatus por enlace). Decisión de
-  producto pendiente: restaurar indicador global, cablear guardNavTap +
-  pending por enlace, o ajustar el check.
+- Hallazgo preexistente investigado y CORREGIDO después en commit 83e4962
+  (fuera del alcance de la 78): el check táctil Agenda→Mi día fallaba
+  desde antes. Causa: el commit 94d2b6b borró NavigationActivity y dejó el
+  uso comentado; la tab bar usa <a> de carga completa sin indicador propio.
+  Se restauró el componente con flushSync (la navegación confirma en ~50 ms
+  en local y el estado se pintaba tarde) y se corrigió el sondeo del check
+  (waitForFunction no observa elementos que solo viven durante el swap de
+  documento). Resultado: feedback=OK, 0 errores en usability --only=agenda;
+  además vuelve la telemetría nav_feedback_ms/nav_complete_ms y la guarda
+  anti doble-toque por ancla.
 Riesgo abierto: el cambio a entregar inline solo se pinta cuando
   cambioTotal > 0 (los cobros E2E son exactos); el cálculo es el mismo
   reduce de pagos[].cambio ya probado en la pantalla /cobrado de la 75.
