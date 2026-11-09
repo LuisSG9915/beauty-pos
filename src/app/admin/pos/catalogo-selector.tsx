@@ -106,7 +106,6 @@ export function CatalogoSelector({
 
   const reportResult = (result: ActionState) => {
     if (result.success) {
-      toast.success(result.message ?? "Agregado al ticket.");
       onAdded?.();
     } else {
       toast.error(result.error ?? "No se pudo agregar al ticket.");

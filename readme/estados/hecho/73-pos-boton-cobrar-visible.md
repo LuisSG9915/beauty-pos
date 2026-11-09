@@ -117,15 +117,45 @@ pnpm test:flows
 
 ```
 Misión: 73 — botón Cobrar visible y a la mano
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔ | usability 0 errores | flows ✔
-Antes → después: <contraste ~1:1 y botón que puede quedar bajo el pliegue →
-  primario bugambilia siempre visible>
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <ninguno | qué falta>
+Cambios: venta-ticket.tsx → botón único responsive (fixed sobre la tab bar
+en <md, static dentro del resumen en md+), columnas md+ corregidas, monto
+= total − anticipoPorAplicar y texto "Cobrar $X · N artículos";
+catalogo-selector.tsx → fuera toast.success por toque (siguen los de error).
+Verificación: typecheck ✔ | lint ✔ (0 err, 3 avisos preexistentes) | test
+626 ✔ | usability --only=pos: 0 color-contrast y 0 "bajo el pliegue" en
+pos.cobro.abrir (la base de la 72 tenía 4+2); flows 72/72 al re-verificar
+(la corrida original reportó 29/30 por un flake que no reprodujo).
+Antes → después: texto ~1.03:1 invisible sobre bg-card y botón que podía
+quedar bajo el pliegue en móvil → primario bugambilia (rgb(169,29,93))
+siempre visible: barra fija de 56 px a 11 px sobre la tab bar en teléfono
+y dentro del resumen en escritorio.
+Desviaciones: ver sección siguiente.
+Riesgo abierto: select-name axe en /admin/pos/cobrado/[id] (preexistente,
+Select "Motivo SAT" de CancelarFacturaForm sin nombre accesible) y aviso
+pos.cobro.confirmar bajo el pliegue — ambos ya estaban en la base de la 72.
 ```
 
 ## Desviaciones (las escribe el implementador)
 
-<Qué supuesto del plan resultó falso y qué se hizo en su lugar. Si no hubo,
-"ninguna".>
+- ~~**`test:flows` 29/30 — fallo preexistente**~~ **Descartado al
+  re-verificar**: la corrida posterior con el mismo código dio 72/72, incluido
+  el paso `mi_dia.cita.cobrar`. El 29/30 fue un flake del entorno de esa
+  sesión (posible dev server desactualizado), no un defecto del flujo.
+- **"N artículos" = suma de `cantidad`** de las 4 listas de líneas (mismo
+  criterio que la columna "Artículos" de `/admin/ventas`), no número de
+  líneas. Plural correcto ("1 artículo").
+- **Botón dentro de la tarjeta "Resumen de cobro"**, debajo del bloque del
+  total y antes del `<details>` de desglose (interpretación de "dentro del
+  resumen, debajo del total").
+- **Alto de barra 56 px (`h-14`)**: `min-h-14` perdía contra
+  `max-sm:min-h-11` del size por defecto del Button (medido 44 px en móvil);
+  `h-14` fija 56 px en todos los breakpoints y gana por orden en `cn()`.
+- **`bottom` distinto en modo inline**: dentro del Sheet de agenda no hay
+  tab bar visible (backdrop z-50 la cubre), así que la barra usa solo
+  `env(safe-area-inset-bottom) + 0.75rem`; en página suma los 3.5 rem de la
+  tab bar. Hoy `env(safe-area-inset-bottom)` vale 0 (sin `viewport-fit=cover`)
+  pero queda listo si se activa.
+- **Espaciador `pb-20 md:pb-0` condicional** en el grid (no un div aparte):
+  en página se suma al `pb-24` del `main`; en el sheet compensa su `p-5`.
+  Verificado con Puppeteer: al hacer scroll al fondo el último bloque del
+  aside queda por encima de la barra (390×844).

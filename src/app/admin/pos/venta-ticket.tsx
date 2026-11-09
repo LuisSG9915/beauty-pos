@@ -597,6 +597,15 @@ export function VentaTicket({
     tieneLineasPostTotal;
   const tieneBeneficioActivo =
     Number(venta.descuento) > 0 || Boolean(venta.promocionId) || Boolean(venta.membresiaId);
+  const montoACobrar = Math.max(
+    Math.round((Number(venta.total) - anticipoPorAplicar) * 100) / 100,
+    0,
+  );
+  const totalArticulos =
+    lineasServicios.reduce((s, l) => s + l.cantidad, 0) +
+    lineasProductos.reduce((s, l) => s + l.cantidad, 0) +
+    lineasPaquetes.reduce((s, l) => s + l.cantidad, 0) +
+    lineasMembresias.reduce((s, l) => s + l.cantidad, 0);
 
   // En modo inline el descuento también debe provocar el refetch del ticket.
   const handledDescuento = useRef<ActionState | null>(null);
@@ -633,8 +642,13 @@ export function VentaTicket({
   };
 
   return (
-    <div className="grid grid-cols-1 gap-4 md:gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)] min-w-0 max-w-full">
-      <section className="order-1 md:order-2 rounded-2xl border border-border bg-card p-4 md:p-6 shadow-sm min-w-0 max-w-full md:max-h-[45vh] md:overflow-y-auto">
+    <div
+      className={cn(
+        "grid grid-cols-1 gap-4 md:gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)] min-w-0 max-w-full",
+        editable && tieneLineas && "pb-20 md:pb-0",
+      )}
+    >
+      <section className="rounded-2xl border border-border bg-card p-4 md:p-6 shadow-sm min-w-0 max-w-full">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-lg font-semibold text-foreground">
@@ -828,7 +842,7 @@ export function VentaTicket({
         </div>
       </section>
 
-      <aside className="order-2 md:order-1 space-y-4 min-h-0 md:max-h-[60vh] md:overflow-y-auto md:max-h-none md:overflow-visible">
+      <aside className="min-w-0 space-y-4">
         <section className="rounded-2xl border border-border/80 bg-card p-4 md:p-6 shadow-sm transition-all duration-200 hover:shadow-md">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold tracking-wide text-foreground">Resumen de cobro</h2>
@@ -850,6 +864,55 @@ export function VentaTicket({
               {formatCurrency(venta.total, { currency })}
             </span>
           </div>
+
+          {editable && tieneLineas ? (
+            <>
+              <Button
+                className={cn(
+                  "fixed inset-x-3 z-50 h-14 rounded-2xl px-4 py-3 text-base font-bold shadow-lg sm:inset-x-6",
+                  modo === "inline"
+                    ? "bottom-[calc(env(safe-area-inset-bottom,0px)+0.75rem)]"
+                    : "bottom-[calc(3.5rem_+_env(safe-area-inset-bottom,0px)_+_0.75rem)]",
+                  "md:static md:w-full",
+                )}
+                data-action-clave="1"
+                data-action-id="pos.cobro.abrir"
+                onClick={() => setCobroAbierto(true)}
+                type="button"
+              >
+                <span className="min-w-0 truncate md:hidden">
+                  Cobrar {formatCurrency(montoACobrar, { currency })} · {totalArticulos}{" "}
+                  artículo{totalArticulos === 1 ? "" : "s"}
+                </span>
+                <span className="hidden min-w-0 truncate md:inline">
+                  Cobrar {formatCurrency(montoACobrar, { currency })}
+                </span>
+              </Button>
+
+              <Dialog open={cobroAbierto} onOpenChange={setCobroAbierto}>
+                <DialogContent className="p-0 sm:p-6 max-w-md md:max-w-lg">
+                  <DialogHeader>
+                    <DialogTitle>Cobrar</DialogTitle>
+                    <DialogDescription className="text-op-sm">
+                      {formatCurrency(venta.total, { currency })}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <CobroForm
+                    anticipo={anticipoPorAplicar}
+                    mediosPago={mediosPago}
+                    modo={modo === "inline" ? "inline" : undefined}
+                    onCobrada={onCobrada}
+                    organizationId={organizationId}
+                    returnTo={returnTo}
+                    total={Number(venta.total)}
+                    ventaId={venta.id}
+                    enDialog
+                    onClose={() => setCobroAbierto(false)}
+                  />
+                </DialogContent>
+              </Dialog>
+            </>
+          ) : null}
 
           <details className="group mt-3" open={tieneAjustesResumen}>
             <summary className="cursor-pointer text-op-xs font-medium text-muted-foreground hover:text-foreground">
@@ -981,45 +1044,7 @@ export function VentaTicket({
           </section>
         ) : null}
 
-        {editable ? (
-          tieneLineas ? (
-            <>
-              <Button
-                data-action-clave="1"
-                data-action-id="pos.cobro.abrir"
-                onClick={() => setCobroAbierto(true)}
-                className="w-full rounded-2xl font-bold bg-primary text-primary-foreground shadow-sm hover:brightness-105 transition-colors sticky bottom-0 z-10 border-t border-border/60 bg-card/95 px-4 py-3 backdrop-blur-sm"
-                size="lg"
-                type="button"
-              >
-                Cobrar {formatCurrency(venta.total, { currency })}
-              </Button>
-
-              <Dialog open={cobroAbierto} onOpenChange={setCobroAbierto}>
-                <DialogContent className="p-0 sm:p-6 max-w-md md:max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle>Cobrar</DialogTitle>
-                    <DialogDescription className="text-op-sm">
-                      {formatCurrency(venta.total, { currency })}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <CobroForm
-                    anticipo={anticipoPorAplicar}
-                    mediosPago={mediosPago}
-                    modo={modo === "inline" ? "inline" : undefined}
-                    onCobrada={onCobrada}
-                    organizationId={organizationId}
-                    returnTo={returnTo}
-                    total={Number(venta.total)}
-                    ventaId={venta.id}
-                    enDialog
-                    onClose={() => setCobroAbierto(false)}
-                  />
-                </DialogContent>
-              </Dialog>
-            </>
-          ) : null
-        ) : cancelada ? (
+        {editable ? null : cancelada ? (
           <section className="rounded-2xl border border-destructive/30 bg-destructive-soft p-6 shadow-sm">
             <h2 className="font-semibold text-destructive-soft-foreground">Venta cancelada</h2>
             <p className="mt-2 text-sm leading-6 text-muted-foreground">
