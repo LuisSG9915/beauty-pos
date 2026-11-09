@@ -23,6 +23,8 @@ export type TicketData = {
     descuento: string;
     total: string;
     propina: string;
+    /** ISO UTC del cobro; null mientras la venta sigue en proceso. */
+    cobradaAt: string | null;
     /** Promoción del catálogo ligada al ticket (si hay). */
     promocionId: string | null;
     promocionNombre: string | null;
@@ -337,6 +339,7 @@ type TicketDetallesRow = {
     descuento: string;
     total: string;
     propina: string;
+    cobradaAt: string | null;
     promocionId: string | null;
     promocionNombre: string | null;
     descuentoPromocion: string;
@@ -448,6 +451,7 @@ export async function getTicketData(
         cl.codigo_postal_fiscal as "clienteCodigoPostalFiscal", cl.uso_cfdi as "clienteUsoCfdi",
         v.subtotal::text as subtotal, v.descuento::text as descuento,
         v.total::text as total, v.propina::text as propina,
+        to_char(v.cobrada_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as "cobradaAt",
         v.promocion_id as "promocionId", pr.nombre as "promocionNombre",
         v.descuento_promocion::text as "descuentoPromocion",
         v.membresia_id as "membresiaId", mb.nombre as "membresiaNombre",

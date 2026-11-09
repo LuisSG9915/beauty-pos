@@ -1,9 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 
 import { getAdminContext } from "@/lib/admin-context";
-import { getTicketData } from "@/modules/pos/ticket";
+import { canAccessBranch, requireAccessPermission } from "@/lib/auth/authorization";
 import { buildAdminHref } from "@/lib/url-context";
-import { CobradoConfirmacion } from "./cobrado-cliente";
+import { getTicketData } from "@/modules/pos/ticket";
+import { VentaCobrada } from "./venta-cobrada";
 
 export const dynamic = "force-dynamic";
 
@@ -17,10 +18,9 @@ type Params = Promise<{
 }>;
 
 /**
- * Página de confirmación post-cobro.
- * Se muestra tras cobrar una venta y ofrece enviar el ticket por WhatsApp,
- * imprimir, copiar enlace, ver la venta o empezar una nueva venta.
- * Al cerrar el modal, regresa al punto de venta.
+ * Pantalla "Venta cobrada": confirmación post-cobro con total, formas de
+ * pago, cambio a entregar, WhatsApp, impresión del comprobante y acciones
+ * para ver la venta o abrir una nueva.
  */
 export default async function CobradoPage({
   params,
@@ -36,9 +36,10 @@ export default async function CobradoPage({
 
   const context = await getAdminContext({ organizationId });
   if (!context.organization) notFound();
+  requireAccessPermission(context.access, "ventas.ver");
 
   const ticket = await getTicketData(organizationId, ventaId);
-  if (!ticket) notFound();
+  if (!ticket || !canAccessBranch(context.access, ticket.venta.sucursalId)) notFound();
   if (ticket.venta.sucursalId !== sucursalId) notFound();
   if (ticket.venta.estado !== "completada") {
     redirect(
@@ -51,12 +52,23 @@ export default async function CobradoPage({
 
   return (
     <div className="min-w-0 max-w-full">
-      <CobradoConfirmacion
-        ventaId={ventaId}
-        montoCobrado={Number(ticket.venta.total)}
-        moneda={context.currency}
-        organizacionId={organizationId}
+      <VentaCobrada
+        clienteNombre={ticket.venta.clienteNombre}
+        clienteTelefono={ticket.venta.clienteTelefono}
+        currency={context.currency}
+        fecha={ticket.venta.cobradaAt ?? undefined}
+        lineasMembresias={ticket.lineasMembresias}
+        lineasPaquetes={ticket.lineasPaquetes}
+        lineasProductos={ticket.lineasProductos}
+        lineasServicios={ticket.lineasServicios}
+        negocioNombre={context.organization.nombre}
+        organizationId={organizationId}
+        pagos={ticket.pagos}
+        propina={ticket.venta.propina}
+        subtotal={ticket.venta.subtotal}
         sucursalId={sucursalId}
+        total={ticket.venta.total}
+        ventaId={ventaId}
       />
     </div>
   );

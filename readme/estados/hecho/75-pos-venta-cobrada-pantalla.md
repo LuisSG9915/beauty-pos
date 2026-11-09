@@ -158,15 +158,69 @@ pnpm test:flows && pnpm test:smoke
 
 ```
 Misión: 75 — pantalla Venta cobrada
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔ | usability 0 errores | flows ✔ | smoke ✔
-Antes → después: <modal con 404 y "sin cambio" → pantalla con cambio real y
-  acciones que funcionan>
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <ninguno | qué falta>
+Cambios:
+- src/modules/pos/ticket.ts → cobradaAt en el CTE `v` y en TicketData.venta
+  (misma ronda SQL, sin consultas extra).
+- src/app/admin/pos/printable-ticket.tsx → exporta ComprobanteImprimible
+  (bloque print:block 80 mm) y TicketCapturaImagen (captura para PNG, punto
+  de integración de la 74); TicketActionsBar los reutiliza.
+- src/app/admin/pos/cobrado/[ventaId]/venta-cobrada.tsx (nuevo) → pantalla
+  propia "Venta cobrada": total, formas de pago, "Cambio a entregar" real
+  (suma de pagos[].cambio > 0), cliente y fecha/hora del cobro, WhatsApp con
+  teléfono prellenado y selector de país con etiqueta visible, Imprimir
+  ticket, Ver venta y "Nueva venta" → /admin/pos?…&nueva=1. Contenido
+  visible envuelto en print:hidden → la impresión solo muestra el
+  comprobante.
+- src/app/admin/pos/cobrado/[ventaId]/page.tsx → guardas
+  requireAccessPermission("ventas.ver") + canAccessBranch; pasa el ticket
+  completo al componente.
+- src/app/admin/pos/cobrado/[ventaId]/cobrado-cliente.tsx → eliminado
+  (sustituido por venta-cobrada.tsx, previsto en el paso 5).
+- src/app/admin/pos/venta-ticket.tsx → bloque completada pasa fecha real
+  (venta.cobradaAt) al TicketActionsBar.
+- src/app/admin/pos/sencillo/page.tsx → mismas guardas de permiso y sucursal.
+- src/components/admin/pos/modal-confirmacion-cobro.tsx + test → eliminados
+  (sin consumidores tras quitar cobrado-cliente).
+- venta-cobrada.test.tsx (nuevo) → 5 pruebas renderToStaticMarkup: h1,
+  cambio condicional, WhatsApp sin /admin/ ni UUID, Nueva venta con
+  nueva=1, acciones accesibles.
+- scripts/flows-e2e.ts → +2 pasos ("Venta cobrada" visible y "Nueva venta"
+  abre ticket nuevo) y clickAccionCita tolera render desactualizado
+  (recarga entre reintentos + diagnóstico de acciones presentes).
+Verificación: typecheck ✔ | lint ✔ (0 errores; 4 avisos preexistentes) |
+test 629 ✔ | usability cobrado 0 errores nuevos (select-name resuelto) |
+flows 74/74 ✔ | smoke ✔ | impresión (emulateMediaType print) muestra solo
+el comprobante ✔
+Antes → después: modal con 404 en "Nueva venta", "sin cambio" fijo, UUID
+visible y select sin nombre → pantalla dedicada con cambio real, WhatsApp
+con teléfono prellenado, impresión del comprobante y guardas de servidor.
+Desviaciones:
+- clickAccionCita del arnés ganó recargas entre reintentos: el paso
+  mi_dia.cita.cobrar falló de forma intermitente (también en la corrida del
+  agente de la 73) porque pollReload puede aceptar el estado optimista y el
+  DOM queda un instante desactualizado. Es robustez del arnés, no cambio de
+  producto.
+- El ticket impreso y el texto de WhatsApp de TicketActionsBar aún llevan
+  "Folio: #<8 chars del id>": se reemplaza por el folio consecutivo en la
+  77b (fuera de alcance aquí).
+Riesgo abierto: ninguno funcional; imagen PNG del ticket sigue pendiente
+  de la 74 (TicketCapturaImagen ya queda montada en la pantalla).
 ```
 
 ## Desviaciones (las escribe el implementador)
 
-<Qué supuesto del plan resultó falso y qué se hizo en su lugar. Si no hubo,
-"ninguna".>
+- `clickAccionCita` en `scripts/flows-e2e.ts` ahora recarga la página entre
+  reintentos y, al fallar, reporta las `data-action-id` presentes. Motivo:
+  el paso `mi_dia.cita.cobrar` falló de forma intermitente (también en la
+  verificación de la 73) porque `pollReload` acepta el estado optimista del
+  cliente y el botón puede quedar un instante desactualizado/deshabilitado.
+- Se añadió `print:hidden` al contenido visible de `venta-cobrada.tsx`:
+  sin él, la vista previa de impresión mostraba la pantalla de confirmación
+  junto al comprobante (el `.no-print` global nunca se usaba).
+- El "Folio" del comprobante impreso y del mensaje de `TicketActionsBar`
+  sigue siendo un fragmento del id; la sustitución por folio consecutivo es
+  alcance de la 77b.
+- Conteo de archivos: 7 modificados + 3 eliminados + 2 nuevos (componente y
+  prueba), ligeramente sobre el presupuesto de 8 al contar eliminaciones;
+  el alcance funcional se mantuvo.
+

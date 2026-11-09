@@ -86,6 +86,7 @@ type VentaTicketProps = {
     descuento: string;
     total: string;
     propina: string;
+    cobradaAt?: string | null;
     promocionId?: string | null;
     promocionNombre?: string | null;
     descuentoPromocion?: string;
@@ -1074,6 +1075,7 @@ export function VentaTicket({
               clienteNombre={venta.clienteNombre}
               clienteTelefono={venta.clienteTelefono}
               currency={currency}
+              fecha={venta.cobradaAt ?? undefined}
               descuento={venta.descuento}
               descuentoMembresia={venta.descuentoMembresia}
               descuentoPromocion={venta.descuentoPromocion}

@@ -315,7 +315,7 @@ WhatsApp con imagen y texto generados en el aparato (sin servidor).
 |---|---|---|---|
 | 72 | El arnés recorre ticket, ventana de cobro y confirmación | `hecho/72` | Hecha — flows 72/72, línea base en `.artifacts/` |
 | 73 | "Cobrar" visible y fijo en móvil; columnas correctas | `hecho/73` | Hecha — contraste y pliegue resueltos en línea base |
-| 75 | Pantalla "Venta cobrada" con cambio real y acciones que funcionan | `pendiente/75` | Pendiente |
+| 75 | Pantalla "Venta cobrada" con cambio real y acciones que funcionan | `hecho/75` | Hecha — flows 74/74, impresión solo comprobante, guardas en /cobrado y /sencillo |
 | 74 | Imagen del ticket real + compartir por aparato + WhatsApp | `pendiente/74` | Pendiente |
 | 76 | Ventana de cobro en orden norhud con pie fijo | `pendiente/76` | Pendiente |
 | 77a | Folio consecutivo por sucursal (esquema + migración) | `pendiente/77a` | Pendiente — migrate requiere autorización |
@@ -377,13 +377,16 @@ microservicios). El razonamiento está en `readme/analisis/`.
 
 ## 11. Próximos cinco pasos
 
-1. **Ejecutar la 72** (arnés de usabilidad del cobro) en una sesión nueva,
-   con `/clear` antes y después: deja la línea base que miden las demás.
-2. **Ejecutar la 73** (botón "Cobrar" visible y fijo) — el defecto más
-   visible del flujo.
-3. **Ejecutar la 75** (pantalla "Venta cobrada") — arregla el 404 de "Nueva
-   venta", el "sin cambio" falso y las guardas de servidor.
-4. **Ejecutar la 74** (imagen del ticket + WhatsApp por aparato) — el PNG hoy
-   nunca se genera; es la pieza que el usuario pidió para WhatsApp.
-5. **Ejecutar la 76** (ventana de cobro norhud) y después 77a/77b (folio),
-   78 (agenda) y 79 (inicio/sencillo), en ese orden.
+1. **Ejecutar la 74** (imagen del ticket + WhatsApp por aparato) — el PNG hoy
+   nunca se genera; es la pieza que el usuario pidió para WhatsApp. La 75 ya
+   dejó montado `TicketCapturaImagen` en la pantalla "Venta cobrada".
+2. **Ejecutar la 76** (ventana de cobro norhud) — orden visual, pie fijo y
+   textos del glosario en el diálogo de cobro.
+3. **Ejecutar la 77a** (folio consecutivo por sucursal) — requiere
+   autorización aparte para la migración de esquema; después la 77b lo
+   muestra en ticket, comprobante, confirmación y listados.
+4. **Ejecutar la 78** (cobrar desde la agenda termina en "Venta cobrada") y
+   la 79 (inicio de Cobrar sin acciones repetidas; sencillo sin jerga).
+5. **Verificación manual de impresión** en un salón real: la 75 dejó la
+   vista previa mostrando solo el comprobante; falta probarla en la
+   impresora térmica física y en iPhone (compartir imagen).

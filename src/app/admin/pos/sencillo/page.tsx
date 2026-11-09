@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { getAdminContext } from "@/lib/admin-context";
+import { canAccessBranch, requireAccessPermission } from "@/lib/auth/authorization";
 import { crearVentaSencilla } from "./actions";
 import { getTicketData } from "@/modules/pos/ticket";
 import { cargarConfiguracionPos } from "@/modules/pos/queries";
@@ -25,6 +26,7 @@ export default async function PosSencilloPage({
 
   const context = await getAdminContext({ organizationId });
   if (!context.organization) notFound();
+  requireAccessPermission(context.access, "ventas.ver");
 
   // Si no hay venta, mostrar botón para crear una (redirige con ventaId).
   if (!ventaId) {
@@ -66,6 +68,7 @@ export default async function PosSencilloPage({
 
   const ticket = await getTicketData(organizationId, ventaId);
   if (!ticket || ticket.venta.sucursalId !== sucursalId) notFound();
+  if (!canAccessBranch(context.access, ticket.venta.sucursalId)) notFound();
 
   const configuracion = await cargarConfiguracionPos(organizationId);
 

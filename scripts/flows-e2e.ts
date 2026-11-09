@@ -985,7 +985,7 @@ async function main() {
     // Check-in y cobro por data-action-id: los textos cambian con el glosario
     // y "Cobrar" también aparece en la tab bar (clickByText tomaría el primero).
     const clickAccionCita = async (actionId: string) => {
-      for (let intento = 0; intento < 4; intento++) {
+      for (let intento = 0; intento < 6; intento++) {
         const ok = await page.evaluate((id) => {
           const b = document.querySelector<HTMLButtonElement>(`[data-action-id="${id}"]`);
           if (!b || b.disabled) return false;
@@ -993,9 +993,23 @@ async function main() {
           return true;
         }, actionId);
         if (ok) return;
-        await sleep(600);
+        await sleep(1200);
+        // Recarga entre intentos: el estado de la cita viaja por server action
+        // y el render optimista puede dejar el botón un instante desactualizado.
+        if (intento % 2 === 1) {
+          await page.reload({ waitUntil: "networkidle0" }).catch(() => {});
+        }
       }
-      throw new Error(`Acción de cita no disponible: ${actionId}`);
+      const disponibles = await page.evaluate(() => [
+        ...new Set(
+          [...document.querySelectorAll("[data-action-id]")].map((e) =>
+            e.getAttribute("data-action-id"),
+          ),
+        ),
+      ]);
+      throw new Error(
+        `Acción de cita no disponible: ${actionId} (presentes: ${disponibles.join(", ")})`,
+      );
     };
     await clickAccionCita("mi_dia.cita.check_in");
     await waitPendingClear().catch(() => {});
@@ -1028,6 +1042,30 @@ async function main() {
       .catch(() => false);
     record("Cobro desde ticket lleva a la confirmación post-cobro", retornoExacto);
     await shot(page, "16b-mi-dia-retorno");
+
+    // La confirmación muestra "Venta cobrada" y su "Nueva venta" abre un
+    // ticket nuevo (regresión: el enlace viejo apuntaba a /pos → 404).
+    const ventaCobradaVista = await waitForTextReload(page, "Venta cobrada")
+      .then(() => true)
+      .catch(() => false);
+    record("Confirmación post-cobro muestra 'Venta cobrada'", ventaCobradaVista);
+    const ventaCobradaId =
+      new URL(page.url()).pathname.split("/").filter(Boolean).pop() ?? "";
+    await clickByText(page, "a", "Nueva venta");
+    const nuevaVentaOk = await page
+      .waitForFunction(
+        (prevId) => {
+          if (location.pathname !== "/admin/pos") return false;
+          const vid = new URLSearchParams(location.search).get("ventaId");
+          return Boolean(vid) && vid !== prevId;
+        },
+        { timeout: 25000 },
+        ventaCobradaId,
+      )
+      .then(() => true)
+      .catch(() => false);
+    record("'Nueva venta' abre un ticket nuevo", nuevaVentaOk);
+    await shot(page, "16c-nueva-venta");
 
     // ── Catálogos: alta en cada módulo ────────────────────────────────────
     const runId = Date.now().toString(36).toUpperCase();
