@@ -840,7 +840,7 @@ async function main() {
     // Medio: elegir EFECTIVO explícitamente (no depende del orden del catálogo
     // ni de referencias obligatorias de otros medios).
     const efectivoOk = await page.evaluate(() => {
-      const grupo = document.querySelector('[role="group"][aria-label="Medio del pago 1"]');
+      const grupo = document.querySelector('[role="group"][aria-label="Forma de pago 1"]');
       const chip = Array.from(grupo?.querySelectorAll("button") ?? []).find((b) =>
         b.textContent?.toUpperCase().includes("EFECTIVO"),
       );
@@ -851,7 +851,7 @@ async function main() {
     if (!efectivoOk) throw new Error("Chip de medio EFECTIVO no encontrado");
     await sleep(300);
     const montoSincronizado = await page.waitForFunction(
-      () => document.querySelector<HTMLInputElement>('input[aria-label="Monto del pago 1"]')?.value === "330.00",
+      () => document.querySelector<HTMLInputElement>('input#cobro-monto-0')?.value === "330.00",
       { timeout: 8000 },
     ).then(() => true).catch(() => false);
     record("Monto del pago se sincroniza con total + propina", montoSincronizado);
@@ -1479,7 +1479,7 @@ async function main() {
 
     await abrirVentanaCobro();
     await page.evaluate(() => {
-      const grupo = document.querySelector('[role="group"][aria-label="Medio del pago 1"]');
+      const grupo = document.querySelector('[role="group"][aria-label="Forma de pago 1"]');
       const chip = Array.from(grupo?.querySelectorAll("button") ?? []).find((b) =>
         b.textContent?.toUpperCase().includes("EFECTIVO"),
       );
@@ -1505,7 +1505,7 @@ async function main() {
     await agregarAlTicket("Paquetes", paqueteNombre);
     await abrirVentanaCobro();
     await page.evaluate(() => {
-      const grupo = document.querySelector('[role="group"][aria-label="Medio del pago 1"]');
+      const grupo = document.querySelector('[role="group"][aria-label="Forma de pago 1"]');
       const chip = Array.from(grupo?.querySelectorAll("button") ?? []).find((b) =>
         b.textContent?.toUpperCase().includes("EFECTIVO"),
       );
@@ -1569,7 +1569,7 @@ async function main() {
     await agregarAlTicket("Membresías", membresiaNombre);
     await abrirVentanaCobro();
     await page.evaluate(() => {
-      const grupo = document.querySelector('[role="group"][aria-label="Medio del pago 1"]');
+      const grupo = document.querySelector('[role="group"][aria-label="Forma de pago 1"]');
       const chip = Array.from(grupo?.querySelectorAll("button") ?? []).find((b) =>
         b.textContent?.toUpperCase().includes("EFECTIVO"),
       );
@@ -1649,7 +1649,7 @@ async function main() {
     await shot(page, "17e-membresia");
     await abrirVentanaCobro();
     await page.evaluate(() => {
-      const grupo = document.querySelector('[role="group"][aria-label="Medio del pago 1"]');
+      const grupo = document.querySelector('[role="group"][aria-label="Forma de pago 1"]');
       const chip = Array.from(grupo?.querySelectorAll("button") ?? []).find((b) =>
         b.textContent?.toUpperCase().includes("EFECTIVO"),
       );

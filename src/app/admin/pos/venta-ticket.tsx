@@ -3,7 +3,7 @@
 import { ChevronDown, Minus, PackageCheck, Plus, ReceiptText, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useEffect, useRef, useState, useTransition } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState, useTransition } from "react";
 
 import {
   aplicarDescuento,
@@ -577,6 +577,12 @@ export function VentaTicket({
   );
   const [, startQuickTransition] = useTransition();
   const [cobroAbierto, setCobroAbierto] = useState(false);
+  // Mientras el cobro está en curso no se permite cerrar la ventana (Esc,
+  // clic fuera ni el botón X): el resultado se perdería sin aviso.
+  const cobroPendingRef = useRef(false);
+  const reportarPendienteCobro = useCallback((pendiente: boolean) => {
+    cobroPendingRef.current = pendiente;
+  }, []);
   const propinaNum = Number(venta.propina) || 0;
   const tieneLineas =
     lineasServicios.length > 0 ||
@@ -890,12 +896,28 @@ export function VentaTicket({
                 </span>
               </Button>
 
-              <Dialog open={cobroAbierto} onOpenChange={setCobroAbierto}>
-                <DialogContent className="p-0 sm:p-6 max-w-md md:max-w-lg">
-                  <DialogHeader>
+              <Dialog
+                onOpenChange={(open, details) => {
+                  if (!open && cobroPendingRef.current) {
+                    details.cancel();
+                    return;
+                  }
+                  setCobroAbierto(open);
+                }}
+                open={cobroAbierto}
+              >
+                {/* Teléfono: pantalla completa. md+: ventana centrada ancha con
+                    el teclado numérico a la derecha del flujo (en CobroForm). */}
+                <DialogContent className="max-md:left-0 max-md:top-0 max-md:h-dvh max-md:max-h-none max-md:w-screen max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none max-md:border-0 md:w-[min(94vw,52rem)]">
+                  <DialogHeader className="max-md:pt-[env(safe-area-inset-top)]">
                     <DialogTitle>Cobrar</DialogTitle>
-                    <DialogDescription className="text-op-sm">
-                      {formatCurrency(venta.total, { currency })}
+                    <DialogDescription className="flex items-baseline justify-between gap-3">
+                      <span className="text-op-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Total de la venta
+                      </span>
+                      <span className="text-2xl font-extrabold tabular-nums text-primary">
+                        {formatCurrency(venta.total, { currency })}
+                      </span>
                     </DialogDescription>
                   </DialogHeader>
                   <CobroForm
@@ -903,6 +925,7 @@ export function VentaTicket({
                     mediosPago={mediosPago}
                     modo={modo === "inline" ? "inline" : undefined}
                     onCobrada={onCobrada}
+                    onPendingChange={reportarPendienteCobro}
                     organizationId={organizationId}
                     returnTo={returnTo}
                     total={Number(venta.total)}

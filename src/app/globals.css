@@ -65,16 +65,6 @@
   --color-brand-icon-fg: var(--brand-icon-fg);
   --color-brand-fg-on-dark: var(--brand-fg-on-dark);
 
-  /* Paleta fresca del punto de venta: fondo claro, superficie suave,
-     primario ámbar (tono de marca del cobro) y acento verde para
-     confirmaciones. Se aplica solo a componentes del POS. */
-  --color-pos-fondo: var(--background);
-  --color-pos-superficie: var(--card);
-  --color-pos-primario: var(--warning);
-  --color-pos-primario-foreground: var(--warning-foreground);
-  --color-pos-primario-soft: var(--warning-soft);
-  --color-pos-acento: var(--success);
-  --color-pos-acento-soft: var(--success-soft);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);

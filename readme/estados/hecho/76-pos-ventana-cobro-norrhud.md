@@ -131,11 +131,50 @@ pnpm test:flows && pnpm test:smoke && pnpm test:perf
 
 ```
 Misión: 76 — ventana de cobro norhud
-Cambios: <archivo → qué hace>
-Verificación: typecheck ✔ | lint ✔ | test N ✔ | usability 0 errores | flows ✔ | perf ✔
-Antes → después: <formulario largo con duplicados → ventana compacta con pie fijo>
-Desviaciones: <ninguna | lista>
-Riesgo abierto: <ninguno | qué falta>
+Cambios:
+- src/app/admin/pos/cobro-form.tsx — reescrito el JSX al orden norhud:
+  sin tarjeta propia ni "Cobrar"/total duplicado (solo desglose
+  "total − anticipo + propina = a cobrar" cuando difiere); propina →
+  formas de pago → "Recibido" con etiqueta visible e input grande +
+  "Lo que falta"/"Borrar" → "Exacto" primero y luego billetes →
+  referencia con etiqueta visible → cambio/"Lo que falta" con
+  aria-live="polite" → pie fijo. Numpad invertido: oculto en teléfono
+  (teclado del sistema) y fijo a la derecha en md+ (columna propia,
+  data-action-id="pos.cobro.teclado", etiqueta "Teclado"). Esc propio
+  eliminado: el Dialog (Base UI) es el único que cierra y el padre veta
+  mientras pending (onPendingChange → ref → details.cancel() en
+  onOpenChange). "(Esc)" solo con puntero fino (any-pointer-fine).
+- src/app/admin/pos/venta-ticket.tsx — DialogContent: pantalla completa
+  en <md (100dvh, sin radio, safe-area) y ventana ancha centrada en md+
+  (52rem); encabezado único "Cobrar" + total grande; onOpenChange con
+  veto de cierre durante el cobro.
+- src/app/globals.css — retirados --color-pos-* (0 usos confirmados
+  con grep de clases utilitarias).
+- scripts/flows-e2e.ts — selectores actualizados a los aria-label
+  nuevos ("Forma de pago 1", #cobro-monto-0).
+Verificación: typecheck ✔ | lint ✔ | test 641 ✔ | usability --only=pos:
+  pos.cobro.dialogo OK en ambos viewports (0 avisos; antes "bajo el
+  pliegue" en 900px y 844px) | smoke ✔ | perf /admin/pos sin regresión
+  (TTFB p50 243/425ms, CLS 0) | navegador real: botón visible sin scroll
+  en 390×844 y 1366×900, teclado solo en desktop, Esc vetado durante
+  pending ✔ | flows <pendiente>
+Antes → después: página larguísima con encabezado duplicado, numpad en
+  móvil y botón bajo el pliegue → ventana compacta de una columna en
+  teléfono, dos columnas con teclado fijo en escritorio, pie siempre
+  visible.
+Desviaciones:
+- El aria-label del grupo de medios pasó de "Medio del pago N" a
+  "Forma de pago N" (vocabulario del flujo norhud); el input de monto
+  perdió aria-label porque ahora tiene <label> visible "Recibido"
+  (con "· pago N" cuando hay varios) — el nombre accesible coincide con
+  el texto visible (label-in-name).
+- "Agregar otro pago" → "Pagar con otra forma"; "Resto" → "Lo que falta";
+  el aviso "Falta por cubrir" → "Lo que falta" (consistencia).
+- data-action-id pos.cobro.billete_borrar → pos.cobro.monto_borrar
+  (limpia el monto, ya no vive en la fila de billetes).
+Riesgo abierto: iOS < 15.4 sin dvh usa fallback vh — el diálogo queda
+  ligeramente más alto que el viewport visible (el pie sigue fijo por
+  flex, solo se traslapa el borde inferior de la ventana del navegador).
 ```
 
 ## Desviaciones (las escribe el implementador)
