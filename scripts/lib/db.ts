@@ -8,7 +8,21 @@ import { Client } from "pg";
  */
 export async function withDb<T>(fn: (client: Client) => Promise<T>): Promise<T> {
   const client = new Client({ connectionString: process.env.DATABASE_URL });
-  await client.connect();
+  // La base es remota: el handshake TLS a veces excede el timeout en frío.
+  // Un solo reintento en connect (nunca en la query: reintentar una consulta
+  // podría duplicar una escritura).
+  try {
+    await client.connect();
+  } catch {
+    await client.end().catch(() => {});
+    const retry = new Client({ connectionString: process.env.DATABASE_URL });
+    await retry.connect();
+    try {
+      return await fn(retry);
+    } finally {
+      await retry.end();
+    }
+  }
   try {
     return await fn(client);
   } finally {

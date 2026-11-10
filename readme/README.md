@@ -344,9 +344,9 @@ readme/
     d1-vs-cockroach.md       ← por qué no migrar la base
     expo-vs-pwa.md           ← por qué no hay app nativa todavía
   estados/
-    pendiente/               ← (vacío) sin misiones pendientes
+    pendiente/               ← 82 (embudo de activación); 80–81 por definir
     en-progreso/             ← (vacío) sin misión en curso
-    hecho/                   ← 01–79 terminadas y verificadas
+    hecho/                   ← misiones terminadas y verificadas (última: 83)
 ```
 
 **Flujo de estados:** una misión entra por `pendiente/`; al asignarla se mueve a

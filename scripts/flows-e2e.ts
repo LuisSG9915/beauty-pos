@@ -5,6 +5,7 @@ import puppeteer, { type Page } from "puppeteer";
 import { withDb } from "./lib/db";
 import { clickByText, sleep } from "./lib/dom";
 import { BASE_URL, E2E_EMAIL, login } from "./lib/e2e";
+import { writeArtifact } from "./lib/report";
 
 const OUT_DIR = ".smoke-shots/flows";
 const TIME_ZONE = "America/Mexico_City";
@@ -18,12 +19,44 @@ const E2E_ORG_NOMBRE = "Estética Prueba E2E";
 const E2E_MARK = "E2E-SMOKE";
 const E2E_NOTAS = `%${E2E_MARK}%`;
 
-const results: Array<{ step: string; ok: boolean; detail?: string }> = [];
+type ClaseFallo = "timeout" | "failed-query" | "afirmacion" | "omitida";
+
+const results: Array<{ step: string; ok: boolean; detail?: string; ms?: number; clase?: ClaseFallo }> = [];
 const consoleErrors: string[] = [];
 
-function record(step: string, ok: boolean, detail?: string) {
-  results.push({ step, ok, detail });
+let marcaPrevio = performance.now();
+function record(step: string, ok: boolean, detail?: string, clase?: ClaseFallo) {
+  const ms = Math.round(performance.now() - marcaPrevio);
+  marcaPrevio = performance.now();
+  results.push({ step, ok, detail, ms, clase });
   console.log(`${ok ? "PASS" : "FAIL"}  ${step}${detail ? ` — ${detail}` : ""}`);
+}
+
+/** Sección que no corre porque una dependencia suya falló (no es un error nuevo). */
+class Omision extends Error {}
+
+/**
+ * Clasifica por qué murió una sección: "Failed query" del servidor →
+ * failed-query; esperas waitFor* → timeout (pero si la página muestra el
+ * error de servidor, el timeout era síntoma → failed-query); resto →
+ * afirmacion. Se usa para diagnosticar la causa dominante con datos.
+ */
+async function clasificarFallo(page: Page, error: unknown): Promise<{ clase: ClaseFallo; detalle: string }> {
+  const msg = error instanceof Error ? error.message : String(error);
+  if (/failed query/i.test(msg)) return { clase: "failed-query", detalle: msg };
+  const esTimeout =
+    (error instanceof Error && error.name === "TimeoutError") ||
+    /timeout|timed out/i.test(msg);
+  if (esTimeout) {
+    const texto = await page
+      .evaluate(() => document.body?.innerText ?? "")
+      .catch(() => "");
+    if (/failed query|ocurrió un error|error inesperado|something went wrong/i.test(texto)) {
+      return { clase: "failed-query", detalle: `${msg} (la página muestra error de servidor)` };
+    }
+    return { clase: "timeout", detalle: msg };
+  }
+  return { clase: "afirmacion", detalle: msg };
 }
 
 function todayKey(timeZone: string) {
@@ -493,10 +526,41 @@ async function main() {
     const slots = await findFreeSlots(ctx, fecha, 4);
     console.log(`Horarios E2E (${ctx.timeZone}): ${slots.join(", ")}`);
 
+    // Aislamiento por sección: cada bloque try/catch registra su fallo y la
+    // suite sigue. `fallidas` alimenta `requiere` para marcar "omitida" las
+    // secciones cuya dependencia ya falló (y propaga la omisión en cascada).
+    const fallidas = new Set<string>();
+    // Datos que produce una sección y consume otra: se asignan dentro de su
+    // try; quedan "" si la sección no llegó a crearlos.
+    let paqueteNombre = "";
+    let membresiaNombre = "";
+    let clienteNombre = "";
+    let servicioNombre = "";
+    let runId = "";
+    let ventaWalkinUrl = "";
+    const requiere = (...deps: string[]) => {
+      const mala = deps.find((d) => fallidas.has(d));
+      if (mala) throw new Omision(mala);
+    };
+    const fallarSeccion = async (nombre: string, error: unknown) => {
+      if (error instanceof Omision) {
+        fallidas.add(nombre);
+        record(`Sección ${nombre} omitida`, false, `omitida — depende de '${error.message}'`, "omitida");
+        return;
+      }
+      fallidas.add(nombre);
+      const { clase, detalle } = await clasificarFallo(page, error);
+      record(`Sección ${nombre} interrumpida`, false, `${clase}: ${detalle.slice(0, 160)}`, clase);
+    };
+
     // ── Sesión (cookie directa: el sign-in remoto puede leer el hash viejo
     // desde la caché de Hyperdrive tras un reset de contraseña) ────────────
+    try {
     await login(page, E2E_EMAIL);
     record("Sesión E2E en /admin", page.url().includes("/admin"));
+    } catch (error) {
+      await fallarSeccion("sesion", error);
+    }
 
     // ── Agenda: crear cita ────────────────────────────────────────────────
     const crearCita = async (hhmm: string, notas: string) => {
@@ -518,11 +582,16 @@ async function main() {
       await page.reload({ waitUntil: "networkidle0" });
     };
 
+    try {
+    requiere("sesion");
     await page.goto(`${BASE_URL}/admin/agenda`, { waitUntil: "networkidle0" });
     await crearCita(slots[0], E2E_MARK);
     await waitForTextReload(page, "Cliente de paso");
     await shot(page, "02-cita-creada");
     record(`Crear cita walk-in a las ${slots[0]}`, true);
+    } catch (error) {
+      await fallarSeccion("agenda-crear", error);
+    }
 
     // ── Agenda: mover cita sin drag ───────────────────────────────────────
     const abrirDetalle = async (needle: string) => {
@@ -575,6 +644,8 @@ async function main() {
         { timeout: 30000 },
       );
 
+    try {
+    requiere("sesion", "agenda-crear");
     await abrirDetalle(citaNeedle(slots[0]));
     await clickPanelDialog("Mover", '[role="dialog"] input[type="time"]');
     await setNativeInput(page, '[role="dialog"] input[type="time"]', slots[1]);
@@ -592,6 +663,9 @@ async function main() {
     await clickPanel("Confirmar");
     await waitPendingClear().catch(() => {});
     record("Transición pendiente → confirmada", await pollReload(page, () => cardAria("confirmada")));
+    } catch (error) {
+      await fallarSeccion("agenda-mover", error);
+    }
     /** page.select con reintento: el select controlado se resetea si React aún no hidrata. */
     const selectOption = async (selector: string, value: string) => {
       for (let i = 0; i < 30; i++) {
@@ -731,6 +805,8 @@ async function main() {
       await page.waitForSelector('[role="dialog"] label', { visible: true, timeout: 15000 });
     };
 
+    try {
+    requiere("sesion", "agenda-mover");
     await abrirDetalle(citaNeedle(slots[1]));
     await shot(page, "04-detalle-cita");
     await abrirCobro();
@@ -840,15 +916,20 @@ async function main() {
     await page.goto(`${BASE_URL}/admin/agenda`, { waitUntil: "networkidle0" });
     record("Cita marcada completada tras el cobro", await cardAria("cobrada"));
     await shot(page, "09-cita-completada");
+    } catch (error) {
+      await fallarSeccion("pos-cobro-cita", error);
+    }
 
     // ── POS walk-in completo ──────────────────────────────────────────────
+    try {
+    requiere("sesion");
     await page.goto(`${BASE_URL}/admin/pos`, { waitUntil: "networkidle0" });
     await Promise.all([
       page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
       clickByText(page, 'button[type="submit"]', "Abrir venta"),
     ]);
     record("Abrir venta walk-in crea ticket", page.url().includes("ventaId"));
-    const ventaWalkinUrl = page.url();
+    ventaWalkinUrl = page.url();
     await waitForTextReload(page, "Agregar al ticket");
     await agregarAlTicket("Servicios", "CORTE DE DAMA");
     // Propina, medios y el submit viven en la ventana de cobro (diálogo).
@@ -915,8 +996,13 @@ async function main() {
     await waitForText(page, "$250.00");
     record("Descuento de $50 reduce el total a $250", true);
     await shot(page, "11-descuento");
+    } catch (error) {
+      await fallarSeccion("pos-walkin", error);
+    }
 
     // ── Agenda: editar cita ───────────────────────────────────────────────
+    try {
+    requiere("sesion", "agenda-crear");
     await page.goto(`${BASE_URL}/admin/agenda`, { waitUntil: "networkidle0" });
     await crearCita(slots[2], `${E2E_MARK} segunda`);
     await waitForTextReload(page, "Cliente de paso");
@@ -976,8 +1062,13 @@ async function main() {
       .catch(() => false);
     record("Vista lista: botón Ver abre detalle", detalleLista);
     await shot(page, "14-lista-detalle");
+    } catch (error) {
+      await fallarSeccion("agenda-edicion", error);
+    }
 
     // ── Mi día (vista estilista) ──────────────────────────────────────────
+    try {
+    requiere("sesion", "agenda-edicion");
     // La cita reagendada (pendiente 19:30) se asigna al admin para probar el
     // flujo personal: check-in → cobro → ticket POS con returnTo.
     await asignarCitaAlAdmin(ctx);
@@ -1152,9 +1243,14 @@ async function main() {
       }
     }
     await shot(page, "16d-ticket-compartir");
+    } catch (error) {
+      await fallarSeccion("mi-dia", error);
+    }
 
     // ── Catálogos: alta en cada módulo ────────────────────────────────────
-    const runId = Date.now().toString(36).toUpperCase();
+    try {
+    requiere("sesion");
+    runId = Date.now().toString(36).toUpperCase();
     const fill = (name: string, value: string) =>
       setNativeInput(page, `form [name="${name}"]`, value);
 
@@ -1194,7 +1290,7 @@ async function main() {
     await shot(page, "16-catalogos");
 
     // ── Paquetes: alta en catálogo (combobox de servicio aparte) ─────────
-    const paqueteNombre = `E2E Paquete ${runId}`;
+    paqueteNombre = `E2E Paquete ${runId}`;
     await page.goto(`${BASE_URL}/admin/paquetes?nuevo=1`, { waitUntil: "networkidle0" });
     await page.waitForSelector('form [name="nombre"]', { visible: true, timeout: 15000 });
     await fill("nombre", paqueteNombre);
@@ -1213,7 +1309,7 @@ async function main() {
 
     // ── Membresías: alta en catálogo (una vigente y otra para la prueba de
     // vigencia: se le inserta un saldo vencido directo en base) ─────────
-    const membresiaNombre = `E2E Membresía ${runId}`;
+    membresiaNombre = `E2E Membresía ${runId}`;
     const membresiaVencidaNombre = `E2E Membresía Vencida ${runId}`;
     for (const nombre of [membresiaNombre, membresiaVencidaNombre]) {
       await page.goto(`${BASE_URL}/admin/membresias?nuevo=1`, { waitUntil: "networkidle0" });
@@ -1234,7 +1330,7 @@ async function main() {
     record("Catálogo membresías: alta visible", membresiaCreada);
 
     // ── Servicios: editar y ocultar ───────────────────────────────────────
-    const servicioNombre = `E2E Servicio ${runId}`;
+    servicioNombre = `E2E Servicio ${runId}`;
     await page.goto(`${BASE_URL}/admin/servicios?q=${encodeURIComponent(servicioNombre)}`, { waitUntil: "networkidle0" });
     await clickByText(page, "a", "Editar");
     await page.waitForFunction(
@@ -1271,7 +1367,7 @@ async function main() {
     record("Servicios: ocultar cambia el estado", ocultado && estaOculto);
 
     // ── Clientes: alta, búsqueda y edición ────────────────────────────────
-    const clienteNombre = `E2ECLI${runId}`;
+    clienteNombre = `E2ECLI${runId}`;
     // Teléfono único por corrida: evita el warning de duplicado del backend.
     const clienteTelefono = `55${String(Date.now()).slice(-8)}`;
     await page.goto(`${BASE_URL}/admin/clientes`, { waitUntil: "networkidle0" });
@@ -1425,8 +1521,13 @@ async function main() {
     record("Clientes: consentimiento informado firmado", consentOk);
 
     await shot(page, "17-clientes");
+    } catch (error) {
+      await fallarSeccion("catalogos-clientes", error);
+    }
 
     // ── Caja: apertura, venta al corte y cierre ciego ─────────────────
+    try {
+    requiere("sesion", "agenda-crear");
     await page.goto(`${BASE_URL}/admin/caja`, { waitUntil: "networkidle0" });
     await setNativeInput(page, 'input[name="fondoInicial"]', "100");
     await setNativeInput(page, 'textarea[name="notas"]', E2E_MARK);
@@ -1508,8 +1609,13 @@ async function main() {
     await sleep(300);
     await clickCobrar();
     await esperarResultadoCobro(false);
+    } catch (error) {
+      await fallarSeccion("caja-anticipos", error);
+    }
 
     // ── Paquete prepagado: compra ($800) a nombre del cliente E2E ────────
+    try {
+    requiere("sesion", "catalogos-clientes");
     await page.goto(`${BASE_URL}/admin/pos`, { waitUntil: "networkidle0" });
     await Promise.all([
       page.waitForNavigation({ waitUntil: "networkidle0", timeout: 20000 }),
@@ -1682,10 +1788,15 @@ async function main() {
       () => location.pathname.startsWith("/admin/pos/cobrado/"),
     );
     record("POS: venta cobrada con descuento de membresía ($270)", ventaConMembresiaOk);
+    } catch (error) {
+      await fallarSeccion("ventas-catalogo", error);
+    }
 
     // Cierre ciego: efectivo contado = fondo $100 + anticipo $100 + venta con
     // anticipo $200 + venta walk-in con promoción $270 + paquete $800 +
     // membresía $500 + venta con membresía $270 = $2240.
+    try {
+    requiere("sesion", "caja-anticipos", "ventas-catalogo");
     await page.goto(`${BASE_URL}/admin/caja`, { waitUntil: "networkidle0" });
     await page.evaluate(() => {
       const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
@@ -1705,8 +1816,13 @@ async function main() {
       .catch(() => false);
     record("Caja: cierre ciego cuadra (fondo + venta en efectivo)", cierreOk);
     await shot(page, "18-caja");
+    } catch (error) {
+      await fallarSeccion("caja-cierre", error);
+    }
 
     // ── Reportes: operativos y financieros del día ────────────────────
+    try {
+    requiere("sesion");
     // El rango por defecto (últimos 30 días) incluye todas las ventas del run.
     await page.goto(`${BASE_URL}/admin/reportes`, { waitUntil: "networkidle0" });
     // Los KPI usan text-transform:uppercase → innerText llega en mayúsculas;
@@ -1844,13 +1960,38 @@ async function main() {
       ventaOfflineRows.length === 1 && ventaOfflineRows[0].estado === "completada" && Number(ventaOfflineRows[0].total) === 25,
     );
     await shot(page, "21-offline-venta");
+    } catch (error) {
+      await fallarSeccion("reportes-pwa-offline", error);
+    }
   } catch (error) {
-    record("Flujo interrumpido", false, error instanceof Error ? error.message : String(error));
+    record("Flujo interrumpido", false, error instanceof Error ? error.message : String(error), "afirmacion");
     await shot(page, "99-error");
   }
 
-  const fallidos = results.filter((r) => !r.ok);
-  console.log(`\n=== Resumen: ${results.length - fallidos.length}/${results.length} pasos OK ===`);
+  const fallidos = results.filter((r) => !r.ok && r.clase !== "omitida");
+  const omitidas = results.filter((r) => r.clase === "omitida");
+  console.log(`\n=== Resumen: ${results.length - fallidos.length - omitidas.length}/${results.length} pasos OK ===`);
+  if (omitidas.length > 0) {
+    console.log(`Secciones omitidas por dependencia: ${omitidas.map((r) => r.step.replace("Sección ", "").replace(" omitida", "")).join(", ")}`);
+  }
+  const porClase = new Map<ClaseFallo, number>();
+  for (const r of results.filter((x) => !x.ok && x.clase !== "omitida")) {
+    const c = r.clase ?? "afirmacion";
+    porClase.set(c, (porClase.get(c) ?? 0) + 1);
+  }
+  if (porClase.size > 0) {
+    console.log(`Fallos por clase: ${Array.from(porClase.entries()).map(([c, n]) => `${c}=${n}`).join(", ")}`);
+  }
+  writeArtifact("flows-e2e", {
+    inicio: new Date().toISOString(),
+    total: results.length,
+    ok: results.length - fallidos.length - omitidas.length,
+    fallidos: fallidos.length,
+    omitidas: omitidas.length,
+    porClase: Object.fromEntries(porClase),
+    results,
+    consoleErrors,
+  });
   if (consoleErrors.length > 0) {
     console.log("\n--- Errores de consola ---");
     for (const err of Array.from(new Set(consoleErrors)).slice(0, 10)) console.log(`  ${err.slice(0, 300)}`);
