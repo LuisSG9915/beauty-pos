@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { ActionFeedback } from "@/components/ui/toast";
 import { initialActionState } from "@/lib/action-state";
 import { formatCurrency } from "@/lib/format";
+import { useClienteUuid } from "@/lib/use-cliente-uuid";
 import { cn } from "@/lib/utils";
 
 type MedioPago = { id: string; nombre: string; categoria: string };
@@ -88,7 +89,7 @@ export function CobroForm({
   const acumuloBilletesPorPago = useRef<Record<number, boolean>>({});
   // Una clave por instancia del formulario: si el request se repite (doble
   // click, retry de red) el servidor devuelve el cobro original sin duplicar.
-  const [idempotencia] = useState(() => crypto.randomUUID());
+  const [idempotencia] = useClienteUuid();
 
   const medioPorId = useMemo(() => new Map(mediosPago.map((m) => [m.id, m])), [mediosPago]);
 

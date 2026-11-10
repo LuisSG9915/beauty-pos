@@ -382,8 +382,13 @@ microservicios). El razonamiento está en `readme/analisis/`.
    impresora térmica física y en iPhone (compartir imagen).
 2. **Evaluar la 80** (imagen del ticket en servidor con Browser Run + R2)
    solo si la generación en iPhone falla en la prueba manual.
-3. **Revisar el aviso de hidratación** en `/admin/clientes/[id]`
-   (preexistente, aparece en consola durante los flujos).
+3. ~~Revisar el aviso de hidratación~~ **Resuelto**: `crypto.randomUUID()` en
+   `useState` inicial llegaba al HTML con valores distintos en server y
+   cliente. Nuevo hook `useClienteUuid` (`useSyncExternalStore`, snapshot de
+   servidor `""`) aplicado a ficha técnica, venta directa, cobro sencillo,
+   cobro y anticipo de agenda; el insumo inicial del recetario usa id
+   determinista. Verificado: 0 errores de consola en `/admin/clientes/[id]`,
+   `/admin/pos` y `/admin/pos/sencillo`.
 4. **Atender la inestabilidad de `test:flows`**: en las últimas corridas la
    suite murió en pasos distintos por timeouts y "Failed query" contra la
    base remota; conviene revisar si es saturación del dev server o de

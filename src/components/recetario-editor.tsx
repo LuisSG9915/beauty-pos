@@ -61,7 +61,10 @@ export function RecetarioEditor({
   const toast = useToast();
   const [insumos, setInsumos] = useState<FichaInsumo[]>([
     {
-      id: crypto.randomUUID(),
+      // Id determinista: un UUID aquí rompería la hidratación (server y cliente
+      // generarían valores distintos para `list`/`datalist`). Solo se usa como
+      // key de React y dentro del JSON de insumos (el schema pide string ≥1).
+      id: "insumo-inicial",
       nombre: "",
       cantidad: 40,
       unidad: "g",

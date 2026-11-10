@@ -8,6 +8,7 @@ import { RecetarioEditor } from "@/components/recetario-editor";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel, Select, Textarea } from "@/components/ui/field";
 import { ActionFeedback, useToast } from "@/components/ui/toast";
+import { useClienteUuid } from "@/lib/use-cliente-uuid";
 import { cn } from "@/lib/utils";
 
 const FICHA_TIPO_LABEL: Record<string, string> = {
@@ -56,19 +57,21 @@ export function FichaForm({
   const formRef = useRef<HTMLFormElement>(null);
   const handled = useRef<FichaActionState | null>(null);
   const [tipo, setTipo] = useState(tipoDefault);
-  // El id de la ficha se genera en cliente para que las fotos suban a R2 con
-  // `entidadId` definitivo antes de que la fila exista; la acción lo reutiliza
-  // como PK y valida que las llaves pertenecen a ese id.
-  const [fichaId, setFichaId] = useState(() => crypto.randomUUID());
+  // El id de la ficha se genera solo en cliente para que las fotos suban a R2
+  // con `entidadId` definitivo antes de que la fila exista; la acción lo
+  // reutiliza como PK y valida que las llaves pertenecen a ese id. El hook
+  // es seguro para hidratar (UUID distinto en server/cliente rompería el
+  // match de atributos) y `regenerar` emite uno nuevo tras cada guardado.
+  const [fichaId, regenerarFichaId] = useClienteUuid();
 
   useEffect(() => {
     if (!state.success || handled.current === state) return;
     handled.current = state;
     toast.success(state.message ?? "Registro guardado.");
     formRef.current?.reset();
-    setFichaId(crypto.randomUUID());
+    regenerarFichaId();
     onSaved?.();
-  }, [onSaved, state, toast]);
+  }, [onSaved, regenerarFichaId, state, toast]);
 
   const esQuimicoOTratamiento = tipo === "color" || tipo === "tratamiento";
 

@@ -31,6 +31,7 @@ import {
 import type { AgendaCita, AgendaRecurso } from "@/app/admin/agenda/agenda-types";
 import { EstadoVistaBadge } from "@/app/admin/agenda/cita-card";
 import { FichaForm } from "@/app/admin/clientes/ficha-form";
+import { useClienteUuid } from "@/lib/use-cliente-uuid";
 import { MediaThumb } from "@/components/media-thumb";
 import { StatusBadge, type StatusTone } from "@/components/status-badge";
 import { ConfirmDialog } from "@/components/ui/alert-dialog";
@@ -189,7 +190,7 @@ function CitaAnticipos({
   const [referencia, setReferencia] = useState("");
   const [devolviendoId, setDevolviendoId] = useState<string | null>(null);
   const [motivoDevolucion, setMotivoDevolucion] = useState("");
-  const [idempotencia, setIdempotencia] = useState(() => crypto.randomUUID());
+  const [idempotencia, regenerarIdempotencia] = useClienteUuid();
 
   const cargar = () => {
     const params = new FormData();
@@ -229,7 +230,7 @@ function CitaAnticipos({
         setFormAbierto(false);
         setMonto("");
         setReferencia("");
-        setIdempotencia(crypto.randomUUID());
+        regenerarIdempotencia();
         cargar();
         onChanged();
       } else {

@@ -1,12 +1,12 @@
 "use client";
 
 import { useFormStatus } from "react-dom";
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Wallet } from "lucide-react";
 import { formatCurrency, formatFolioVenta } from "@/lib/format";
+import { useClienteUuid } from "@/lib/use-cliente-uuid";
 import { cobrarVentaSencilla } from "./actions";
 import { CatalogoSelector } from "@/app/admin/pos/catalogo-selector";
 import type { TicketData } from "@/modules/pos/ticket";
@@ -42,7 +42,7 @@ export function CobroSencillo({
   currency,
 }: CobroSencilloProps) {
   const router = useRouter();
-  const [idempotencia] = useState(() => crypto.randomUUID());
+  const [idempotencia] = useClienteUuid();
 
   const cobroCajaActivo = configuracion["cobro-caja"] ?? true;
   const ventasTiendaActivas = configuracion["ventas-tienda"] ?? true;
