@@ -389,10 +389,15 @@ microservicios). El razonamiento está en `readme/analisis/`.
    cobro y anticipo de agenda; el insumo inicial del recetario usa id
    determinista. Verificado: 0 errores de consola en `/admin/clientes/[id]`,
    `/admin/pos` y `/admin/pos/sencillo`.
-4. **Atender la inestabilidad de `test:flows`**: en las últimas corridas la
-   suite murió en pasos distintos por timeouts y "Failed query" contra la
-   base remota; conviene revisar si es saturación del dev server o de
-   CockroachDB antes de confiar en corridas aisladas.
+4. ~~Atender la inestabilidad de `test:flows`~~ **Resuelto**: las corridas
+   morían por `idleTimeoutMillis: 5000` — el pool destruía sockets TLS a la
+   base remota entre pasos del navegador y al reconectar caía en picos de
+   latencia ("Connection terminated", "Query read timeout"). Pool local
+   ajustado a `idleTimeoutMillis/query_timeout/connectionTimeoutMillis`
+   30 s/30 s/15 s + `keepAlive` TCP + `max: 8`. Estrés HTTP 200/200 sin
+   fallos y `test:flows` cerró **77/77 sin errores de consola** (antes 5
+   corridas fallidas en puntos distintos). Ojo: el pool vive en
+   `globalThis`, así que el cambio exige reiniciar `pnpm dev` para aplicar.
 5. **Decidir el destino de `/admin/pos/sencillo`**: quedó como ruta directa
    sin enlace en el menú (fuera de alcance de la 79); si se quiere exponer,
    hace falta una misión de producto aparte.

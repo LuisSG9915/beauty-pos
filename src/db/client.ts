@@ -110,7 +110,11 @@ export function getDatabase() {
   }
 
   // Entorno local/scripts: pool global por cadena de conexión (los sockets sí
-  // persisten entre requests del mismo proceso).
+  // persisten entre requests del mismo proceso). La base es remota (~100 ms
+  // por consulta): idleTimeoutMillis alto evita destruir y reabrir sockets TLS
+  // entre pasos del E2E o pausas del usuario; keepAlive detecta sockets que el
+  // servidor remoto ya cerró; timeouts amplios dejan terminar ráfagas durante
+  // picos de latencia de CockroachDB en vez de fallar la página completa.
   const isHyperdrive = Boolean(cloudflare?.env?.HYPERDRIVE?.connectionString || process.env.HYPERDRIVE_CONNECTION_STRING);
   const runtimeGlobal = globalThis as DatabaseGlobal;
   const pools = (runtimeGlobal.__beautyPosPools ??= new Map());
@@ -118,10 +122,12 @@ export function getDatabase() {
     pools.get(connectionString) ??
     conManejadorErrores(new Pool({
       connectionString,
-      max: isHyperdrive ? 2 : 5,
-      connectionTimeoutMillis: 5000,
-      query_timeout: 10000,
-      idleTimeoutMillis: 5000,
+      max: isHyperdrive ? 2 : 8,
+      connectionTimeoutMillis: 15000,
+      query_timeout: 30000,
+      idleTimeoutMillis: 30000,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10000,
     }));
   pools.set(connectionString, pool);
 
